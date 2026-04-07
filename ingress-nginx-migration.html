@@ -592,6 +592,10 @@
             <span class="mobile-breadcrumb" id="mobileBreadcrumb">Getting Started</span>
         </div>
         <div class="topbar-right">
+            <a class="topbar-link hide-mobile" href="https://nginx.org" target="_blank" rel="noopener" aria-label="Visit nginx.org">
+                <svg aria-hidden="true" style="width:16px;height:18px;" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></svg>
+                nginx.org
+            </a>
             <a class="topbar-link" href="https://github.com/nginx/kubernetes.nginx.org" target="_blank" rel="noopener" aria-label="Contribute on GitHub">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                 Contribute
@@ -1438,7 +1442,7 @@ spec:
                     <tbody>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><code>nginx.ingress.kubernetes.io/canary</code><br><code>nginx.ingress.kubernetes.io/canary-by-cookie</code><br><code>nginx.ingress.kubernetes.io/canary-by-header</code><br><code>nginx.ingress.kubernetes.io/canary-by-header-pattern</code><br><code>nginx.ingress.kubernetes.io/canary-by-header-value</code><br><code>nginx.ingress.kubernetes.io/canary-weight</code><br><code>nginx.ingress.kubernetes.io/canary-weight-total</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>splits[]</code><br><code>matches[]</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>splits[]</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1964,7 +1968,7 @@ data:
                     <tbody>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>hsts</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-include-subdomains</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-max-age</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-preload</code></td>
-                            <td><code>nginx.org/hsts</code> (includes preload by default)<br><code>nginx.org/hsts-include-subdomains</code><br><code>nginx.org/hsts-max-age</code></td>
+                            <td><code>nginx.org/hsts</code><br><code>nginx.org/hsts-include-subdomains</code><br><code>nginx.org/hsts-max-age</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1983,7 +1987,7 @@ data:
   nginx.org/hsts-include-subdomains: "true"
   nginx.org/hsts-max-age: "31536000"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HSTS annotations are F5 NGINX Ingress Controller-only and provide per-Ingress control. The community controller handles HSTS via ConfigMap only.</div>
+                            <div class="info-box note"><strong>Note:</strong> HSTS annotations are F5 NGINX Ingress Controller-only and provide per-Ingress control. The community controller handles HSTS via ConfigMap only. The F5 NGINX Ingress Controller's <code>nginx.org/hsts</code> annotation includes the <code>preload</code> directive by default — there is no separate equivalent of the community <code>hsts-preload</code> ConfigMap key.</div>
                         </div></td></tr>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td>No direct equivalent</td>
@@ -2065,7 +2069,7 @@ spec:
       lb-method: "least_conn"  # load-balance</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Supported methods differ. The F5 NGINX Ingress Controller supports: <code>round_robin</code>, <code>least_conn</code>, <code>ip_hash</code>, <code>hash</code>, <code>random</code>. The F5 NGINX Ingress Controller's default is <code>random two least_conn</code> (not <code>round_robin</code>), so load balancing behavior may change even without explicit configuration.</div>
+                            <div class="info-box note"><strong>Note:</strong> Supported methods differ. The F5 NGINX Ingress Controller supports: <code>round_robin</code>, <code>least_conn</code>, <code>ip_hash</code>, <code>hash</code>, <code>random</code>, <code>random two</code>, and <code>random two least_conn</code> (NGINX Plus adds <code>least_time</code> variants). The community controller's <code>ewma</code> method is <strong>not supported</strong> — the closest equivalent is <code>least_conn</code>. The F5 NGINX Ingress Controller's default is <code>random two least_conn</code> (not <code>round_robin</code>), so load balancing behavior may change even without explicit configuration.</div>
                         </div></td></tr>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><code>nginx.ingress.kubernetes.io/service-upstream</code></td>
@@ -2213,7 +2217,7 @@ spec:
                     <tbody>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><code>nginx.ingress.kubernetes.io/mirror-target</code><br><code>nginx.ingress.kubernetes.io/mirror-request-body</code><br><code>nginx.ingress.kubernetes.io/mirror-host</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code> / <code>server-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code><br><code>nginx.org/server-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code> / <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>server-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code><br><code>nginx.org/server-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2508,7 +2512,7 @@ data:
                     <tbody>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>upstream-fail-timeout</code><br><span class="badge badge-configmap">ConfigMap</span> <code>upstream-max-fails</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].fail-timeout</code><br><code>upstreams[].max-fails</code><span class="or-text">— or —</span><code>nginx.org/fail-timeout</code><br><code>nginx.org/max-fails</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].fail-timeout</code><br><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].max-fails</code><span class="or-text">— or —</span><code>nginx.org/fail-timeout</code><br><code>nginx.org/max-fails</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2566,7 +2570,7 @@ spec:
                     <tbody>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><code>nginx.ingress.kubernetes.io/proxy-next-upstream</code><br><code>nginx.ingress.kubernetes.io/proxy-next-upstream-timeout</code><br><code>nginx.ingress.kubernetes.io/proxy-next-upstream-tries</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].next-upstream</code><br><code>upstreams[].next-upstream-timeout</code><br><code>upstreams[].next-upstream-tries</code><span class="or-text">— or —</span><code>nginx.org/proxy-next-upstream</code><br><code>nginx.org/proxy-next-upstream-timeout</code><br><code>nginx.org/proxy-next-upstream-tries</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].next-upstream</code><br><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].next-upstream-timeout</code><br><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].next-upstream-tries</code><span class="or-text">— or —</span><code>nginx.org/proxy-next-upstream</code><br><code>nginx.org/proxy-next-upstream-timeout</code><br><code>nginx.org/proxy-next-upstream-tries</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -3055,7 +3059,7 @@ spec:
                     <tbody>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><code>nginx.ingress.kubernetes.io/backend-protocol</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].tls.enable</code><br><code>upstreams[].type</code><span class="or-text">— or —</span><code>nginx.org/ssl-services</code><br><code>nginx.org/grpc-services</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].tls.enable</code><br><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].type</code><span class="or-text">— or —</span><code>nginx.org/ssl-services</code><br><code>nginx.org/grpc-services</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -3168,25 +3172,58 @@ spec:
                         </div></td></tr>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><code>nginx.ingress.kubernetes.io/ssl-redirect</code></td>
-                            <td><code>nginx.org/redirect-to-https</code> or <code>nginx.org/ssl-redirect</code></td>
+                            <td><code>nginx.org/redirect-to-https</code> / <code>nginx.org/ssl-redirect</code> + <code>nginx.org/http-redirect-code: "308"</code><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>tls.redirect.code: 308</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code>annotations:
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" onclick="switchApproach(this, 'annotation')">Annotation Approach</button>
+                                <button class="approach-tab" onclick="switchApproach(this, 'crd')">CRD Approach</button>
+                            </div>
+                            <div class="approach-content active" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code>annotations:
   nginx.ingress.kubernetes.io/ssl-redirect: "true"</code></pre></div>
-                                <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>annotations:
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>annotations:
+  # Match the community controller's 308 default
+  # (preserves request method and body)
+  nginx.org/http-redirect-code: "308"
   # Option 1: For TLS terminated at load balancer
   nginx.org/redirect-to-https: "true"
   # OR Option 2: For unconditional redirect
   nginx.org/ssl-redirect: "true"</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code>annotations:
+  nginx.ingress.kubernetes.io/ssl-redirect: "true"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+spec:
+  host: app.example.com
+  tls:
+    secret: app-tls
+    redirect:
+      enable: true
+      code: 308  # ssl-redirect (matches community 308 default)
+  upstreams:
+    - name: backend
+      service: my-service
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box tip"><strong>Important distinction:</strong>
                                 <ul style="margin: 8px 0 0 20px;">
                                     <li><code>nginx.org/redirect-to-https</code> checks the <code>X-Forwarded-Proto</code> header before redirecting. Use this when TLS terminates at a load balancer in front of NGINX.</li>
-                                    <li><code>nginx.org/ssl-redirect</code> performs an unconditional 301 redirect for all incoming HTTP traffic. Use this when NGINX handles TLS termination directly. Default: <code>true</code>.</li>
+                                    <li><code>nginx.org/ssl-redirect</code> performs an unconditional redirect for all incoming HTTP traffic. Use this when NGINX handles TLS termination directly. Default: <code>true</code>.</li>
                                 </ul>
                             </div>
-                            <div class="info-box note"><strong>New in v5.4.0:</strong> The <code>nginx.org/ssl-redirect</code> annotation is new. Previously, only <code>nginx.org/redirect-to-https</code> was available. Use <code>ssl-redirect</code> as the direct 1:1 mapping from the community annotation.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller's <code>ssl-redirect</code> defaults to a <strong>308 Permanent Redirect</strong>, which preserves the original request method and body. The F5 NGINX Ingress Controller defaults to <strong>301</strong>, which clients may downgrade to <code>GET</code> and drop the request body. To match the community behavior exactly, set <code>nginx.org/http-redirect-code: "308"</code> on the Ingress, or <code>tls.redirect.code: 308</code> on the VirtualServer.</div>
+                            <div class="info-box note"><strong>New in v5.4.0:</strong> The <code>nginx.org/ssl-redirect</code> and <code>nginx.org/http-redirect-code</code> annotations are new. Previously, only <code>nginx.org/redirect-to-https</code> was available, with a fixed 301 response code. Use <code>ssl-redirect</code> as the direct 1:1 mapping from the community annotation.</div>
                         </div></td></tr>
                         <tr class="expandable" onclick="toggleRow(this)"><td>No direct equivalent</td><td><code>nginx.org/http-redirect-code</code> (used with <code>nginx.org/redirect-to-https</code>)</td></tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3491,7 +3528,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable" onclick="toggleRow(this)">
                             <td><code>nginx.ingress.kubernetes.io/affinity-canary-behavior</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[]</code> + <code>upstreams[].sessionCookie</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[]</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].sessionCookie</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5604,7 +5641,7 @@ data:
               nicMapping: { crdKind: "VirtualServer", crdInstall: "kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/v5.4.1/deploy/crds.yaml", templateFn: "generateRequestHeadersVS" } },
             // Load Balancing
             { community: ["load-balance"], nic: "nginx.org/lb-method — or — VirtualServer CRD upstreams[].lb-method", type: "annotation", category: "Load Balancing", anchor: "load-balancing", section: "oss", dualApproach: false, plusRequired: false,
-              nicMapping: { annotations: { "load-balance": { key: "nginx.org/lb-method", transform: "direct" } } } },
+              nicMapping: { annotations: { "load-balance": { key: "nginx.org/lb-method", transform: "lbMethod" } } } },
             { community: ["service-upstream"], nic: "nginx.org/use-cluster-ip — or — VirtualServer CRD upstreams[].use-cluster-ip", type: "annotation", category: "Load Balancing", anchor: "load-balancing", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "service-upstream": { key: "nginx.org/use-cluster-ip", transform: "direct" } } } },
             { community: ["upstream-hash-by", "upstream-hash-by-subset", "upstream-hash-by-subset-size"], nic: "nginx.org/lb-method — or — VirtualServer CRD upstreams[].lb-method", type: "virtualserver", category: "Load Balancing", anchor: "load-balancing", section: "oss", dualApproach: true, plusRequired: false,
@@ -5915,6 +5952,9 @@ data:
             'opentelemetry-trust-incoming-span': 'Trust incoming trace context for OpenTelemetry spans'
         };
 
+        // Translate a community annotation value to its NIC equivalent.
+        // Returns either a string (the translated value) or an object
+        // { value, note } when a non-trivial substitution was applied.
         function translateValue(value, transform, template) {
             if (!value && value !== '0') return value;
             switch (transform) {
@@ -5928,8 +5968,27 @@ data:
                 case 'backendProtocol': return value; // key selection handled in generateMigrationYaml
                 case 'corsSnippet': return value; // handled specially in generateMigrationYaml
                 case 'proxyRedirect': return value; // handled specially in generateMigrationYaml
+                case 'lbMethod': {
+                    // NIC's nginx.org/lb-method does not support every value the
+                    // community controller accepts. Map known unsupported values
+                    // to the closest equivalent and surface a note.
+                    var lbAliases = { 'ewma': 'least_conn', 'round_robin': 'round_robin' };
+                    var trimmed = (value || '').trim();
+                    if (lbAliases[trimmed] && lbAliases[trimmed] !== trimmed) {
+                        return { value: lbAliases[trimmed], note: trimmed + ' is not supported, using ' + lbAliases[trimmed] + ' as the closest equivalent' };
+                    }
+                    return value;
+                }
                 default: return value;
             }
+        }
+
+        // Normalize a translateValue result into { value, note } for callers.
+        function unwrapTranslated(result) {
+            if (result && typeof result === 'object' && 'value' in result) {
+                return { value: result.value, note: result.note || null };
+            }
+            return { value: result, note: null };
         }
 
         function formatYamlKV(indent, key, value) {
@@ -6244,8 +6303,8 @@ data:
                                     }
                                     // HTTP is default (no mapping needed); AUTO_HTTP and FCGI have no direct equivalent
                                 } else if (spec) {
-                                    var translated = translateValue(a.value, spec.transform, spec.template);
-                                    annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, to: spec.key, value: translated, originalValue: a.value, entry: entry });
+                                    var translated = unwrapTranslated(translateValue(a.value, spec.transform, spec.template));
+                                    annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, to: spec.key, value: translated.value, note: translated.note, originalValue: a.value, entry: entry });
                                 }
                             });
                         // Special handling for proxy-redirect
@@ -6257,8 +6316,8 @@ data:
                             entry.foundAnnotations.forEach(function(a) {
                                 var spec = om.annotations[a.annotation];
                                 if (spec) {
-                                    var translated = translateValue(a.value, spec.transform, spec.template);
-                                    annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, to: spec.key, value: translated, originalValue: a.value, entry: entry });
+                                    var translated = unwrapTranslated(translateValue(a.value, spec.transform, spec.template));
+                                    annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, to: spec.key, value: translated.value, note: translated.note, originalValue: a.value, entry: entry });
                                 }
                             });
                         }
@@ -6270,8 +6329,8 @@ data:
                     entry.foundAnnotations.forEach(function(a) {
                         var spec = om.configMap[a.annotation];
                         if (spec) {
-                            var translated = translateValue(a.value, spec.transform, spec.template);
-                            configMapChanges.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, to: spec.key, value: translated, originalValue: a.value, entry: entry });
+                            var translated = unwrapTranslated(translateValue(a.value, spec.transform, spec.template));
+                            configMapChanges.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, to: spec.key, value: translated.value, note: translated.note, originalValue: a.value, entry: entry });
                         }
                     });
                 }
@@ -6311,6 +6370,28 @@ data:
                 if (merged.allFromAnnotations.length > 0) merged.swap.fromAnnotations = merged.allFromAnnotations;
                 mergedSwaps.push(merged.swap);
             });
+
+            // Post-process: when ssl-redirect or force-ssl-redirect is migrated,
+            // also emit nginx.org/http-redirect-code: "308" so the migrated
+            // Ingress preserves the community controller's 308 default
+            // (which preserves the original request method and body — NIC
+            // defaults to 301, which clients may downgrade to GET).
+            var redirectSwap = mergedSwaps.find(function(s) {
+                return s.to === 'nginx.org/ssl-redirect' || s.to === 'nginx.org/redirect-to-https';
+            });
+            var alreadyHasCode = mergedSwaps.some(function(s) { return s.to === 'nginx.org/http-redirect-code'; });
+            if (redirectSwap && !alreadyHasCode) {
+                mergedSwaps.push({
+                    from: 'ssl-redirect (community 308 default)',
+                    fromAnnotations: [],
+                    to: 'nginx.org/http-redirect-code',
+                    value: '308',
+                    originalValue: '308',
+                    note: 'matches community 308 default; preserves request method and body',
+                    entry: redirectSwap.entry,
+                    isSynthetic: true
+                });
+            }
 
             return { annotationSwaps: mergedSwaps, configMapChanges: configMapChanges, crdResources: crdResources, unsupportedEntries: unsupportedEntries };
         }
@@ -6748,12 +6829,14 @@ data:
                             oldLines.push(formatYamlKV('  ', swap.from, swap.originalValue || swap.value));
                         }
                         // New line: NIC annotation + comment showing community source
+                        // and any substitution note (e.g., "ewma is not supported, using least_conn").
                         var shortName = swap.from.replace(/nginx\.ingress\.kubernetes\.io\//g, '');
+                        var commentText = shortName + (swap.note ? ' — ' + swap.note : '');
                         var newLine = formatYamlKV('  ', swap.to, swap.value);
                         if (newLine.indexOf(': |\n') !== -1) {
-                            newLine = newLine.replace(': |', ': |  # ' + shortName);
+                            newLine = newLine.replace(': |', ': |  # ' + commentText);
                         } else {
-                            newLine += '  # ' + shortName;
+                            newLine += '  # ' + commentText;
                         }
                         newLines.push(newLine);
                         var entriesToTrack = swap.mergedEntries || [swap.entry];
@@ -6825,7 +6908,8 @@ data:
                 migration.configMapChanges.forEach(function(change) {
                     cmOldLines.push(formatYamlKV('  ', change.from, change.originalValue || change.value));
                     var cmShortName = change.from.replace(/nginx\.ingress\.kubernetes\.io\//g, '');
-                    cmLines.push(formatYamlKV('  ', change.to, change.value) + '  # ' + cmShortName);
+                    var cmComment = cmShortName + (change.note ? ' — ' + change.note : '');
+                    cmLines.push(formatYamlKV('  ', change.to, change.value) + '  # ' + cmComment);
                 });
 
                 // Side-by-side comparison for ConfigMap
@@ -7403,7 +7487,6 @@ data:
 '    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"\n' +
 '    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"\n' +
 '    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"\n' +
-'    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"\n' +
 '    nginx.ingress.kubernetes.io/load-balance: "ewma"\n' +
 '    nginx.ingress.kubernetes.io/enable-access-log: "false"\n' +
 '    nginx.ingress.kubernetes.io/enable-opentelemetry: "true"\n' +

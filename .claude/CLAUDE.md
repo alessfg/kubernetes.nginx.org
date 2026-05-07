@@ -113,7 +113,11 @@ When bumping the referenced version, audit the release notes to identify genuine
 
 ### Release update checklist
 
-When updating the sites for a new NIC release, update **all** of the following:
+When updating the sites for a new release, update **all** of the following.
+
+**Kubernetes compatibility (applies to both NIC and NGF):** the compat tables always show the **latest 3 Kubernetes minor versions** (matches upstream's support window — verify via `kubernetes/kubernetes` releases), not the project's full supported range. Bump these alongside any release update if a newer K8s minor has shipped.
+
+#### NGINX Ingress Controller (NIC) release
 
 **`index.html`:**
 
@@ -125,6 +129,17 @@ When updating the sites for a new NIC release, update **all** of the following:
 
 **`ingress-nginx-migration.html`:**
 
-- Version Reference banners (3 instances across Getting Started, Annotations, and ConfigMap tabs)
-- CRD install URLs pointing to `raw.githubusercontent.com/.../deploy/crds.yaml`
-- Release tag links in Version Reference banners
+- Update the `NIC_VERSION` and `INGRESS_NGINX_VERSION` constants at the top of the main `<script>` block — these are the single source of truth for the Version Reference banners (3 instances), the standalone `kubectl apply` example, and every `crdInstall` URL inside `ANNOTATION_MAPPINGS`. Banner text and release-tag links are populated from these constants at `DOMContentLoaded`.
+- Update the static fallback text inside the `data-*-version` spans / `data-*-release-link` anchors (so no-JS users see the correct version before the JS runs).
+
+#### NGINX Gateway Fabric (NGF) release
+
+**`index.html` only** (the migration tool does not reference NGF):
+
+- Version fallback text in `data-version="ngf.release"` spans (sidebar, hero badge, Key Details)
+- Release tag link in the hero badge (`href`)
+- Helm chart version in `data-version="ngf.helm"` spans and the Helm install command
+- JS `VERSION_CONFIG` fallback values for `ngf.release` and `ngf.helm`
+- **Compatibility table** in the NGF section — update NGINX OSS version (check the NGF release notes / README technical specs table) and Kubernetes versions if changed
+- **Supported Resources** tag list — review against `apis/v1alpha1` and `apis/v1alpha2` at the release tag to catch any new CRDs (e.g. `WAFPolicy` was added in v2.6.0). Keep tags alphabetical within the NGF custom-resources block.
+- **Gateway API version** in the "Fully Conformant Gateway API" pill and feature card copy (currently mentions v1.5.1) — update if the release bumps the conformant Gateway API version.

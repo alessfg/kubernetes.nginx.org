@@ -469,7 +469,7 @@
                         <span class="dot" data-color="green"></span>
                         <span class="sidebar-link-text">
                             <span class="sidebar-link-name">NGINX Ingress Controller</span>
-                            <span class="sidebar-link-desc"><span data-version="nic.release">v5.4.3</span> &middot; Ingress API</span>
+                            <span class="sidebar-link-desc"><span data-version="nic.release">v5.5.0</span> &middot; Ingress API</span>
                         </span>
                     </button></li>
                     <li><button class="sidebar-link" data-product="nginx-gateway-fabric">
@@ -634,7 +634,7 @@
                         <span class="page-hero-badge nic">
                             <svg aria-hidden="true" width="16" height="16" viewBox="34 5 36 48" fill="none"><path fill="#009639" d="M35.31,40.15c.21.37.52.66.86.86l17.65,10.19c.34.2.75.32,1.17.32s.83-.12,1.17-.32l17.65-10.19c.35-.2.65-.48.86-.86.21-.37.31-.78.31-1.18v-20.38c0-.4-.1-.81-.31-1.18-.21-.37-.52-.66-.86-.86l-17.65-10.19c-.34-.2-.74-.32-1.17-.32s-.83.12-1.17.32l-17.65,10.19c-.35.2-.65.49-.86.86-.21.37-.31.78-.31,1.18v20.38c0,.4.1.8.31,1.18"/><path fill="#fff" d="M56.79,36.68h-13.66c-.37,0-.67-.3-.67-.67v-13.66c0-.37.3-.67.67-.67h13.66c.37,0,.67.3.67.67v13.66c0,.37-.3.67-.67.67Z"/><path fill="#fff" d="M67,22.69h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><path fill="#fff" d="M67,31.68h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><path fill="#fff" d="M67.08,39.88h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><polygon fill="#fff" points="64.95 29.68 48.15 29.66 64.7 19.76 65.21 20.62 51.76 28.67 64.96 28.68 64.95 29.68"/><rect fill="#fff" x="57" y="24.68" width="1" height="17.18" transform="translate(.78 67.86) rotate(-61.43)"/></svg>
                             Ingress Controller
-                            <a class="hero-version" data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.4.3" target="_blank" rel="noopener">v5.4.3</a>
+                            <a class="hero-version" data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.0" target="_blank" rel="noopener">v5.5.0</a>
                         </span>
                         <h1>NGINX Ingress Controller</h1>
                         <p>Production-grade Ingress controller built on NGINX. Advanced traffic management, TLS termination, VirtualServer CRDs, and full observability for Kubernetes.</p>
@@ -696,11 +696,11 @@
                         <div class="details-grid">
                             <div class="detail-item">
                                 <span class="detail-label">Latest Version</span>
-                                <span class="version-pill nic"><a data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/latest" target="_blank" rel="noopener">v5.4.3</a></span>
+                                <span class="version-pill nic"><a data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/latest" target="_blank" rel="noopener">v5.5.0</a></span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Latest Helm Chart</span>
-                                <span class="version-pill nic"><a data-version="nic.helm" href="https://github.com/nginx/kubernetes-ingress/tree/main/charts/nginx-ingress" target="_blank" rel="noopener">v2.5.3</a></span>
+                                <span class="version-pill nic"><a data-version="nic.helm" href="https://github.com/nginx/kubernetes-ingress/tree/main/charts/nginx-ingress" target="_blank" rel="noopener">v2.6.0</a></span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Custom Resources</span>
@@ -739,7 +739,7 @@
                         <div class="code-block"><button class="copy-btn" aria-label="Copy NIC install command">Copy</button><code><span class="comment"># Install via Helm (OCI registry)</span>
 <span class="cmd">helm</span> install nginx-ingress \
   oci://ghcr.io/nginx/charts/nginx-ingress \
-  <span class="flag">--version</span> <span class="str" data-version="nic.helm" data-version-format="bare">2.5.3</span> \
+  <span class="flag">--version</span> <span class="str" data-version="nic.helm" data-version-format="bare">2.6.0</span> \
   <span class="flag">--namespace</span> nginx-ingress <span class="flag">--create-namespace</span></code></div>
                     </div>
 
@@ -1061,7 +1061,7 @@
 
         /* ── Auto-Fetch Versions ── */
         let VERSION_CONFIG = {
-            nic: { repo: 'nginx/kubernetes-ingress',        fallback: { release: 'v5.4.3', helm: 'v2.5.3' } },
+            nic: { repo: 'nginx/kubernetes-ingress',        fallback: { release: 'v5.5.0', helm: 'v2.6.0' } },
             ngf: { repo: 'nginx/nginx-gateway-fabric',      fallback: { release: 'v2.6.2', helm: 'v2.6.2' } },
             i2g: { repo: 'kubernetes-sigs/ingress2gateway',  fallback: { release: 'v1.0.0' } }
         };

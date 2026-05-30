@@ -141,6 +141,15 @@
                                 <span class="sidebar-link-desc">Annotations, Middlewares &amp; CRDs</span>
                             </span>
                         </button>
+                        <ul class="sidebar-subnav">
+                            <li><button class="sidebar-link" data-section="differences"><span class="dot"></span><span class="sidebar-link-name">Key Differences</span></button></li>
+                            <li><button class="sidebar-link" data-section="annotation-mappings"><span class="dot"></span><span class="sidebar-link-name">Annotation Mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="middleware-mappings"><span class="dot"></span><span class="sidebar-link-name">HTTP Middlewares</span></button></li>
+                            <li><button class="sidebar-link" data-section="tcp-middleware-mappings"><span class="dot"></span><span class="sidebar-link-name">TCP Middlewares</span></button></li>
+                            <li><button class="sidebar-link" data-section="crd-translations"><span class="dot"></span><span class="sidebar-link-name">CRD Translations</span></button></li>
+                            <li><button class="sidebar-link" data-section="configmap-mappings"><span class="dot"></span><span class="sidebar-link-name">ConfigMap Mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="plus-mappings"><span class="dot"></span><span class="sidebar-link-name">Plus / Hub Mappings</span></button></li>
+                        </ul>
                     </li>
                 </ul>
             </section>
@@ -372,9 +381,68 @@
             </div><!-- /.tool-page #page-analyzer -->
 
             <div class="tool-page" id="page-reference">
-            <section>
-                <h2>Reference Guide</h2>
-                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> The reference guide will cover roughly 64 annotation, middleware, and CRD mappings between Traefik v3.x and F5 NGINX Ingress Controller v5.5, including <code>IngressRoute</code> &rarr; <code>VirtualServer</code> worked examples.</div>
+            <div class="info-box note" style="margin: 0 0 24px;"><strong>Version Reference:</strong> This guide is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.1" target="_blank" rel="noopener">Traefik <span data-traefik-version>v3.7.1</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.0</span></a>. Annotations, middlewares, and CRD fields below exist in those releases; pre-v3 Traefik manifests (<code>traefik.containo.us/v1alpha1</code>) need to be regenerated against Traefik v3 schemas before migrating.</div>
+
+            <section id="differences">
+                <h2 id="key-differences">Key Differences</h2>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th scope="col">Aspect</th><th scope="col">Traefik Proxy</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr><td>Repository</td><td><code>traefik/traefik</code></td><td><code>nginx/kubernetes-ingress</code></td></tr>
+                            <tr><td>Annotation prefix (on standard Ingress)</td><td><code>traefik.ingress.kubernetes.io/</code></td><td><code>nginx.org/</code> (OSS) or <code>nginx.com/</code> (Plus) or <code>appprotect.f5.com/</code></td></tr>
+                            <tr><td>CRD API group</td><td><code>traefik.io/v1alpha1</code> (v3.x). Pre-v3 used <code>traefik.containo.us/v1alpha1</code> (removed in v3.0).</td><td><code>k8s.nginx.org/v1</code> and <code>k8s.nginx.org/v1alpha1</code></td></tr>
+                            <tr><td>HTTP routing CRD</td><td><code>IngressRoute</code></td><td><code>VirtualServer</code> (+ <code>VirtualServerRoute</code> for cross-namespace delegation)</td></tr>
+                            <tr><td>TCP / UDP routing CRDs</td><td><code>IngressRouteTCP</code>, <code>IngressRouteUDP</code></td><td><code>TransportServer</code> (+ <code>GlobalConfiguration</code> listeners)</td></tr>
+                            <tr><td>Middleware model</td><td><code>Middleware</code> CRD; routes reference middlewares by <code>{name, namespace}</code>; <code>Chain</code> middleware composes reusable named chains</td><td><code>Policy</code> CRD attached to <code>VirtualServer</code> routes or via <code>nginx.org/policies</code> annotation on <code>Ingress</code>. No reusable-chain concept &mdash; flatten chains during migration.</td></tr>
+                            <tr><td>Match syntax</td><td>DSL string: <code>Host(`x.com`) &amp;&amp; PathPrefix(`/api`) &amp;&amp; Headers(`X-Env`, `prod`)</code></td><td>Structured fields: <code>routes[].path</code> + <code>routes[].matches[].conditions[]</code> for headers/cookies/args</td></tr>
+                            <tr><td>Service composition</td><td><code>TraefikService</code> &mdash; WRR, HRW, mirroring, failover across other services</td><td><code>VirtualServer.upstreams[]</code> + <code>routes[].splits[]</code> (weighted only). No built-in mirroring or active/standby failover.</td></tr>
+                            <tr><td>Listener configuration</td><td><code>EntryPoints</code> defined in static config (CLI / env / file); routes reference them by name</td><td>HTTP ports via NIC CLI flags / Helm values; TCP/UDP ports via <code>GlobalConfiguration.listeners</code> (per-VS port selection limited)</td></tr>
+                            <tr><td>Certificate issuance</td><td>Built-in ACME client (<code>certResolver</code>) + per-router <code>tls.domains[]</code></td><td>Delegated to <code>cert-manager</code>; reference issued <code>Secret</code> in <code>spec.tls.secretName</code></td></tr>
+                            <tr><td>NGINX Plus features</td><td>n/a (OSS Traefik). Traefik Hub adds JWT, OIDC, WAF, LDAP, OPA, etc.</td><td>JWT, OIDC, WAF (App Protect), API Key auth, sticky sessions, active health checks via <code>nginx.com/policies</code> / <code>nginx.com/</code> annotations</td></tr>
+                            <tr><td>Plugins</td><td>Yaegi-interpreted Go plugins loaded from the plugin catalog</td><td>No equivalent &mdash; use NGINX modules in custom data-plane builds or <code>nginx.org/server-snippets</code> for raw directives</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="info-box note" style="margin: 20px 0 0;"><strong>Note:</strong> The mapping tables below cover the OSS surface area of Traefik. Many Traefik features that don't have direct NIC equivalents can still be expressed via NGINX configuration snippets (<code>nginx.org/server-snippets</code>, <code>nginx.org/location-snippets</code>, or VirtualServer <code>http-snippets</code>/<code>server-snippets</code>/<code>location-snippets</code>). Snippets require the <code>-enable-snippets</code> command-line argument and inject raw NGINX config &mdash; use with caution.</div>
+                <div class="info-box tip" style="margin: 12px 0 0;"><strong>New in v5.5.0 &mdash; ExternalAuth Policy:</strong> NIC v5.5 added an <code>externalAuth</code> Policy CRD that works in NGINX OSS &mdash; the clean migration target for Traefik's <code>ForwardAuth</code> middleware. Several other Policy CRDs (<code>ingressMTLS</code>, <code>egressMTLS</code>, <code>basicAuth</code>) also work in OSS and can be attached directly to <code>Ingress</code> resources via <code>nginx.org/policies</code>.</div>
+            </section>
+
+            <section id="annotation-mappings">
+                <h2>Annotation Mappings</h2>
+                <p>Mappings for <code>traefik.ingress.kubernetes.io/router.*</code> and <code>traefik.ingress.kubernetes.io/service.*</code> annotations on standard <code>Ingress</code> resources, to NIC <code>nginx.org/</code> / <code>nginx.com/</code> annotations or CRD fields.</p>
+                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> 27 annotation rows (13 router, 14 service) with side-by-side examples will populate here. The verified NIC mappings are summarized in the Migration Checklist; this section will surface them as searchable, copy-ready table rows.</div>
+            </section>
+
+            <section id="middleware-mappings">
+                <h2>HTTP Middleware Mappings</h2>
+                <p>Mappings for all 22 OSS HTTP middlewares in the Traefik <code>Middleware</code> CRD, to NIC <code>Policy</code> CRDs, <code>nginx.org/</code> annotations, VirtualServer fields, or sanctioned snippet patterns.</p>
+                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> 22 HTTP middleware rows with side-by-side examples. Highlights: <code>BasicAuth</code>/<code>ForwardAuth</code>/<code>IPAllowList</code> map cleanly to NIC Policies (OSS); <code>StripPrefix</code>/<code>ReplacePath</code> map to <code>nginx.org/rewrites</code>; <code>Headers</code> splits across VS request/response headers + ConfigMap HSTS; <code>Chain</code> has no equivalent and is flattened during migration.</div>
+            </section>
+
+            <section id="tcp-middleware-mappings">
+                <h2>TCP Middleware Mappings</h2>
+                <p>The Traefik <code>MiddlewareTCP</code> CRD ships two middlewares; both map to TransportServer-adjacent configuration in NIC.</p>
+                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> 2 rows: <code>IPAllowList</code> (TCP) &rarr; <code>stream-snippets</code> ConfigMap key with <code>allow</code>/<code>deny</code>; <code>InFlightConn</code> &rarr; <code>stream-snippets</code> with <code>limit_conn</code>. NIC does not expose these as first-class Policy CRDs.</div>
+            </section>
+
+            <section id="crd-translations">
+                <h2>CRD Translations</h2>
+                <p>Worked YAML examples translating Traefik routing CRDs to NIC CRDs side-by-side.</p>
+                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> Examples covering: <code>IngressRoute</code> (basic HTTP route) &rarr; <code>VirtualServer</code>; <code>IngressRoute</code> with middleware chain &rarr; <code>VirtualServer</code> + Policy attachments (with chain-flatten warning); <code>IngressRouteTCP</code> &rarr; <code>TransportServer</code> (with TLS passthrough variant); <code>TraefikService</code> weighted routing &rarr; <code>VirtualServer</code> <code>splits</code>.</div>
+            </section>
+
+            <section id="configmap-mappings">
+                <h2>Static Config &rarr; ConfigMap Mappings</h2>
+                <p>Equivalent NIC <code>nginx-config</code> ConfigMap keys (or Helm values) for the Traefik static-config toggles users typically touch (log level, accessLog format, metrics, TLS defaults, EntryPoint redirects, providers config).</p>
+                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> ~13 rows covering EntryPoint redirects, default TLS options, log level/format, accessLog config, Prometheus metrics, OpenTelemetry tracing, IngressClass / IngressEndpoint selectors, serversTransport insecure-skip-verify, and the API/dashboard analog.</div>
+            </section>
+
+            <section id="plus-mappings">
+                <h2>NGINX Plus / Traefik Hub Middleware Mappings</h2>
+                <p>The Traefik Hub commercial offering ships several middlewares not present in the OSS <code>Middleware</code> CRD. Where NIC Plus has a clean equivalent (JWT, OIDC, WAF), we surface it; LDAP, OPA, HMAC, OAuth2 Client Credentials, OAuth2 Token Introspection, APIKey, and DistributedRateLimit have no direct NIC equivalent.</p>
+                <div class="info-box warning" style="margin: 20px 0;"><strong>Heads-up:</strong> These rows assume the source workload was running on <em>Traefik Hub</em>, not OSS Traefik. If you're on OSS Traefik you don't have any of the middlewares in this section.</div>
+                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> 10 Hub middleware rows: 3 with clean NIC Plus mappings (JWT, OIDC, WAF), 7 with "no equivalent" guidance (LDAP, OPA, HMAC, OAuth2 Client Credentials, OAuth2 Token Introspection, APIKey, DistributedRateLimit).</div>
             </section>
             </div><!-- /.tool-page #page-reference -->
 
@@ -404,10 +472,12 @@
             let sectionLinks = document.querySelectorAll('.sidebar-link[data-section]');
             let allSubnavs = document.querySelectorAll('.sidebar-subnav');
             let pageNames = { 'getting-started': 'Getting Started', analyzer: 'Config Analyzer', reference: 'Reference Guide' };
-            // Map sections to their parent pages — Phase 2c will add reference-page sections here
             let sectionPageMap = {
                 overview: 'getting-started', 'why-migrate': 'getting-started', 'phased-migration': 'getting-started',
-                features: 'getting-started', installation: 'getting-started', checklist: 'getting-started', resources: 'getting-started'
+                features: 'getting-started', installation: 'getting-started', checklist: 'getting-started', resources: 'getting-started',
+                differences: 'reference', 'annotation-mappings': 'reference', 'middleware-mappings': 'reference',
+                'tcp-middleware-mappings': 'reference', 'crd-translations': 'reference',
+                'configmap-mappings': 'reference', 'plus-mappings': 'reference'
             };
             let currentPage = 'getting-started';
 

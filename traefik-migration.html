@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interactive migration tool for transitioning from Traefik Proxy to the F5 NGINX Ingress Controller. Covers annotations on standard Ingress resources, the Traefik Middleware CRD, IngressRoute/IngressRouteTCP/TraefikService translation to VirtualServer and Policy CRDs, and Traefik static config to NIC ConfigMap mappings.">
+    <meta name="keywords" content="NGINX, Traefik, Ingress, Kubernetes, Migration, Controller, CRD, VirtualServer, Policy, IngressRoute, Middleware">
+    <meta name="author" content="F5, Inc.">
+    <link rel="canonical" href="https://kubernetes.nginx.org/traefik-migration.html">
+    <meta property="og:title" content="NGINX Traefik Migration Tool">
+    <meta property="og:description" content="Interactive migration tool for transitioning from Traefik Proxy to the F5 NGINX Ingress Controller.">
+    <meta property="og:url" content="https://kubernetes.nginx.org/traefik-migration.html">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <title>NGINX Traefik Migration Tool</title>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "NGINX Traefik Migration Tool",
+        "url": "https://kubernetes.nginx.org/traefik-migration.html",
+        "description": "Interactive migration tool for transitioning from Traefik Proxy to the F5 NGINX Ingress Controller.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript",
+        "isAccessibleForFree": true,
+        "publisher": {
+            "@type": "Organization",
+            "name": "F5, Inc.",
+            "url": "https://www.f5.com/"
+        }
+    }
+    </script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='53' height='60' viewBox='0 0 53 60'%3E%3Cg transform='translate(-7.198 -0.359)'%3E%3Cpath fill='%23009639' d='M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544'/%3E%3Cpath fill='%23fff' d='M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z'/%3E%3C/g%3E%3C/svg%3E">
+    <link rel="stylesheet" href="migration-shared.css">
+    <script>try{let s=localStorage.getItem('darkMode');if(s==='1'||(s===null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark-mode')}catch(e){}</script>
+    <script src="migration-shared.js" defer></script>
+</head>
+<body>
+    <noscript><div style="background:#fff3e0;color:#bf4000;text-align:center;padding:12px;font-size:0.9rem;">This tool requires JavaScript for the config analyzer, navigation, and interactive features.</div></noscript>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="sr-only" aria-live="polite" id="page-announce"></div>
+
+    <!-- ── Top Bar ── -->
+    <nav class="topbar" aria-label="Top navigation">
+        <div class="topbar-left">
+            <button class="menu-toggle" id="menuToggle" aria-label="Toggle sidebar navigation" aria-expanded="false">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            </button>
+            <a class="topbar-brand" href="index.html">
+                <svg aria-hidden="true" width="28" height="28" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></svg>
+                <span>NGINX <span class="sub">Traefik Migration Tool</span></span>
+            </a>
+            <span class="mobile-breadcrumb" id="mobileBreadcrumb">Getting Started</span>
+        </div>
+        <div class="topbar-right">
+            <a class="topbar-link hide-mobile" href="https://nginx.org" target="_blank" rel="noopener" aria-label="Visit nginx.org">
+                <svg aria-hidden="true" style="width:16px;height:18px;" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></svg>
+                nginx.org
+            </a>
+            <a class="topbar-link" href="https://github.com/nginx/kubernetes.nginx.org" target="_blank" rel="noopener" aria-label="Contribute on GitHub">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                Contribute
+            </a>
+            <button class="dark-toggle" id="darkToggle" aria-label="Switch to dark mode">
+                <svg aria-hidden="true" class="dark-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                <svg aria-hidden="true" class="dark-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            </button>
+        </div>
+    </nav>
+
+    <div class="layout">
+        <!-- ── Sidebar Backdrop ── -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+
+        <!-- ── Sidebar ── -->
+        <aside class="sidebar" id="sidebar" aria-label="Section navigation">
+            <section class="sidebar-section" aria-labelledby="sidebar-sections-label">
+                <div class="sidebar-label" id="sidebar-sections-label">Sections</div>
+                <ul class="sidebar-nav">
+                    <li>
+                        <button class="sidebar-link active" data-page="getting-started">
+                            <span class="dot"></span>
+                            <span class="sidebar-link-text">
+                                <span class="sidebar-link-name">Getting Started</span>
+                                <span class="sidebar-link-desc">Tool Overview &amp; Migration Strategy</span>
+                            </span>
+                        </button>
+                    </li>
+                    <li>
+                        <button class="sidebar-link" data-page="analyzer">
+                            <span class="dot"></span>
+                            <span class="sidebar-link-text">
+                                <span class="sidebar-link-name">Config Analyzer</span>
+                                <span class="sidebar-link-desc">Analyze, Assess &amp; Migrate</span>
+                            </span>
+                        </button>
+                    </li>
+                    <li>
+                        <button class="sidebar-link" data-page="reference">
+                            <span class="dot"></span>
+                            <span class="sidebar-link-text">
+                                <span class="sidebar-link-name">Reference Guide</span>
+                                <span class="sidebar-link-desc">Annotations, Middlewares &amp; CRDs</span>
+                            </span>
+                        </button>
+                    </li>
+                </ul>
+            </section>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-ext-links">
+                <a class="sidebar-ext" href="https://github.com/nginx" target="_blank" rel="noopener">
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    GitHub
+                </a>
+                <a class="sidebar-ext" href="https://docs.nginx.com" target="_blank" rel="noopener">
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                    Documentation
+                </a>
+                <a class="sidebar-ext" href="https://blog.nginx.org" target="_blank" rel="noopener">
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    Blog
+                </a>
+                <a class="sidebar-ext" href="https://www.youtube.com/@nginx_official" target="_blank" rel="noopener">
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                    YouTube
+                </a>
+                <a class="sidebar-ext" href="https://community.nginx.org" target="_blank" rel="noopener">
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                    Community
+                </a>
+            </div>
+            <div class="sidebar-copyright">
+                &copy; <span id="copyright-year">2026</span> F5, Inc. All rights reserved.
+                <div class="sidebar-tagline">Created with AI. Maintained by humans.</div>
+            </div>
+        </aside>
+
+        <!-- ── Main Content ── -->
+        <main class="main" id="main-content" role="main" aria-label="Migration tool content">
+            <h1 class="sr-only">NGINX Traefik Migration Tool</h1>
+            <div class="main-inner">
+
+            <div class="tool-page active" id="page-getting-started">
+            <div class="info-box tip" style="margin: 0 0 12px;"><strong>Under construction:</strong> This is a scaffold for the Traefik &rarr; F5 NGINX Ingress Controller migration tool. Content is being added incrementally &mdash; see <a href="https://github.com/nginx/kubernetes.nginx.org" target="_blank" rel="noopener">the repository</a> for progress.</div>
+            <div class="info-box note" style="margin: 0 0 24px;"><strong>Version Reference:</strong> This tool is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.1" target="_blank" rel="noopener">Traefik <span data-traefik-version>v3.7.1</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.0</span></a>.</div>
+
+            <section id="overview">
+                <h2 id="migration-overview">Overview</h2>
+                <p>This interactive guide will help you migrate from Traefik Proxy to the F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). Coverage will include:</p>
+                <ul style="padding-left: 40px;">
+                    <li><strong>Annotation mappings</strong> &mdash; Translations for <code>traefik.ingress.kubernetes.io/router.*</code> and <code>traefik.ingress.kubernetes.io/service.*</code> annotations on standard Ingress resources</li>
+                    <li><strong>Middleware mappings</strong> &mdash; Mappings for all 22 OSS HTTP middlewares (StripPrefix, RateLimit, Headers, etc.) to NIC Policy CRDs, annotations, or snippets</li>
+                    <li><strong>CRD migration</strong> &mdash; Worked examples translating Traefik <code>IngressRoute</code>, <code>IngressRouteTCP</code>, and <code>TraefikService</code> to NIC <code>VirtualServer</code>, <code>TransportServer</code>, and <code>Policy</code> CRDs</li>
+                    <li><strong>Static-config mappings</strong> &mdash; Equivalent NIC <code>nginx-config</code> ConfigMap keys for Traefik's common static-config toggles</li>
+                </ul>
+            </section>
+            </div><!-- /.tool-page #page-getting-started -->
+
+            <div class="tool-page" id="page-analyzer">
+            <section>
+                <h2>Config Analyzer</h2>
+                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> The Traefik configuration analyzer will accept Traefik <code>IngressRoute</code>, <code>Middleware</code>, and <code>TraefikService</code> CRDs (plus standard <code>Ingress</code> resources with <code>traefik.ingress.kubernetes.io/</code> annotations) and generate F5 NGINX Ingress Controller equivalents.</div>
+            </section>
+            </div><!-- /.tool-page #page-analyzer -->
+
+            <div class="tool-page" id="page-reference">
+            <section>
+                <h2>Reference Guide</h2>
+                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> The reference guide will cover roughly 64 annotation, middleware, and CRD mappings between Traefik v3.x and F5 NGINX Ingress Controller v5.5, including <code>IngressRoute</code> &rarr; <code>VirtualServer</code> worked examples.</div>
+            </section>
+            </div><!-- /.tool-page #page-reference -->
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+    (function() {
+        'use strict';
+        const TRAEFIK_VERSION = 'v3.7.1';
+        const NIC_VERSION = 'v5.5.0';
+        const TRAEFIK_RELEASE_URL = 'https://github.com/traefik/traefik/releases/tag/' + TRAEFIK_VERSION;
+        const NIC_RELEASE_URL = 'https://github.com/nginx/kubernetes-ingress/releases/tag/' + NIC_VERSION;
+
+        function init() {
+            // Version banner population
+            document.querySelectorAll('[data-traefik-version]').forEach(function(el) { el.textContent = TRAEFIK_VERSION; });
+            document.querySelectorAll('[data-nic-version]').forEach(function(el) { el.textContent = NIC_VERSION; });
+            document.querySelectorAll('[data-traefik-release-link]').forEach(function(el) { el.setAttribute('href', TRAEFIK_RELEASE_URL); });
+            document.querySelectorAll('[data-nic-release-link]').forEach(function(el) { el.setAttribute('href', NIC_RELEASE_URL); });
+
+            let yearEl = document.getElementById('copyright-year');
+            if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+            // Page navigation (no subnav in scaffold — Phase 2 fills sections)
+            let pageLinks = document.querySelectorAll('.sidebar-link[data-page]');
+            let pageNames = { 'getting-started': 'Getting Started', analyzer: 'Config Analyzer', reference: 'Reference Guide' };
+            let currentPage = 'getting-started';
+
+            function closeMobileSidebar() {
+                let sidebar = document.getElementById('sidebar');
+                let backdrop = document.getElementById('sidebarBackdrop');
+                let menuToggle = document.getElementById('menuToggle');
+                if (sidebar) sidebar.classList.remove('open');
+                if (backdrop) backdrop.classList.remove('visible');
+                if (menuToggle) menuToggle.setAttribute('aria-expanded', 'false');
+                document.body.style.overflow = '';
+            }
+
+            function showPage(id) {
+                let switching = (id !== currentPage);
+                currentPage = id;
+                document.querySelectorAll('.tool-page').forEach(function(p) { p.classList.remove('active'); });
+                let page = document.getElementById('page-' + id);
+                if (page) page.classList.add('active');
+                pageLinks.forEach(function(l) { l.classList.remove('active'); });
+                let activeLink = document.querySelector('.sidebar-link[data-page="' + id + '"]');
+                if (activeLink) activeLink.classList.add('active');
+                history.replaceState(null, '', '#' + id);
+
+                let announcer = document.getElementById('page-announce');
+                if (announcer && switching) announcer.textContent = 'Navigated to ' + (pageNames[id] || id);
+                let breadcrumb = document.getElementById('mobileBreadcrumb');
+                if (breadcrumb) breadcrumb.textContent = pageNames[id] || id;
+
+                if (switching) window.scrollTo(0, 0);
+                closeMobileSidebar();
+            }
+
+            pageLinks.forEach(function(link) {
+                link.addEventListener('click', function() { showPage(this.getAttribute('data-page')); });
+            });
+
+            let hash = location.hash.replace('#', '');
+            if (hash === 'getting-started' || hash === 'analyzer' || hash === 'reference') {
+                showPage(hash);
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+    </script>
+</body>
+</html>

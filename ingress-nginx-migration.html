@@ -5031,125 +5031,35 @@ data:
         const NIC_RELEASE_URL = 'https://github.com/nginx/kubernetes-ingress/releases/tag/' + NIC_VERSION;
         const INGRESS_NGINX_RELEASE_URL = 'https://github.com/kubernetes/ingress-nginx/releases/tag/controller-' + INGRESS_NGINX_VERSION;
 
-        function toggleRow(row) {
-            const exampleRow = row.nextElementSibling;
-            if (exampleRow && exampleRow.classList.contains('example-row')) {
-                row.classList.toggle('expanded');
-                exampleRow.classList.toggle('visible');
-                let isExpanded = row.classList.contains('expanded');
-                row.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
-                exampleRow.setAttribute('aria-hidden', isExpanded ? 'false' : 'true');
-            }
-        }
+        // Register analyzer-specific actions on the shared registry (migration-shared.js).
+        // Generic reference-table actions (switchApproach, expandAllExamples,
+        // collapseAllExamples) plus the expandable-row / filter / category-dropdown
+        // wiring are provided by migration-shared.js and do not need to be re-declared.
+        window.MigrationActions = window.MigrationActions || {};
+        Object.assign(window.MigrationActions, {
+            toggleSampleDropdown: function(el, e) { toggleSampleDropdown(e); },
+            showPage: function(el) {
+                let page = el.getAttribute('data-page');
+                let link = document.querySelector('.sidebar-link[data-page="' + page + '"]');
+                if (link) link.click();
+            },
+            setStrategy: function(el) { setStrategy(el.getAttribute('data-strategy'), el); },
+            loadSampleYaml: function(el) { loadSampleYaml(el.getAttribute('data-preset')); },
+            clearAnalyzer: function() { clearAnalyzer(); },
+            analyzeYaml: function() { analyzeYaml(); }
+        });
 
-        // Add keyboard accessibility to expandable rows and approach tabs
+        // Tool-specific DOMContentLoaded — copyright, version banner, approach-tab ARIA,
+        // and per-block copy buttons (analyzer-coupled).
         document.addEventListener('DOMContentLoaded', function() {
-            // Copyright year
             let yearEl = document.getElementById('copyright-year');
             if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-            // Populate version-reference markers from the single source of truth (NIC_VERSION / INGRESS_NGINX_VERSION)
             document.querySelectorAll('[data-nic-version]').forEach(function(el) { el.textContent = NIC_VERSION; });
             document.querySelectorAll('[data-ingress-nginx-version]').forEach(function(el) { el.textContent = INGRESS_NGINX_VERSION; });
             document.querySelectorAll('[data-nic-release-link]').forEach(function(el) { el.href = NIC_RELEASE_URL; });
             document.querySelectorAll('[data-ingress-nginx-release-link]').forEach(function(el) { el.href = INGRESS_NGINX_RELEASE_URL; });
             document.querySelectorAll('[data-nic-crd-install]').forEach(function(el) { el.textContent = NIC_CRD_INSTALL_CMD; });
-
-            // Populate category filter dropdowns
-            function populateCategoryFilter(filterId, sectionId) {
-                let filter = document.getElementById(filterId);
-                let section = document.getElementById(sectionId);
-                if (filter && section) {
-                    section.querySelectorAll('h3[id]').forEach(function(h3) {
-                        let opt = document.createElement('option');
-                        opt.value = h3.id;
-                        opt.textContent = h3.textContent;
-                        filter.appendChild(opt);
-                    });
-                }
-            }
-            populateCategoryFilter('categoryFilter', 'mappings');
-            populateCategoryFilter('categoryFilterPlus', 'plus-mappings');
-            populateCategoryFilter('categoryFilterConfigMap', 'configmap-mappings');
-
-            // Delegated event dispatcher — replaces all inline onclick/onkeydown/etc.
-            // Behaviour: any element with [data-action="..."] is dispatched on click; non-button
-            // elements also activate on Enter/Space (so menuitem divs and links behave like buttons).
-            // Argument values are read from sibling data-* attributes (data-approach, data-strategy, …).
-            let ACTIONS = {
-                switchApproach: function(el) { switchApproach(el, el.getAttribute('data-approach')); },
-                expandAllExamples: function(el) { expandAllExamples(el); },
-                collapseAllExamples: function(el) { collapseAllExamples(el); },
-                toggleSampleDropdown: function(el, e) { toggleSampleDropdown(e); },
-                // showPage's logic lives in a separate IIFE — trigger it by clicking the
-                // matching sidebar link so we don't have to expose the function on window.
-                showPage: function(el) {
-                    let page = el.getAttribute('data-page');
-                    let link = document.querySelector('.sidebar-link[data-page="' + page + '"]');
-                    if (link) link.click();
-                },
-                setStrategy: function(el) { setStrategy(el.getAttribute('data-strategy'), el); },
-                loadSampleYaml: function(el) { loadSampleYaml(el.getAttribute('data-preset')); },
-                clearAnalyzer: function() { clearAnalyzer(); },
-                analyzeYaml: function() { analyzeYaml(); }
-            };
-
-            function dispatchAction(el, e) {
-                let name = el.getAttribute('data-action');
-                let fn = ACTIONS[name];
-                if (!fn) return;
-                if (el.tagName === 'A') e.preventDefault();
-                fn(el, e);
-            }
-
-            document.addEventListener('click', function(e) {
-                let el = e.target.closest('[data-action]');
-                if (el) dispatchAction(el, e);
-            });
-            document.addEventListener('keydown', function(e) {
-                if (e.key !== 'Enter' && e.key !== ' ') return;
-                let el = e.target.closest('[data-action]');
-                if (!el) return;
-                // Native buttons already activate on Enter/Space; only synthesise for other elements.
-                if (el.tagName === 'BUTTON') return;
-                e.preventDefault();
-                dispatchAction(el, e);
-            });
-
-            // Filter inputs/selects — both text input and select-change funnel through filterTable.
-            document.querySelectorAll('[data-filter-source]').forEach(function(el) {
-                let evt = el.tagName === 'SELECT' ? 'change' : 'input';
-                el.addEventListener(evt, function() {
-                    filterTable(el.getAttribute('data-filter-source'));
-                });
-            });
-
-            // Expandable rows — add full ARIA wiring (button semantics + control linkage to
-            // the example row that toggles in/out alongside the trigger) and click/keyboard
-            // handlers (replaces former inline onclick="toggleRow(this)").
-            document.querySelectorAll('.expandable').forEach(function(row, i) {
-                row.setAttribute('tabindex', '0');
-                row.setAttribute('role', 'button');
-                row.setAttribute('aria-expanded', 'false');
-                let exampleRow = row.nextElementSibling;
-                if (exampleRow && exampleRow.classList.contains('example-row')) {
-                    if (!exampleRow.id) exampleRow.id = 'example-row-' + i;
-                    row.setAttribute('aria-controls', exampleRow.id);
-                    exampleRow.setAttribute('aria-hidden', 'true');
-                }
-                row.addEventListener('click', function(e) {
-                    // Don't collapse the row when a click hits an interactive element inside
-                    // the trigger row (anchors, copy buttons via approach-tabs, etc.).
-                    if (e.target.closest('button, a, input, select, textarea, .approach-tab')) return;
-                    toggleRow(this);
-                });
-                row.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        toggleRow(this);
-                    }
-                });
-            });
 
             // Approach tabs ARIA enhancement with arrow key navigation
             document.querySelectorAll('.approach-tabs').forEach(function(tabList, i) {
@@ -5251,33 +5161,6 @@ data:
             });
         }
 
-        function expandAllExamples(btn) {
-            let scope = btn ? btn.closest('section') : document;
-            if (!scope) scope = document;
-            scope.querySelectorAll('.expandable').forEach(row => {
-                row.classList.add('expanded');
-                row.setAttribute('aria-expanded', 'true');
-                const exampleRow = row.nextElementSibling;
-                if (exampleRow && exampleRow.classList.contains('example-row')) {
-                    exampleRow.classList.add('visible');
-                    exampleRow.setAttribute('aria-hidden', 'false');
-                }
-            });
-        }
-        function collapseAllExamples(btn) {
-            let scope = btn ? btn.closest('section') : document;
-            if (!scope) scope = document;
-            scope.querySelectorAll('.expandable').forEach(row => {
-                row.classList.remove('expanded');
-                row.setAttribute('aria-expanded', 'false');
-                const exampleRow = row.nextElementSibling;
-                if (exampleRow && exampleRow.classList.contains('example-row')) {
-                    exampleRow.classList.remove('visible');
-                    exampleRow.setAttribute('aria-hidden', 'true');
-                }
-            });
-        }
-        let _savedExpanded = [];
         let _migrationStrategy = 'crd'; // 'annotation' or 'crd'
 
         function setStrategy(strategy, btn) {
@@ -5290,113 +5173,6 @@ data:
                     ? 'Swap annotations where possible, use CRDs only when needed'
                     : 'Prefer Policy CRDs and VirtualServer, fall back to annotations when no CRD path exists';
             }
-        }
-        function filterTable(source) {
-            let ossInput = document.getElementById('searchInput');
-            let plusInput = document.getElementById('searchInputPlus');
-            let cmInput = document.getElementById('searchInputConfigMap');
-            let catFilter = document.getElementById('categoryFilter');
-            let catFilterPlus = document.getElementById('categoryFilterPlus');
-            let catFilterCM = document.getElementById('categoryFilterConfigMap');
-            if (!ossInput) return;
-            // Sync search inputs (but not category filters — each section has its own).
-            // Whichever input the user typed in becomes the canonical value, then mirror to the others.
-            if (source === 'plus' && plusInput) ossInput.value = plusInput.value;
-            else if (source === 'configmap' && cmInput) ossInput.value = cmInput.value;
-            if (plusInput) plusInput.value = ossInput.value;
-            if (cmInput) cmInput.value = ossInput.value;
-            let term = ossInput.value.toLowerCase();
-            let categoryOss = catFilter ? catFilter.value : '';
-            let categoryPlus = catFilterPlus ? catFilterPlus.value : '';
-            let categoryCM = catFilterCM ? catFilterCM.value : '';
-            let anyCategory = categoryOss || categoryPlus || categoryCM;
-            // Save expanded state when filtering begins
-            if ((term || anyCategory) && _savedExpanded.length === 0) {
-                document.querySelectorAll('.expandable.expanded').forEach(function(r) { _savedExpanded.push(r); });
-            }
-            let totalVisible = 0;
-            let totalRows = 0;
-            document.querySelectorAll('.mapping-table').forEach(function(table) {
-                let visibleCount = 0;
-                let wrapper = table.closest('.table-wrapper');
-                let h3 = wrapper ? wrapper.previousElementSibling : null;
-                let tableCategory = (h3 && h3.tagName === 'H3' && h3.id) ? h3.id : '';
-                // Determine which category filter applies based on parent section
-                let parentSection = table.closest('section[id]');
-                let sectionId = parentSection ? parentSection.id : '';
-                let category = '';
-                if (sectionId === 'mappings') category = categoryOss;
-                else if (sectionId === 'plus-mappings') category = categoryPlus;
-                else if (sectionId === 'configmap-mappings') category = categoryCM;
-                let categoryMatch = !category || tableCategory === category;
-                table.querySelectorAll('tbody tr').forEach(function(row) {
-                    if (row.classList.contains('example-row')) {
-                        if (term || category) {
-                            row.classList.remove('visible');
-                            row.setAttribute('aria-hidden', 'true');
-                            let prev = row.previousElementSibling;
-                            if (prev) { prev.classList.remove('expanded'); prev.setAttribute('aria-expanded', 'false'); }
-                        }
-                        return;
-                    }
-                    totalRows++;
-                    let textMatch = !term || row.textContent.toLowerCase().includes(term);
-                    let match = textMatch && categoryMatch;
-                    row.style.display = match ? '' : 'none';
-                    if (match) visibleCount++;
-                });
-                totalVisible += visibleCount;
-                if (!wrapper) return;
-                let infoBox = wrapper.nextElementSibling;
-                let hidden = (term || category) && visibleCount === 0;
-                wrapper.style.display = hidden ? 'none' : '';
-                if (h3 && h3.tagName === 'H3') h3.style.display = hidden ? 'none' : '';
-                if (infoBox && infoBox.classList.contains('info-box')) infoBox.style.display = hidden ? 'none' : '';
-            });
-            // Update result count displays
-            let countText = '';
-            let noResults = false;
-            if (term) {
-                countText = totalVisible + ' of ' + totalRows + ' rows';
-                noResults = totalVisible === 0;
-            }
-            let countEl = document.getElementById('searchCount');
-            let countElPlus = document.getElementById('searchCountPlus');
-            let countElCM = document.getElementById('searchCountConfigMap');
-            if (countEl) { countEl.textContent = countText; countEl.className = 'search-count' + (noResults ? ' no-results' : ''); }
-            if (countElPlus) { countElPlus.textContent = countText; countElPlus.className = 'search-count' + (noResults ? ' no-results' : ''); }
-            if (countElCM) { countElCM.textContent = countText; countElCM.className = 'search-count' + (noResults ? ' no-results' : ''); }
-            // Restore expanded state when filters are cleared
-            if (!term && !anyCategory && _savedExpanded.length > 0) {
-                _savedExpanded.forEach(function(r) {
-                    r.classList.add('expanded');
-                    r.setAttribute('aria-expanded', 'true');
-                    let ex = r.nextElementSibling;
-                    if (ex && ex.classList.contains('example-row')) {
-                        ex.classList.add('visible');
-                        ex.setAttribute('aria-hidden', 'false');
-                    }
-                });
-                _savedExpanded = [];
-            }
-        }
-        function switchApproach(btn, type) {
-            const container = btn.closest('.example-content');
-            container.querySelectorAll('.approach-tab').forEach(function(t) {
-                t.classList.remove('active');
-                t.setAttribute('aria-selected', 'false');
-            });
-            container.querySelectorAll('.approach-content').forEach(function(c) {
-                c.classList.remove('active');
-                c.setAttribute('aria-hidden', 'true');
-            });
-            btn.classList.add('active');
-            btn.setAttribute('aria-selected', 'true');
-            let panel = container.querySelector('.approach-content[data-approach="' + type + '"]');
-            panel.classList.add('active');
-            panel.setAttribute('aria-hidden', 'false');
-            // Highlight any code blocks that weren't highlighted on initial load
-            highlightStaticExamples(panel);
         }
         function copyInstall(btn, e) {
             e.stopPropagation();

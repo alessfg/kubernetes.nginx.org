@@ -38,12 +38,61 @@ Project characteristics:
 
 #### Migration tool ordering and structure rules
 
-Applies to mapping tables in both `ingress-nginx-migration.html` and `traefik-migration.html` (once Traefik tables land):
+Applies to mapping tables in both `ingress-nginx-migration.html` and `traefik-migration.html`:
 
 - **Annotation/middleware mapping rows** within each category table must be sorted alphabetically by the source name (left column).
 - **"No direct equivalent" rows** (NIC-only or source-only features without a target) go at the end of their category table, after all source-to-NIC mappings.
 - **NIC-only annotations must not be bundled** into source mapping rows. If an NIC annotation has no source equivalent, it gets its own "No direct equivalent" row — never grouped into an existing row.
 - **Within a single row**, when multiple annotations are listed on either side, they should be in alphabetical order.
+
+#### Reference Guide layout contract (strict — every migration tool must match)
+
+Every migration tool's Reference Guide tab uses the **same** four-section layout. Adding a new migration tool (Contour, HAProxy Ingress, Envoy Gateway, …) means producing this exact layout — the search/filter/expand behavior in `migration-shared.js` depends on these IDs and class names.
+
+**Section structure (always these four `<section>` IDs, in this order):**
+
+1. `#differences` — Key Differences table (no controls, no h3 sub-categories). Optional trailing info-boxes for general caveats and version highlights.
+2. `#mappings` — OSS mappings (h2 "NGINX Mappings").
+3. `#plus-mappings` — NGINX Plus mappings (h2 "NGINX Plus Mappings").
+4. `#configmap-mappings` — ConfigMap-equivalent mappings (h2 "ConfigMap Mappings").
+
+**Each non-`#differences` section ships, in this order:**
+
+1. `<h2>` title.
+2. Intro `<p>` explaining the surface area and prefix/badge conventions.
+3. Optional `<div class="info-box warning">` for source-specific caveats (e.g. "Hub-only" framing in the Plus section).
+4. `<div class="info-box tip">` with a `<strong>How to Read the Mappings</strong>` heading and an `<ul>` of bullets explaining row types (annotation-to-annotation, CRD-based, no-equivalent, etc.).
+5. `<div class="controls">` with canonical IDs (see below).
+6. One or more `<h3 id="…">` sub-categories, each followed by its own `<div class="table-wrapper"><table class="mapping-table">…</table></div>`.
+
+**Canonical control IDs (drive `migration-shared.js`'s `filterTable` + `populateCategoryFilter`):**
+
+| Section | Search input ID | Category select ID | Count span ID | `data-filter-source` |
+| --- | --- | --- | --- | --- |
+| `#mappings` | `searchInput` | `categoryFilter` | `searchCount` | `oss` |
+| `#plus-mappings` | `searchInputPlus` | `categoryFilterPlus` | `searchCountPlus` | `plus` |
+| `#configmap-mappings` | `searchInputConfigMap` | `categoryFilterConfigMap` | `searchCountConfigMap` | `configmap` |
+
+The category select `<option>` list starts as `<option value="">All Categories</option>` only; the shared JS walks each section's `h3[id]` elements on `DOMContentLoaded` and appends options. **Never** hard-code per-section category options — let the shared populator do it.
+
+**Row markup contract:**
+
+- Trigger row: `<tr class="expandable"><td><code>source-feature</code></td><td>NIC equivalent with optional <span class="badge …"> badges</span></td></tr>`. Source-side shows the full prefix for annotations (e.g. `traefik.ingress.kubernetes.io/router.entrypoints`) and the bare middleware-CRD field name for middlewares (e.g. `basicAuth`).
+- Example row: `<tr class="example-row"><td colspan="2"><div class="example-content">…</div></td></tr>`. Inside `.example-content`, use `<div class="comparison"><div class="comparison-block old"><h5>Source</h5><pre><code>…</code></pre></div><div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>…</code></pre></div></div>` for side-by-side YAML. Multiple NIC approaches use `<div class="approach-tabs">` + `<div class="approach-content" data-approach="…">` panels (shared `switchApproach` action).
+- "No equivalent" rows still get an example: the NIC side shows a comment block explaining the gap plus the documented workaround.
+
+**Sidebar subnav (under the Reference Guide page link):**
+
+```
+Key Differences      → #differences
+NGINX Mappings       → #mappings
+NGINX Plus Mappings  → #plus-mappings
+ConfigMap Mappings   → #configmap-mappings
+```
+
+Exactly four entries, in that order. Per-section h3 sub-categories don't get sidebar entries — they're reachable via the category filter dropdown.
+
+**Behavior comes from `migration-shared.js`:** every tool's inline `<script>` only registers tool-specific `data-action` handlers (`window.MigrationActions`) and handles its page-nav / version-banner population. Do not re-implement `toggleRow`, `switchApproach`, `expandAllExamples`, `collapseAllExamples`, `filterTable`, or `populateCategoryFilter` inline.
 
 ## Shared UI Elements
 

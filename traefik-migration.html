@@ -143,12 +143,9 @@
                         </button>
                         <ul class="sidebar-subnav">
                             <li><button class="sidebar-link" data-section="differences"><span class="dot"></span><span class="sidebar-link-name">Key Differences</span></button></li>
-                            <li><button class="sidebar-link" data-section="annotation-mappings"><span class="dot"></span><span class="sidebar-link-name">Annotation Mappings</span></button></li>
-                            <li><button class="sidebar-link" data-section="middleware-mappings"><span class="dot"></span><span class="sidebar-link-name">HTTP Middlewares</span></button></li>
-                            <li><button class="sidebar-link" data-section="tcp-middleware-mappings"><span class="dot"></span><span class="sidebar-link-name">TCP Middlewares</span></button></li>
-                            <li><button class="sidebar-link" data-section="crd-translations"><span class="dot"></span><span class="sidebar-link-name">CRD Translations</span></button></li>
+                            <li><button class="sidebar-link" data-section="mappings"><span class="dot"></span><span class="sidebar-link-name">NGINX Mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="plus-mappings"><span class="dot"></span><span class="sidebar-link-name">NGINX Plus Mappings</span></button></li>
                             <li><button class="sidebar-link" data-section="configmap-mappings"><span class="dot"></span><span class="sidebar-link-name">ConfigMap Mappings</span></button></li>
-                            <li><button class="sidebar-link" data-section="plus-mappings"><span class="dot"></span><span class="sidebar-link-name">Plus / Hub Mappings</span></button></li>
                         </ul>
                     </li>
                 </ul>
@@ -408,20 +405,29 @@
                 <div class="info-box tip" style="margin: 12px 0 0;"><strong>New in v5.5.0 &mdash; ExternalAuth Policy:</strong> NIC v5.5 added an <code>externalAuth</code> Policy CRD that works in NGINX OSS &mdash; the clean migration target for Traefik's <code>ForwardAuth</code> middleware. Several other Policy CRDs (<code>ingressMTLS</code>, <code>egressMTLS</code>, <code>basicAuth</code>) also work in OSS and can be attached directly to <code>Ingress</code> resources via <code>nginx.org/policies</code>.</div>
             </section>
 
-            <section id="annotation-mappings">
-                <h2>Annotation Mappings</h2>
-                <p>Mappings for <code>traefik.ingress.kubernetes.io/router.*</code> and <code>traefik.ingress.kubernetes.io/service.*</code> annotations on standard <code>Ingress</code> resources, to NIC <code>nginx.org/</code> / <code>nginx.com/</code> annotations or CRD fields. Annotation names below are shown as suffixes; prepend the full Traefik prefix when applying to live manifests. <strong>Click any row to expand a side-by-side YAML example.</strong></p>
+            <!-- OSS Mappings -->
+            <section id="mappings">
+                <h2>NGINX Mappings</h2>
+                <p>These mappings cover Traefik's standard-Ingress annotations (<code>traefik.ingress.kubernetes.io/router.*</code> and <code>.service.*</code>), all OSS HTTP and TCP middlewares from the Traefik <code>Middleware</code> / <code>MiddlewareTCP</code> CRDs, and worked CRD translations between Traefik's routing CRDs and the corresponding NIC CRDs (<code>VirtualServer</code>, <code>TransportServer</code>, <code>Policy</code>, <code>GlobalConfiguration</code>). All items are annotations or middleware-CRD <code>spec</code> fields unless otherwise indicated with a badge (e.g. <span class="badge badge-policy">Policy CRD</span>, <span class="badge badge-virtualserver">VirtualServer CRD</span>, <span class="badge badge-configmap">ConfigMap</span>).</p>
+
+                <div class="info-box tip" style="margin: 20px 0;">
+                    <strong>How to Read the Mappings</strong>
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li><strong>Annotation-to-annotation rows <span style="color: var(--green);">&#9654;</span>:</strong> Direct mappings where you change the annotation name/prefix on an Ingress. Click to expand for before/after YAML.</li>
+                        <li><strong>Middleware-to-Policy rows <span style="color: var(--green);">&#9654;</span>:</strong> A Traefik <code>Middleware</code> CRD maps to a NIC <code>Policy</code> CRD (attached to a VirtualServer route or to an Ingress via <code>nginx.org/policies</code>). Click to expand for full Policy CRD examples.</li>
+                        <li><strong>CRD-translation rows <span style="color: var(--green);">&#9654;</span>:</strong> Whole-CRD translations (<code>IngressRoute</code> &rarr; <code>VirtualServer</code>, <code>IngressRouteTCP</code> &rarr; <code>TransportServer</code>, etc.) with side-by-side YAML.</li>
+                        <li><strong><em>No equivalent</em> rows:</strong> Features without a direct NIC mapping still get an example &mdash; the NIC side shows a comment block explaining the workaround (snippets, cert-manager, externalAuth bridge, or staying on the source).</li>
+                    </ul>
+                </div>
 
                 <div class="controls">
-                    <input type="search" placeholder="Filter annotations by name or NIC mapping..." data-filter-source="annotation" aria-label="Filter annotations">
-                    <select data-filter-source="annotation" aria-label="Filter by category">
-                        <option value="">All categories</option>
-                        <option value="router-annotations">Router</option>
-                        <option value="service-annotations">Service</option>
+                    <input type="search" id="searchInput" placeholder="Search mappings..." data-filter-source="oss" aria-label="Search mappings">
+                    <select id="categoryFilter" data-filter-source="oss" aria-label="Filter by category">
+                        <option value="">All Categories</option>
                     </select>
-                    <span class="search-count" role="status"></span>
-                    <button class="btn btn-secondary" data-action="expandAllExamples" style="margin-left: auto;">Expand all</button>
-                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
+                    <span id="searchCount" class="search-count" aria-live="polite"></span>
+                    <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
+                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
                 </div>
 
                 <h3 id="router-annotations">Router Annotations</h3>
@@ -961,29 +967,8 @@ metadata:
                         </tbody>
                     </table>
                 </div>
-            </section>
-
-            <section id="middleware-mappings">
-                <h2>HTTP Middleware Mappings</h2>
-                <p>Mappings for the OSS HTTP middlewares in the Traefik <code>Middleware</code> CRD (<code>spec.</code><em>middlewareType</em>), to NIC <code>Policy</code> CRDs, <code>nginx.org/</code> annotations, VirtualServer fields, or sanctioned snippet patterns. Rows are sorted alphabetically by Traefik middleware name. <strong>Click any row to expand a side-by-side YAML example.</strong></p>
-
-                <div class="controls">
-                    <input type="search" placeholder="Filter middlewares by name or NIC mapping..." data-filter-source="middleware" aria-label="Filter middlewares">
-                    <select data-filter-source="middleware" aria-label="Filter by category">
-                        <option value="">All categories</option>
-                        <option value="mw-auth">Authentication</option>
-                        <option value="mw-routing">Routing &amp; Redirects</option>
-                        <option value="mw-headers">Headers &amp; Content</option>
-                        <option value="mw-security">Access Control &amp; Rate Limiting</option>
-                        <option value="mw-resilience">Resilience</option>
-                        <option value="mw-protocol">Protocol</option>
-                        <option value="mw-composition">Composition</option>
-                    </select>
-                    <span class="search-count" role="status"></span>
-                    <button class="btn btn-secondary" data-action="expandAllExamples" style="margin-left: auto;">Expand all</button>
-                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
-                </div>
-
+                <h3 id="http-middlewares">HTTP Middlewares</h3>
+                <p>The 24 OSS HTTP middlewares from the Traefik <code>Middleware</code> CRD (<code>spec.</code><em>middlewareType</em>), mapped to NIC <code>Policy</code> CRDs, <code>nginx.org/</code> annotations, VirtualServer fields, or sanctioned snippet patterns. Sorted alphabetically by Traefik middleware name.</p>
                 <div class="table-wrapper">
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -1629,12 +1614,8 @@ spec:
                         </tbody>
                     </table>
                 </div>
-            </section>
-
-            <section id="tcp-middleware-mappings">
-                <h2>TCP Middleware Mappings</h2>
-                <p>The Traefik <code>MiddlewareTCP</code> CRD ships two middlewares. Both map to <code>stream-snippets</code> in NIC's <code>nginx-config</code> ConfigMap (no first-class Policy CRD analog at L4). <strong>Click any row to expand a side-by-side example.</strong></p>
-
+                <h3 id="tcp-middlewares">TCP Middlewares</h3>
+                <p>The Traefik <code>MiddlewareTCP</code> CRD ships two middlewares. Both map to <code>stream-snippets</code> in NIC's <code>nginx-config</code> ConfigMap (no first-class Policy CRD analog at L4).</p>
                 <div class="table-wrapper">
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik TCP middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -1689,15 +1670,19 @@ spec:
                     </table>
                 </div>
                 <div class="info-box note" style="margin: 20px 0 0;"><strong>Note:</strong> Both NIC stream-snippet patterns require the <code>-enable-snippets</code> command-line flag on the NIC controller.</div>
-            </section>
 
-            <section id="crd-translations">
-                <h2>CRD Translations</h2>
+                <h3 id="crd-translations">CRD Translations</h3>
                 <p>Worked YAML examples translating Traefik routing CRDs to NIC CRDs side-by-side. The Traefik side targets <code>traefik.io/v1alpha1</code>; NIC targets v5.5 CRDs (<code>k8s.nginx.org/v1</code> for VirtualServer, TransportServer, Policy, and GlobalConfiguration).</p>
-
-                <h3 id="crd-basic-ingressroute">1. Basic <code>IngressRoute</code> &rarr; <code>VirtualServer</code></h3>
-                <p>Single-host TLS-terminating route with two path-prefix branches.</p>
-                <div class="comparison">
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik CRD</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable">
+                                <td>Basic <code>IngressRoute</code> &mdash; single host, two paths</td>
+                                <td><span class="badge badge-virtualserver">VirtualServer CRD</span></td>
+                            </tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
                     <div class="comparison-block old">
                         <h5>Traefik (<code>IngressRoute</code>)</h5>
                         <pre><code>apiVersion: traefik.io/v1alpha1
@@ -1750,10 +1735,15 @@ spec:
                     </div>
                 </div>
                 <div class="info-box note" style="margin: 12px 0 0;"><strong>Mapping notes:</strong> Traefik <code>entryPoints: [websecure]</code> is implied by NIC's TLS configuration on the controller side. The match-DSL <code>Host(`...`) &amp;&amp; PathPrefix(`...`)</code> splits into VirtualServer <code>host</code> + <code>routes[].path</code>. Each Traefik <code>service</code> becomes an <code>upstreams[]</code> entry; routes reference them by upstream name in <code>action.pass</code>.</div>
+                            </div></td></tr>
 
-                <h3 id="crd-chain-middleware">2. <code>IngressRoute</code> with middleware chain &rarr; <code>VirtualServer</code> + Policies (chain flatten)</h3>
-                <p>A reusable <code>Chain</code> middleware (trusted IPs &rarr; rate limit &rarr; strip prefix) attached to a route. NIC has no chain abstraction &mdash; the chain is flattened into the consuming VirtualServer's <code>policies[]</code> array, and the prefix-strip becomes a rewrite on the upstream.</p>
-                <div class="comparison">
+                            <tr class="expandable">
+                                <td><code>IngressRoute</code> + <code>Chain</code> middleware &mdash; chain flatten</td>
+                                <td><span class="badge badge-policy">Policy CRDs</span> + <span class="badge badge-virtualserver">VirtualServer CRD</span></td>
+                            </tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <p>A reusable <code>Chain</code> middleware (trusted IPs &rarr; rate limit &rarr; strip prefix) attached to a route. NIC has no chain abstraction &mdash; the chain is flattened into the consuming VirtualServer's <code>policies[]</code> array, and the prefix-strip becomes a rewrite on the upstream.</p>
+                                <div class="comparison">
                     <div class="comparison-block old">
                         <h5>Traefik (Middleware + Chain + IngressRoute)</h5>
                         <pre><code>---
@@ -1856,10 +1846,15 @@ spec:
                     </div>
                 </div>
                 <div class="info-box warning" style="margin: 12px 0 0;"><strong>Chain flatten lossiness:</strong> The Traefik <code>Chain</code> middleware <code>api-chain</code> is gone &mdash; its three middlewares are now directly listed on the VS route. If <code>api-chain</code> was attached to multiple IngressRoutes, you must copy the same <code>policies[]</code> + <code>rewritePath</code> to every VS that consumed it. There is no shared, reusable chain abstraction in NIC.</div>
+                            </div></td></tr>
 
-                <h3 id="crd-tcp-route">3. <code>IngressRouteTCP</code> &rarr; <code>TransportServer</code> (with TLS passthrough variant)</h3>
-                <p>SNI-based TCP routing for non-HTTP workloads (databases, custom protocols). NIC requires a <code>GlobalConfiguration</code> with a named listener that <code>TransportServer</code> references by name.</p>
-                <div class="comparison">
+                            <tr class="expandable">
+                                <td><code>IngressRouteTCP</code> &mdash; TCP and TLS passthrough</td>
+                                <td><span class="badge badge-transportserver">TransportServer CRD</span> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
+                            </tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <p>SNI-based TCP routing for non-HTTP workloads (databases, custom protocols). NIC requires a <code>GlobalConfiguration</code> with a named listener that <code>TransportServer</code> references by name.</p>
+                                <div class="comparison">
                     <div class="comparison-block old">
                         <h5>Traefik (<code>IngressRouteTCP</code>)</h5>
                         <pre><code>apiVersion: traefik.io/v1alpha1
@@ -1946,10 +1941,15 @@ spec:
                     </div>
                 </div>
                 <div class="info-box note" style="margin: 12px 0 0;"><strong>Mapping notes:</strong> NIC's <code>tls-passthrough</code> listener is pre-configured on the controller via the <code>-enable-tls-passthrough</code> command-line flag (or the corresponding Helm value); it does not need a <code>GlobalConfiguration</code> listener entry. The Traefik <code>HostSNI(<em>x</em>)</code> matcher becomes NIC's <code>host</code> field.</div>
+                            </div></td></tr>
 
-                <h3 id="crd-traefik-service">4. <code>TraefikService</code> weighted (canary) &rarr; <code>VirtualServer</code> <code>splits</code></h3>
-                <p>Weighted Round Robin across two backends &mdash; the classic canary pattern. Maps cleanly to NIC's <code>routes[].splits[]</code>.</p>
-                <div class="comparison">
+                            <tr class="expandable">
+                                <td><code>TraefikService</code> &mdash; weighted services (canary)</td>
+                                <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].splits[]</code></td>
+                            </tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <p>Weighted Round Robin across two backends &mdash; the classic canary pattern. Maps cleanly to NIC's <code>routes[].splits[]</code>.</p>
+                                <div class="comparison">
                     <div class="comparison-block old">
                         <h5>Traefik (<code>TraefikService</code> + <code>IngressRoute</code>)</h5>
                         <pre><code>---
@@ -2005,41 +2005,49 @@ spec:
             pass: v2</code></pre>
                     </div>
                 </div>
-                <div class="info-box warning" style="margin: 12px 0 0;"><strong>TraefikService features without NIC equivalents:</strong>
-                    <ul style="margin: 8px 0 0 20px;">
-                        <li><strong>Mirroring</strong> (<code>TraefikService.mirroring</code> with <code>percent</code>): NIC has no built-in mirror on VirtualServer. Workaround: <code>nginx.org/location-snippets</code> with NGINX <code>mirror</code> + <code>mirror_request_body on;</code> directives &mdash; <code>-enable-snippets</code> required, and percentage-based mirroring needs additional snippet logic (<code>split_clients</code>).</li>
-                        <li><strong>Failover</strong> (primary/fallback with health-gated promotion): NIC has no active/standby switch on a VirtualServer route. Closest pattern: separate VirtualServers + external traffic management, or <code>nginx.org/upstream-fail-timeout</code> for passive failover within a single upstream.</li>
-                        <li><strong>Nested TraefikServices</strong> (a <code>TraefikService</code> whose <code>services[]</code> reference other <code>TraefikServices</code>): NIC <code>splits</code> are flat &mdash; nesting must be expanded into a flat weighted distribution during migration.</li>
+                                <div class="info-box warning" style="margin: 12px 0 0;"><strong>TraefikService features without NIC equivalents:</strong>
+                                    <ul style="margin: 8px 0 0 20px;">
+                                        <li><strong>Mirroring</strong> (<code>TraefikService.mirroring</code> with <code>percent</code>): NIC has no built-in mirror on VirtualServer. Workaround: <code>nginx.org/location-snippets</code> with NGINX <code>mirror</code> + <code>mirror_request_body on;</code> directives &mdash; <code>-enable-snippets</code> required, and percentage-based mirroring needs additional snippet logic (<code>split_clients</code>).</li>
+                                        <li><strong>Failover</strong> (primary/fallback with health-gated promotion): NIC has no active/standby switch on a VirtualServer route. Closest pattern: separate VirtualServers + external traffic management, or <code>nginx.org/upstream-fail-timeout</code> for passive failover within a single upstream.</li>
+                                        <li><strong>Nested TraefikServices</strong> (a <code>TraefikService</code> whose <code>services[]</code> reference other <code>TraefikServices</code>): NIC <code>splits</code> are flat &mdash; nesting must be expanded into a flat weighted distribution during migration.</li>
+                                    </ul>
+                                </div>
+                            </div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section><!-- /#mappings -->
+
+            <!-- ConfigMap Mappings -->
+            <section id="configmap-mappings">
+                <h2>ConfigMap Mappings</h2>
+                <p>Traefik does not use a single Kubernetes ConfigMap &mdash; static config is set via CLI args, env vars, or a mounted file (TOML/YAML). The toggles users most often touch map to NIC's <code>nginx-config</code> <code>ConfigMap</code> keys, NIC controller CLI flags, or Helm values.</p>
+
+                <div class="info-box tip" style="margin: 20px 0;">
+                    <strong>How to Read the Mappings</strong>
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li>The left column shows the equivalent Traefik static-config key (TOML/YAML or CLI flag).</li>
+                        <li>The right column shows the NIC mapping &mdash; usually a <code>nginx-config</code> ConfigMap key, but sometimes a Helm value or a CLI flag where NIC does not expose a ConfigMap key.</li>
+                        <li>Click any row to expand a side-by-side example.</li>
                     </ul>
                 </div>
-            </section>
-
-            <section id="configmap-mappings">
-                <h2>Static Config &rarr; ConfigMap Mappings</h2>
-                <p>Traefik does not use a single Kubernetes ConfigMap &mdash; static config is set via CLI args, env vars, or a mounted file (TOML/YAML). The toggles users most often touch map to NIC's <code>nginx-config</code> <code>ConfigMap</code> keys, NIC controller CLI flags, or Helm values. <strong>Click any row to expand a side-by-side example.</strong></p>
 
                 <div class="controls">
-                    <input type="search" placeholder="Filter ConfigMap keys by name..." data-filter-source="configmap" aria-label="Filter ConfigMap keys">
-                    <select data-filter-source="configmap" aria-label="Filter by category">
-                        <option value="">All categories</option>
-                        <option value="cm-redirects">Redirects</option>
-                        <option value="cm-tls">TLS</option>
-                        <option value="cm-logging">Logging</option>
-                        <option value="cm-observability">Metrics &amp; Tracing</option>
-                        <option value="cm-providers">Providers</option>
-                        <option value="cm-transport">Transport</option>
-                        <option value="cm-api">API / Dashboard</option>
+                    <input type="search" id="searchInputConfigMap" placeholder="Search ConfigMap keys..." data-filter-source="configmap" aria-label="Search ConfigMap keys">
+                    <select id="categoryFilterConfigMap" data-filter-source="configmap" aria-label="Filter by category">
+                        <option value="">All Categories</option>
                     </select>
-                    <span class="search-count" role="status"></span>
-                    <button class="btn btn-secondary" data-action="expandAllExamples" style="margin-left: auto;">Expand all</button>
-                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
+                    <span id="searchCountConfigMap" class="search-count" aria-live="polite"></span>
+                    <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
+                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
                 </div>
 
+                <h3 id="configmap-redirects">Redirects</h3>
                 <div class="table-wrapper">
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable" data-category="cm-redirects"><td><code>entryPoints.<em>name</em>.http.redirections.entryPoint.to</code></td><td>ConfigMap <code>ssl-redirect</code></td></tr>
+                            <tr class="expandable"><td><code>entryPoints.<em>name</em>.http.redirections.entryPoint.to</code></td><td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-redirect</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik (static config / CLI args)</h5><pre><code># Global http → https redirect:
@@ -2065,7 +2073,16 @@ data:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">For per-Ingress redirect control use <code>nginx.org/redirect-to-https: "true"</code> instead.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="cm-tls"><td><code>entryPoints.<em>name</em>.http.tls</code> (default TLS)</td><td>ConfigMap <code>ssl-protocols</code>, <code>ssl-ciphers</code>; CLI <code>-default-server-tls-secret</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-tls">TLS Defaults</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>entryPoints.<em>name</em>.http.tls</code> (default TLS)</td><td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-protocols</code>, <code>ssl-ciphers</code>; CLI <code>-default-server-tls-secret</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik (static config)</h5><pre><code>entryPoints:
@@ -2091,7 +2108,16 @@ data:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC TLS defaults are controller-wide. Per-Ingress TLS handshake overrides aren't supported &mdash; deploy distinct NIC controllers if different workloads need different TLS profiles.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="cm-logging"><td><code>log.level</code></td><td>ConfigMap <code>error-log-level</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-logging">Logging</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>log.level</code></td><td><span class="badge badge-configmap">ConfigMap</span> <code>error-log-level</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>log:
@@ -2149,7 +2175,16 @@ metadata:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC-managed log files aren't a first-class concept &mdash; the Kubernetes pattern is to log to stdout and collect with FluentBit/Loki/etc. If you absolutely need on-disk logs, configure via server-snippets.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="cm-observability"><td><code>metrics.prometheus.entryPoint</code></td><td>CLI flag <code>-enable-prometheus-metrics</code> / Helm value</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-observability">Metrics &amp; Tracing</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>metrics.prometheus.entryPoint</code></td><td>CLI flag <code>-enable-prometheus-metrics</code> / Helm value</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metrics:
@@ -2188,7 +2223,16 @@ controller:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC's OpenTelemetry integration covers OTLP exporters. For Jaeger / Zipkin, route through an OTel Collector (which speaks all three).</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="cm-providers"><td><code>providers.kubernetesIngress.ingressClass</code></td><td>CLI <code>-ingress-class</code> / Helm <code>controller.ingressClass.name</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-providers">Providers</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>providers.kubernetesIngress.ingressClass</code></td><td>CLI <code>-ingress-class</code> / Helm <code>controller.ingressClass.name</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
@@ -2267,7 +2311,16 @@ controller:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC's strict resolution prevents configuration that would produce empty upstreams. If you relied on this flag, plan to maintain at least one always-ready endpoint per Service.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="cm-transport"><td><code>serversTransport.insecureSkipVerify</code></td><td>ConfigMap <code>ssl-verify</code>; per-VS <code>upstream.tls</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-transport">Transport</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>serversTransport.insecureSkipVerify</code></td><td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-verify</code>; per-VS <code>upstream.tls</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>serversTransport:
@@ -2297,7 +2350,16 @@ data:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Prefer per-VirtualServer trusted CA configuration over global skip-verify. The keepalive ConfigMap keys cover Traefik's <code>maxIdleConnsPerHost</code>.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="cm-api"><td><code>api.dashboard</code>, <code>api.insecure</code></td><td>OSS NIC: no built-in dashboard; <span class="badge badge-plus">NIC Plus</span>: dashboard endpoint</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-api">API &amp; Dashboard</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>api.dashboard</code>, <code>api.insecure</code></td><td>OSS NIC: no built-in dashboard; <span class="badge badge-plus">NIC Plus</span>: dashboard endpoint</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>api:
@@ -2324,29 +2386,37 @@ controller:
                 </div>
             </section>
 
+            <!-- NGINX Plus Mappings -->
             <section id="plus-mappings">
-                <h2>NGINX Plus / Traefik Hub Middleware Mappings</h2>
-                <p>The Traefik Hub commercial offering ships several middlewares not present in the OSS <code>Middleware</code> CRD. NIC Plus has clean equivalents for some (JWT, OIDC, WAF, APIKey); others have no NIC equivalent and would require custom data-plane work or staying on the source. <strong>Click any row to expand a side-by-side example.</strong></p>
-                <div class="info-box warning" style="margin: 20px 0;"><strong>Heads-up:</strong> These rows assume the source workload was running on <em>Traefik Hub</em>, not OSS Traefik. If you're on OSS Traefik you do not have any of the middlewares listed in this section.</div>
+                <h2>NGINX Plus Mappings</h2>
+                <p>These features require an NGINX Plus subscription and provide enterprise-grade capabilities. The Traefik source for each row is a <em>Traefik Hub</em> middleware (not OSS Traefik). NIC Plus has clean Policy CRD mappings for JWT, OIDC, WAF, and APIKey; OAuth2 and distributed rate limiting are partial via the OSS <code>externalAuth</code> Policy or Plus + Redis; HMAC, LDAP, and OPA have no direct NIC equivalent.</p>
+                <div class="info-box warning" style="margin: 20px 0;"><strong>Heads-up:</strong> Every row assumes the source workload was running on <em>Traefik Hub</em>, not OSS Traefik. If you're on OSS Traefik you do not have any of the middlewares listed in this section.</div>
 
-                <div class="controls">
-                    <input type="search" placeholder="Filter Hub middlewares by name..." data-filter-source="plus" aria-label="Filter Hub middlewares">
-                    <select data-filter-source="plus" aria-label="Filter by mapping kind">
-                        <option value="">All mappings</option>
-                        <option value="hub-clean">Clean Plus mapping</option>
-                        <option value="hub-partial">Partial (via externalAuth or Plus + Redis)</option>
-                        <option value="hub-none">No equivalent</option>
-                    </select>
-                    <span class="search-count" role="status"></span>
-                    <button class="btn btn-secondary" data-action="expandAllExamples" style="margin-left: auto;">Expand all</button>
-                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
+                <div class="info-box tip" style="margin: 20px 0;">
+                    <strong>How to Read the Mappings</strong>
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li><strong>Hub-to-Plus rows <span style="color: var(--green);">&#9654;</span>:</strong> A Traefik Hub Middleware CRD maps to a NIC Plus <code>Policy</code> CRD. Click to expand for side-by-side YAML.</li>
+                        <li><strong>Partial mappings:</strong> The NIC side shows the closest pattern (often <code>externalAuth</code> Policy + a small bridge service) along with notes on the trade-offs.</li>
+                        <li><strong><em>No equivalent</em> rows:</strong> The NIC side shows documented workarounds (custom NIC data-plane build, sidecar pattern via <code>externalAuth</code>, or staying on the source).</li>
+                    </ul>
                 </div>
 
+                <div class="controls">
+                    <input type="search" id="searchInputPlus" placeholder="Search Plus mappings..." data-filter-source="plus" aria-label="Search Plus mappings">
+                    <select id="categoryFilterPlus" data-filter-source="plus" aria-label="Filter by category">
+                        <option value="">All Categories</option>
+                    </select>
+                    <span id="searchCountPlus" class="search-count" aria-live="polite"></span>
+                    <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
+                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
+                </div>
+
+                <h3 id="api-key-authentication">API Key Authentication</h3>
                 <div class="table-wrapper">
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable" data-category="hub-clean"><td><code>apiKey</code> <span class="badge badge-plus">NIC Plus</span></td><td><span class="badge badge-policy">Policy CRD <code>apiKey</code></span></td></tr>
+                            <tr class="expandable"><td><code>apiKey</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>apiKey</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2373,7 +2443,16 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Validates API keys present in a configurable header or query parameter against a Secret-mounted lookup map. The Secret data is <code>key=identity</code> pairs.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-partial"><td><code>distributedRateLimit</code> <span class="badge badge-plus">Hub Premium</span></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>rateLimit</code></span> + Redis <span class="badge badge-plus">NIC Plus</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="distributed-rate-limiting">Distributed Rate Limiting</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>distributedRateLimit</code></td><td>Partial via <span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>rateLimit</code> + Redis</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2405,7 +2484,16 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC Plus supports cluster-wide rate limiting via shared-zone synchronization. OSS NIC limits are per-pod and don't share state.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-none"><td><code>hmac</code></td><td>No equivalent</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="hmac-authentication">HMAC Authentication</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>hmac</code></td><td>No equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2433,7 +2521,16 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No first-class HMAC policy. The externalAuth + sidecar pattern is the standard NGINX way to do this.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-clean"><td><code>jwt</code> <span class="badge badge-plus">NIC Plus</span></td><td><span class="badge badge-policy">Policy CRD <code>jwt</code></span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="jwt-authentication">JWT Authentication</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>jwt</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>jwt</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2462,7 +2559,16 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Clean Plus mapping. NIC validates JWTs against a Secret-mounted JWK set or remote <code>jwksURI</code>. Supports <code>jwtToken</code> claim extraction for downstream propagation.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-none"><td><code>ldap</code></td><td>No equivalent</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="ldap-authentication">LDAP Authentication</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>ldap</code></td><td>No equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2495,7 +2601,16 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The reference daemon approach keeps LDAP credentials inside one validator service, with NIC just relaying via externalAuth.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-partial"><td><code>oAuthClientCredentials</code> <span class="badge badge-plus">Hub</span></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (OSS) + token broker</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="oauth2-authentication">OAuth2 Authentication</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>oAuthClientCredentials</code></td><td>Partial via <span class="badge badge-policy">Policy CRD</span> <code>externalAuth</code> (OSS) + token broker</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2527,7 +2642,7 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Standing up a small token broker keeps OAuth2 credentials in one place. NIC then relays via externalAuth without ever holding the client_secret.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-partial"><td><code>oAuthIntrospection</code> <span class="badge badge-plus">Hub</span></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (OSS) + introspection endpoint</td></tr>
+                            <tr class="expandable"><td><code>oAuthIntrospection</code></td><td>Partial via <span class="badge badge-policy">Policy CRD</span> <code>externalAuth</code> (OSS) + introspection endpoint</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2552,7 +2667,16 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Point externalAuth's <code>authURI</code> at a service that introspects opaque tokens (RFC 7662 <code>POST /introspect</code>) and forwards an HTTP 2xx/4xx.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-clean"><td><code>oidc</code> <span class="badge badge-plus">NIC Plus</span></td><td><span class="badge badge-policy">Policy CRD <code>oidc</code></span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="oidc-authentication">OIDC Authentication</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>oidc</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>oidc</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2581,7 +2705,16 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Native OIDC integration (authorization code flow with PKCE). The OAuth2 sign-in redirect location is shared across all routes on the same host.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-none"><td><code>opa</code></td><td>No equivalent</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="opa-authorization">OPA Authorization</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>opa</code></td><td>No equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2609,7 +2742,16 @@ spec:
                                 <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The OPA team publishes <code>opa-envoy-plugin</code> and similar HTTP-fronted OPA evaluators that work with externalAuth without modification.</p>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="hub-clean"><td><code>waf</code> <span class="badge badge-plus">NIC Plus + App Protect</span></td><td><span class="badge badge-policy">Policy CRD <code>waf</code></span> (F5 App Protect)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="waf">WAF</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable"><td><code>waf</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>waf</code> (F5 App Protect)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2659,140 +2801,7 @@ spec:
         const TRAEFIK_RELEASE_URL = 'https://github.com/traefik/traefik/releases/tag/' + TRAEFIK_VERSION;
         const NIC_RELEASE_URL = 'https://github.com/nginx/kubernetes-ingress/releases/tag/' + NIC_VERSION;
 
-        function toggleRow(row) {
-            const exampleRow = row.nextElementSibling;
-            if (exampleRow && exampleRow.classList.contains('example-row')) {
-                row.classList.toggle('expanded');
-                exampleRow.classList.toggle('visible');
-                let isExpanded = row.classList.contains('expanded');
-                row.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
-                exampleRow.setAttribute('aria-hidden', isExpanded ? 'false' : 'true');
-            }
-        }
-
-        function switchApproach(btn, type) {
-            const container = btn.closest('.example-content');
-            if (!container) return;
-            container.querySelectorAll('.approach-tab').forEach(function(t) {
-                t.classList.remove('active');
-                t.setAttribute('aria-selected', 'false');
-            });
-            container.querySelectorAll('.approach-content').forEach(function(c) {
-                c.classList.remove('active');
-                c.setAttribute('aria-hidden', 'true');
-            });
-            btn.classList.add('active');
-            btn.setAttribute('aria-selected', 'true');
-            let panel = container.querySelector('.approach-content[data-approach="' + type + '"]');
-            if (panel) {
-                panel.classList.add('active');
-                panel.setAttribute('aria-hidden', 'false');
-            }
-        }
-
-        function expandAllExamples(btn) {
-            let scope = document;
-            let scopeId = btn.getAttribute('data-scope');
-            if (scopeId) {
-                let scopeEl = document.getElementById(scopeId);
-                if (scopeEl) scope = scopeEl;
-            } else {
-                let section = btn.closest('section');
-                if (section) scope = section;
-            }
-            scope.querySelectorAll('.expandable').forEach(function(row) {
-                row.classList.add('expanded');
-                row.setAttribute('aria-expanded', 'true');
-                const exampleRow = row.nextElementSibling;
-                if (exampleRow && exampleRow.classList.contains('example-row')) {
-                    exampleRow.classList.add('visible');
-                    exampleRow.setAttribute('aria-hidden', 'false');
-                }
-            });
-        }
-
-        function collapseAllExamples(btn) {
-            let scope = document;
-            let scopeId = btn.getAttribute('data-scope');
-            if (scopeId) {
-                let scopeEl = document.getElementById(scopeId);
-                if (scopeEl) scope = scopeEl;
-            } else {
-                let section = btn.closest('section');
-                if (section) scope = section;
-            }
-            scope.querySelectorAll('.expandable').forEach(function(row) {
-                row.classList.remove('expanded');
-                row.setAttribute('aria-expanded', 'false');
-                const exampleRow = row.nextElementSibling;
-                if (exampleRow && exampleRow.classList.contains('example-row')) {
-                    exampleRow.classList.remove('visible');
-                    exampleRow.setAttribute('aria-hidden', 'true');
-                }
-            });
-        }
-
-        function filterTable(source) {
-            let section = source.closest('section');
-            if (!section) return;
-            let searchInput = section.querySelector('input[type="search"]');
-            let categorySelect = section.querySelector('select[data-filter-source]');
-            let term = searchInput ? searchInput.value.toLowerCase() : '';
-            let category = categorySelect ? categorySelect.value : '';
-            let visibleCount = 0;
-            let totalRows = 0;
-            section.querySelectorAll('.mapping-table').forEach(function(table) {
-                table.querySelectorAll('tbody tr').forEach(function(row) {
-                    if (row.classList.contains('example-row')) {
-                        if (term || category) {
-                            row.classList.remove('visible');
-                            let prev = row.previousElementSibling;
-                            if (prev) {
-                                prev.classList.remove('expanded');
-                                prev.setAttribute('aria-expanded', 'false');
-                            }
-                        }
-                        return;
-                    }
-                    totalRows++;
-                    let textMatch = !term || row.textContent.toLowerCase().includes(term);
-                    let rowCategory = row.getAttribute('data-category') || '';
-                    let categoryMatch = !category || rowCategory === category;
-                    let match = textMatch && categoryMatch;
-                    row.style.display = match ? '' : 'none';
-                    if (match) visibleCount++;
-                });
-            });
-            // Hide empty h3 subgroups when a filter is active
-            section.querySelectorAll('h3[id]').forEach(function(h3) {
-                let cursor = h3.nextElementSibling;
-                let wrapper = null;
-                while (cursor && !wrapper) {
-                    if (cursor.classList && cursor.classList.contains('table-wrapper')) wrapper = cursor;
-                    cursor = cursor.nextElementSibling;
-                }
-                if (!wrapper) return;
-                let subVisible = 0;
-                wrapper.querySelectorAll('tbody tr:not(.example-row)').forEach(function(r) {
-                    if (r.style.display !== 'none') subVisible++;
-                });
-                let hideGroup = (term || category) && subVisible === 0;
-                h3.style.display = hideGroup ? 'none' : '';
-                wrapper.style.display = hideGroup ? 'none' : '';
-                let intro = h3.nextElementSibling;
-                if (intro && intro.tagName === 'P') intro.style.display = hideGroup ? 'none' : '';
-            });
-            let countEl = section.querySelector('.search-count');
-            if (countEl) {
-                if (term || category) {
-                    countEl.textContent = visibleCount + ' of ' + totalRows + ' rows';
-                    countEl.className = 'search-count' + (visibleCount === 0 ? ' no-results' : '');
-                } else {
-                    countEl.textContent = '';
-                    countEl.className = 'search-count';
-                }
-            }
-        }
+        // Generic reference-table helpers + dispatcher + wiring live in migration-shared.js.
 
         function init() {
             // Version banner population
@@ -2811,9 +2820,8 @@ spec:
             let sectionPageMap = {
                 overview: 'getting-started', 'why-migrate': 'getting-started', 'phased-migration': 'getting-started',
                 features: 'getting-started', installation: 'getting-started', checklist: 'getting-started', resources: 'getting-started',
-                differences: 'reference', 'annotation-mappings': 'reference', 'middleware-mappings': 'reference',
-                'tcp-middleware-mappings': 'reference', 'crd-translations': 'reference',
-                'configmap-mappings': 'reference', 'plus-mappings': 'reference'
+                differences: 'reference', mappings: 'reference',
+                'plus-mappings': 'reference', 'configmap-mappings': 'reference'
             };
             let currentPage = 'getting-started';
 
@@ -2925,53 +2933,6 @@ spec:
                 }, { rootMargin: (document.body.classList.contains('has-banner') ? '-87px' : '-52px') + ' 0px -60% 0px', threshold: 0 });
                 sections.forEach(function(s) { observer.observe(s.el); });
             }
-
-            // Expandable row wiring (table mappings)
-            document.querySelectorAll('.expandable').forEach(function(row, i) {
-                row.setAttribute('tabindex', '0');
-                row.setAttribute('role', 'button');
-                row.setAttribute('aria-expanded', 'false');
-                let exampleRow = row.nextElementSibling;
-                if (exampleRow && exampleRow.classList.contains('example-row')) {
-                    if (!exampleRow.id) exampleRow.id = 'tex-' + i;
-                    row.setAttribute('aria-controls', exampleRow.id);
-                    exampleRow.setAttribute('aria-hidden', 'true');
-                }
-                row.addEventListener('click', function(e) {
-                    if (e.target.closest('button, a, input, select, textarea, .approach-tab')) return;
-                    toggleRow(this);
-                });
-                row.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRow(this); }
-                });
-            });
-
-            // Filter input/select handlers
-            document.querySelectorAll('[data-filter-source]').forEach(function(el) {
-                let evt = el.tagName === 'SELECT' ? 'change' : 'input';
-                el.addEventListener(evt, function() { filterTable(this); });
-            });
-
-            // Action delegator (data-action=...) — handles expand/collapse and approach tabs
-            let ACTIONS = {
-                expandAllExamples: function(el) { expandAllExamples(el); },
-                collapseAllExamples: function(el) { collapseAllExamples(el); },
-                switchApproach: function(el) { switchApproach(el, el.getAttribute('data-approach')); }
-            };
-            document.addEventListener('click', function(e) {
-                let el = e.target.closest('[data-action]');
-                if (!el) return;
-                let fn = ACTIONS[el.getAttribute('data-action')];
-                if (fn) fn(el);
-            });
-            document.addEventListener('keydown', function(e) {
-                if (e.key !== 'Enter' && e.key !== ' ') return;
-                let el = e.target.closest('[data-action]');
-                if (!el || el.tagName === 'BUTTON') return;
-                e.preventDefault();
-                let fn = ACTIONS[el.getAttribute('data-action')];
-                if (fn) fn(el);
-            });
 
             let hash = location.hash.replace('#', '');
             if (hash) {

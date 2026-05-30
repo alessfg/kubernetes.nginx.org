@@ -114,6 +114,15 @@
                                 <span class="sidebar-link-desc">Tool Overview &amp; Migration Strategy</span>
                             </span>
                         </button>
+                        <ul class="sidebar-subnav open">
+                            <li><button class="sidebar-link" data-section="overview"><span class="dot"></span><span class="sidebar-link-name">Overview</span></button></li>
+                            <li><button class="sidebar-link" data-section="why-migrate"><span class="dot"></span><span class="sidebar-link-name">Why Migrate?</span></button></li>
+                            <li><button class="sidebar-link" data-section="phased-migration"><span class="dot"></span><span class="sidebar-link-name">Phased Migration</span></button></li>
+                            <li><button class="sidebar-link" data-section="features"><span class="dot"></span><span class="sidebar-link-name">CRDs Summary</span></button></li>
+                            <li><button class="sidebar-link" data-section="installation"><span class="dot"></span><span class="sidebar-link-name">Installing CRDs</span></button></li>
+                            <li><button class="sidebar-link" data-section="checklist"><span class="dot"></span><span class="sidebar-link-name">Migration Checklist</span></button></li>
+                            <li><button class="sidebar-link" data-section="resources"><span class="dot"></span><span class="sidebar-link-name">Additional Resources</span></button></li>
+                        </ul>
                     </li>
                     <li>
                         <button class="sidebar-link" data-page="analyzer">
@@ -175,12 +184,182 @@
 
             <section id="overview">
                 <h2 id="migration-overview">Overview</h2>
-                <p>This interactive guide will help you migrate from Traefik Proxy to the F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). Coverage will include:</p>
+                <p>This interactive guide helps you migrate from Traefik Proxy (<code>traefik/traefik</code>) to the F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). It covers Traefik annotations on standard Ingress resources, the full set of OSS HTTP and TCP middlewares, IngressRoute / IngressRouteTCP / TraefikService translations, and Traefik static-config to NIC ConfigMap mappings &mdash; across three tabs:</p>
                 <ul style="padding-left: 40px;">
-                    <li><strong>Annotation mappings</strong> &mdash; Translations for <code>traefik.ingress.kubernetes.io/router.*</code> and <code>traefik.ingress.kubernetes.io/service.*</code> annotations on standard Ingress resources</li>
-                    <li><strong>Middleware mappings</strong> &mdash; Mappings for all 22 OSS HTTP middlewares (StripPrefix, RateLimit, Headers, etc.) to NIC Policy CRDs, annotations, or snippets</li>
-                    <li><strong>CRD migration</strong> &mdash; Worked examples translating Traefik <code>IngressRoute</code>, <code>IngressRouteTCP</code>, and <code>TraefikService</code> to NIC <code>VirtualServer</code>, <code>TransportServer</code>, and <code>Policy</code> CRDs</li>
-                    <li><strong>Static-config mappings</strong> &mdash; Equivalent NIC <code>nginx-config</code> ConfigMap keys for Traefik's common static-config toggles</li>
+                    <li><strong>Getting Started</strong> &mdash; Why migrate, CRD overviews, installation, and a Traefik-aware migration checklist</li>
+                    <li><strong>Traefik Config Analyzer</strong> &mdash; (coming soon) Paste an <code>IngressRoute</code>, <code>Middleware</code>, or annotated Ingress and get migration suggestions with ready-to-use NIC YAML</li>
+                    <li><strong>Reference Guide</strong> &mdash; Complete annotation, middleware, and CRD mapping tables with side-by-side examples</li>
+                </ul>
+            </section>
+
+            <section id="why-migrate">
+                <h2 id="why-migrate-heading">Why Migrate?</h2>
+                <p>Traefik is actively maintained, so the case for switching is feature- and ecosystem-driven rather than urgency-driven. The F5 NGINX Ingress Controller (NIC) is the right target when one or more of the following applies:</p>
+                <ul style="padding-left: 40px;">
+                    <li><strong>NGINX Plus features</strong> &mdash; JWT validation, OIDC integration, F5 WAF (App Protect), API Key auth, native session persistence with sticky cookies, and active backend health checks are first-class Policy CRDs and annotations in NIC.</li>
+                    <li><strong>F5 commercial support</strong> &mdash; Paid 24&times;7 support, FIPS 140-3 builds, and access to F5's broader security stack (App Protect WAF, App Protect DoS) for regulated workloads.</li>
+                    <li><strong>NGINX ecosystem alignment</strong> &mdash; If your team already runs NGINX OSS or NGINX Plus outside Kubernetes, NIC keeps the configuration model and operational tooling consistent. Snippet annotations let you inject raw NGINX directives when CRDs don't cover a niche use case.</li>
+                    <li><strong>Battle-tested data plane</strong> &mdash; NIC ships NGINX as its data plane (OSS or Plus). NGINX has decades of production hardening as an HTTP server and reverse proxy.</li>
+                    <li><strong>Schema-validated CRDs</strong> &mdash; VirtualServer, VirtualServerRoute, Policy, TransportServer, and GlobalConfiguration provide structured, validated configuration with IDE autocompletion &mdash; closely matching Traefik's own CRD-native philosophy.</li>
+                </ul>
+                <p style="margin-top: 24px;">Migration friction worth flagging up front (covered in detail throughout the Reference Guide):</p>
+                <ul style="padding-left: 40px;">
+                    <li>Traefik's <strong><code>Chain</code> middleware</strong> has no NIC equivalent &mdash; chains are flattened during migration; the named-chain abstraction is lost.</li>
+                    <li>The Traefik <strong>match-string DSL</strong> (<code>Host(`...`) &amp;&amp; PathPrefix(`...`)</code>) translates to VirtualServer <code>routes[].path</code> + <code>routes[].matches[]</code>, but matchers like <code>HostRegexp</code>, <code>Query</code>, and <code>ClientIP</code> require careful per-case mapping.</li>
+                    <li><strong>Cert resolvers (ACME)</strong> are not built into NIC. Plan to install <code>cert-manager</code> for certificate issuance and reference the issued Secret in <code>spec.tls.secretName</code>.</li>
+                    <li><strong>Plugins</strong> loaded via Traefik's plugin catalog are not migratable &mdash; each needs a manual review for an NGINX module or snippet equivalent.</li>
+                    <li><strong>EntryPoints</strong> beyond <code>web</code>/<code>websecure</code> may not have a clean NIC equivalent &mdash; HTTP listening ports are configured via NIC CLI flags / Helm values, not per-Ingress.</li>
+                    <li><strong>TraefikService mirroring</strong>, <strong>per-route metrics / tracing toggles</strong>, <strong><code>router.priority</code></strong>, <strong><code>service.nodeportlb</code></strong>, and <strong><code>GrpcWeb</code> translation</strong> have no NIC equivalent &mdash; documented workarounds (or "keep Traefik for these specific routes") apply.</li>
+                </ul>
+            </section>
+
+            <section id="phased-migration">
+                <h2 id="phased-migration-strategy">Phased Migration Strategy</h2>
+                <p>Rather than performing a "big bang" cutover, F5 recommends a phased migration that lets you validate each workload before decommissioning Traefik. Both controllers can run side-by-side in the same cluster using separate <code>IngressClass</code> resources.</p>
+                <ol style="padding-left: 40px;">
+                    <li><strong>Deploy side-by-side</strong> &mdash; Install the F5 NGINX Ingress Controller alongside Traefik using a distinct <code>IngressClass</code> (e.g., <code>nginx-nic</code>). Traefik continues to serve all existing traffic.</li>
+                    <li><strong>Migrate workload-by-workload</strong> &mdash; For each application:
+                        <ul style="padding-left: 24px; margin-top: 6px;">
+                            <li>If the workload uses <strong>standard Ingress + Traefik annotations</strong>, translate annotations per the Reference Guide, then update <code>ingressClassName</code> to the NIC class.</li>
+                            <li>If it uses <strong>IngressRoute / Middleware CRDs</strong>, generate equivalent VirtualServer + Policy CRDs, apply them, then delete the IngressRoute. The TraefikService weighted-services pattern usually maps to VirtualServer <code>splits</code>.</li>
+                            <li>Validate routing, TLS, and any middleware-driven behavior (auth, rate limiting) in staging before promoting.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Migrate edge concerns</strong> &mdash; Cert issuance (ACME &rarr; cert-manager), entry-point overrides, and any plugin-driven behavior need a separate path (see the "Why Migrate" caveats above).</li>
+                    <li><strong>Decommission Traefik</strong> &mdash; After all workloads have moved and been validated, remove Traefik's deployment, its <code>IngressClass</code>, and the Traefik CRDs (<code>kubectl delete crd ingressroutes.traefik.io ingressroutetcps.traefik.io middlewares.traefik.io ...</code>).</li>
+                </ol>
+                <div class="info-box tip"><strong>Tip:</strong> The Traefik Config Analyzer tab (coming soon) will accept individual IngressRoute / Middleware / annotated Ingress manifests and emit the equivalent NIC configuration &mdash; use it during step 2 to accelerate per-workload conversion.</div>
+            </section>
+
+            <section id="features">
+                <h2 id="crd-features">CRDs Summary</h2>
+                <p>The F5 NGINX Ingress Controller uses Custom Resource Definitions (CRDs) to extend Kubernetes with NGINX-specific configuration. CRDs provide type-safe, validated configuration that goes beyond what standard Ingress annotations can offer.</p>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4><span class="badge badge-virtualserver" style="margin:0 8px 0 0; font-size: 0.95rem; padding: 4px 12px;">VirtualServer CRD</span></h4>
+                        <p class="description">The primary CRD for configuring HTTP/HTTPS load balancing. The migration target for Traefik <code>IngressRoute</code>. Provides advanced traffic management capabilities with full validation.</p>
+                        <ul>
+                            <li><strong>Traffic Splitting:</strong> Route percentages of traffic to different backends &mdash; the migration target for Traefik <code>TraefikService</code> weighted services</li>
+                            <li><strong>Content-Based Routing:</strong> Route based on headers, cookies, arguments, or variables &mdash; maps to Traefik's <code>Headers</code> / <code>Query</code> matchers</li>
+                            <li><strong>Path Rewriting:</strong> Modify request URIs &mdash; replaces Traefik <code>StripPrefix</code>, <code>ReplacePath</code>, <code>ReplacePathRegex</code> middlewares</li>
+                            <li><strong>Error Pages:</strong> Custom responses &mdash; replaces Traefik <code>Errors</code> middleware</li>
+                            <li><strong>Request/Response Headers:</strong> Add, modify, or remove headers &mdash; replaces parts of Traefik <code>Headers</code> middleware</li>
+                            <li><strong>Health Checks:</strong> Active health monitoring (NIC Plus) &mdash; closest analog to Traefik <code>CircuitBreaker</code></li>
+                            <li><strong>Session Persistence:</strong> Cookie-based sticky sessions (NIC Plus) &mdash; replaces Traefik <code>service.sticky.cookie.*</code> annotations</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card">
+                        <h4><span class="badge badge-virtualserverroute" style="margin:0 8px 0 0; font-size: 0.95rem; padding: 4px 12px;">VirtualServerRoute CRD</span></h4>
+                        <p class="description">Enables delegation of route configuration to different namespaces. Useful when migrating Traefik setups where teams managed their own IngressRoutes.</p>
+                        <ul>
+                            <li><strong>Cross-Namespace Routing:</strong> Reference services in different namespaces</li>
+                            <li><strong>Path Delegation:</strong> Delegate path prefixes to other teams/namespaces</li>
+                            <li><strong>Independent Updates:</strong> Teams update routes without modifying the parent VirtualServer</li>
+                            <li><strong>Access Control:</strong> Limit which namespaces can define routes for a host</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card">
+                        <h4><span class="badge badge-policy" style="margin:0 8px 0 0; font-size: 0.95rem; padding: 4px 12px;">Policy CRD</span></h4>
+                        <p class="description">Reusable security and traffic policies attached to VirtualServers or specific routes. The migration target for most Traefik HTTP <code>Middleware</code> kinds.</p>
+                        <ul>
+                            <li><strong>Rate Limiting:</strong> Token-bucket per source &mdash; replaces Traefik <code>RateLimit</code> middleware</li>
+                            <li><strong>Access Control:</strong> IP allowlists/denylists &mdash; replaces Traefik <code>IPAllowList</code> middleware</li>
+                            <li><strong>Basic Auth:</strong> htpasswd-based authentication (OSS) &mdash; replaces Traefik <code>BasicAuth</code> middleware</li>
+                            <li><strong>External Auth:</strong> Subrequest-based auth (new in v5.5, OSS) &mdash; replaces Traefik <code>ForwardAuth</code> middleware</li>
+                            <li><strong>JWT Validation:</strong> JSON Web Tokens (Plus) &mdash; replaces Traefik Hub <code>JWT</code> middleware</li>
+                            <li><strong>OIDC:</strong> Native OpenID Connect (Plus) &mdash; replaces Traefik Hub <code>OIDC</code> middleware</li>
+                            <li><strong>API Key Auth:</strong> Header/query-based keys (Plus) &mdash; replaces Traefik Hub <code>APIKey</code> middleware</li>
+                            <li><strong>mTLS:</strong> Client cert verification (ingress) and backend TLS (egress) &mdash; replaces Traefik <code>PassTLSClientCert</code> + <code>ServersTransport</code> mTLS</li>
+                            <li><strong>WAF:</strong> F5 WAF for NGINX (Plus) &mdash; replaces Traefik Hub <code>WAF</code> middleware</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card">
+                        <h4><span class="badge badge-transportserver" style="margin:0 8px 0 0; font-size: 0.95rem; padding: 4px 12px;">TransportServer CRD</span></h4>
+                        <p class="description">Configures TCP/UDP load balancing for non-HTTP protocols. The migration target for Traefik <code>IngressRouteTCP</code> and <code>IngressRouteUDP</code>.</p>
+                        <ul>
+                            <li><strong>TCP Load Balancing:</strong> MySQL, PostgreSQL, Redis, custom TCP services &mdash; replaces <code>IngressRouteTCP</code></li>
+                            <li><strong>UDP Load Balancing:</strong> DNS, RADIUS, gaming protocols &mdash; replaces <code>IngressRouteUDP</code></li>
+                            <li><strong>TLS Passthrough:</strong> SNI-based routing without termination &mdash; replaces <code>IngressRouteTCP</code> with <code>tls.passthrough: true</code></li>
+                            <li><strong>Health Checks:</strong> TCP/UDP health monitoring</li>
+                            <li><strong>Session Persistence:</strong> IP hash-based session affinity</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card">
+                        <h4><span class="badge badge-globalconfiguration" style="margin:0 8px 0 0; font-size: 0.95rem; padding: 4px 12px;">GlobalConfiguration CRD</span></h4>
+                        <p class="description">Cluster-wide configuration for the F5 NGINX Ingress Controller. Defines listener ports that <code>TransportServer</code> resources reference &mdash; the closest analog to Traefik <code>EntryPoints</code>.</p>
+                        <ul>
+                            <li><strong>TCP/UDP Listeners:</strong> Define ports for non-HTTP traffic &mdash; replaces Traefik EntryPoints for TCP/UDP</li>
+                            <li><strong>TLS Passthrough Listeners:</strong> Configure SNI-based routing ports</li>
+                            <li><strong>Global Settings:</strong> Controller-wide configuration options</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section id="installation">
+                <h2 id="installing-crds">Installing CRDs</h2>
+                <p>CRDs can be installed via Helm or manually using manifests, depending on your deployment method. See the <a href="https://docs.nginx.com/nginx-ingress-controller/installation/" target="_blank" rel="noopener">F5 NGINX Ingress Controller installation docs</a> for full instructions.</p>
+                <div class="install-box"><h4>Helm (example)</h4>
+                    <p style="margin: 0 0 12px; font-size: 0.9rem;">If you install the F5 NGINX Ingress Controller via Helm, CRDs are included automatically. To ensure they are enabled:</p>
+                    <pre><code>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version 2.5.0 --set controller.enableCRDs=true</code></pre>
+                    <p style="margin: 12px 0 0; font-size: 0.85rem; opacity: 0.8;">The <code>controller.enableCRDs</code> flag is <code>true</code> by default. See the <a href="https://docs.nginx.com/nginx-ingress-controller/installation/installing-nic/installation-with-helm/" target="_blank" rel="noopener">Helm installation guide</a> for details.</p>
+                </div>
+                <div class="install-box"><h4>Manifests (example)</h4>
+                    <p style="margin: 0 0 12px; font-size: 0.9rem;">If you deploy using manifests, install CRDs manually before deploying the controller:</p>
+                    <pre><code data-nic-crd-install>kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/v5.5.0/deploy/crds.yaml</code></pre>
+                    <p style="margin: 12px 0 0; font-size: 0.85rem; opacity: 0.8;">Replace the version number with your target controller version. See the <a href="https://docs.nginx.com/nginx-ingress-controller/installation/installing-nic/installation-with-manifests/" target="_blank" rel="noopener">manifest installation guide</a> for the full step-by-step process.</p>
+                </div>
+                <div class="info-box note"><strong>Note:</strong> The <code>crds.yaml</code> file contains all CRDs (VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration) in a single manifest.</div>
+                <div class="info-box tip"><strong>Tip:</strong> If you were using Traefik's built-in ACME client for cert issuance, install <code>cert-manager</code> before cutting traffic over &mdash; NIC delegates certificate issuance to cert-manager and references the issued <code>Secret</code> in <code>spec.tls.secretName</code>.</div>
+            </section>
+
+            <section id="checklist">
+                <h2 id="migration-checklist">Migration Checklist</h2>
+                <ul class="checklist" id="migrationChecklist">
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Install NIC CRDs via Helm (<code>controller.enableCRDs=true</code>) or manifests (<code>deploy/crds.yaml</code>)</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Install <code>cert-manager</code> if Traefik was issuing certificates via ACME (NIC has no built-in ACME client)</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Deploy NIC side-by-side with Traefik using a distinct <code>IngressClass</code> (e.g., <code>nginx-nic</code>)</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>For workloads on standard Ingress + Traefik annotations: translate <code>router.*</code> and <code>service.*</code> annotations to NIC equivalents (see Reference Guide)</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>For workloads using <code>IngressRoute</code>: rewrite to <code>VirtualServer</code> with attached Policy CRDs</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>For workloads using <code>IngressRouteTCP</code>: rewrite to <code>TransportServer</code> (with optional <code>GlobalConfiguration</code> listener)</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>For workloads using <code>TraefikService</code> weighted routing: convert to <code>VirtualServer</code> <code>splits</code></span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>TraefikService mirroring: no direct equivalent &mdash; use <code>location-snippets</code> with the NGINX <code>mirror</code> directive, or accept loss</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Flatten any <code>Chain</code> middleware: inline each chained middleware into the consuming VirtualServer or Policy attachment</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>RateLimit</code> middleware to Policy CRD <code>rateLimit</code></span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>BasicAuth</code> middleware to Policy CRD <code>basicAuth</code> (OSS) or <code>nginx.org/basic-auth-secret</code> annotation</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>IPAllowList</code> middleware to Policy CRD <code>accessControl</code></span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>ForwardAuth</code> middleware to Policy CRD <code>externalAuth</code> (new in NIC v5.5, OSS-compatible)</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>Headers</code> middleware to <code>VirtualServer</code> <code>requestHeaders</code>/<code>responseHeaders</code> or <code>nginx.org/proxy-set-headers</code></span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>StripPrefix</code> / <code>ReplacePath</code> / <code>AddPrefix</code> middlewares to <code>nginx.org/rewrites</code></span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>RedirectScheme</code> middleware to <code>nginx.org/redirect-to-https</code></span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>Compress</code> middleware to global gzip ConfigMap keys (NIC has no per-route compression toggle)</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert <code>Buffering</code> middleware to <code>nginx.org/proxy-*</code> annotations or ConfigMap <code>proxy-*</code> keys</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Convert HSTS via <code>Headers</code> middleware to NIC ConfigMap <code>hsts*</code> keys</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Replace Traefik <code>certResolver</code> TLS with cert-manager-issued Secrets referenced from <code>spec.tls.secretName</code></span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Accept that per-route metrics/tracing toggles have no NIC equivalent (global only) &mdash; adjust observability expectations</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>For gRPC-Web routes: NIC has no translation &mdash; either keep Traefik or move translation to backend (Envoy sidecar, server-side library)</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Test routing and middleware behavior in staging</span></li>
+                    <li role="checkbox" aria-checked="false" tabindex="0"><span>Update monitoring and alerting (NIC exports its own Prometheus metric set)</span></li>
+                </ul>
+            </section>
+
+            <section id="resources">
+                <h2 id="additional-resources">Additional Resources</h2>
+                <ul style="padding-left: 40px;">
+                    <li><a href="https://docs.nginx.com/nginx-ingress-controller/" target="_blank" rel="noopener noreferrer">F5 NGINX Ingress Controller Documentation</a></li>
+                    <li><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/virtualserver-and-virtualserverroute-resources/" target="_blank" rel="noopener noreferrer">VirtualServer / VirtualServerRoute Reference</a></li>
+                    <li><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/policy-resource/" target="_blank" rel="noopener noreferrer">Policy CRD Reference</a></li>
+                    <li><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/transportserver-resource/" target="_blank" rel="noopener noreferrer">TransportServer CRD Reference</a></li>
+                    <li><a href="https://doc.traefik.io/traefik/routing/providers/kubernetes-crd/" target="_blank" rel="noopener noreferrer">Traefik Kubernetes CRD Provider Reference</a> (for cross-checking what you're migrating from)</li>
+                    <li><a href="https://doc.traefik.io/traefik/middlewares/http/overview/" target="_blank" rel="noopener noreferrer">Traefik HTTP Middlewares Overview</a></li>
+                    <li><a href="https://github.com/kubernetes-sigs/ingress2gateway" target="_blank" rel="noopener noreferrer">ingress2gateway</a> &mdash; alternative path if you want Gateway API instead of NIC</li>
+                    <li><a href="https://github.com/nginx/kubernetes-ingress" target="_blank" rel="noopener noreferrer">NGINX Ingress Controller on GitHub</a></li>
+                    <li><a href="https://github.com/nginx/kubernetes.nginx.org" target="_blank" rel="noopener noreferrer">Contribute to This Tool</a></li>
                 </ul>
             </section>
             </div><!-- /.tool-page #page-getting-started -->
@@ -221,9 +400,15 @@
             let yearEl = document.getElementById('copyright-year');
             if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-            // Page navigation (no subnav in scaffold — Phase 2 fills sections)
             let pageLinks = document.querySelectorAll('.sidebar-link[data-page]');
+            let sectionLinks = document.querySelectorAll('.sidebar-link[data-section]');
+            let allSubnavs = document.querySelectorAll('.sidebar-subnav');
             let pageNames = { 'getting-started': 'Getting Started', analyzer: 'Config Analyzer', reference: 'Reference Guide' };
+            // Map sections to their parent pages — Phase 2c will add reference-page sections here
+            let sectionPageMap = {
+                overview: 'getting-started', 'why-migrate': 'getting-started', 'phased-migration': 'getting-started',
+                features: 'getting-started', installation: 'getting-started', checklist: 'getting-started', resources: 'getting-started'
+            };
             let currentPage = 'getting-started';
 
             function closeMobileSidebar() {
@@ -236,7 +421,8 @@
                 document.body.style.overflow = '';
             }
 
-            function showPage(id) {
+            function showPage(id, opts) {
+                opts = opts || {};
                 let switching = (id !== currentPage);
                 currentPage = id;
                 document.querySelectorAll('.tool-page').forEach(function(p) { p.classList.remove('active'); });
@@ -245,14 +431,21 @@
                 pageLinks.forEach(function(l) { l.classList.remove('active'); });
                 let activeLink = document.querySelector('.sidebar-link[data-page="' + id + '"]');
                 if (activeLink) activeLink.classList.add('active');
-                history.replaceState(null, '', '#' + id);
+
+                allSubnavs.forEach(function(sn) { sn.classList.remove('open'); });
+                if (activeLink) {
+                    let parentSubnav = activeLink.parentElement.querySelector('.sidebar-subnav');
+                    if (parentSubnav) parentSubnav.classList.add('open');
+                }
+
+                if (opts.updateHash !== false) history.replaceState(null, '', '#' + id);
 
                 let announcer = document.getElementById('page-announce');
                 if (announcer && switching) announcer.textContent = 'Navigated to ' + (pageNames[id] || id);
                 let breadcrumb = document.getElementById('mobileBreadcrumb');
                 if (breadcrumb) breadcrumb.textContent = pageNames[id] || id;
 
-                if (switching) window.scrollTo(0, 0);
+                if (switching && !opts.skipScroll) window.scrollTo(0, 0);
                 closeMobileSidebar();
             }
 
@@ -260,9 +453,81 @@
                 link.addEventListener('click', function() { showPage(this.getAttribute('data-page')); });
             });
 
+            let _clickScrolling = false;
+            let _clickScrollTimer = null;
+
+            sectionLinks.forEach(function(link) {
+                link.addEventListener('click', function() {
+                    let sectionId = this.getAttribute('data-section');
+                    let targetPage = sectionPageMap[sectionId] || 'getting-started';
+                    let wasOnTargetPage = (currentPage === targetPage);
+                    showPage(targetPage, { updateHash: false, skipScroll: true });
+                    history.replaceState(null, '', '#' + sectionId);
+
+                    function scrollToSection() {
+                        let target = document.getElementById(sectionId);
+                        if (target) {
+                            let topbarH = document.body.classList.contains('has-banner') ? 87 : 52;
+                            let y = target.getBoundingClientRect().top + window.pageYOffset - topbarH - 12;
+                            window.scrollTo({ top: y, behavior: 'smooth' });
+                        }
+                    }
+
+                    if (wasOnTargetPage) {
+                        scrollToSection();
+                    } else {
+                        requestAnimationFrame(function() {
+                            let target = document.getElementById(sectionId);
+                            if (target) {
+                                let topbarH = document.body.classList.contains('has-banner') ? 87 : 52;
+                                let y = target.getBoundingClientRect().top + window.pageYOffset - topbarH - 12;
+                                window.scrollTo({ top: y });
+                            }
+                        });
+                    }
+
+                    _clickScrolling = true;
+                    sectionLinks.forEach(function(l) { l.classList.remove('active'); });
+                    this.classList.add('active');
+                    clearTimeout(_clickScrollTimer);
+                    _clickScrollTimer = setTimeout(function() { _clickScrolling = false; }, 1000);
+                });
+            });
+
+            let sections = [];
+            sectionLinks.forEach(function(link) {
+                let id = link.getAttribute('data-section');
+                let section = document.getElementById(id);
+                if (section) sections.push({ el: section, link: link });
+            });
+            if (sections.length > 0) {
+                let observer = new IntersectionObserver(function(entries) {
+                    if (_clickScrolling) return;
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) {
+                            let matched = sections.find(function(s) { return s.el === entry.target; });
+                            if (matched) {
+                                let sectionId = matched.link.getAttribute('data-section');
+                                let parentPage = sectionPageMap[sectionId] || 'getting-started';
+                                let parentEl = document.getElementById('page-' + parentPage);
+                                if (!parentEl || !parentEl.classList.contains('active')) return;
+                                sectionLinks.forEach(function(l) { l.classList.remove('active'); });
+                                matched.link.classList.add('active');
+                            }
+                        }
+                    });
+                }, { rootMargin: (document.body.classList.contains('has-banner') ? '-87px' : '-52px') + ' 0px -60% 0px', threshold: 0 });
+                sections.forEach(function(s) { observer.observe(s.el); });
+            }
+
             let hash = location.hash.replace('#', '');
-            if (hash === 'getting-started' || hash === 'analyzer' || hash === 'reference') {
-                showPage(hash);
+            if (hash) {
+                let sectionLink = document.querySelector('.sidebar-link[data-section="' + hash + '"]');
+                if (sectionLink) {
+                    sectionLink.click();
+                } else if (hash === 'getting-started' || hash === 'analyzer' || hash === 'reference') {
+                    showPage(hash);
+                }
             }
         }
 

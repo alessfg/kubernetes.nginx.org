@@ -410,8 +410,54 @@
 
             <section id="annotation-mappings">
                 <h2>Annotation Mappings</h2>
-                <p>Mappings for <code>traefik.ingress.kubernetes.io/router.*</code> and <code>traefik.ingress.kubernetes.io/service.*</code> annotations on standard <code>Ingress</code> resources, to NIC <code>nginx.org/</code> / <code>nginx.com/</code> annotations or CRD fields.</p>
-                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> 27 annotation rows (13 router, 14 service) with side-by-side examples will populate here. The verified NIC mappings are summarized in the Migration Checklist; this section will surface them as searchable, copy-ready table rows.</div>
+                <p>Mappings for <code>traefik.ingress.kubernetes.io/router.*</code> and <code>traefik.ingress.kubernetes.io/service.*</code> annotations on standard <code>Ingress</code> resources, to NIC <code>nginx.org/</code> / <code>nginx.com/</code> annotations or CRD fields. Annotation names below are shown as suffixes; prepend the full Traefik prefix when applying to live manifests.</p>
+
+                <h3 id="router-annotations">Router Annotations</h3>
+                <p>Prefix: <code>traefik.ingress.kubernetes.io/router.</code></p>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th scope="col" style="width: 22%;">Traefik annotation</th><th scope="col" style="width: 30%;">F5 NGINX Ingress Controller</th><th scope="col">Notes</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>entrypoints</code></td><td><code>nginx.org/listen-ports</code>, <code>nginx.org/listen-ports-ssl</code></td><td>Conceptual mismatch: Traefik EntryPoints are named static-config primitives that routers reference. NIC HTTP listeners are controller-wide via CLI flags / Helm values. Use these annotations only when a workload needs a non-default listen port.</td></tr>
+                            <tr><td><code>middlewares</code></td><td>No 1:1 &mdash; migrate each referenced middleware separately</td><td>See <a href="#middleware-mappings">HTTP Middleware Mappings</a>. The cross-provider <code>name@provider</code> syntax (e.g. <code>auth@file</code>, <code>strip-prefix@kubernetescrd</code>) is not migratable; every middleware must be a Kubernetes resource. Lost: middleware ordering across <code>name@provider</code> references from non-CRD providers.</td></tr>
+                            <tr><td><code>priority</code></td><td>No equivalent</td><td>NIC orders routes by NGINX <code>location</code> priority (<code>=</code> exact &gt; <code>^~</code> longest-prefix &gt; regex &gt; prefix) and tie-breaks across resources by <code>creationTimestamp</code> then by lexicographic <code>uid</code>. No tunable integer. Migrate overlapping routes by switching them to distinct path types.</td></tr>
+                            <tr><td><code>rulesyntax</code></td><td>N/A (Traefik-internal)</td><td>Used to opt into v2 vs v3 router DSL syntax. Deprecated in Traefik v3.7. No NIC analog.</td></tr>
+                            <tr><td><code>pathmatcher</code></td><td>Ingress <code>pathType</code> (<code>Exact</code>, <code>Prefix</code>, <code>ImplementationSpecific</code>) or VirtualServer <code>routes[].path</code> with <code>~</code>/<code>~*</code> regex modifier</td><td>Traefik <code>Path</code> &rarr; <code>pathType: Exact</code>; <code>PathPrefix</code> &rarr; <code>pathType: Prefix</code>; <code>PathRegexp</code> &rarr; <code>VirtualServer.routes[].path: ~ ^/regex/$</code>.</td></tr>
+                            <tr><td><code>tls</code></td><td>Standard Ingress <code>spec.tls[]</code> block</td><td>No NIC annotation; setting <code>spec.tls[].hosts</code> + <code>spec.tls[].secretName</code> is sufficient.</td></tr>
+                            <tr><td><code>tls.certresolver</code></td><td>No equivalent &mdash; install cert-manager</td><td>NIC has no built-in ACME client. Create a cert-manager <code>Certificate</code> resource (using your ACME issuer) and reference its issued <code>Secret</code> from <code>spec.tls[].secretName</code>.</td></tr>
+                            <tr><td><code>tls.domains.n.main</code></td><td>cert-manager <code>Certificate.spec.dnsNames</code></td><td>Configure the main domain in cert-manager out-of-band.</td></tr>
+                            <tr><td><code>tls.domains.n.sans</code></td><td>cert-manager <code>Certificate.spec.dnsNames</code></td><td>Configure SANs alongside the main domain in cert-manager <code>Certificate.spec.dnsNames</code>.</td></tr>
+                            <tr><td><code>tls.options</code></td><td>ConfigMap <code>ssl-protocols</code>, <code>ssl-ciphers</code>, <code>ssl-prefer-server-ciphers</code> (global only)</td><td>NIC has no per-Ingress TLS option override &mdash; TLS handshake parameters are controller-wide.</td></tr>
+                            <tr><td><code>observability.accesslogs</code></td><td>ConfigMap <code>access-log</code> / <code>access-log-off</code>; or <code>nginx.org/server-snippets</code> with <code>access_log</code> directive for per-Ingress control</td><td>Per-Ingress access-log toggle requires snippets (<code>-enable-snippets</code>); global control is via ConfigMap keys.</td></tr>
+                            <tr><td><code>observability.metrics</code></td><td>No equivalent</td><td>NIC exports process-level Prometheus metrics globally (enabled via <code>-enable-prometheus-metrics</code>). No per-route toggle. Filter at Prometheus scrape level if specific routes must be omitted.</td></tr>
+                            <tr><td><code>observability.tracing</code></td><td>Snippet pattern: set ConfigMap <code>otel-trace-in-http: "false"</code> globally and opt-in per route via <code>nginx.org/location-snippets</code> with <code>otel_trace on;</code></td><td>Inverse model from Traefik: Traefik defaults on with opt-out per route; NIC defaults off (when globally disabled) with opt-in per route via snippets. Requires <code>-enable-snippets</code>.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="service-annotations">Service Annotations</h3>
+                <p>Prefix: <code>traefik.ingress.kubernetes.io/service.</code></p>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th scope="col" style="width: 22%;">Traefik annotation</th><th scope="col" style="width: 30%;">F5 NGINX Ingress Controller</th><th scope="col">Notes</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>nativelb</code></td><td><code>nginx.org/use-cluster-ip: "true"</code></td><td>Uses the Service ClusterIP as a single synthetic upstream instead of pod endpoints. Disables NIC's LB-related options (lb-method, next-upstream) since there is only one upstream server.</td></tr>
+                            <tr><td><code>nodeportlb</code></td><td>No equivalent</td><td>NIC has no NodePort + node-IP upstream mode. If a single synthetic upstream works for your case use <code>nginx.org/use-cluster-ip</code>; otherwise front NIC with an external LB that handles node selection.</td></tr>
+                            <tr><td><code>serversscheme</code></td><td><code>nginx.org/ssl-services</code> (for <code>https</code>); <code>nginx.org/grpc-services</code> (for <code>h2c</code>)</td><td>Sets the upstream scheme. The gRPC annotation also requires <code>http2: "True"</code> in the ConfigMap and TLS termination on the Ingress.</td></tr>
+                            <tr><td><code>serverstransport</code></td><td>Split mapping: TLS verify via VirtualServer <code>upstream.tls.enable</code> + <code>upstream.tls.trustedCertSecret</code>; timeouts via <code>nginx.org/proxy-*-timeout</code> annotations; max idle conns / keepalive via ConfigMap <code>keepalive</code> + <code>keepalive-timeout</code></td><td>Traefik's <code>ServersTransport</code> bundles transport-level concerns into one CRD; NIC spreads them across annotations, ConfigMap keys, and VirtualServer fields. No single CRD analog.</td></tr>
+                            <tr><td><code>passhostheader</code></td><td>NIC default forwards the original Host. To NOT forward, use <code>nginx.org/location-snippets</code> with <code>proxy_set_header Host $proxy_host;</code></td><td>Both controllers default to forwarding the original Host. Overriding requires snippets in NIC.</td></tr>
+                            <tr><td><code>sticky.cookie</code></td><td><code>nginx.com/sticky-cookie-services</code> (<span class="badge badge-plus">NIC Plus</span>)</td><td>OSS NIC has no sticky-cookie LB &mdash; closest OSS option is <code>VirtualServer.upstream.lb-method: hash</code> (e.g. by source IP).</td></tr>
+                            <tr><td><code>sticky.cookie.name</code></td><td><code>nginx.com/sticky-cookie-services</code> parameter (<span class="badge badge-plus">NIC Plus</span>)</td><td>Cookie name is encoded into the annotation value string, not a separate key.</td></tr>
+                            <tr><td><code>sticky.cookie.secure</code></td><td><code>nginx.com/sticky-cookie-services</code> parameter (<span class="badge badge-plus">NIC Plus</span>)</td><td>Set the Secure attribute in the sticky cookie.</td></tr>
+                            <tr><td><code>sticky.cookie.samesite</code></td><td><code>nginx.com/sticky-cookie-services</code> parameter (<span class="badge badge-plus">NIC Plus</span>)</td><td>SameSite attribute.</td></tr>
+                            <tr><td><code>sticky.cookie.domain</code></td><td><code>nginx.com/sticky-cookie-services</code> parameter (<span class="badge badge-plus">NIC Plus</span>)</td><td>Domain attribute.</td></tr>
+                            <tr><td><code>sticky.cookie.httponly</code></td><td><code>nginx.com/sticky-cookie-services</code> parameter (<span class="badge badge-plus">NIC Plus</span>)</td><td>HttpOnly attribute.</td></tr>
+                            <tr><td><code>sticky.cookie.maxage</code></td><td><code>nginx.com/sticky-cookie-services</code> parameter (<span class="badge badge-plus">NIC Plus</span>)</td><td>Max-Age in seconds.</td></tr>
+                            <tr><td><code>sticky.cookie.path</code></td><td><code>nginx.com/sticky-cookie-services</code> parameter (<span class="badge badge-plus">NIC Plus</span>)</td><td>Path attribute.</td></tr>
+                            <tr><td><code>middlewares</code></td><td>No equivalent (same caveat as <code>router.middlewares</code>)</td><td>NIC Policies attach at the VirtualServer/route level, not the upstream-service level. Traefik's distinction between router-level and service-level middleware execution does not exist in NIC.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <section id="middleware-mappings">

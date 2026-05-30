@@ -555,3 +555,40 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus { opac
     .analyzer-success-banner { border: 1px solid #999; }
     body { background: white; font-size: 11pt; }
 }
+
+/* ── Source Selector (topbar chip + sidebar mode-switcher) ── */
+.source-chip { position: relative; display: inline-block; margin-left: 4px; }
+.source-chip > summary { list-style: none; cursor: pointer; padding: 5px 12px; border: 1px solid var(--border); border-radius: 16px; font-size: 0.8rem; color: var(--text); background: var(--surface); display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s, border-color 0.2s; min-height: 32px; font-family: var(--font); }
+.source-chip > summary:hover { background: var(--bg); border-color: var(--text-secondary); }
+.source-chip > summary:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.source-chip > summary::-webkit-details-marker { display: none; }
+.source-chip > summary::marker { content: ''; }
+.source-chip > summary::after { content: '\25BC'; font-size: 0.55rem; opacity: 0.6; margin-left: 2px; transition: transform 0.2s; }
+.source-chip[open] > summary::after { transform: rotate(180deg); }
+.source-chip-label { color: var(--text-secondary); font-weight: 400; }
+.source-chip-current { font-weight: 600; }
+.source-chip-menu { position: absolute; top: calc(100% + 6px); left: 0; min-width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); overflow: hidden; z-index: 220; }
+.source-chip-option { display: block; padding: 10px 14px; font-size: 0.85rem; font-weight: 600; text-decoration: none; color: var(--text); border-bottom: 1px solid var(--border); }
+.source-chip-option:link, .source-chip-option:visited { color: var(--text); }
+.source-chip-option:last-child { border-bottom: none; }
+.source-chip-option:hover { background: var(--bg); }
+.source-chip-option.active { background: var(--bg); }
+.source-chip-option.active::before { content: '\25CF '; color: var(--green); margin-right: 2px; }
+.source-chip-option-desc { display: block; font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; font-weight: 400; }
+
+.sidebar-source-section { padding: 12px 16px 4px; }
+.source-mode { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; text-decoration: none; color: var(--text-secondary); font-size: 0.85rem; transition: background 0.2s, color 0.2s; }
+.source-mode:link, .source-mode:visited { color: var(--text-secondary); }
+.source-mode:hover { background: var(--bg); color: var(--text); }
+.source-mode:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: 6px; }
+.source-mode.active { background: var(--bg); color: var(--text); font-weight: 600; }
+.source-mode-radio { width: 14px; height: 14px; border: 2px solid var(--text-secondary); border-radius: 50%; flex-shrink: 0; position: relative; opacity: 0.5; }
+.source-mode.active .source-mode-radio { border-color: var(--green); opacity: 1; }
+.source-mode.active .source-mode-radio::after { content: ''; position: absolute; top: 2px; left: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+:is(html, body).dark-mode .source-chip-menu { box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+
+@media (max-width: 600px) {
+    .source-chip-label { display: none; }
+    .source-chip > summary { padding: 5px 10px; }
+}

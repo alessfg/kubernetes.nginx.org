@@ -52,6 +52,22 @@
                 <span>NGINX <span class="sub">Traefik Migration Tool</span></span>
             </a>
             <span class="mobile-breadcrumb" id="mobileBreadcrumb">Getting Started</span>
+            <details class="source-chip">
+                <summary>
+                    <span class="source-chip-label">From:</span>
+                    <span class="source-chip-current">Traefik</span>
+                </summary>
+                <div class="source-chip-menu">
+                    <a href="ingress-nginx-migration.html" class="source-chip-option">
+                        ingress-nginx
+                        <span class="source-chip-option-desc">kubernetes/ingress-nginx (EoL)</span>
+                    </a>
+                    <a href="traefik-migration.html" class="source-chip-option active">
+                        Traefik
+                        <span class="source-chip-option-desc">traefik/traefik v3.x</span>
+                    </a>
+                </div>
+            </details>
         </div>
         <div class="topbar-right">
             <a class="topbar-link hide-mobile" href="https://nginx.org" target="_blank" rel="noopener" aria-label="Visit nginx.org">
@@ -75,6 +91,18 @@
 
         <!-- ── Sidebar ── -->
         <aside class="sidebar" id="sidebar" aria-label="Section navigation">
+            <section class="sidebar-section sidebar-source-section" aria-labelledby="sidebar-source-label">
+                <div class="sidebar-label" id="sidebar-source-label">Migration Source</div>
+                <a href="ingress-nginx-migration.html" class="source-mode">
+                    <span class="source-mode-radio"></span>
+                    <span>ingress-nginx</span>
+                </a>
+                <a href="traefik-migration.html" class="source-mode active">
+                    <span class="source-mode-radio"></span>
+                    <span>Traefik</span>
+                </a>
+            </section>
+            <div class="sidebar-divider"></div>
             <section class="sidebar-section" aria-labelledby="sidebar-sections-label">
                 <div class="sidebar-label" id="sidebar-sections-label">Sections</div>
                 <ul class="sidebar-nav">

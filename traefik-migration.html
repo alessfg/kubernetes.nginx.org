@@ -513,8 +513,325 @@
 
             <section id="crd-translations">
                 <h2>CRD Translations</h2>
-                <p>Worked YAML examples translating Traefik routing CRDs to NIC CRDs side-by-side.</p>
-                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> Examples covering: <code>IngressRoute</code> (basic HTTP route) &rarr; <code>VirtualServer</code>; <code>IngressRoute</code> with middleware chain &rarr; <code>VirtualServer</code> + Policy attachments (with chain-flatten warning); <code>IngressRouteTCP</code> &rarr; <code>TransportServer</code> (with TLS passthrough variant); <code>TraefikService</code> weighted routing &rarr; <code>VirtualServer</code> <code>splits</code>.</div>
+                <p>Worked YAML examples translating Traefik routing CRDs to NIC CRDs side-by-side. The Traefik side targets <code>traefik.io/v1alpha1</code>; NIC targets v5.5 CRDs (<code>k8s.nginx.org/v1</code> for VirtualServer, TransportServer, Policy, and GlobalConfiguration).</p>
+
+                <h3 id="crd-basic-ingressroute">1. Basic <code>IngressRoute</code> &rarr; <code>VirtualServer</code></h3>
+                <p>Single-host TLS-terminating route with two path-prefix branches.</p>
+                <div class="comparison">
+                    <div class="comparison-block old">
+                        <h5>Traefik (<code>IngressRoute</code>)</h5>
+                        <pre><code>apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: app
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`app.example.com`) &amp;&amp; PathPrefix(`/api`)
+      kind: Rule
+      services:
+        - name: api-service
+          port: 8080
+    - match: Host(`app.example.com`) &amp;&amp; PathPrefix(`/web`)
+      kind: Rule
+      services:
+        - name: web-service
+          port: 80
+  tls:
+    secretName: app-tls</code></pre>
+                    </div>
+                    <div class="comparison-block new">
+                        <h5>NIC (<code>VirtualServer</code>)</h5>
+                        <pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: app
+  namespace: default
+spec:
+  host: app.example.com
+  tls:
+    secret: app-tls
+  upstreams:
+    - name: api
+      service: api-service
+      port: 8080
+    - name: web
+      service: web-service
+      port: 80
+  routes:
+    - path: /api
+      action:
+        pass: api
+    - path: /web
+      action:
+        pass: web</code></pre>
+                    </div>
+                </div>
+                <div class="info-box note" style="margin: 12px 0 0;"><strong>Mapping notes:</strong> Traefik <code>entryPoints: [websecure]</code> is implied by NIC's TLS configuration on the controller side. The match-DSL <code>Host(`...`) &amp;&amp; PathPrefix(`...`)</code> splits into VirtualServer <code>host</code> + <code>routes[].path</code>. Each Traefik <code>service</code> becomes an <code>upstreams[]</code> entry; routes reference them by upstream name in <code>action.pass</code>.</div>
+
+                <h3 id="crd-chain-middleware">2. <code>IngressRoute</code> with middleware chain &rarr; <code>VirtualServer</code> + Policies (chain flatten)</h3>
+                <p>A reusable <code>Chain</code> middleware (trusted IPs &rarr; rate limit &rarr; strip prefix) attached to a route. NIC has no chain abstraction &mdash; the chain is flattened into the consuming VirtualServer's <code>policies[]</code> array, and the prefix-strip becomes a rewrite on the upstream.</p>
+                <div class="comparison">
+                    <div class="comparison-block old">
+                        <h5>Traefik (Middleware + Chain + IngressRoute)</h5>
+                        <pre><code>---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: trusted-ips
+spec:
+  ipAllowList:
+    sourceRange:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-rate-limit
+spec:
+  rateLimit:
+    average: 100
+    burst: 50
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-api
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-chain
+spec:
+  chain:
+    middlewares:
+      - name: trusted-ips
+      - name: api-rate-limit
+      - name: strip-api
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: api
+spec:
+  routes:
+    - match: Host(`api.example.com`)
+      kind: Rule
+      services:
+        - name: api-service
+          port: 8080
+      middlewares:
+        - name: api-chain</code></pre>
+                    </div>
+                    <div class="comparison-block new">
+                        <h5>NIC (Policies + VirtualServer)</h5>
+                        <pre><code>---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: trusted-ips
+spec:
+  accessControl:
+    allow:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: api-rate-limit
+spec:
+  rateLimit:
+    rate: 100r/s
+    burst: 50
+    key: ${binary_remote_addr}
+    zoneSize: 10M
+---
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: api
+spec:
+  host: api.example.com
+  upstreams:
+    - name: api
+      service: api-service
+      port: 8080
+  routes:
+    - path: /api
+      policies:
+        - name: trusted-ips
+        - name: api-rate-limit
+      action:
+        proxy:
+          upstream: api
+          rewritePath: /</code></pre>
+                    </div>
+                </div>
+                <div class="info-box warning" style="margin: 12px 0 0;"><strong>Chain flatten lossiness:</strong> The Traefik <code>Chain</code> middleware <code>api-chain</code> is gone &mdash; its three middlewares are now directly listed on the VS route. If <code>api-chain</code> was attached to multiple IngressRoutes, you must copy the same <code>policies[]</code> + <code>rewritePath</code> to every VS that consumed it. There is no shared, reusable chain abstraction in NIC.</div>
+
+                <h3 id="crd-tcp-route">3. <code>IngressRouteTCP</code> &rarr; <code>TransportServer</code> (with TLS passthrough variant)</h3>
+                <p>SNI-based TCP routing for non-HTTP workloads (databases, custom protocols). NIC requires a <code>GlobalConfiguration</code> with a named listener that <code>TransportServer</code> references by name.</p>
+                <div class="comparison">
+                    <div class="comparison-block old">
+                        <h5>Traefik (<code>IngressRouteTCP</code>)</h5>
+                        <pre><code>apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: mysql
+  namespace: data
+spec:
+  entryPoints:
+    - mysql
+  routes:
+    - match: HostSNI(`*`)
+      services:
+        - name: mysql-svc
+          port: 3306</code></pre>
+                    </div>
+                    <div class="comparison-block new">
+                        <h5>NIC (<code>GlobalConfiguration</code> + <code>TransportServer</code>)</h5>
+                        <pre><code>---
+apiVersion: k8s.nginx.org/v1
+kind: GlobalConfiguration
+metadata:
+  name: nginx-configuration
+  namespace: nginx-ingress
+spec:
+  listeners:
+    - name: mysql-tcp
+      port: 3306
+      protocol: TCP
+---
+apiVersion: k8s.nginx.org/v1
+kind: TransportServer
+metadata:
+  name: mysql
+  namespace: data
+spec:
+  listener:
+    name: mysql-tcp
+    protocol: TCP
+  upstreams:
+    - name: mysql
+      service: mysql-svc
+      port: 3306
+  action:
+    pass: mysql</code></pre>
+                    </div>
+                </div>
+                <p style="margin-top: 24px;"><strong>TLS passthrough variant</strong> &mdash; Traefik uses <code>tls.passthrough: true</code>; NIC uses a <code>TLS_PASSTHROUGH</code> protocol on the listener (pre-defined globally) and references the host for SNI matching:</p>
+                <div class="comparison">
+                    <div class="comparison-block old">
+                        <h5>Traefik (TLS passthrough)</h5>
+                        <pre><code>apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: passthrough
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: HostSNI(`secure.example.com`)
+      services:
+        - name: backend-tls
+          port: 443
+  tls:
+    passthrough: true</code></pre>
+                    </div>
+                    <div class="comparison-block new">
+                        <h5>NIC (TLS passthrough)</h5>
+                        <pre><code>apiVersion: k8s.nginx.org/v1
+kind: TransportServer
+metadata:
+  name: passthrough
+spec:
+  listener:
+    name: tls-passthrough
+    protocol: TLS_PASSTHROUGH
+  host: secure.example.com
+  upstreams:
+    - name: backend
+      service: backend-tls
+      port: 443
+  action:
+    pass: backend</code></pre>
+                    </div>
+                </div>
+                <div class="info-box note" style="margin: 12px 0 0;"><strong>Mapping notes:</strong> NIC's <code>tls-passthrough</code> listener is pre-configured on the controller via the <code>-enable-tls-passthrough</code> command-line flag (or the corresponding Helm value); it does not need a <code>GlobalConfiguration</code> listener entry. The Traefik <code>HostSNI(<em>x</em>)</code> matcher becomes NIC's <code>host</code> field.</div>
+
+                <h3 id="crd-traefik-service">4. <code>TraefikService</code> weighted (canary) &rarr; <code>VirtualServer</code> <code>splits</code></h3>
+                <p>Weighted Round Robin across two backends &mdash; the classic canary pattern. Maps cleanly to NIC's <code>routes[].splits[]</code>.</p>
+                <div class="comparison">
+                    <div class="comparison-block old">
+                        <h5>Traefik (<code>TraefikService</code> + <code>IngressRoute</code>)</h5>
+                        <pre><code>---
+apiVersion: traefik.io/v1alpha1
+kind: TraefikService
+metadata:
+  name: canary
+spec:
+  weighted:
+    services:
+      - name: app-v1
+        port: 80
+        weight: 90
+      - name: app-v2
+        port: 80
+        weight: 10
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: app
+spec:
+  routes:
+    - match: Host(`app.example.com`)
+      kind: Rule
+      services:
+        - name: canary
+          kind: TraefikService</code></pre>
+                    </div>
+                    <div class="comparison-block new">
+                        <h5>NIC (<code>VirtualServer</code> with <code>splits</code>)</h5>
+                        <pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: v1
+      service: app-v1
+      port: 80
+    - name: v2
+      service: app-v2
+      port: 80
+  routes:
+    - path: /
+      splits:
+        - weight: 90
+          action:
+            pass: v1
+        - weight: 10
+          action:
+            pass: v2</code></pre>
+                    </div>
+                </div>
+                <div class="info-box warning" style="margin: 12px 0 0;"><strong>TraefikService features without NIC equivalents:</strong>
+                    <ul style="margin: 8px 0 0 20px;">
+                        <li><strong>Mirroring</strong> (<code>TraefikService.mirroring</code> with <code>percent</code>): NIC has no built-in mirror on VirtualServer. Workaround: <code>nginx.org/location-snippets</code> with NGINX <code>mirror</code> + <code>mirror_request_body on;</code> directives &mdash; <code>-enable-snippets</code> required, and percentage-based mirroring needs additional snippet logic (<code>split_clients</code>).</li>
+                        <li><strong>Failover</strong> (primary/fallback with health-gated promotion): NIC has no active/standby switch on a VirtualServer route. Closest pattern: separate VirtualServers + external traffic management, or <code>nginx.org/upstream-fail-timeout</code> for passive failover within a single upstream.</li>
+                        <li><strong>Nested TraefikServices</strong> (a <code>TraefikService</code> whose <code>services[]</code> reference other <code>TraefikServices</code>): NIC <code>splits</code> are flat &mdash; nesting must be expanded into a flat weighted distribution during migration.</li>
+                    </ul>
+                </div>
             </section>
 
             <section id="configmap-mappings">

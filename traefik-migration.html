@@ -2016,24 +2016,309 @@ spec:
 
             <section id="configmap-mappings">
                 <h2>Static Config &rarr; ConfigMap Mappings</h2>
-                <p>Traefik does not use a single Kubernetes ConfigMap &mdash; static config is set via CLI args, env vars, or a mounted file (TOML/YAML). The toggles users most often touch map to NIC's <code>nginx-config</code> <code>ConfigMap</code> keys, NIC controller CLI flags, or Helm values.</p>
+                <p>Traefik does not use a single Kubernetes ConfigMap &mdash; static config is set via CLI args, env vars, or a mounted file (TOML/YAML). The toggles users most often touch map to NIC's <code>nginx-config</code> <code>ConfigMap</code> keys, NIC controller CLI flags, or Helm values. <strong>Click any row to expand a side-by-side example.</strong></p>
+
+                <div class="controls">
+                    <input type="search" placeholder="Filter ConfigMap keys by name..." data-filter-source="configmap" aria-label="Filter ConfigMap keys">
+                    <select data-filter-source="configmap" aria-label="Filter by category">
+                        <option value="">All categories</option>
+                        <option value="cm-redirects">Redirects</option>
+                        <option value="cm-tls">TLS</option>
+                        <option value="cm-logging">Logging</option>
+                        <option value="cm-observability">Metrics &amp; Tracing</option>
+                        <option value="cm-providers">Providers</option>
+                        <option value="cm-transport">Transport</option>
+                        <option value="cm-api">API / Dashboard</option>
+                    </select>
+                    <span class="search-count" role="status"></span>
+                    <button class="btn btn-secondary" data-action="expandAllExamples" style="margin-left: auto;">Expand all</button>
+                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
+                </div>
+
                 <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th scope="col" style="width: 32%;">Traefik static-config key</th><th scope="col" style="width: 30%;">F5 NGINX Ingress Controller</th><th scope="col">Notes</th></tr></thead>
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr><td><code>entryPoints.<em>name</em>.http.redirections.entryPoint.to</code> (global http&rarr;https redirect)</td><td>ConfigMap <code>ssl-redirect: "True"</code></td><td>NIC's <code>ssl-redirect</code> applies to every Ingress with TLS configured. For per-Ingress control use <code>nginx.org/redirect-to-https</code>.</td></tr>
-                            <tr><td><code>entryPoints.<em>name</em>.http.tls</code> (default TLS on entry point)</td><td>ConfigMap <code>ssl-protocols</code>, <code>ssl-ciphers</code>, <code>ssl-prefer-server-ciphers</code>; default cert via CLI flag <code>-default-server-tls-secret</code> / Helm <code>controller.defaultTLS.secret</code></td><td>NIC TLS defaults are controller-wide. The "default cert" served when SNI does not match is configured via the CLI flag, not the ConfigMap.</td></tr>
-                            <tr><td><code>log.level</code> (DEBUG / INFO / WARN / ERROR)</td><td>ConfigMap <code>error-log-level</code></td><td>NIC values: <code>debug</code>, <code>info</code>, <code>notice</code>, <code>warn</code>, <code>error</code>, <code>crit</code>, <code>alert</code>, <code>emerg</code> (matches NGINX log levels).</td></tr>
-                            <tr><td><code>log.format</code> (json / common)</td><td>ConfigMap <code>log-format</code>, <code>log-format-escaping</code></td><td>NIC defaults to NGINX's <code>combined</code> format. JSON requires a custom <code>log-format</code> value with NGINX variables (e.g. <code>'{"time": "$time_iso8601", "remote_addr": "$remote_addr", ...}'</code>) plus <code>log-format-escaping: json</code>.</td></tr>
-                            <tr><td><code>accessLog.filePath</code>, <code>accessLog.format</code></td><td>ConfigMap <code>access-log</code>, <code>log-format</code>; or CLI flag <code>-access-log-off</code></td><td>NIC writes access logs to stdout by default. Custom paths require a custom <code>log-format</code> + an explicit <code>access_log</code> in <code>nginx.org/server-snippets</code>.</td></tr>
-                            <tr><td><code>metrics.prometheus.entryPoint</code></td><td>CLI flag <code>-enable-prometheus-metrics</code>; Helm <code>controller.prometheus.create: true</code> + <code>controller.prometheus.port</code></td><td>Process-level Prometheus metrics. No per-route toggle. Default port: 9113.</td></tr>
-                            <tr><td><code>tracing.serviceName</code> + tracing exporter (OTel, Jaeger, Zipkin)</td><td>ConfigMap <code>otel-exporter-endpoint</code>, <code>otel-trace-in-http</code>, <code>otel-service-name</code></td><td>NIC's OpenTelemetry integration covers OTLP exporters. Jaeger/Zipkin not first-class &mdash; route via OTel Collector if needed.</td></tr>
-                            <tr><td><code>providers.kubernetesIngress.ingressClass</code></td><td>CLI flag <code>-ingress-class=<em>name</em></code>; Helm <code>controller.ingressClass.name</code></td><td>Selector for which Ingresses NIC owns &mdash; set distinctly from Traefik's class for side-by-side deployments.</td></tr>
-                            <tr><td><code>providers.kubernetesIngress.ingressEndpoint</code> (status reporter)</td><td>CLI flag <code>-external-service</code>; or <code>-report-ingress-status</code> for status sync</td><td>Configures which LB Service IP/hostname appears in <code>Ingress.status</code>.</td></tr>
-                            <tr><td><code>providers.kubernetesIngress.namespaces</code> / <code>.allowCrossNamespace</code></td><td>CLI flag <code>-watch-namespace=<em>ns1,ns2</em></code>; no cross-namespace allow flag (NIC restricts cross-namespace Secret/Service refs by default)</td><td>For multi-namespace watching, NIC supports a comma-separated list. Cross-namespace Secret/Service references require an explicit <code>-enable-cross-namespace-secrets</code> flag.</td></tr>
-                            <tr><td><code>providers.kubernetesCRD.allowEmptyServices</code></td><td>No analog</td><td>NIC VirtualServer requires backing Services to resolve. Empty-services tolerance is not a NIC feature.</td></tr>
-                            <tr><td><code>serversTransport.insecureSkipVerify</code> (global skip-verify on upstream TLS)</td><td>ConfigMap <code>ssl-verify</code>; per-VS <code>upstream.tls.enable</code> + omit <code>trustedCertSecret</code>; or <code>nginx.org/ssl-services</code> + snippet</td><td>NIC verifies upstream TLS by default when <code>upstream.tls.enable: true</code>. Bypass requires either omitting the trusted cert or explicit ConfigMap override.</td></tr>
-                            <tr><td><code>api.dashboard</code>, <code>api.insecure</code></td><td>No built-in dashboard (NIC OSS); <span class="badge badge-plus">NIC Plus</span> dashboard via <code>nginx.com/health-checks</code> + Plus API endpoint</td><td>OSS NIC exposes <code>/nginx_status</code> (stub_status) via <code>-nginx-status</code>; integrate with Grafana for visualization.</td></tr>
+                            <tr class="expandable" data-category="cm-redirects"><td><code>entryPoints.<em>name</em>.http.redirections.entryPoint.to</code></td><td>ConfigMap <code>ssl-redirect</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik (static config / CLI args)</h5><pre><code># Global http → https redirect:
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: nginx-ingress
+data:
+  ssl-redirect: "True"   # applies to every Ingress with TLS</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">For per-Ingress redirect control use <code>nginx.org/redirect-to-https: "true"</code> instead.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-tls"><td><code>entryPoints.<em>name</em>.http.tls</code> (default TLS)</td><td>ConfigMap <code>ssl-protocols</code>, <code>ssl-ciphers</code>; CLI <code>-default-server-tls-secret</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik (static config)</h5><pre><code>entryPoints:
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: example.com
+            sans: ["*.example.com"]</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># TLS handshake parameters → ConfigMap (controller-wide):
+data:
+  ssl-protocols: "TLSv1.2 TLSv1.3"
+  ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384:..."
+  ssl-prefer-server-ciphers: "True"
+
+# Default cert (served when SNI doesn't match) →
+# NIC CLI flag / Helm value:
+# helm install ... \
+#   --set controller.defaultTLS.secret=nginx-ingress/default-tls</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC TLS defaults are controller-wide. Per-Ingress TLS handshake overrides aren't supported &mdash; deploy distinct NIC controllers if different workloads need different TLS profiles.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-logging"><td><code>log.level</code></td><td>ConfigMap <code>error-log-level</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>log:
+  level: DEBUG
+  format: json</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
+  error-log-level: "debug"
+  # NGINX log levels (debug | info | notice | warn |
+  # error | crit | alert | emerg).</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik DEBUG ↔ NIC debug. Traefik INFO ↔ NIC info. Traefik WARN ↔ NIC warn. Traefik ERROR ↔ NIC error.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-logging"><td><code>log.format</code> (json / common)</td><td>ConfigMap <code>log-format</code>, <code>log-format-escaping</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>log:
+  format: json
+accessLog:
+  format: json
+  filePath: /var/log/traefik/access.log</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
+  log-format: |-
+    {"time": "$time_iso8601",
+     "remote_addr": "$remote_addr",
+     "request": "$request",
+     "status": $status,
+     "bytes_sent": $bytes_sent,
+     "upstream": "$upstream_addr",
+     "upstream_response_time": "$upstream_response_time"}
+  log-format-escaping: "json"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC writes logs to stdout/stderr by default. JSON format requires a custom <code>log-format</code> string with NGINX variables plus <code>log-format-escaping: json</code> for proper escaping.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-logging"><td><code>accessLog.filePath</code>, <code>accessLog.format</code></td><td>ConfigMap <code>access-log</code>, <code>log-format</code>; or CLI <code>-access-log-off</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>accessLog:
+  filePath: /var/log/traefik/access.log
+  format: json
+  bufferingSize: 100</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC writes access logs to stdout by default (a Pod-level
+# concept; collect with your log aggregator).
+data:
+  access-log-off: "False"  # explicit: keep access logs on
+
+# To write to a non-stdout path use a server-snippet
+# on the specific Ingress:
+metadata:
+  annotations:
+    nginx.org/server-snippets: |-
+      access_log /var/log/nginx/app.log main;</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC-managed log files aren't a first-class concept &mdash; the Kubernetes pattern is to log to stdout and collect with FluentBit/Loki/etc. If you absolutely need on-disk logs, configure via server-snippets.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-observability"><td><code>metrics.prometheus.entryPoint</code></td><td>CLI flag <code>-enable-prometheus-metrics</code> / Helm value</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Helm value:
+controller:
+  prometheus:
+    create: true
+    port: 9113
+
+# Or NIC CLI flag (when deploying via manifests):
+#   -enable-prometheus-metrics
+#   -prometheus-metrics-listen-port=9113</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Process-level Prometheus metrics. No per-route toggle; default port is 9113. NIC exposes NGINX process metrics plus controller workqueue metrics.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-observability"><td><code>tracing.serviceName</code> + exporter</td><td>ConfigMap <code>otel-exporter-endpoint</code>, <code>otel-trace-in-http</code>, <code>otel-service-name</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>tracing:
+  serviceName: traefik
+  otlp:
+    grpc:
+      endpoint: otel-collector.observability:4317
+      insecure: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
+  otel-exporter-endpoint: "otel-collector.observability:4317"
+  otel-trace-in-http: "True"       # enable globally
+  otel-service-name: "nginx-ingress"
+  otel-exporter-trusted-ca: ""     # for TLS-secured collectors</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC's OpenTelemetry integration covers OTLP exporters. For Jaeger / Zipkin, route through an OTel Collector (which speaks all three).</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-providers"><td><code>providers.kubernetesIngress.ingressClass</code></td><td>CLI <code>-ingress-class</code> / Helm <code>controller.ingressClass.name</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
+  kubernetesIngress:
+    ingressClass: traefik</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Helm value:
+controller:
+  ingressClass:
+    name: nginx-nic
+
+# Or NIC CLI flag:
+#   -ingress-class=nginx-nic</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Set distinct from Traefik's class when running side-by-side. Workloads opt into NIC by setting <code>ingressClassName</code> on their Ingress.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-providers"><td><code>providers.kubernetesIngress.ingressEndpoint</code></td><td>CLI <code>-external-service</code> / <code>-report-ingress-status</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
+  kubernetesIngress:
+    ingressEndpoint:
+      ip: "203.0.113.10"
+      # or:
+      # hostname: "ingress.example.com"
+      # publishedService: "kube-system/traefik"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC CLI flag (publishedService equivalent):
+#   -external-service=nginx-ingress/nginx-ingress
+#   -report-ingress-status
+
+# Helm:
+controller:
+  service:
+    name: nginx-ingress     # the LB Service
+  reportIngressStatus:
+    enable: true</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Determines which LB IP / hostname appears in <code>Ingress.status.loadBalancer</code>. NIC reads it from the named LB Service.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-providers"><td><code>providers.kubernetesIngress.namespaces</code> / <code>.allowCrossNamespace</code></td><td>CLI <code>-watch-namespace</code>; cross-namespace requires <code>-enable-cross-namespace-secrets</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
+  kubernetesCRD:
+    namespaces:
+      - default
+      - app-team
+    allowCrossNamespace: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC CLI flags:
+#   -watch-namespace=default,app-team
+#   -enable-cross-namespace-secrets   # opt-in, default OFF
+
+# Helm:
+controller:
+  watchNamespace: "default,app-team"
+  enableCrossNamespaceSecrets: true</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC restricts cross-namespace Secret/Service references by default for safety. Explicitly opt in if VirtualServers in one namespace need to reference Secrets in another.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-providers"><td><code>providers.kubernetesCRD.allowEmptyServices</code></td><td>No analog</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
+  kubernetesCRD:
+    allowEmptyServices: true   # tolerate Services with no endpoints</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># No equivalent. NIC requires backing Services to resolve to
+# at least one endpoint at config-generation time.
+#
+# If a Service can be empty during transitions, options:
+# (a) Always have a placeholder Pod (e.g. ErrorPages).
+# (b) Use VirtualServer with a route that returns a fixed
+#     response when the upstream is unhealthy.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC's strict resolution prevents configuration that would produce empty upstreams. If you relied on this flag, plan to maintain at least one always-ready endpoint per Service.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-transport"><td><code>serversTransport.insecureSkipVerify</code></td><td>ConfigMap <code>ssl-verify</code>; per-VS <code>upstream.tls</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>serversTransport:
+  insecureSkipVerify: true
+  rootCAs:
+    - "/etc/ssl/private/ca-bundle.crt"
+  maxIdleConnsPerHost: 100</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Global skip-verify (NOT recommended in production):
+data:
+  ssl-verify: "False"
+
+# Per-VirtualServer trusted CA (recommended):
+spec:
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 443
+      tls:
+        enable: true
+        trustedCertSecret: backend-ca   # Secret with ca.crt
+
+# Keepalive / connection pooling:
+data:
+  keepalive: "100"
+  keepalive-timeout: "60s"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Prefer per-VirtualServer trusted CA configuration over global skip-verify. The keepalive ConfigMap keys cover Traefik's <code>maxIdleConnsPerHost</code>.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="cm-api"><td><code>api.dashboard</code>, <code>api.insecure</code></td><td>OSS NIC: no built-in dashboard; <span class="badge badge-plus">NIC Plus</span>: dashboard endpoint</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>api:
+  dashboard: true
+  insecure: true        # expose on the entry point</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># OSS NIC: stub_status + Grafana
+controller:
+  nginxStatus:
+    enable: true
+    port: 8080
+    allowCidrs: "127.0.0.1,10.0.0.0/8"
+# Scrape /nginx_status with Prometheus + visualize in Grafana
+# using a standard NGINX dashboard.
+
+# NIC Plus: built-in dashboard
+controller:
+  nginxPlus: true
+# Plus exposes /dashboard.html with live request/upstream stats.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">OSS NIC has no equivalent first-class dashboard. The Plus dashboard is comparable to Traefik's in spirit (live request rates, upstream stats, server zones).</p>
+                            </div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2041,22 +2326,321 @@ spec:
 
             <section id="plus-mappings">
                 <h2>NGINX Plus / Traefik Hub Middleware Mappings</h2>
-                <p>The Traefik Hub commercial offering ships several middlewares not present in the OSS <code>Middleware</code> CRD. NIC Plus has clean equivalents for some (JWT, OIDC, WAF, APIKey); others have no NIC equivalent and would require custom data-plane work or staying on the source.</p>
+                <p>The Traefik Hub commercial offering ships several middlewares not present in the OSS <code>Middleware</code> CRD. NIC Plus has clean equivalents for some (JWT, OIDC, WAF, APIKey); others have no NIC equivalent and would require custom data-plane work or staying on the source. <strong>Click any row to expand a side-by-side example.</strong></p>
                 <div class="info-box warning" style="margin: 20px 0;"><strong>Heads-up:</strong> These rows assume the source workload was running on <em>Traefik Hub</em>, not OSS Traefik. If you're on OSS Traefik you do not have any of the middlewares listed in this section.</div>
+
+                <div class="controls">
+                    <input type="search" placeholder="Filter Hub middlewares by name..." data-filter-source="plus" aria-label="Filter Hub middlewares">
+                    <select data-filter-source="plus" aria-label="Filter by mapping kind">
+                        <option value="">All mappings</option>
+                        <option value="hub-clean">Clean Plus mapping</option>
+                        <option value="hub-partial">Partial (via externalAuth or Plus + Redis)</option>
+                        <option value="hub-none">No equivalent</option>
+                    </select>
+                    <span class="search-count" role="status"></span>
+                    <button class="btn btn-secondary" data-action="expandAllExamples" style="margin-left: auto;">Expand all</button>
+                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
+                </div>
+
                 <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th scope="col" style="width: 20%;">Traefik Hub middleware</th><th scope="col" style="width: 32%;">F5 NGINX Ingress Controller</th><th scope="col">Notes</th></tr></thead>
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr><td><code>jwt</code></td><td><span class="badge badge-policy">Policy CRD <code>jwt</code></span> (<span class="badge badge-plus">NIC Plus</span>)</td><td>Clean mapping. NIC validates JWTs against a Secret-mounted JWK set (<code>jwksURI</code> for remote refresh). Supports <code>jwtToken</code> claim extraction for downstream propagation.</td></tr>
-                            <tr><td><code>oidc</code></td><td><span class="badge badge-policy">Policy CRD <code>oidc</code></span> (<span class="badge badge-plus">NIC Plus</span>)</td><td>Native OIDC integration (authorization code flow with PKCE). Required: <code>clientID</code>, <code>clientSecret</code> Secret, <code>authEndpoint</code>, <code>tokenEndpoint</code>, <code>jwksURI</code>. The OAuth2 sign-in redirect location is shared across all routes on the same host.</td></tr>
-                            <tr><td><code>waf</code></td><td><span class="badge badge-policy">Policy CRD <code>waf</code></span> (<span class="badge badge-plus">NIC Plus</span>, F5 App Protect)</td><td>F5 NGINX App Protect WAF with declarative policy bundles. Requires the App Protect data plane module + an <code>APPolicy</code> / <code>APLogConf</code> CRD.</td></tr>
-                            <tr><td><code>apiKey</code></td><td><span class="badge badge-policy">Policy CRD <code>apiKey</code></span> (<span class="badge badge-plus">NIC Plus</span>)</td><td>Validates API keys present in a configurable header or query parameter against a Secret-mounted lookup map.</td></tr>
-                            <tr><td><code>hmac</code></td><td>No equivalent</td><td>HMAC-signed request validation has no first-class NIC policy. Workaround: <code>nginx.org/server-snippets</code> with <code>auth_request</code> to an external HMAC-validator service; or NJS module for in-process signature verification.</td></tr>
-                            <tr><td><code>ldap</code></td><td>No equivalent</td><td>NIC has no LDAP auth module. Closest path: front the workload with a forward-auth service that handles LDAP (e.g. nginx-ldap-auth-daemon) and use NIC's <code>externalAuth</code> Policy (OSS) to proxy to it.</td></tr>
-                            <tr><td><code>oAuthClientCredentials</code></td><td>Partial via <code>externalAuth</code> Policy (OSS) + custom token-broker service</td><td>NIC's <code>externalAuth</code> handles subrequest-style auth, but does not itself acquire OAuth2 tokens. A small broker service is required to perform client_credentials flows.</td></tr>
-                            <tr><td><code>oAuthIntrospection</code></td><td>Partial via <code>externalAuth</code> Policy (OSS) + introspection endpoint</td><td>Point <code>externalAuth.authURI</code> at a service that introspects opaque tokens (e.g. <code>POST /introspect</code>) and forwards an HTTP 2xx/4xx.</td></tr>
-                            <tr><td><code>opa</code></td><td>No equivalent</td><td>OPA-based policy decisions are not a first-class NIC concept. Patterns: external authorization via <code>externalAuth</code> + an OPA sidecar (the OPA team publishes the <code>opa-envoy-plugin</code> and similar), or NJS scripting for in-process policy evaluation.</td></tr>
-                            <tr><td><code>distributedRateLimit</code></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>rateLimit</code></span> + Redis (<span class="badge badge-plus">NIC Plus</span>)</td><td>NIC Plus supports cluster-wide rate limiting with Redis as a shared zone backend (via the <code>limit_req</code> directive in Plus). OSS NIC limits are per-pod &mdash; for shared rate limits, deploy a single NIC instance behind a forwarding proxy, or stay on the source.</td></tr>
+                            <tr class="expandable" data-category="hub-clean"><td><code>apiKey</code> <span class="badge badge-plus">NIC Plus</span></td><td><span class="badge badge-policy">Policy CRD <code>apiKey</code></span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: APIKey
+metadata: { name: api-keys }
+spec:
+  keys:
+    - id: client-a
+      value: $2y$10$...hashedkey...</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: api-keys }
+spec:
+  apiKey:
+    suppliedIn:
+      header: ["X-API-Key"]
+    clientSecret: api-keys-map  # Secret with key→identity map
+---
+spec:
+  routes:
+    - path: /api
+      policies: [{ name: api-keys }]</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Validates API keys present in a configurable header or query parameter against a Secret-mounted lookup map. The Secret data is <code>key=identity</code> pairs.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-partial"><td><code>distributedRateLimit</code> <span class="badge badge-plus">Hub Premium</span></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>rateLimit</code></span> + Redis <span class="badge badge-plus">NIC Plus</span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: DistributedRateLimit
+metadata: { name: cluster-rate }
+spec:
+  amount: 1000
+  period: 1m
+  store:
+    redis:
+      endpoints: ["redis:6379"]</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code># NIC Plus with Redis-backed shared zone for limit_req:
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: cluster-rate }
+spec:
+  rateLimit:
+    rate: 1000r/m
+    burst: 100
+    key: ${binary_remote_addr}
+    # NIC Plus reads the zone from a shared Redis backend
+    # when configured via -enable-shared-memory-redis
+    # (cluster-wide synchronization).
+
+# OSS NIC limits are per-NIC-pod. For OSS clusters that
+# need shared limits, run a single NIC instance behind
+# an external L4 proxy, or stay on the source.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC Plus supports cluster-wide rate limiting via shared-zone synchronization. OSS NIC limits are per-pod and don't share state.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-none"><td><code>hmac</code></td><td>No equivalent</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: HMAC
+metadata: { name: webhook-hmac }
+spec:
+  signatureHeader: X-Hub-Signature-256
+  secrets:
+    - name: webhook-secret</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># No first-class HMAC policy in NIC.
+# Options:
+
+# (a) externalAuth Policy → custom HMAC validator service:
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: hmac-validate }
+spec:
+  externalAuth:
+    authServiceName: hmac-validator
+    authURI: /verify
+
+# (b) NJS module for in-process signature verification
+#     (requires custom NIC data-plane build).</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No first-class HMAC policy. The externalAuth + sidecar pattern is the standard NGINX way to do this.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-clean"><td><code>jwt</code> <span class="badge badge-plus">NIC Plus</span></td><td><span class="badge badge-policy">Policy CRD <code>jwt</code></span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: JWT
+metadata: { name: api-jwt }
+spec:
+  signingSecret: jwt-key
+  forwardHeaders:
+    Sub: "sub"
+    Email: "email"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: api-jwt }
+spec:
+  jwt:
+    realm: "API"
+    secret: jwt-keys             # Secret with the JWK set
+    token: "$http_authorization"
+    jwksURI: "https://auth/.well-known/jwks.json"
+---
+spec:
+  routes:
+    - path: /api
+      policies: [{ name: api-jwt }]</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Clean Plus mapping. NIC validates JWTs against a Secret-mounted JWK set or remote <code>jwksURI</code>. Supports <code>jwtToken</code> claim extraction for downstream propagation.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-none"><td><code>ldap</code></td><td>No equivalent</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: LDAP
+metadata: { name: corp-ldap }
+spec:
+  server: ldaps://ldap.corp:636
+  baseDN: ou=Users,dc=corp,dc=com
+  bindDN: cn=traefik,ou=Service,dc=corp,dc=com
+  bindPassword:
+    secretKeyRef:
+      name: ldap-bind
+      key: password</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC has no LDAP auth module.
+# Recommended pattern: front the workload with a small
+# LDAP-bridge service that speaks HTTP, then use externalAuth:
+
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: corp-ldap }
+spec:
+  externalAuth:
+    authServiceName: nginx-ldap-auth-daemon  # ref impl exists
+    authURI: /verify
+
+# nginx-ldap-auth-daemon (https://github.com/nginxinc/
+# nginx-ldap-auth) is a small reference daemon that runs
+# next to NIC and handles LDAP binds.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The reference daemon approach keeps LDAP credentials inside one validator service, with NIC just relaying via externalAuth.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-partial"><td><code>oAuthClientCredentials</code> <span class="badge badge-plus">Hub</span></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (OSS) + token broker</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: OAuth2ClientCredentials
+metadata: { name: api-auth }
+spec:
+  tokenURL: https://auth/token
+  clientID:
+    secretKeyRef: { name: oauth, key: id }
+  clientSecret:
+    secretKeyRef: { name: oauth, key: secret }
+  scope: api.read</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC's externalAuth handles subrequest-style auth, but it
+# does NOT itself perform OAuth2 client-credentials flows.
+# Stand up a small token-broker service:
+
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: api-auth }
+spec:
+  externalAuth:
+    authServiceName: oauth-broker
+    authURI: /authorize
+    authResponseHeaders: [Authorization]
+
+# The oauth-broker handles the token exchange with the
+# IdP and returns Authorization headers for NIC to forward.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Standing up a small token broker keeps OAuth2 credentials in one place. NIC then relays via externalAuth without ever holding the client_secret.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-partial"><td><code>oAuthIntrospection</code> <span class="badge badge-plus">Hub</span></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (OSS) + introspection endpoint</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: OAuth2TokenIntrospection
+metadata: { name: token-check }
+spec:
+  introspectionURL: https://auth/introspect
+  clientID:
+    secretKeyRef: { name: introspect, key: id }
+  clientSecret:
+    secretKeyRef: { name: introspect, key: secret }</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: token-check }
+spec:
+  externalAuth:
+    authServiceName: introspector  # validates RFC 7662 tokens
+    authURI: /introspect
+    authSnippets: |-
+      proxy_set_header Authorization "Bearer $http_authorization";</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Point externalAuth's <code>authURI</code> at a service that introspects opaque tokens (RFC 7662 <code>POST /introspect</code>) and forwards an HTTP 2xx/4xx.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-clean"><td><code>oidc</code> <span class="badge badge-plus">NIC Plus</span></td><td><span class="badge badge-policy">Policy CRD <code>oidc</code></span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: OIDC
+metadata: { name: corp-oidc }
+spec:
+  issuer: https://auth.corp/realms/main
+  clientID:
+    secretKeyRef: { name: oidc, key: id }
+  clientSecret:
+    secretKeyRef: { name: oidc, key: secret }
+  scopes: [openid, profile, email]</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: corp-oidc }
+spec:
+  oidc:
+    clientID: app-client
+    clientSecret: oidc-client-secret    # Secret with id/secret
+    authEndpoint: https://auth.corp/realms/main/protocol/openid-connect/auth
+    tokenEndpoint: https://auth.corp/realms/main/protocol/openid-connect/token
+    jwksURI: https://auth.corp/realms/main/protocol/openid-connect/certs
+    scope: openid+profile+email
+    redirectURI: /_codexchange</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Native OIDC integration (authorization code flow with PKCE). The OAuth2 sign-in redirect location is shared across all routes on the same host.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-none"><td><code>opa</code></td><td>No equivalent</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: OPA
+metadata: { name: rbac }
+spec:
+  bundleURL: https://opa-bundles/policy.tar.gz
+  query: data.authz.allow</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># OPA-based policy decisions are not a first-class concept.
+# Patterns:
+
+# (a) externalAuth + OPA sidecar:
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: rbac }
+spec:
+  externalAuth:
+    authServiceName: opa-proxy     # opa-envoy-plugin or
+                                   # equivalent http proxy
+    authURI: /v1/data/authz/allow
+
+# (b) NJS module for in-process policy evaluation (custom
+#     data-plane build required).</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The OPA team publishes <code>opa-envoy-plugin</code> and similar HTTP-fronted OPA evaluators that work with externalAuth without modification.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="hub-clean"><td><code>waf</code> <span class="badge badge-plus">NIC Plus + App Protect</span></td><td><span class="badge badge-policy">Policy CRD <code>waf</code></span> (F5 App Protect)</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
+kind: WAF
+metadata: { name: app-waf }
+spec:
+  ruleSets:
+    - OWASP-CRS-4.0</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code># F5 App Protect Policy:
+apiVersion: appprotect.f5.com/v1beta1
+kind: APPolicy
+metadata: { name: app-waf-policy }
+spec:
+  policy: { ... declarative WAF policy ... }
+---
+# NIC waf Policy referencing the APPolicy:
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: app-waf }
+spec:
+  waf:
+    enable: true
+    apPolicy: default/app-waf-policy
+---
+spec:
+  routes:
+    - path: /
+      policies: [{ name: app-waf }]</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">F5 NGINX App Protect WAF with declarative policy bundles. Requires the App Protect data plane module + an <code>APPolicy</code> / <code>APLogConf</code> CRD. The two-CRD split (APPolicy + Policy) means rule sets can be reused across multiple workloads.</p>
+                            </div></td></tr>
                         </tbody>
                     </table>
                 </div>

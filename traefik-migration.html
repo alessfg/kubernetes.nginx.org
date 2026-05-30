@@ -965,35 +965,667 @@ metadata:
 
             <section id="middleware-mappings">
                 <h2>HTTP Middleware Mappings</h2>
-                <p>Mappings for the OSS HTTP middlewares in the Traefik <code>Middleware</code> CRD (<code>spec.</code><em>middlewareType</em>), to NIC <code>Policy</code> CRDs, <code>nginx.org/</code> annotations, VirtualServer fields, or sanctioned snippet patterns. The middleware name shown below is the Traefik CRD <code>spec</code> field name (e.g. <code>spec.stripPrefix</code>).</p>
+                <p>Mappings for the OSS HTTP middlewares in the Traefik <code>Middleware</code> CRD (<code>spec.</code><em>middlewareType</em>), to NIC <code>Policy</code> CRDs, <code>nginx.org/</code> annotations, VirtualServer fields, or sanctioned snippet patterns. Rows are sorted alphabetically by Traefik middleware name. <strong>Click any row to expand a side-by-side YAML example.</strong></p>
+
+                <div class="controls">
+                    <input type="search" placeholder="Filter middlewares by name or NIC mapping..." data-filter-source="middleware" aria-label="Filter middlewares">
+                    <select data-filter-source="middleware" aria-label="Filter by category">
+                        <option value="">All categories</option>
+                        <option value="mw-auth">Authentication</option>
+                        <option value="mw-routing">Routing &amp; Redirects</option>
+                        <option value="mw-headers">Headers &amp; Content</option>
+                        <option value="mw-security">Access Control &amp; Rate Limiting</option>
+                        <option value="mw-resilience">Resilience</option>
+                        <option value="mw-protocol">Protocol</option>
+                        <option value="mw-composition">Composition</option>
+                    </select>
+                    <span class="search-count" role="status"></span>
+                    <button class="btn btn-secondary" data-action="expandAllExamples" style="margin-left: auto;">Expand all</button>
+                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
+                </div>
+
                 <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th scope="col" style="width: 18%;">Traefik middleware</th><th scope="col" style="width: 32%;">F5 NGINX Ingress Controller</th><th scope="col">Notes</th></tr></thead>
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr><td><code>addPrefix</code></td><td><code>nginx.org/rewrites</code> + <code>nginx.org/location-snippets</code> (for the <code>X-Forwarded-Prefix</code> header)</td><td>Path-prefix rewrite is straightforward; the header injection requires a snippet (<code>proxy_set_header X-Forwarded-Prefix /your/prefix;</code>).</td></tr>
-                            <tr><td><code>basicAuth</code></td><td><span class="badge badge-policy">Policy CRD <code>basicAuth</code></span> (OSS) on VirtualServer; or <code>nginx.org/basic-auth-secret</code> + <code>nginx.org/basic-auth-realm</code> annotations on Ingress</td><td>NIC requires a Secret of type <code>nginx.org/htpasswd</code> keyed under <code>htpasswd</code>. Only one BasicAuth policy applies per VS route (additional refs are ignored).</td></tr>
-                            <tr><td><code>buffering</code></td><td><code>nginx.org/client-max-body-size</code>, <code>nginx.org/proxy-buffers</code>, <code>nginx.org/proxy-buffer-size</code>, <code>nginx.org/proxy-busy-buffers-size</code>, or the corresponding ConfigMap keys</td><td>NIC exposes the underlying NGINX <code>client_*</code> and <code>proxy_*</code> buffer directives. Traefik's <code>memRequestBodyBytes</code> / <code>memResponseBodyBytes</code> map to <code>proxy-buffers</code> sizes; <code>maxResponseBodyBytes</code> maps to <code>client-max-body-size</code>.</td></tr>
-                            <tr><td><code>chain</code></td><td>No equivalent &mdash; flatten during migration</td><td>NIC has no reusable named-chain abstraction. Inline each chained middleware into every consuming VirtualServer's <code>policies[]</code> array or Ingress <code>nginx.org/policies</code> annotation. Flag during automated migration: the named-chain semantic is lost.</td></tr>
-                            <tr><td><code>circuitBreaker</code></td><td>Passive: <code>nginx.org/upstream-fail-timeout</code>, <code>nginx.org/upstream-max-fails</code>. Active health checks: VirtualServer <code>upstream.healthcheck</code> (<span class="badge badge-plus">NIC Plus</span>).</td><td>No direct expression-based circuit breaker. Traefik's <code>NetworkErrorRatio()</code> / <code>ResponseCodeRatio()</code> expressions have no NGINX analog &mdash; closest behavior is passive failure detection with timeouts.</td></tr>
-                            <tr><td><code>compress</code></td><td>ConfigMap <code>gzip</code>, <code>gzip-level</code>, <code>gzip-types</code>, <code>gzip-min-length</code>, <code>gzip-proxied</code> (global only)</td><td>NIC has no per-Ingress compression toggle &mdash; compression is controller-wide. Brotli and Zstd require custom NIC builds (NGINX modules).</td></tr>
-                            <tr><td><code>contentType</code></td><td>No direct equivalent</td><td>NGINX <code>default_type</code> is global; to set per-route use <code>nginx.org/location-snippets</code> with <code>default_type application/octet-stream;</code>. Traefik 3.x default behavior (auto-detect on) maps to NGINX's default behavior.</td></tr>
-                            <tr><td><code>digestAuth</code></td><td>No equivalent</td><td>NIC does not ship the <code>ngx_http_auth_digest_module</code> by default. Use <code>basicAuth</code> instead, or build a custom data plane with the third-party digest module.</td></tr>
-                            <tr><td><code>encodedCharacters</code></td><td>No equivalent</td><td>Per-path percent-encoded character allowlists have no NGINX analog. Mitigations via WAF rules (NIC Plus, App Protect) or backend validation.</td></tr>
-                            <tr><td><code>errors</code> (errorpages)</td><td><code>VirtualServer.routes[].errorPages[]</code></td><td>NIC's <code>errorPages</code> covers per-status-code custom responses with redirect/return/proxy actions. Maps cleanly from Traefik <code>status</code> + <code>service</code> + <code>query</code>.</td></tr>
-                            <tr><td><code>forwardAuth</code></td><td><span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (new in NIC v5.5, OSS)</td><td>Clean migration target. Required: <code>authURI</code>, <code>authServiceName</code>. Supports <code>authResponseHeaders</code>, sign-in URI (OAuth2 flow). Only one ExternalAuth applies per route; additional refs ignored.</td></tr>
-                            <tr><td><code>grpcWeb</code></td><td>No equivalent</td><td>NIC has no gRPC-Web translation. <code>nginx.org/grpc-services</code> is plain gRPC (HTTP/2). Translate at the backend (Envoy sidecar, <code>improbable-eng/grpc-web</code>, server-side library), or keep Traefik for gRPC-Web routes only.</td></tr>
-                            <tr><td><code>headers</code></td><td>VirtualServer <code>routes[].action.proxy.requestHeaders</code> / <code>responseHeaders</code>; or <code>nginx.org/proxy-set-headers</code>, <code>nginx.org/proxy-hide-headers</code> annotations; HSTS via ConfigMap <code>hsts</code>, <code>hsts-max-age</code>, <code>hsts-include-subdomains</code>, <code>hsts-behind-proxy</code>; CORS via <span class="badge badge-policy">Policy CRD <code>cors</code></span> or snippet</td><td>The Traefik <code>Headers</code> middleware is a kitchen sink &mdash; map to multiple targets: standard request/response headers to VirtualServer fields, HSTS to ConfigMap keys, CORS to the Policy CRD or server-snippets, and security headers (CSP, X-Frame-Options, Referrer-Policy) to <code>responseHeaders.add</code>.</td></tr>
-                            <tr><td><code>ipAllowList</code></td><td><span class="badge badge-policy">Policy CRD <code>accessControl</code></span> (allow/deny CIDR lists)</td><td>Client IP determination uses ConfigMap <code>real-ip-header</code> + <code>set-real-ip-from</code> (no Traefik <code>IPStrategy</code> depth/excludedIPs equivalent &mdash; you configure trusted proxies once globally).</td></tr>
-                            <tr><td><code>inFlightReq</code></td><td>ConfigMap <code>limit-conn-zones</code> + <code>nginx.org/limit-conn</code>; or <code>nginx.org/server-snippets</code> with <code>limit_conn_zone</code> + <code>limit_conn</code></td><td>RateLimitPolicy is requests-per-second, not concurrent connections &mdash; not a substitute. NIC's connection limits use NGINX's <code>limit_conn</code> directive.</td></tr>
-                            <tr><td><code>passTLSClientCert</code></td><td><span class="badge badge-policy">Policy CRD <code>ingressMTLS</code></span> (verifies the cert) + <code>nginx.org/server-snippets</code> with <code>proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert;</code></td><td>Two-step: NIC's <code>ingressMTLS</code> Policy handles client cert verification; the snippet propagates the cert to the upstream as a header (Traefik does both in one middleware).</td></tr>
-                            <tr><td><code>rateLimit</code></td><td><span class="badge badge-policy">Policy CRD <code>rateLimit</code></span> (clean 1:1)</td><td>Maps cleanly: <code>rate</code> &rarr; <code>rate</code>, <code>burst</code> &rarr; <code>burst</code>, <code>sourceCriterion.ipStrategy</code> &rarr; <code>key: ${binary_remote_addr}</code>, <code>sourceCriterion.requestHeaderName</code> &rarr; <code>key: ${http_<header>}</code>. Traefik's <code>period</code> &rarr; NIC <code>rate</code> in <code>r/s</code> or <code>r/m</code>.</td></tr>
-                            <tr><td><code>redirectRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite <em>regex</em> <em>replacement</em> permanent;</code></td><td>No first-class annotation. Snippet uses NGINX's <code>rewrite</code> directive directly. Requires <code>-enable-snippets</code>.</td></tr>
-                            <tr><td><code>redirectScheme</code></td><td><code>nginx.org/redirect-to-https: "true"</code> or ConfigMap <code>ssl-redirect: "True"</code></td><td>http &rarr; https only. For custom <code>port</code> overrides, fall back to <code>nginx.org/server-snippets</code> with explicit <code>rewrite</code>.</td></tr>
-                            <tr><td><code>replacePath</code></td><td><code>nginx.org/rewrites: "serviceName=<em>svc</em> rewrite=<em>newpath</em>"</code></td><td>Per-service path rewrite. The rewrite syntax matches per-service, so map Traefik <code>path</code> &rarr; NIC <code>rewrite=</code>.</td></tr>
-                            <tr><td><code>replacePathRegex</code></td><td><code>nginx.org/rewrites</code> (limited, prefix-style); or <code>nginx.org/server-snippets</code> with <code>rewrite <em>regex</em> <em>replacement</em>;</code> for full regex</td><td>NIC's <code>rewrites</code> annotation uses NGINX's prefix-replacement mode, not regex. Full regex needs a snippet.</td></tr>
-                            <tr><td><code>retry</code></td><td>ConfigMap <code>proxy-next-upstream</code>, <code>proxy-next-upstream-tries</code>, <code>proxy-next-upstream-timeout</code>; or <code>nginx.org/proxy-next-upstream*</code> annotations</td><td>NIC retries are governed by NGINX <code>proxy_next_upstream</code>. Traefik's <code>initialInterval</code> (backoff) has no direct equivalent &mdash; NGINX retries the next upstream immediately.</td></tr>
-                            <tr><td><code>stripPrefix</code></td><td><code>nginx.org/rewrites: "serviceName=<em>svc</em> rewrite=/"</code></td><td>Direct prefix strip per service.</td></tr>
-                            <tr><td><code>stripPrefixRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite <em>regex</em> / break;</code></td><td>Same constraint as <code>replacePathRegex</code>: regex-based stripping requires snippet.</td></tr>
+                            <tr class="expandable" data-category="mw-routing"><td><code>addPrefix</code></td><td><code>nginx.org/rewrites</code> + <code>nginx.org/location-snippets</code> (for the <code>X-Forwarded-Prefix</code> header)</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: add-api-prefix }
+spec:
+  addPrefix:
+    prefix: /api/v1</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Path-prefix rewrite via annotation:
+metadata:
+  annotations:
+    nginx.org/rewrites: "serviceName=app rewrite=/api/v1"
+    # X-Forwarded-Prefix header (Traefik sets this automatically):
+    nginx.org/location-snippets: |-
+      proxy_set_header X-Forwarded-Prefix /api/v1;</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Path prepending is straightforward; the <code>X-Forwarded-Prefix</code> header injection requires a snippet because <code>nginx.org/rewrites</code> doesn't touch request headers.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-auth"><td><code>basicAuth</code></td><td><span class="badge badge-policy">Policy CRD <code>basicAuth</code></span> (OSS) or <code>nginx.org/basic-auth-secret</code> annotation</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: api-auth }
+spec:
+  basicAuth:
+    secret: api-htpasswd
+    realm: "Restricted API"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Option A — Policy CRD on VirtualServer (OSS-compatible):
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: api-auth }
+spec:
+  basicAuth:
+    secret: api-htpasswd       # type nginx.org/htpasswd
+    realm: "Restricted API"
+---
+# Reference from the VirtualServer route:
+spec:
+  routes:
+    - path: /api
+      policies: [{ name: api-auth }]
+
+# Option B — Direct annotation on the Ingress:
+metadata:
+  annotations:
+    nginx.org/basic-auth-secret: api-htpasswd
+    nginx.org/basic-auth-realm: "Restricted API"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The NIC Policy requires a Secret of type <code>nginx.org/htpasswd</code> keyed under <code>htpasswd</code>. Only one BasicAuth policy applies per route &mdash; additional refs are silently ignored.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-headers"><td><code>buffering</code></td><td><code>nginx.org/client-max-body-size</code>, <code>nginx.org/proxy-buffers</code>, <code>nginx.org/proxy-buffer-size</code>, <code>nginx.org/proxy-busy-buffers-size</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: upload-buffering }
+spec:
+  buffering:
+    maxRequestBodyBytes: 10485760   # 10 MiB
+    memRequestBodyBytes: 524288     # 512 KiB
+    maxResponseBodyBytes: 52428800
+    memResponseBodyBytes: 2097152</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>metadata:
+  annotations:
+    nginx.org/client-max-body-size: "10m"   # maxRequestBodyBytes
+    nginx.org/proxy-buffers: "8 256k"        # memResponseBodyBytes
+    nginx.org/proxy-buffer-size: "16k"       # memResponseBodyBytes head
+    nginx.org/proxy-busy-buffers-size: "32k"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);"><code>memRequestBodyBytes</code> / <code>memResponseBodyBytes</code> map to NGINX <code>proxy_buffers</code> sizes; <code>maxResponseBodyBytes</code> bounds the response NIC will buffer before streaming. <code>maxRequestBodyBytes</code> &rarr; <code>client-max-body-size</code>.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-composition"><td><code>chain</code></td><td>No equivalent &mdash; flatten chains during migration</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: secured-api }
+spec:
+  chain:
+    middlewares:
+      - name: trusted-ips
+      - name: api-rate-limit
+      - name: api-auth
+      - name: strip-api</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC has no Chain abstraction. Flatten the chain into the
+# consuming VirtualServer's policies[] array (in order),
+# plus any non-policy mappings (e.g. stripPrefix → rewritePath):
+spec:
+  routes:
+    - path: /api
+      policies:
+        - name: trusted-ips      # was ipAllowList Middleware
+        - name: api-rate-limit   # was rateLimit Middleware
+        - name: api-auth         # was basicAuth Middleware
+      action:
+        proxy:
+          upstream: api
+          rewritePath: /         # was stripPrefix Middleware
+
+# Repeat the same policies[] in every VirtualServer that
+# referenced "secured-api" — the named chain is lost.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);"><strong>Chain flatten lossiness:</strong> the named-chain abstraction is unrecoverable in NIC. If your Chain was attached to 10 IngressRoutes, you'll need to copy the same <code>policies[]</code> + non-policy mappings into 10 VirtualServers. Plan time for the duplication and ongoing drift management.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-resilience"><td><code>circuitBreaker</code></td><td>Passive: <code>nginx.org/upstream-fail-timeout</code>, <code>upstream-max-fails</code>. Active: VirtualServer <code>upstream.healthcheck</code> <span class="badge badge-plus">NIC Plus</span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: cb }
+spec:
+  circuitBreaker:
+    expression: "NetworkErrorRatio() > 0.5"
+    checkPeriod: 10s
+    fallbackDuration: 30s
+    recoveryDuration: 1m</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Passive failure detection (OSS):
+metadata:
+  annotations:
+    nginx.org/upstream-fail-timeout: "30s"
+    nginx.org/upstream-max-fails: "3"
+
+# Active health checks (Plus, on VirtualServer):
+spec:
+  upstreams:
+    - name: api
+      service: api-svc
+      port: 80
+      healthCheck:
+        enable: true
+        path: /healthz
+        interval: 10s
+        fails: 3
+        passes: 2</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No expression-based circuit breaker in NIC. Closest behavior: passive failure detection (mark upstream down for <code>fail-timeout</code> after <code>max-fails</code> errors) plus active health checks for explicit recovery testing.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-headers"><td><code>compress</code></td><td>ConfigMap <code>gzip*</code> keys (global only)</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: compress }
+spec:
+  compress:
+    excludedContentTypes:
+      - image/png
+      - image/jpeg
+    minResponseBodyBytes: 1024</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Controller-wide ConfigMap:
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: nginx-config, namespace: nginx-ingress }
+data:
+  gzip: "True"
+  gzip-types: "text/plain text/css application/json application/javascript"
+  gzip-min-length: "1024"
+  gzip-level: "6"
+  gzip-proxied: "any"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No per-Ingress compression toggle. <code>excludedContentTypes</code> inverts in NIC &mdash; you list compressible types in <code>gzip-types</code> rather than excluded ones. Brotli / Zstd require custom NIC builds with the corresponding NGINX modules.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-headers"><td><code>contentType</code></td><td>No direct equivalent (snippet)</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: detect-content-type }
+spec:
+  contentType: {}   # enables Content-Type auto-detect</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NGINX auto-fills Content-Type via the mime.types map by
+# default — no separate "enable" needed.
+# To force a default for routes missing it:
+metadata:
+  annotations:
+    nginx.org/location-snippets: |-
+      default_type application/octet-stream;</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik v3 defaults this middleware behavior on; NIC/NGINX behaves the same by default. The middleware is usually safe to drop entirely. Only configure a snippet if you need a non-default fallback type.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-auth"><td><code>digestAuth</code></td><td>No equivalent</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: digest }
+spec:
+  digestAuth:
+    secret: digest-credentials
+    realm: "Secure Area"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC does not ship the ngx_http_auth_digest_module.
+# Options:
+# (a) Switch the workload to BasicAuth (Policy CRD basicAuth
+#     or nginx.org/basic-auth-secret).
+# (b) Front the workload with a forward-auth service that
+#     speaks Digest and use externalAuth Policy to proxy to it.
+# (c) Build a custom NIC data plane with the third-party
+#     digest module.
+
+# Recommended migration: (a) BasicAuth.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Digest is rarely required in modern deployments &mdash; most consumers accept BasicAuth or token-based auth. Migrating to BasicAuth is usually the path of least resistance.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-headers"><td><code>encodedCharacters</code></td><td>No equivalent</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: allow-encoded }
+spec:
+  encodedCharacters:
+    encodedCharacters:
+      - encodedCharacter: "%2F"
+        unencodedCharacter: "/"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># No NGINX analog for per-path encoded-character allowlists.
+# Mitigations:
+# (a) F5 WAF for NGINX (App Protect) - Plus only.
+# (b) Validate at the backend application layer.
+# (c) Restrict path patterns via Ingress pathType or
+#     VirtualServer regex routes.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NGINX handles percent-encoded URI characters per RFC 3986; there is no per-path override. If the workload depends on this behavior, App Protect (NIC Plus) is the closest controlled environment.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-resilience"><td><code>errors</code> (errorpages)</td><td>VirtualServer <code>routes[].errorPages[]</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: custom-errors }
+spec:
+  errors:
+    status: ["500-599"]
+    service:
+      name: error-page-service
+      port: 80
+    query: /errors/{status}</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+spec:
+  upstreams:
+    - name: app
+      service: app-svc
+      port: 80
+    - name: errors
+      service: error-page-service
+      port: 80
+  routes:
+    - path: /
+      action:
+        proxy:
+          upstream: app
+      errorPages:
+        - codes: [500, 501, 502, 503, 504]
+          redirect:
+            url: https://errors.example.com/${status_code}
+            code: 301
+        # Or proxy to a service:
+        - codes: [404]
+          return:
+            code: 404
+            body: "Not Found"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Maps cleanly. NIC's <code>errorPages</code> supports both redirect and return actions; Traefik's <code>service</code> + <code>query</code> pattern (proxy to another service) can be expressed via a <code>pass</code> action to a separate upstream.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-auth"><td><code>forwardAuth</code></td><td><span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (new in NIC v5.5, OSS)</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: auth }
+spec:
+  forwardAuth:
+    address: http://auth-svc.auth.svc/verify
+    authResponseHeaders:
+      - X-User-Id
+      - X-User-Roles
+    trustForwardHeader: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: auth }
+spec:
+  externalAuth:
+    authServiceName: auth-svc
+    authServicePorts: [80]
+    authURI: /verify
+    authResponseHeaders:
+      - X-User-Id
+      - X-User-Roles
+---
+# Attach to a VirtualServer:
+spec:
+  routes:
+    - path: /
+      policies: [{ name: auth }]
+
+# Or attach directly to an Ingress (NIC v5.4+):
+metadata:
+  annotations:
+    nginx.org/policies: "default/auth"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Clean v5.5 migration target. Only one ExternalAuth policy applies per route. For OAuth2 sign-in flows, use <code>authSigninURI</code> + <code>authSigninRedirectBasePath</code>.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-protocol"><td><code>grpcWeb</code></td><td>No equivalent</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: grpc-web }
+spec:
+  grpcWeb:
+    allowOrigins: ["https://app.example.com"]</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC has no gRPC-Web ↔ gRPC translation.
+# nginx.org/grpc-services is plain gRPC (HTTP/2), NOT gRPC-Web.
+
+# Migration options:
+# (a) Translate at the backend — use an Envoy sidecar or
+#     improbable-eng/grpc-web at the backend Pod. Then the
+#     backend speaks gRPC and NIC routes it as standard gRPC.
+# (b) Have the gRPC server library serve gRPC-Web natively
+#     (e.g. grpc-web mode in grpc-go). NIC then proxies it as
+#     plain HTTP via standard Ingress.
+# (c) Keep Traefik for gRPC-Web routes specifically.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Confirmed via NIC v5.5 source search &mdash; no <code>grpc_web</code> directive or annotation exists. NGINX OSS does not ship a gRPC-Web translation module either, so there's no sanctioned snippet pattern.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-headers"><td><code>headers</code></td><td>VirtualServer <code>requestHeaders</code>/<code>responseHeaders</code>; <code>nginx.org/proxy-set-headers</code>; ConfigMap <code>hsts*</code>; <span class="badge badge-policy">Policy CRD <code>cors</code></span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: security-headers }
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-By: nic
+    customResponseHeaders:
+      X-Frame-Options: DENY
+      X-Content-Type-Options: nosniff
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true
+    accessControlAllowOriginList: ["https://app.example.com"]
+    accessControlAllowMethods: [GET, POST]</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Request headers → annotation:
+metadata:
+  annotations:
+    nginx.org/proxy-set-headers: "X-Forwarded-By nic"
+
+# Response headers → VirtualServer or annotation:
+# Option A — VirtualServer responseHeaders.add
+# Option B — nginx.org/add-headers annotation (NIC v5.5+)
+
+# HSTS → ConfigMap (global):
+data:
+  hsts: "True"
+  hsts-max-age: "31536000"
+  hsts-include-subdomains: "True"
+
+# CORS → Policy CRD:
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: app-cors }
+spec:
+  cors:
+    allowOrigin: "https://app.example.com"
+    allowMethods: ["GET", "POST"]</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The Traefik <code>headers</code> middleware is a kitchen sink: standard request/response headers go to VirtualServer fields or NIC annotations; HSTS to ConfigMap keys; CORS to the Policy CRD; security headers (CSP, X-Frame-Options, Referrer-Policy) to <code>responseHeaders.add</code>.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-security"><td><code>inFlightReq</code></td><td>ConfigMap <code>limit-conn-zones</code> + <code>nginx.org/limit-conn</code> (or server-snippets)</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: cap-concurrent }
+spec:
+  inFlightReq:
+    amount: 100
+    sourceCriterion:
+      ipStrategy: { depth: 1 }</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Define a connection zone in the ConfigMap:
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: nginx-config, namespace: nginx-ingress }
+data:
+  limit-conn-zones: |
+    perip $binary_remote_addr 10m
+
+# Apply the cap per Ingress:
+metadata:
+  annotations:
+    nginx.org/limit-conn: "perip 100"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Different from <code>rateLimit</code>: concurrent connections, not requests-per-second. NIC's RateLimitPolicy is not a substitute &mdash; you need <code>limit_conn</code> via the connection-zone annotation/ConfigMap pair.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-security"><td><code>ipAllowList</code></td><td><span class="badge badge-policy">Policy CRD <code>accessControl</code></span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: trusted-ips }
+spec:
+  ipAllowList:
+    sourceRange:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+    ipStrategy:
+      depth: 1</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: trusted-ips }
+spec:
+  accessControl:
+    allow:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+---
+# Reference from VirtualServer route:
+spec:
+  routes:
+    - path: /admin
+      policies: [{ name: trusted-ips }]
+
+# Client IP determination via ConfigMap (global):
+data:
+  real-ip-header: "X-Forwarded-For"
+  set-real-ip-from: "10.0.0.0/8"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik's <code>ipStrategy.depth</code> / <code>excludedIPs</code> have no per-Middleware equivalent. NIC determines the client IP once globally via ConfigMap (<code>real-ip-header</code>, <code>set-real-ip-from</code>); the AccessControl Policy then operates on that determined value.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-auth"><td><code>passTLSClientCert</code></td><td><span class="badge badge-policy">Policy CRD <code>ingressMTLS</code></span> + server-snippets for cert propagation</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: client-cert }
+spec:
+  passTLSClientCert:
+    pem: true
+    info:
+      subject: { commonName: true, organization: true }</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Step 1 — Verify the client cert (Policy CRD):
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: client-cert }
+spec:
+  ingressMTLS:
+    clientCertSecret: client-ca
+    verifyClient: "on"
+---
+# Step 2 — Forward the cert to upstream (server-snippets):
+metadata:
+  annotations:
+    nginx.org/policies: "default/client-cert"
+    nginx.org/server-snippets: |-
+      proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert;
+      proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Two-step: Policy verifies the client cert; snippet propagates it as a header. Traefik bundles both into one middleware; NIC separates concerns. Requires <code>-enable-snippets</code>.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-security"><td><code>rateLimit</code></td><td><span class="badge badge-policy">Policy CRD <code>rateLimit</code></span> (clean 1:1)</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: api-rl }
+spec:
+  rateLimit:
+    average: 100
+    burst: 50
+    period: 1s
+    sourceCriterion:
+      ipStrategy: { depth: 1 }</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata: { name: api-rl }
+spec:
+  rateLimit:
+    rate: 100r/s
+    burst: 50
+    key: ${binary_remote_addr}
+    zoneSize: 10M
+---
+spec:
+  routes:
+    - path: /api
+      policies: [{ name: api-rl }]</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Cleanest mapping in the table. Traefik <code>average</code> + <code>period</code> &rarr; NIC <code>rate</code> in <code>r/s</code> or <code>r/m</code>. <code>sourceCriterion.requestHeaderName</code> &rarr; <code>key: ${http_<header_name>}</code>.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-routing"><td><code>redirectRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> directive</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: old-to-new }
+spec:
+  redirectRegex:
+    regex: ^/old/(.*)$
+    replacement: /new/$1
+    permanent: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>metadata:
+  annotations:
+    nginx.org/server-snippets: |-
+      rewrite ^/old/(.*)$ /new/$1 permanent;</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No first-class annotation. Uses NGINX's <code>rewrite</code> directive directly. Requires <code>-enable-snippets</code> on the NIC controller.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-routing"><td><code>redirectScheme</code></td><td><code>nginx.org/redirect-to-https</code> or ConfigMap <code>ssl-redirect</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: https-only }
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Per-Ingress:
+metadata:
+  annotations:
+    nginx.org/redirect-to-https: "true"
+
+# Or globally (ConfigMap):
+data:
+  ssl-redirect: "True"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">http &rarr; https only. For custom <code>port</code> overrides (e.g. redirect to <code>:8443</code>), fall back to <code>nginx.org/server-snippets</code> with an explicit <code>rewrite</code>.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-routing"><td><code>replacePath</code></td><td><code>nginx.org/rewrites</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: api-path }
+spec:
+  replacePath:
+    path: /v2/api</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>metadata:
+  annotations:
+    nginx.org/rewrites: "serviceName=app rewrite=/v2/api"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Per-service path replacement. The <code>serviceName=</code> token in the rewrite value scopes the rewrite to a specific upstream by Service name.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-routing"><td><code>replacePathRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> regex</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: api-version }
+spec:
+  replacePathRegex:
+    regex: ^/api/v[0-9]+/(.*)$
+    replacement: /api/latest/$1</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>metadata:
+  annotations:
+    nginx.org/server-snippets: |-
+      rewrite ^/api/v[0-9]+/(.*)$ /api/latest/$1 break;</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC's <code>nginx.org/rewrites</code> uses NGINX prefix-replacement mode, not regex. Full regex requires a snippet. Use <code>break</code> (not <code>permanent</code>) to keep the rewrite internal &mdash; otherwise it becomes a redirect.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-resilience"><td><code>retry</code></td><td>ConfigMap or <code>nginx.org/proxy-next-upstream*</code> annotations</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: api-retry }
+spec:
+  retry:
+    attempts: 3
+    initialInterval: 100ms</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>metadata:
+  annotations:
+    nginx.org/proxy-next-upstream: "error timeout http_502 http_503"
+    nginx.org/proxy-next-upstream-tries: "3"
+    nginx.org/proxy-next-upstream-timeout: "10s"</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);"><code>initialInterval</code> (backoff) has no direct equivalent &mdash; NGINX retries the next upstream immediately without delay. If exponential backoff matters, implement at the client.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-routing"><td><code>stripPrefix</code></td><td><code>nginx.org/rewrites</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: strip-api }
+spec:
+  stripPrefix:
+    prefixes:
+      - /api</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>metadata:
+  annotations:
+    nginx.org/rewrites: "serviceName=app rewrite=/"
+# The Ingress path is matched (e.g. /api), then the rewrite
+# strips the prefix and forwards "/" + the remainder.</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Direct prefix strip per service. For multiple prefixes in one Middleware, declare multiple rewrites or split into multiple Ingress paths.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="mw-routing"><td><code>stripPrefixRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> regex</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: strip-versioned }
+spec:
+  stripPrefixRegex:
+    regex:
+      - ^/api/v[0-9]+/?</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>metadata:
+  annotations:
+    nginx.org/server-snippets: |-
+      rewrite ^/api/v[0-9]+/?(.*)$ /$1 break;</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Regex-based prefix strip requires the snippet escape hatch. Same constraint as <code>replacePathRegex</code>: <code>nginx.org/rewrites</code> uses prefix replacement, not regex.</p>
+                            </div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1001,17 +1633,62 @@ metadata:
 
             <section id="tcp-middleware-mappings">
                 <h2>TCP Middleware Mappings</h2>
-                <p>The Traefik <code>MiddlewareTCP</code> CRD ships two middlewares. Both map to <code>stream-snippets</code> in NIC's <code>nginx-config</code> ConfigMap (no first-class Policy CRD analog at L4).</p>
+                <p>The Traefik <code>MiddlewareTCP</code> CRD ships two middlewares. Both map to <code>stream-snippets</code> in NIC's <code>nginx-config</code> ConfigMap (no first-class Policy CRD analog at L4). <strong>Click any row to expand a side-by-side example.</strong></p>
+
                 <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th scope="col" style="width: 18%;">Traefik TCP middleware</th><th scope="col" style="width: 32%;">F5 NGINX Ingress Controller</th><th scope="col">Notes</th></tr></thead>
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik TCP middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr><td><code>ipAllowList</code> (TCP)</td><td>ConfigMap <code>stream-snippets</code> with <code>allow <em>cidr</em>;</code> / <code>deny <em>cidr</em>;</code> directives</td><td>NIC has no L4 Policy CRD for access control. Per-server stream-snippets can target individual TransportServer listeners by port (verify behavior carefully &mdash; stream-snippets are stream-context-global).</td></tr>
-                            <tr><td><code>inFlightConn</code></td><td>ConfigMap <code>stream-snippets</code> with <code>limit_conn_zone $binary_remote_addr zone=<em>name</em>:10m;</code> + <code>limit_conn <em>name</em> <em>n</em>;</code></td><td>NIC has no first-class concurrent-TCP-connection annotation. Stream snippets use NGINX's <code>ngx_stream_limit_conn_module</code>.</td></tr>
+                            <tr class="expandable" data-category="tcp"><td><code>ipAllowList</code> (TCP)</td><td>ConfigMap <code>stream-snippets</code> with <code>allow</code> / <code>deny</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: MiddlewareTCP
+metadata: { name: trusted-tcp }
+spec:
+  ipAllowList:
+    sourceRange:
+      - 10.0.0.0/8
+      - 192.168.1.0/24</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata: { name: nginx-config, namespace: nginx-ingress }
+data:
+  stream-snippets: |
+    # Inserted at the stream {} context — applies to all
+    # TransportServer listeners. Scope per-server inside the
+    # snippet (e.g. by listen port) if needed.
+    allow 10.0.0.0/8;
+    allow 192.168.1.0/24;
+    deny all;</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC has no L4 Policy CRD for access control. Stream-snippets apply at the stream context globally &mdash; for per-listener scoping, embed an explicit <code>server { listen <em>port</em>; allow ...; }</code> block inside the snippet.</p>
+                            </div></td></tr>
+
+                            <tr class="expandable" data-category="tcp"><td><code>inFlightConn</code></td><td>ConfigMap <code>stream-snippets</code> with <code>limit_conn</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
+kind: MiddlewareTCP
+metadata: { name: cap-tcp-conns }
+spec:
+  inFlightConn:
+    amount: 100</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
+  stream-snippets: |
+    limit_conn_zone $binary_remote_addr zone=peraddr:10m;
+    server {
+      listen 3306;
+      limit_conn peraddr 100;
+      # ...
+    }</code></pre></div>
+                                </div>
+                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Uses NGINX's <code>ngx_stream_limit_conn_module</code>. The zone has to be defined once at the stream context, then referenced from each server block where it applies.</p>
+                            </div></td></tr>
                         </tbody>
                     </table>
                 </div>
-                <div class="info-box note" style="margin: 20px 0 0;"><strong>Note:</strong> Both NIC stream-snippet patterns above require the <code>-enable-snippets</code> command-line flag on the NIC controller.</div>
+                <div class="info-box note" style="margin: 20px 0 0;"><strong>Note:</strong> Both NIC stream-snippet patterns require the <code>-enable-snippets</code> command-line flag on the NIC controller.</div>
             </section>
 
             <section id="crd-translations">

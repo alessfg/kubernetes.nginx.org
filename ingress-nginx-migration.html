@@ -2918,6 +2918,114 @@ spec:
                 </table>
             </div>
 
+            <!-- Session Affinity -->
+            <h3 id="session-affinity">Session Affinity / Sticky Sessions</h3>
+            <div class="table-wrapper">
+                <table class="mapping-table"><thead><tr><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>nginx.ingress.kubernetes.io/affinity: "cookie"</code><br><code>nginx.ingress.kubernetes.io/affinity-mode</code><br><code>nginx.ingress.kubernetes.io/session-cookie-change-on-failure</code><br><code>nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none</code><br><code>nginx.ingress.kubernetes.io/session-cookie-domain</code><br><code>nginx.ingress.kubernetes.io/session-cookie-expires</code><br><code>nginx.ingress.kubernetes.io/session-cookie-max-age</code><br><code>nginx.ingress.kubernetes.io/session-cookie-name</code><br><code>nginx.ingress.kubernetes.io/session-cookie-path</code><br><code>nginx.ingress.kubernetes.io/session-cookie-samesite</code><br><code>nginx.ingress.kubernetes.io/session-cookie-secure</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>sessionCookie</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><code>nginx.com/sticky-cookie-services</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                            </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code>annotations:
+  nginx.ingress.kubernetes.io/affinity: "cookie"
+  nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+  nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+  nginx.ingress.kubernetes.io/session-cookie-name: "SERVERID"
+  nginx.ingress.kubernetes.io/session-cookie-path: "/"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>annotations:
+  nginx.com/sticky-cookie-services: "serviceName=my-service srv_id expires=48h path=/"</code></pre></div>
+                                </div>
+                                <div class="info-box note"><strong>Note:</strong> The <code>nginx.com/sticky-cookie-services</code> annotation provides a simpler way to configure session persistence via Ingress annotations. For more granular control (domain, secure, samesite, httpOnly), use the VirtualServer CRD approach.</div>
+                            </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code>annotations:
+  nginx.ingress.kubernetes.io/affinity: "cookie"
+  nginx.ingress.kubernetes.io/affinity-mode: "balanced"
+  nginx.ingress.kubernetes.io/session-cookie-change-on-failure: "true"
+  nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none: "true"
+  nginx.ingress.kubernetes.io/session-cookie-domain: ".example.com"
+  nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+  nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+  nginx.ingress.kubernetes.io/session-cookie-name: "SERVERID"
+  nginx.ingress.kubernetes.io/session-cookie-path: "/"
+  nginx.ingress.kubernetes.io/session-cookie-samesite: "Strict"
+  nginx.ingress.kubernetes.io/session-cookie-secure: "true"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+spec:
+  upstreams:
+    - name: backend
+      service: my-service
+      port: 80
+      sessionCookie:
+        domain: ".example.com"  # session-cookie-domain
+        enable: true  # affinity: "cookie"
+        expires: 48h  # session-cookie-expires / session-cookie-max-age
+        httpOnly: true
+        name: SERVERID  # session-cookie-name
+        path: /  # session-cookie-path
+        samesite: strict  # session-cookie-samesite
+        secure: true  # session-cookie-secure</code></pre></div>
+                                </div>
+                                <div class="info-box note"><strong>New in v5.4.0:</strong> Session persistence via <code>sessionCookie</code> is now available in both NGINX OSS and NGINX Plus. Community-specific features <code>affinity-mode</code>, <code>session-cookie-change-on-failure</code>, and <code>session-cookie-conditional-samesite-none</code> have no direct equivalents.</div>
+                            </div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>nginx.ingress.kubernetes.io/affinity-canary-behavior</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[]</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].sessionCookie</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code># Canary with session affinity behavior
+annotations:
+  nginx.ingress.kubernetes.io/affinity: "cookie"
+  nginx.ingress.kubernetes.io/affinity-canary-behavior: "sticky"
+  nginx.ingress.kubernetes.io/canary: "true"
+  nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"</code></pre></div>
+                                <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+spec:
+  upstreams:
+    - name: main
+      service: main-svc
+      port: 80
+      sessionCookie:  # affinity: "cookie" + affinity-canary-behavior: "sticky"
+        enable: true  # affinity: "cookie"
+        httpOnly: true
+        name: SERVERID
+    - name: canary
+      service: canary-svc
+      port: 80
+      sessionCookie:  # affinity: "cookie" + affinity-canary-behavior: "sticky"
+        enable: true  # affinity: "cookie"
+        httpOnly: true
+        name: SERVERID
+  routes:
+    - path: /
+      matches:
+        - conditions:
+            - header: X-Canary  # canary-by-header
+              value: "true"
+          action:
+            pass: canary  # canary: "true"
+      action:
+        pass: main</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller's <code>affinity-canary-behavior: "sticky"</code> ensures users routed to canary by session affinity continue to be served by the canary. The F5 NGINX Ingress Controller separates these concerns: canary routing uses VirtualServer <code>matches[]</code>, <code>splits[]</code>, while session persistence uses the VirtualServer <code>upstreams[].sessionCookie</code> field. The <code>sessionCookie</code> feature is available in both NGINX OSS and NGINX Plus.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
             <!-- SSL/TLS -->
             <h3 id="ssl-tls">SSL/TLS</h3>
             <div class="table-wrapper">
@@ -3331,114 +3439,6 @@ spec:
                     </tbody>
                 </table>
             </div>
-            <!-- Session Affinity -->
-            <h3 id="session-affinity">Session Affinity / Sticky Sessions</h3>
-            <div class="table-wrapper">
-                <table class="mapping-table"><thead><tr><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                    <tbody>
-                        <tr class="expandable">
-                            <td><code>nginx.ingress.kubernetes.io/affinity: "cookie"</code><br><code>nginx.ingress.kubernetes.io/affinity-mode</code><br><code>nginx.ingress.kubernetes.io/session-cookie-change-on-failure</code><br><code>nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none</code><br><code>nginx.ingress.kubernetes.io/session-cookie-domain</code><br><code>nginx.ingress.kubernetes.io/session-cookie-expires</code><br><code>nginx.ingress.kubernetes.io/session-cookie-max-age</code><br><code>nginx.ingress.kubernetes.io/session-cookie-name</code><br><code>nginx.ingress.kubernetes.io/session-cookie-path</code><br><code>nginx.ingress.kubernetes.io/session-cookie-samesite</code><br><code>nginx.ingress.kubernetes.io/session-cookie-secure</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>sessionCookie</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><code>nginx.com/sticky-cookie-services</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
-                            </div>
-                            <div class="approach-content" data-approach="annotation">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code>annotations:
-  nginx.ingress.kubernetes.io/affinity: "cookie"
-  nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
-  nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
-  nginx.ingress.kubernetes.io/session-cookie-name: "SERVERID"
-  nginx.ingress.kubernetes.io/session-cookie-path: "/"</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>annotations:
-  nginx.com/sticky-cookie-services: "serviceName=my-service srv_id expires=48h path=/"</code></pre></div>
-                                </div>
-                                <div class="info-box note"><strong>Note:</strong> The <code>nginx.com/sticky-cookie-services</code> annotation provides a simpler way to configure session persistence via Ingress annotations. For more granular control (domain, secure, samesite, httpOnly), use the VirtualServer CRD approach.</div>
-                            </div>
-                            <div class="approach-content active" data-approach="crd">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code>annotations:
-  nginx.ingress.kubernetes.io/affinity: "cookie"
-  nginx.ingress.kubernetes.io/affinity-mode: "balanced"
-  nginx.ingress.kubernetes.io/session-cookie-change-on-failure: "true"
-  nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none: "true"
-  nginx.ingress.kubernetes.io/session-cookie-domain: ".example.com"
-  nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
-  nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
-  nginx.ingress.kubernetes.io/session-cookie-name: "SERVERID"
-  nginx.ingress.kubernetes.io/session-cookie-path: "/"
-  nginx.ingress.kubernetes.io/session-cookie-samesite: "Strict"
-  nginx.ingress.kubernetes.io/session-cookie-secure: "true"</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
-kind: VirtualServer
-spec:
-  upstreams:
-    - name: backend
-      service: my-service
-      port: 80
-      sessionCookie:
-        domain: ".example.com"  # session-cookie-domain
-        enable: true  # affinity: "cookie"
-        expires: 48h  # session-cookie-expires / session-cookie-max-age
-        httpOnly: true
-        name: SERVERID  # session-cookie-name
-        path: /  # session-cookie-path
-        samesite: strict  # session-cookie-samesite
-        secure: true  # session-cookie-secure</code></pre></div>
-                                </div>
-                                <div class="info-box note"><strong>New in v5.4.0:</strong> Session persistence via <code>sessionCookie</code> is now available in both NGINX OSS and NGINX Plus. Community-specific features <code>affinity-mode</code>, <code>session-cookie-change-on-failure</code>, and <code>session-cookie-conditional-samesite-none</code> have no direct equivalents.</div>
-                            </div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>nginx.ingress.kubernetes.io/affinity-canary-behavior</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[]</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].sessionCookie</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code># Canary with session affinity behavior
-annotations:
-  nginx.ingress.kubernetes.io/affinity: "cookie"
-  nginx.ingress.kubernetes.io/affinity-canary-behavior: "sticky"
-  nginx.ingress.kubernetes.io/canary: "true"
-  nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"</code></pre></div>
-                                <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
-kind: VirtualServer
-spec:
-  upstreams:
-    - name: main
-      service: main-svc
-      port: 80
-      sessionCookie:  # affinity: "cookie" + affinity-canary-behavior: "sticky"
-        enable: true  # affinity: "cookie"
-        httpOnly: true
-        name: SERVERID
-    - name: canary
-      service: canary-svc
-      port: 80
-      sessionCookie:  # affinity: "cookie" + affinity-canary-behavior: "sticky"
-        enable: true  # affinity: "cookie"
-        httpOnly: true
-        name: SERVERID
-  routes:
-    - path: /
-      matches:
-        - conditions:
-            - header: X-Canary  # canary-by-header
-              value: "true"
-          action:
-            pass: canary  # canary: "true"
-      action:
-        pass: main</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller's <code>affinity-canary-behavior: "sticky"</code> ensures users routed to canary by session affinity continue to be served by the canary. The F5 NGINX Ingress Controller separates these concerns: canary routing uses VirtualServer <code>matches[]</code>, <code>splits[]</code>, while session persistence uses the VirtualServer <code>upstreams[].sessionCookie</code> field. The <code>sessionCookie</code> feature is available in both NGINX OSS and NGINX Plus.</div>
-                        </div></td></tr>
-                    </tbody>
-                </table>
-            </div>
-
         </section>
 
         <!-- Plus Mappings -->
@@ -3466,43 +3466,6 @@ spec:
                 <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
             </div>
 
-
-            <!-- API Key Authentication -->
-            <h3 id="api-key-authentication">API Key Authentication</h3>
-            <div class="table-wrapper">
-                <table class="mapping-table"><thead><tr><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                    <tbody>
-                        <tr class="expandable">
-                            <td>No direct equivalent</td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>apiKey</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code># No direct equivalent
-# Requires custom Lua or external service</code></pre></div>
-                                <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>apiVersion: v1
-kind: Secret
-metadata:
-  name: api-keys
-type: nginx.org/apikey
-data:
-  client1: YXBpa2V5MTIzNDU=
----
-apiVersion: k8s.nginx.org/v1
-kind: Policy
-metadata:
-  name: api-key-auth
-spec:
-  apiKey:
-    clientSecret: api-keys
-    suppliedIn:
-      header: [X-API-Key]
-      query: [api_key]</code></pre></div>
-                            </div>
-                        </div></td></tr>
-                    </tbody>
-                </table>
-            </div>
 
             <!-- Active Health Checks -->
             <h3 id="active-health-checks">Active Health Checks</h3>
@@ -3547,6 +3510,43 @@ spec:
         statusMatch: "200-399"
       slowStart: 30s  # slow-start</code></pre>
                                 <div class="info-box note"><strong>Note:</strong> The VirtualServer CRD provides the most granular control over active health checks. Active health checks and <code>slowStart</code> require NGINX Plus. For passive health checks (OSS), see <a href="#passive-health-checks">Passive Health Checks</a> in OSS Mappings.</div>
+                            </div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- API Key Authentication -->
+            <h3 id="api-key-authentication">API Key Authentication</h3>
+            <div class="table-wrapper">
+                <table class="mapping-table"><thead><tr><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td>No direct equivalent</td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>apiKey</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h5>Kubernetes Ingress NGINX (Ingress-NGINX)</h5><pre><code># No direct equivalent
+# Requires custom Lua or external service</code></pre></div>
+                                <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>apiVersion: v1
+kind: Secret
+metadata:
+  name: api-keys
+type: nginx.org/apikey
+data:
+  client1: YXBpa2V5MTIzNDU=
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: api-key-auth
+spec:
+  apiKey:
+    clientSecret: api-keys
+    suppliedIn:
+      header: [X-API-Key]
+      query: [api_key]</code></pre></div>
                             </div>
                         </div></td></tr>
                     </tbody>
@@ -5061,105 +5061,9 @@ data:
             document.querySelectorAll('[data-ingress-nginx-release-link]').forEach(function(el) { el.href = INGRESS_NGINX_RELEASE_URL; });
             document.querySelectorAll('[data-nic-crd-install]').forEach(function(el) { el.textContent = NIC_CRD_INSTALL_CMD; });
 
-            // Approach tabs ARIA enhancement with arrow key navigation
-            document.querySelectorAll('.approach-tabs').forEach(function(tabList, i) {
-                tabList.setAttribute('role', 'tablist');
-                let tabs = tabList.querySelectorAll('.approach-tab');
-                tabs.forEach(function(tab) {
-                    let type = tab.textContent.toLowerCase().includes('annotation') ? 'annotation' : 'crd';
-                    let panelId = 'panel-' + i + '-' + type;
-                    tab.setAttribute('role', 'tab');
-                    tab.setAttribute('aria-selected', tab.classList.contains('active') ? 'true' : 'false');
-                    tab.setAttribute('aria-controls', panelId);
-                    tab.id = 'tab-' + i + '-' + type;
-                });
-                // Arrow key navigation per WAI-ARIA tabs pattern
-                tabList.addEventListener('keydown', function(e) {
-                    let tabsArr = Array.from(tabs);
-                    let idx = tabsArr.indexOf(document.activeElement);
-                    if (idx < 0) return;
-                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        let next = tabsArr[(idx + 1) % tabsArr.length];
-                        next.focus();
-                        next.click();
-                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        let prev = tabsArr[(idx - 1 + tabsArr.length) % tabsArr.length];
-                        prev.focus();
-                        prev.click();
-                    }
-                });
-                let container = tabList.closest('.example-content');
-                if (container) {
-                    container.querySelectorAll('.approach-content').forEach(function(panel) {
-                        let type = panel.getAttribute('data-approach');
-                        panel.setAttribute('role', 'tabpanel');
-                        panel.id = 'panel-' + i + '-' + type;
-                        panel.setAttribute('aria-labelledby', 'tab-' + i + '-' + type);
-                        panel.setAttribute('aria-hidden', panel.classList.contains('active') ? 'false' : 'true');
-                    });
-                }
-            });
-            // Add copy buttons to comparison blocks
-            document.querySelectorAll('.comparison-block').forEach(function(block) {
-                let h5 = block.querySelector('h5');
-                let pre = block.querySelector('pre');
-                if (!h5 || !pre) return;
-                let btn = document.createElement('button');
-                btn.className = 'comparison-copy-btn';
-                btn.textContent = 'Copy';
-                btn.setAttribute('aria-label', 'Copy code snippet');
-                btn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    let code = pre.textContent;
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(code).then(function() {
-                            btn.textContent = 'Copied!';
-                            btn.classList.add('copied');
-                            setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
-                        }).catch(function() {
-                            btn.textContent = 'Failed';
-                            setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
-                        });
-                    } else {
-                        let textarea = document.createElement('textarea');
-                        textarea.value = code;
-                        textarea.style.position = 'fixed';
-                        textarea.style.opacity = '0';
-                        document.body.appendChild(textarea);
-                        textarea.select();
-                        try {
-                            document.execCommand('copy');
-                            btn.textContent = 'Copied!';
-                            btn.classList.add('copied');
-                        } catch (err) {
-                            btn.textContent = 'Failed';
-                        } finally {
-                            document.body.removeChild(textarea);
-                        }
-                        setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
-                    }
-                });
-                h5.appendChild(btn);
-            });
-            // Syntax-highlight all static YAML examples
-            highlightStaticExamples();
+            // Approach-tab ARIA, copy buttons, syntax highlighting, and heading
+            // permalink anchors are wired by migration-shared.js — no inline copies.
         });
-
-        // Applies the existing highlightYaml() DOM-based highlighter to all static pre>code blocks
-        function highlightStaticExamples(root) {
-            (root || document).querySelectorAll('pre > code').forEach(function(block) {
-                if (block.dataset.highlighted) return;
-                try {
-                    let text = block.textContent;
-                    let frag = highlightYaml(text);
-                    block.textContent = '';
-                    block.appendChild(frag);
-                    block.dataset.highlighted = '1';
-                } catch (e) { /* skip block on error */ }
-            });
-        }
 
         let _migrationStrategy = 'crd'; // 'annotation' or 'crd'
 
@@ -5208,39 +5112,6 @@ data:
                 setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
             }
         }
-        document.querySelectorAll('h2[id], h3[id]').forEach(heading => {
-            const anchor = document.createElement('a');
-            anchor.className = 'heading-anchor';
-            // For h2 headings inside sections, prefer the section ID for consistency with sidebar navigation
-            let anchorId = heading.id;
-            if (heading.tagName === 'H2') {
-                let parentSection = heading.parentElement;
-                if (parentSection && parentSection.tagName === 'SECTION' && parentSection.id) anchorId = parentSection.id;
-            }
-            anchor.href = '#' + anchorId;
-            anchor.addEventListener('click', function(e) {
-                e.preventDefault();
-                history.replaceState(null, '', '#' + anchorId);
-                let target = document.getElementById(anchorId);
-                if (target) {
-                    let y = target.getBoundingClientRect().top + window.pageYOffset - 64;
-                    window.scrollTo({ top: y, behavior: 'smooth' });
-                }
-            });
-            anchor.setAttribute('aria-label', 'Permalink: ' + heading.textContent.trim());
-            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('width', '16');
-            svg.setAttribute('height', '16');
-            svg.setAttribute('viewBox', '0 0 16 16');
-            svg.setAttribute('fill', 'currentColor');
-            svg.setAttribute('aria-hidden', 'true');
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            path.setAttribute('d', 'm7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z');
-            svg.appendChild(path);
-            anchor.appendChild(svg);
-            heading.appendChild(anchor);
-        });
-
         // --- YAML Migration Analyzer ---
         const ANNOTATION_MAPPINGS = [
             // Access Control
@@ -6104,115 +5975,8 @@ data:
             container.appendChild(div);
         }
 
-        function highlightYaml(text) {
-            let frag = document.createDocumentFragment();
-            let lines = text.split('\n');
-            lines.forEach(function(line, i) {
-                if (i > 0) frag.appendChild(document.createTextNode('\n'));
-                // Comment lines
-                let trimmed = line.trimStart();
-                if (trimmed.startsWith('#')) {
-                    let indent = document.createTextNode(line.substring(0, line.length - trimmed.length));
-                    frag.appendChild(indent);
-                    let commentSpan = document.createElement('span');
-                    commentSpan.className = 'yaml-comment';
-                    commentSpan.textContent = trimmed;
-                    frag.appendChild(commentSpan);
-                    return;
-                }
-                // Document separator
-                if (trimmed === '---') {
-                    let sepSpan = document.createElement('span');
-                    sepSpan.className = 'yaml-separator';
-                    sepSpan.textContent = line;
-                    frag.appendChild(sepSpan);
-                    return;
-                }
-                // Key: value pairs
-                let kvMatch = line.match(/^(\s*)([-]?\s*)([^\s:#\n]+)(\s*:\s*)(.*)?$/);
-                if (kvMatch) {
-                    frag.appendChild(document.createTextNode(kvMatch[1]));
-                    if (kvMatch[2]) frag.appendChild(document.createTextNode(kvMatch[2]));
-                    let keySpan = document.createElement('span');
-                    keySpan.className = 'yaml-key';
-                    keySpan.textContent = kvMatch[3];
-                    frag.appendChild(keySpan);
-                    let colonSpan = document.createElement('span');
-                    colonSpan.className = 'yaml-separator';
-                    colonSpan.textContent = kvMatch[4];
-                    frag.appendChild(colonSpan);
-                    if (kvMatch[5] !== undefined && kvMatch[5] !== '') {
-                        let fullVal = kvMatch[5];
-                        // Split trailing inline comment (# preceded by space, outside quotes)
-                        let commentStart = -1, inQ = false, qc = '';
-                        for (let ci = 0; ci < fullVal.length; ci++) {
-                            let cc = fullVal[ci];
-                            if (inQ) { if (cc === qc) inQ = false; }
-                            else if (cc === '"' || cc === "'") { inQ = true; qc = cc; }
-                            else if (cc === '#' && ci > 0 && fullVal[ci - 1] === ' ') { commentStart = ci; break; }
-                        }
-                        let val = commentStart >= 0 ? fullVal.substring(0, commentStart) : fullVal;
-                        let inlineComment = commentStart >= 0 ? fullVal.substring(commentStart) : '';
-                        let valSpan = document.createElement('span');
-                        // Color-code specific value types
-                        if (/^(apiVersion|kind|metadata|spec|data)$/.test(kvMatch[3].trim())) {
-                            keySpan.className = 'yaml-keyword';
-                        }
-                        let valTrimmed = val.trim();
-                        if (/^["']?(true|false|yes|no|on|off)["']?$/i.test(valTrimmed)) {
-                            valSpan.className = 'yaml-bool';
-                        } else if (/^["']?\d+(\.\d+)?[smhkMG]?["']?$/.test(valTrimmed)) {
-                            valSpan.className = 'yaml-number';
-                        } else if (valTrimmed.startsWith('#')) {
-                            valSpan.className = 'yaml-comment';
-                        } else {
-                            valSpan.className = 'yaml-value';
-                        }
-                        valSpan.textContent = val;
-                        frag.appendChild(valSpan);
-                        if (inlineComment) {
-                            let cmSpan = document.createElement('span');
-                            cmSpan.className = 'yaml-comment';
-                            cmSpan.textContent = inlineComment;
-                            frag.appendChild(cmSpan);
-                        }
-                    }
-                    return;
-                }
-                // List items (- value)
-                let listMatch = line.match(/^(\s*)(- )(.*)$/);
-                if (listMatch) {
-                    frag.appendChild(document.createTextNode(listMatch[1]));
-                    let dashSpan = document.createElement('span');
-                    dashSpan.className = 'yaml-separator';
-                    dashSpan.textContent = listMatch[2];
-                    frag.appendChild(dashSpan);
-                    let itemSpan = document.createElement('span');
-                    itemSpan.className = 'yaml-value';
-                    itemSpan.textContent = listMatch[3];
-                    frag.appendChild(itemSpan);
-                    return;
-                }
-                // Fallback — detect inline comments (e.g. snippet content with trailing # comment)
-                let fbComment = -1, fbInQ = false, fbQC = '';
-                for (let fi = 0; fi < line.length; fi++) {
-                    let fc = line[fi];
-                    if (fbInQ) { if (fc === fbQC) fbInQ = false; }
-                    else if (fc === '"' || fc === "'") { fbInQ = true; fbQC = fc; }
-                    else if (fc === '#' && fi > 0 && line[fi - 1] === ' ') { fbComment = fi; break; }
-                }
-                if (fbComment >= 0) {
-                    frag.appendChild(document.createTextNode(line.substring(0, fbComment)));
-                    let fbCmSpan = document.createElement('span');
-                    fbCmSpan.className = 'yaml-comment';
-                    fbCmSpan.textContent = line.substring(fbComment);
-                    frag.appendChild(fbCmSpan);
-                } else {
-                    frag.appendChild(document.createTextNode(line));
-                }
-            });
-            return frag;
-        }
+        // highlightYaml lives in migration-shared.js (used by the analyzer below
+        // and by the reference-page syntax highlighter on DOMContentLoaded).
 
         function buildYamlBlock(text, collapsible) {
             let pre = document.createElement('div');

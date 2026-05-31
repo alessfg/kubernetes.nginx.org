@@ -376,3 +376,258 @@ Object.assign(window.MigrationActions, {
         init();
     }
 })();
+
+// ── YAML syntax highlighter for static example blocks ──
+
+function highlightYaml(text) {
+    let frag = document.createDocumentFragment();
+    let lines = text.split('\n');
+    lines.forEach(function(line, i) {
+        if (i > 0) frag.appendChild(document.createTextNode('\n'));
+        let trimmed = line.trimStart();
+        if (trimmed.startsWith('#')) {
+            let indent = document.createTextNode(line.substring(0, line.length - trimmed.length));
+            frag.appendChild(indent);
+            let commentSpan = document.createElement('span');
+            commentSpan.className = 'yaml-comment';
+            commentSpan.textContent = trimmed;
+            frag.appendChild(commentSpan);
+            return;
+        }
+        if (trimmed === '---') {
+            let sepSpan = document.createElement('span');
+            sepSpan.className = 'yaml-separator';
+            sepSpan.textContent = line;
+            frag.appendChild(sepSpan);
+            return;
+        }
+        let kvMatch = line.match(/^(\s*)([-]?\s*)([^\s:#\n]+)(\s*:\s*)(.*)?$/);
+        if (kvMatch) {
+            frag.appendChild(document.createTextNode(kvMatch[1]));
+            if (kvMatch[2]) frag.appendChild(document.createTextNode(kvMatch[2]));
+            let keySpan = document.createElement('span');
+            keySpan.className = 'yaml-key';
+            keySpan.textContent = kvMatch[3];
+            frag.appendChild(keySpan);
+            let colonSpan = document.createElement('span');
+            colonSpan.className = 'yaml-separator';
+            colonSpan.textContent = kvMatch[4];
+            frag.appendChild(colonSpan);
+            if (kvMatch[5] !== undefined && kvMatch[5] !== '') {
+                let fullVal = kvMatch[5];
+                let commentStart = -1, inQ = false, qc = '';
+                for (let ci = 0; ci < fullVal.length; ci++) {
+                    let cc = fullVal[ci];
+                    if (inQ) { if (cc === qc) inQ = false; }
+                    else if (cc === '"' || cc === "'") { inQ = true; qc = cc; }
+                    else if (cc === '#' && ci > 0 && fullVal[ci - 1] === ' ') { commentStart = ci; break; }
+                }
+                let val = commentStart >= 0 ? fullVal.substring(0, commentStart) : fullVal;
+                let inlineComment = commentStart >= 0 ? fullVal.substring(commentStart) : '';
+                let valSpan = document.createElement('span');
+                if (/^(apiVersion|kind|metadata|spec|data)$/.test(kvMatch[3].trim())) {
+                    keySpan.className = 'yaml-keyword';
+                }
+                let valTrimmed = val.trim();
+                if (/^["']?(true|false|yes|no|on|off)["']?$/i.test(valTrimmed)) {
+                    valSpan.className = 'yaml-bool';
+                } else if (/^["']?\d+(\.\d+)?[smhkMG]?["']?$/.test(valTrimmed)) {
+                    valSpan.className = 'yaml-number';
+                } else if (valTrimmed.startsWith('#')) {
+                    valSpan.className = 'yaml-comment';
+                } else {
+                    valSpan.className = 'yaml-value';
+                }
+                valSpan.textContent = val;
+                frag.appendChild(valSpan);
+                if (inlineComment) {
+                    let cmSpan = document.createElement('span');
+                    cmSpan.className = 'yaml-comment';
+                    cmSpan.textContent = inlineComment;
+                    frag.appendChild(cmSpan);
+                }
+            }
+            return;
+        }
+        let listMatch = line.match(/^(\s*)(- )(.*)$/);
+        if (listMatch) {
+            frag.appendChild(document.createTextNode(listMatch[1]));
+            let dashSpan = document.createElement('span');
+            dashSpan.className = 'yaml-separator';
+            dashSpan.textContent = listMatch[2];
+            frag.appendChild(dashSpan);
+            let itemSpan = document.createElement('span');
+            itemSpan.className = 'yaml-value';
+            itemSpan.textContent = listMatch[3];
+            frag.appendChild(itemSpan);
+            return;
+        }
+        let fbComment = -1, fbInQ = false, fbQC = '';
+        for (let fi = 0; fi < line.length; fi++) {
+            let fc = line[fi];
+            if (fbInQ) { if (fc === fbQC) fbInQ = false; }
+            else if (fc === '"' || fc === "'") { fbInQ = true; fbQC = fc; }
+            else if (fc === '#' && fi > 0 && line[fi - 1] === ' ') { fbComment = fi; break; }
+        }
+        if (fbComment >= 0) {
+            frag.appendChild(document.createTextNode(line.substring(0, fbComment)));
+            let fbCmSpan = document.createElement('span');
+            fbCmSpan.className = 'yaml-comment';
+            fbCmSpan.textContent = line.substring(fbComment);
+            frag.appendChild(fbCmSpan);
+        } else {
+            frag.appendChild(document.createTextNode(line));
+        }
+    });
+    return frag;
+}
+
+function highlightStaticExamples(root) {
+    (root || document).querySelectorAll('pre > code').forEach(function(block) {
+        if (block.dataset.highlighted) return;
+        try {
+            let text = block.textContent;
+            let frag = highlightYaml(text);
+            block.textContent = '';
+            block.appendChild(frag);
+            block.dataset.highlighted = '1';
+        } catch (e) { /* skip block on error */ }
+    });
+}
+
+// ── Reference-page enhancement wiring ──
+// On DOMContentLoaded: approach-tab ARIA + arrow-key nav, copy buttons on
+// .comparison-block, syntax highlighting on all <pre><code>, heading
+// permalink anchors. All tool-agnostic — feature-detect and bail when the
+// elements aren't present.
+
+(function() {
+    function init() {
+        // Approach-tab ARIA + arrow-key navigation.
+        document.querySelectorAll('.approach-tabs').forEach(function(tabList, i) {
+            tabList.setAttribute('role', 'tablist');
+            let tabs = tabList.querySelectorAll('.approach-tab');
+            tabs.forEach(function(tab) {
+                let type = tab.getAttribute('data-approach')
+                    || (tab.textContent.toLowerCase().includes('annotation') ? 'annotation' : 'crd');
+                let panelId = 'panel-' + i + '-' + type;
+                tab.setAttribute('role', 'tab');
+                tab.setAttribute('aria-selected', tab.classList.contains('active') ? 'true' : 'false');
+                tab.setAttribute('aria-controls', panelId);
+                tab.id = 'tab-' + i + '-' + type;
+            });
+            tabList.addEventListener('keydown', function(e) {
+                let tabsArr = Array.from(tabs);
+                let idx = tabsArr.indexOf(document.activeElement);
+                if (idx < 0) return;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    let next = tabsArr[(idx + 1) % tabsArr.length];
+                    next.focus();
+                    next.click();
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    let prev = tabsArr[(idx - 1 + tabsArr.length) % tabsArr.length];
+                    prev.focus();
+                    prev.click();
+                }
+            });
+            let container = tabList.closest('.example-content');
+            if (container) {
+                container.querySelectorAll('.approach-content').forEach(function(panel) {
+                    let type = panel.getAttribute('data-approach');
+                    panel.setAttribute('role', 'tabpanel');
+                    panel.id = 'panel-' + i + '-' + type;
+                    panel.setAttribute('aria-labelledby', 'tab-' + i + '-' + type);
+                    panel.setAttribute('aria-hidden', panel.classList.contains('active') ? 'false' : 'true');
+                });
+            }
+        });
+
+        // Copy buttons on every .comparison-block (clipboard + fallback).
+        document.querySelectorAll('.comparison-block').forEach(function(block) {
+            let h5 = block.querySelector('h5');
+            let pre = block.querySelector('pre');
+            if (!h5 || !pre) return;
+            if (h5.querySelector('.comparison-copy-btn')) return;
+            let btn = document.createElement('button');
+            btn.className = 'comparison-copy-btn';
+            btn.textContent = 'Copy';
+            btn.setAttribute('aria-label', 'Copy code snippet');
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                let code = pre.textContent;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(code).then(function() {
+                        btn.textContent = 'Copied!';
+                        btn.classList.add('copied');
+                        setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+                    }).catch(function() {
+                        btn.textContent = 'Failed';
+                        setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+                    });
+                } else {
+                    let textarea = document.createElement('textarea');
+                    textarea.value = code;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    try {
+                        document.execCommand('copy');
+                        btn.textContent = 'Copied!';
+                        btn.classList.add('copied');
+                    } catch (err) {
+                        btn.textContent = 'Failed';
+                    } finally {
+                        document.body.removeChild(textarea);
+                    }
+                    setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+                }
+            });
+            h5.appendChild(btn);
+        });
+
+        // Heading permalink anchors on h2[id] and h3[id].
+        document.querySelectorAll('h2[id], h3[id]').forEach(function(heading) {
+            if (heading.querySelector('.heading-anchor')) return;
+            let anchor = document.createElement('a');
+            anchor.className = 'heading-anchor';
+            let anchorId = heading.id;
+            if (heading.tagName === 'H2') {
+                let parentSection = heading.parentElement;
+                if (parentSection && parentSection.tagName === 'SECTION' && parentSection.id) anchorId = parentSection.id;
+            }
+            anchor.href = '#' + anchorId;
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                history.replaceState(null, '', '#' + anchorId);
+                let target = document.getElementById(anchorId);
+                if (target) {
+                    let y = target.getBoundingClientRect().top + window.pageYOffset - 64;
+                    window.scrollTo({ top: y, behavior: 'smooth' });
+                }
+            });
+            anchor.setAttribute('aria-label', 'Permalink: ' + heading.textContent.trim());
+            let svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', '16');
+            svg.setAttribute('height', '16');
+            svg.setAttribute('viewBox', '0 0 16 16');
+            svg.setAttribute('fill', 'currentColor');
+            svg.setAttribute('aria-hidden', 'true');
+            let path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', 'm7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z');
+            svg.appendChild(path);
+            anchor.appendChild(svg);
+            heading.appendChild(anchor);
+        });
+
+        // Syntax-highlight all static <pre><code> blocks.
+        highlightStaticExamples();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();

@@ -252,7 +252,7 @@
                             <li><strong>Error Pages:</strong> Custom responses &mdash; replaces Traefik <code>Errors</code> middleware</li>
                             <li><strong>Request/Response Headers:</strong> Add, modify, or remove headers &mdash; replaces parts of Traefik <code>Headers</code> middleware</li>
                             <li><strong>Health Checks:</strong> Active health monitoring (NIC Plus) &mdash; closest analog to Traefik <code>CircuitBreaker</code></li>
-                            <li><strong>Session Persistence:</strong> Cookie-based sticky sessions (NIC Plus) &mdash; replaces Traefik <code>service.sticky.cookie.*</code> annotations</li>
+                            <li><strong>Session Persistence:</strong> Cookie-based sticky sessions via <code>upstreams[].sessionCookie</code> &mdash; replaces Traefik <code>service.sticky.cookie.*</code> annotations</li>
                         </ul>
                     </div>
 
@@ -436,7 +436,7 @@
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik annotation</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.entrypoints</code></td><td><code>nginx.org/listen-ports</code>, <code>nginx.org/listen-ports-ssl</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.entrypoints</code></td><td><code>nginx.org/listen-ports</code>, <code>nginx.org/listen-ports-ssl</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -447,10 +447,10 @@
     nginx.org/listen-ports: "80"
     nginx.org/listen-ports-ssl: "443"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);"><strong>Conceptual mismatch:</strong> Traefik EntryPoints are named static-config primitives that routers reference. NIC HTTP listeners are controller-wide via CLI flags / Helm values; per-Ingress port selection is rare. Use these annotations only when a workload needs a non-default listen port.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> <strong>Conceptual mismatch:</strong> Traefik EntryPoints are named static-config primitives that routers reference. NIC HTTP listeners are controller-wide via CLI flags / Helm values; per-Ingress port selection is rare. Use these annotations only when a workload needs a non-default listen port.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.middlewares</code></td><td>No 1:1 &mdash; migrate each referenced middleware separately to its NIC Policy / annotation / snippet</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.middlewares</code></td><td>No 1:1 &mdash; migrate each referenced middleware separately to its NIC Policy / annotation / snippet</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -463,10 +463,10 @@
     nginx.org/policies: "default/auth"
     nginx.org/rewrites: "serviceName=app rewrite=/"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">See <a href="#middleware-mappings">HTTP Middleware Mappings</a> for each individual middleware. The cross-provider <code>name@provider</code> suffix (<code>auth@file</code>, <code>strip@docker</code>) is not migratable &mdash; every middleware must be a Kubernetes resource.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> See <a href="#middleware-mappings">HTTP Middleware Mappings</a> for each individual middleware. The cross-provider <code>name@provider</code> suffix (<code>auth@file</code>, <code>strip@docker</code>) is not migratable &mdash; every middleware must be a Kubernetes resource.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.priority</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.priority</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -483,10 +483,10 @@ spec:
             pathType: Exact   # highest priority
             backend: { service: { name: api, port: { number: 80 } } }</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Ties between overlapping resources break by <code>creationTimestamp</code>, then lexicographic <code>uid</code>. Migrate overlapping routes by switching them to distinct path types or by consolidating into a single VirtualServer with explicit ordering.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Ties between overlapping resources break by <code>creationTimestamp</code>, then lexicographic <code>uid</code>. Migrate overlapping routes by switching them to distinct path types or by consolidating into a single VirtualServer with explicit ordering.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.rulesyntax</code></td><td>N/A (Traefik-internal)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.rulesyntax</code></td><td>N/A (Traefik-internal)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -496,10 +496,10 @@ spec:
 # router DSL syntax — it does not affect routing behavior in
 # NIC. Drop the annotation when migrating.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Deprecated in Traefik v3.7. Safe to drop entirely during migration.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Deprecated in Traefik v3.7. Safe to drop entirely during migration.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.pathmatcher</code></td><td>Ingress <code>pathType</code> or VirtualServer <code>routes[].path</code> regex modifier</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.pathmatcher</code></td><td>Ingress <code>pathType</code> or VirtualServer <code>routes[].path</code> regex modifier</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -523,10 +523,10 @@ spec:
 # PathRegexp → VirtualServer with regex modifier:
 # spec.routes[].path: ~ ^/api/v[0-9]+/users$</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik <code>Path</code> &rarr; <code>pathType: Exact</code>. <code>PathPrefix</code> &rarr; <code>pathType: Prefix</code>. <code>PathRegexp</code> needs a VirtualServer route with <code>path: ~ ^/regex/$</code> (or <code>~*</code> for case-insensitive).</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Traefik <code>Path</code> &rarr; <code>pathType: Exact</code>. <code>PathPrefix</code> &rarr; <code>pathType: Prefix</code>. <code>PathRegexp</code> needs a VirtualServer route with <code>path: ~ ^/regex/$</code> (or <code>~*</code> for case-insensitive).</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.tls</code></td><td>Standard Ingress <code>spec.tls[]</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.tls</code></td><td>Standard Ingress <code>spec.tls[]</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -546,10 +546,10 @@ spec:
     - host: app.example.com
       http: { ... }</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Drop the annotation; declare standard <code>spec.tls[]</code> with a Secret reference. NIC honors the standard Ingress TLS block directly.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Drop the annotation; declare standard <code>spec.tls[]</code> with a Secret reference. NIC honors the standard Ingress TLS block directly.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.tls.certresolver</code></td><td>No equivalent &mdash; use cert-manager</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.tls.certresolver</code></td><td>No equivalent &mdash; use cert-manager</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -573,10 +573,10 @@ spec:
     - hosts: [app.example.com]
       secretName: app-tls</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC has no built-in ACME client. cert-manager handles ACME (Let's Encrypt, internal CAs, ZeroSSL, etc.) and writes the issued cert to a Secret that the Ingress references.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC has no built-in ACME client. cert-manager handles ACME (Let's Encrypt, internal CAs, ZeroSSL, etc.) and writes the issued cert to a Secret that the Ingress references.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.tls.domains.n.main</code></td><td>cert-manager <code>Certificate.spec.dnsNames</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.tls.domains.n.main</code></td><td>cert-manager <code>Certificate.spec.dnsNames</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -590,10 +590,10 @@ spec:
   dnsNames:
     - app.example.com</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Main domain is the first entry in cert-manager's <code>dnsNames</code> list.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Main domain is the first entry in cert-manager's <code>dnsNames</code> list.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.tls.domains.n.sans</code></td><td>cert-manager <code>Certificate.spec.dnsNames</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.tls.domains.n.sans</code></td><td>cert-manager <code>Certificate.spec.dnsNames</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -611,10 +611,10 @@ spec:
     - api.example.com    # SAN
     - admin.example.com  # SAN</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">SANs go alongside the main domain in the same <code>dnsNames</code> list. The Ingress <code>spec.tls[].hosts</code> should mirror all of them.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> SANs go alongside the main domain in the same <code>dnsNames</code> list. The Ingress <code>spec.tls[].hosts</code> should mirror all of them.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.tls.options</code></td><td>ConfigMap <code>ssl-protocols</code>, <code>ssl-ciphers</code> (global only)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.tls.options</code></td><td><span class="badge badge-configmap">ConfigMap <code>ssl-protocols</code></span>, <code>ssl-ciphers</code> (global only)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code># TLSOption CRD (referenced by per-Ingress annotation):
@@ -640,10 +640,10 @@ data:
   ssl-ciphers: "TLS_AES_256_GCM_SHA384"
   ssl-prefer-server-ciphers: "True"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC has no per-Ingress TLS option override. If different workloads need different TLS handshake settings, deploy separate NIC controllers, one per profile.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC has no per-Ingress TLS option override. If different workloads need different TLS handshake settings, deploy separate NIC controllers, one per profile.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.observability.accesslogs</code></td><td>ConfigMap <code>access-log</code> / <code>access-log-off</code>; or <code>nginx.org/server-snippets</code> for per-Ingress</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.observability.accesslogs</code></td><td><span class="badge badge-configmap">ConfigMap <code>access-log</code></span> / <code>access-log-off</code>; or <code>nginx.org/server-snippets</code> for per-Ingress</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -659,10 +659,10 @@ metadata:
     nginx.org/server-snippets: |-
       access_log off;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Global control via ConfigMap. Per-Ingress disable requires snippet support enabled on the NIC controller.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Global control via ConfigMap. Per-Ingress disable requires snippet support enabled on the NIC controller.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.observability.metrics</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.observability.metrics</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -674,10 +674,10 @@ metadata:
 # Prometheus scrape level (relabel_configs) or run a
 # dedicated NIC controller for that workload.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Confirmed via NIC v5.5 source &mdash; no <code>nginx.org/disable-metrics</code> annotation or VirtualServer field. Adjust expectations or deploy NIC per workload tier.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Confirmed via NIC v5.5 source &mdash; no <code>nginx.org/disable-metrics</code> annotation or VirtualServer field. Adjust expectations or deploy NIC per workload tier.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="router-annotations"><td><code>router.observability.tracing</code></td><td>Inverse pattern: ConfigMap <code>otel-trace-in-http: "false"</code> + per-Ingress snippet opt-in</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/router.observability.tracing</code></td><td>Inverse pattern: ConfigMap <code>otel-trace-in-http: "false"</code> + per-Ingress snippet opt-in</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code># Traefik defaults to tracing ON; opt out per route:
@@ -700,7 +700,7 @@ metadata:
     nginx.org/location-snippets: |-
       otel_trace on;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Inverse model from Traefik: Traefik defaults on with opt-out; NIC defaults off (when global is false) with opt-in via snippets. The ConfigMap key is officially documented as the way to enable per-route tracing.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Inverse model from Traefik: Traefik defaults on with opt-out; NIC defaults off (when global is false) with opt-in via snippets. The ConfigMap key is officially documented as the way to enable per-route tracing.</div>
                             </div></td></tr>
                         </tbody>
                     </table>
@@ -712,7 +712,27 @@ metadata:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik annotation</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.nativelb</code></td><td><code>nginx.org/use-cluster-ip: "true"</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/service.middlewares</code></td><td>No equivalent (NIC Policies attach at route level, not service level)</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code># Service-level middlewares run after the routing decision
+# but before request dispatch to the backend:
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/service.middlewares: |-
+      default-circuit-breaker@kubernetescrd</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC Policies attach to VirtualServer routes or to Ingress
+# resources via nginx.org/policies. There is no separate
+# "service-level" middleware execution phase.
+
+# Move the policy to the route level:
+metadata:
+  annotations:
+    nginx.org/policies: "default/circuit-breaker"</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Traefik's distinction between router-level and service-level middleware execution does not exist in NIC. The two-phase model is collapsed into a single route-attached policy chain.</div>
+                            </div></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/service.nativelb</code></td><td><code>nginx.org/use-cluster-ip: "true"</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -722,10 +742,10 @@ metadata:
   annotations:
     nginx.org/use-cluster-ip: "true"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Uses the Service ClusterIP as a single synthetic upstream instead of resolving pod endpoints. Disables NIC's LB-related options (lb-method, next-upstream) since there is only one upstream server.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Uses the Service ClusterIP as a single synthetic upstream instead of resolving pod endpoints. Disables NIC's LB-related options (lb-method, next-upstream) since there is only one upstream server.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.nodeportlb</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/service.nodeportlb</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
@@ -745,10 +765,10 @@ metadata:
 # If you specifically need NodePort+node-IP behavior, front
 # NIC with an external LB that handles node selection.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Confirmed via NIC v5.5 source &mdash; only <code>use-cluster-ip</code> exists as an upstream-resolution override.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Confirmed via NIC v5.5 source &mdash; only <code>use-cluster-ip</code> exists as an upstream-resolution override.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.serversscheme</code></td><td><code>nginx.org/ssl-services</code> (https) or <code>nginx.org/grpc-services</code> (h2c)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/service.serversscheme</code></td><td><code>nginx.org/ssl-services</code> (https) or <code>nginx.org/grpc-services</code> (h2c)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code># For an HTTPS backend:
@@ -771,10 +791,10 @@ metadata:
 data:
   http2: "True"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC annotations take a comma-separated list of Service names within the Ingress, not a single scheme value &mdash; one Ingress can mix HTTP, HTTPS, and gRPC backends by name.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC annotations take a comma-separated list of Service names within the Ingress, not a single scheme value &mdash; one Ingress can mix HTTP, HTTPS, and gRPC backends by name.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.serverstransport</code></td><td>Split: VirtualServer <code>upstream.tls</code> + <code>nginx.org/proxy-*-timeout</code> + ConfigMap <code>keepalive</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/service.serverstransport</code></td><td>Split: VirtualServer <code>upstream.tls</code> + <code>nginx.org/proxy-*-timeout</code> + ConfigMap <code>keepalive</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code># One CRD bundles TLS, timeouts, max idle conns:
@@ -811,10 +831,10 @@ data:
   keepalive: "100"
   keepalive-timeout: "60s"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik's <code>ServersTransport</code> bundles transport-level concerns into one CRD; NIC spreads them across VirtualServer fields, annotations, and ConfigMap keys. There is no single NIC analog.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Traefik's <code>ServersTransport</code> bundles transport-level concerns into one CRD; NIC spreads them across VirtualServer fields, annotations, and ConfigMap keys. There is no single NIC analog.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.passhostheader</code></td><td>Default forwards; override via snippet</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>traefik.ingress.kubernetes.io/service.passhostheader</code></td><td>Default forwards; override via snippet</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code># Disable host header forwarding:
@@ -829,141 +849,56 @@ metadata:
     nginx.org/location-snippets: |-
       proxy_set_header Host $proxy_host;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Both controllers default to forwarding the original Host. Overriding requires snippets in NIC (<code>-enable-snippets</code>).</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Both controllers default to forwarding the original Host. Overriding requires snippets in NIC (<code>-enable-snippets</code>).</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.sticky.cookie</code></td><td><code>nginx.com/sticky-cookie-services</code> <span class="badge badge-plus">NIC Plus</span></td></tr>
+                            <tr class="expandable" aria-expanded="false">
+                                <td>
+                                    <code>traefik.ingress.kubernetes.io/service.sticky.cookie</code><br>
+                                    <code>traefik.ingress.kubernetes.io/service.sticky.cookie.domain</code><br>
+                                    <code>traefik.ingress.kubernetes.io/service.sticky.cookie.httponly</code><br>
+                                    <code>traefik.ingress.kubernetes.io/service.sticky.cookie.maxage</code><br>
+                                    <code>traefik.ingress.kubernetes.io/service.sticky.cookie.name</code><br>
+                                    <code>traefik.ingress.kubernetes.io/service.sticky.cookie.path</code><br>
+                                    <code>traefik.ingress.kubernetes.io/service.sticky.cookie.samesite</code><br>
+                                    <code>traefik.ingress.kubernetes.io/service.sticky.cookie.secure</code>
+                                </td>
+                                <td>
+                                    <span class="badge badge-virtualserver">VirtualServer CRD <code>upstreams[].sessionCookie</code></span><span class="or-text">&mdash; or &mdash;</span><code>nginx.com/sticky-cookie-services</code> <span class="badge badge-plus">Plus</span>
+                                </td>
+                            </tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
   annotations:
-    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>metadata:
-  annotations:
-    nginx.com/sticky-cookie-services: |-
-      serviceName=app srv_id expires=1h domain=.example.com path=/</code></pre></div>
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.name: my_session
+    traefik.ingress.kubernetes.io/service.sticky.cookie.domain: .example.com
+    traefik.ingress.kubernetes.io/service.sticky.cookie.path: /app
+    traefik.ingress.kubernetes.io/service.sticky.cookie.maxage: "3600"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.secure: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.httponly: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.samesite: lax</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+spec:
+  upstreams:
+    - name: app
+      service: app-svc
+      port: 80
+      sessionCookie:
+        enable: true
+        name: my_session
+        domain: .example.com
+        path: /app
+        expires: 1h           # maxage seconds -> NIC duration string
+        secure: true
+        httponly: true
+        samesite: lax</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);"><strong>NIC Plus only.</strong> OSS NIC has no sticky-cookie load balancing &mdash; closest OSS option is <code>VirtualServer.upstreams[].lb-method: hash $binary_remote_addr</code> for source-IP affinity.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> The OSS-compatible path is VirtualServer <code>upstreams[].sessionCookie</code>; sub-fields map cleanly to the per-attribute Traefik annotations. For Ingress-based deployments, the equivalent <code>nginx.com/sticky-cookie-services</code> annotation is available with NGINX Plus. Traefik's <code>maxage</code> (seconds) becomes NIC's <code>expires</code> (duration string like <code>1h</code>, <code>30m</code>, <code>3600s</code>).</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.sticky.cookie.name</code></td><td><code>nginx.com/sticky-cookie-services</code> cookie name parameter <span class="badge badge-plus">NIC Plus</span></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/service.sticky.cookie.name: my_session</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>metadata:
-  annotations:
-    nginx.com/sticky-cookie-services: |-
-      serviceName=app my_session expires=1h</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The cookie name is the second positional token in the NIC annotation value (after <code>serviceName=</code>).</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.sticky.cookie.secure</code></td><td><code>nginx.com/sticky-cookie-services</code> <code>secure</code> flag <span class="badge badge-plus">NIC Plus</span></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/service.sticky.cookie.secure: "true"</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>metadata:
-  annotations:
-    nginx.com/sticky-cookie-services: |-
-      serviceName=app srv_id secure</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Appending <code>secure</code> to the annotation value adds the Secure attribute.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.sticky.cookie.samesite</code></td><td><code>nginx.com/sticky-cookie-services</code> <code>samesite=</code> parameter <span class="badge badge-plus">NIC Plus</span></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/service.sticky.cookie.samesite: strict</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>metadata:
-  annotations:
-    nginx.com/sticky-cookie-services: |-
-      serviceName=app srv_id samesite=strict</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">SameSite values: <code>none</code>, <code>lax</code>, <code>strict</code>.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.sticky.cookie.domain</code></td><td><code>nginx.com/sticky-cookie-services</code> <code>domain=</code> parameter <span class="badge badge-plus">NIC Plus</span></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/service.sticky.cookie.domain: .example.com</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>metadata:
-  annotations:
-    nginx.com/sticky-cookie-services: |-
-      serviceName=app srv_id domain=.example.com</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Standard cookie Domain attribute.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.sticky.cookie.httponly</code></td><td><code>nginx.com/sticky-cookie-services</code> <code>httponly</code> flag <span class="badge badge-plus">NIC Plus</span></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/service.sticky.cookie.httponly: "true"</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>metadata:
-  annotations:
-    nginx.com/sticky-cookie-services: |-
-      serviceName=app srv_id httponly</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Appending <code>httponly</code> adds the HttpOnly attribute.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.sticky.cookie.maxage</code></td><td><code>nginx.com/sticky-cookie-services</code> <code>expires=</code> parameter <span class="badge badge-plus">NIC Plus</span></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/service.sticky.cookie.maxage: "3600"</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>metadata:
-  annotations:
-    nginx.com/sticky-cookie-services: |-
-      serviceName=app srv_id expires=1h</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC uses a duration string (<code>1h</code>, <code>30m</code>, <code>3600s</code>) rather than raw seconds. Convert from Traefik's seconds count accordingly.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.sticky.cookie.path</code></td><td><code>nginx.com/sticky-cookie-services</code> <code>path=</code> parameter <span class="badge badge-plus">NIC Plus</span></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/service.sticky.cookie.path: /app</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller (Plus)</h5><pre><code>metadata:
-  annotations:
-    nginx.com/sticky-cookie-services: |-
-      serviceName=app srv_id path=/app</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Standard cookie Path attribute.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="service-annotations"><td><code>service.middlewares</code></td><td>No equivalent (NIC Policies attach at route level, not service level)</td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code># Service-level middlewares run after the routing decision
-# but before request dispatch to the backend:
-metadata:
-  annotations:
-    traefik.ingress.kubernetes.io/service.middlewares: |-
-      default-circuit-breaker@kubernetescrd</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC Policies attach to VirtualServer routes or to Ingress
-# resources via nginx.org/policies. There is no separate
-# "service-level" middleware execution phase.
-
-# Move the policy to the route level:
-metadata:
-  annotations:
-    nginx.org/policies: "default/circuit-breaker"</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik's distinction between router-level and service-level middleware execution does not exist in NIC. The two-phase model is collapsed into a single route-attached policy chain.</p>
-                            </div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -973,7 +908,7 @@ metadata:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable" data-category="mw-routing"><td><code>addPrefix</code></td><td><code>nginx.org/rewrites</code> + <code>nginx.org/location-snippets</code> (for the <code>X-Forwarded-Prefix</code> header)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>addPrefix</code></td><td><code>nginx.org/rewrites</code> + <code>nginx.org/location-snippets</code> (for the <code>X-Forwarded-Prefix</code> header)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -990,10 +925,10 @@ metadata:
     nginx.org/location-snippets: |-
       proxy_set_header X-Forwarded-Prefix /api/v1;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Path prepending is straightforward; the <code>X-Forwarded-Prefix</code> header injection requires a snippet because <code>nginx.org/rewrites</code> doesn't touch request headers.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Path prepending is straightforward; the <code>X-Forwarded-Prefix</code> header injection requires a snippet because <code>nginx.org/rewrites</code> doesn't touch request headers.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-auth"><td><code>basicAuth</code></td><td><span class="badge badge-policy">Policy CRD <code>basicAuth</code></span> (OSS) or <code>nginx.org/basic-auth-secret</code> annotation</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>basicAuth</code></td><td><span class="badge badge-policy">Policy CRD <code>basicAuth</code></span> (OSS) or <code>nginx.org/basic-auth-secret</code> annotation</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1024,10 +959,10 @@ metadata:
     nginx.org/basic-auth-secret: api-htpasswd
     nginx.org/basic-auth-realm: "Restricted API"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The NIC Policy requires a Secret of type <code>nginx.org/htpasswd</code> keyed under <code>htpasswd</code>. Only one BasicAuth policy applies per route &mdash; additional refs are silently ignored.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> The NIC Policy requires a Secret of type <code>nginx.org/htpasswd</code> keyed under <code>htpasswd</code>. Only one BasicAuth policy applies per route &mdash; additional refs are silently ignored.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-headers"><td><code>buffering</code></td><td><code>nginx.org/client-max-body-size</code>, <code>nginx.org/proxy-buffers</code>, <code>nginx.org/proxy-buffer-size</code>, <code>nginx.org/proxy-busy-buffers-size</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>buffering</code></td><td><code>nginx.org/client-max-body-size</code>, <code>nginx.org/proxy-buffers</code>, <code>nginx.org/proxy-buffer-size</code>, <code>nginx.org/proxy-busy-buffers-size</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1046,10 +981,10 @@ spec:
     nginx.org/proxy-buffer-size: "16k"       # memResponseBodyBytes head
     nginx.org/proxy-busy-buffers-size: "32k"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);"><code>memRequestBodyBytes</code> / <code>memResponseBodyBytes</code> map to NGINX <code>proxy_buffers</code> sizes; <code>maxResponseBodyBytes</code> bounds the response NIC will buffer before streaming. <code>maxRequestBodyBytes</code> &rarr; <code>client-max-body-size</code>.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> <code>memRequestBodyBytes</code> / <code>memResponseBodyBytes</code> map to NGINX <code>proxy_buffers</code> sizes; <code>maxResponseBodyBytes</code> bounds the response NIC will buffer before streaming. <code>maxRequestBodyBytes</code> &rarr; <code>client-max-body-size</code>.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-composition"><td><code>chain</code></td><td>No equivalent &mdash; flatten chains during migration</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>chain</code></td><td>No equivalent &mdash; flatten chains during migration</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1080,10 +1015,10 @@ spec:
 # Repeat the same policies[] in every VirtualServer that
 # referenced "secured-api" — the named chain is lost.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);"><strong>Chain flatten lossiness:</strong> the named-chain abstraction is unrecoverable in NIC. If your Chain was attached to 10 IngressRoutes, you'll need to copy the same <code>policies[]</code> + non-policy mappings into 10 VirtualServers. Plan time for the duplication and ongoing drift management.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> <strong>Chain flatten lossiness:</strong> the named-chain abstraction is unrecoverable in NIC. If your Chain was attached to 10 IngressRoutes, you'll need to copy the same <code>policies[]</code> + non-policy mappings into 10 VirtualServers. Plan time for the duplication and ongoing drift management.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-resilience"><td><code>circuitBreaker</code></td><td>Passive: <code>nginx.org/upstream-fail-timeout</code>, <code>upstream-max-fails</code>. Active: VirtualServer <code>upstream.healthcheck</code> <span class="badge badge-plus">NIC Plus</span></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>circuitBreaker</code></td><td>Passive: <code>nginx.org/upstream-fail-timeout</code>, <code>upstream-max-fails</code>. Active: VirtualServer <code>upstream.healthcheck</code> <span class="badge badge-plus">NIC Plus</span></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1114,10 +1049,10 @@ spec:
         fails: 3
         passes: 2</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No expression-based circuit breaker in NIC. Closest behavior: passive failure detection (mark upstream down for <code>fail-timeout</code> after <code>max-fails</code> errors) plus active health checks for explicit recovery testing.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> No expression-based circuit breaker in NIC. Closest behavior: passive failure detection (mark upstream down for <code>fail-timeout</code> after <code>max-fails</code> errors) plus active health checks for explicit recovery testing.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-headers"><td><code>compress</code></td><td>ConfigMap <code>gzip*</code> keys (global only)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>compress</code></td><td><span class="badge badge-configmap">ConfigMap <code>gzip*</code></span> keys (global only)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1140,10 +1075,10 @@ data:
   gzip-level: "6"
   gzip-proxied: "any"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No per-Ingress compression toggle. <code>excludedContentTypes</code> inverts in NIC &mdash; you list compressible types in <code>gzip-types</code> rather than excluded ones. Brotli / Zstd require custom NIC builds with the corresponding NGINX modules.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> No per-Ingress compression toggle. <code>excludedContentTypes</code> inverts in NIC &mdash; you list compressible types in <code>gzip-types</code> rather than excluded ones. Brotli / Zstd require custom NIC builds with the corresponding NGINX modules.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-headers"><td><code>contentType</code></td><td>No direct equivalent (snippet)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>contentType</code></td><td>No direct equivalent (snippet)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1159,10 +1094,10 @@ metadata:
     nginx.org/location-snippets: |-
       default_type application/octet-stream;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik v3 defaults this middleware behavior on; NIC/NGINX behaves the same by default. The middleware is usually safe to drop entirely. Only configure a snippet if you need a non-default fallback type.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Traefik v3 defaults this middleware behavior on; NIC/NGINX behaves the same by default. The middleware is usually safe to drop entirely. Only configure a snippet if you need a non-default fallback type.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-auth"><td><code>digestAuth</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>digestAuth</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1183,10 +1118,10 @@ spec:
 
 # Recommended migration: (a) BasicAuth.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Digest is rarely required in modern deployments &mdash; most consumers accept BasicAuth or token-based auth. Migrating to BasicAuth is usually the path of least resistance.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Digest is rarely required in modern deployments &mdash; most consumers accept BasicAuth or token-based auth. Migrating to BasicAuth is usually the path of least resistance.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-headers"><td><code>encodedCharacters</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>encodedCharacters</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1204,10 +1139,10 @@ spec:
 # (c) Restrict path patterns via Ingress pathType or
 #     VirtualServer regex routes.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NGINX handles percent-encoded URI characters per RFC 3986; there is no per-path override. If the workload depends on this behavior, App Protect (NIC Plus) is the closest controlled environment.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NGINX handles percent-encoded URI characters per RFC 3986; there is no per-path override. If the workload depends on this behavior, App Protect (NIC Plus) is the closest controlled environment.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-resilience"><td><code>errors</code> (errorpages)</td><td>VirtualServer <code>routes[].errorPages[]</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>errors</code> (errorpages)</td><td><span class="badge badge-virtualserver">VirtualServer CRD <code>routes[].errorPages[]</code></span></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1246,10 +1181,10 @@ spec:
             code: 404
             body: "Not Found"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Maps cleanly. NIC's <code>errorPages</code> supports both redirect and return actions; Traefik's <code>service</code> + <code>query</code> pattern (proxy to another service) can be expressed via a <code>pass</code> action to a separate upstream.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Maps cleanly. NIC's <code>errorPages</code> supports both redirect and return actions; Traefik's <code>service</code> + <code>query</code> pattern (proxy to another service) can be expressed via a <code>pass</code> action to a separate upstream.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-auth"><td><code>forwardAuth</code></td><td><span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (new in NIC v5.5, OSS)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>forwardAuth</code></td><td><span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> <span class="badge badge-new">New v5.5.0</span> (OSS)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1285,10 +1220,10 @@ metadata:
   annotations:
     nginx.org/policies: "default/auth"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Clean v5.5 migration target. Only one ExternalAuth policy applies per route. For OAuth2 sign-in flows, use <code>authSigninURI</code> + <code>authSigninRedirectBasePath</code>.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Clean v5.5 migration target. Only one ExternalAuth policy applies per route. For OAuth2 sign-in flows, use <code>authSigninURI</code> + <code>authSigninRedirectBasePath</code>.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-protocol"><td><code>grpcWeb</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>grpcWeb</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1309,10 +1244,10 @@ spec:
 #     plain HTTP via standard Ingress.
 # (c) Keep Traefik for gRPC-Web routes specifically.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Confirmed via NIC v5.5 source search &mdash; no <code>grpc_web</code> directive or annotation exists. NGINX OSS does not ship a gRPC-Web translation module either, so there's no sanctioned snippet pattern.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Confirmed via NIC v5.5 source search &mdash; no <code>grpc_web</code> directive or annotation exists. NGINX OSS does not ship a gRPC-Web translation module either, so there's no sanctioned snippet pattern.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-headers"><td><code>headers</code></td><td>VirtualServer <code>requestHeaders</code>/<code>responseHeaders</code>; <code>nginx.org/proxy-set-headers</code>; ConfigMap <code>hsts*</code>; <span class="badge badge-policy">Policy CRD <code>cors</code></span></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>headers</code></td><td><span class="badge badge-virtualserver">VirtualServer CRD <code>requestHeaders</code></span>/<code>responseHeaders</code>; <code>nginx.org/proxy-set-headers</code>; ConfigMap <code>hsts*</code>; <span class="badge badge-policy">Policy CRD <code>cors</code></span></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1353,10 +1288,10 @@ spec:
     allowOrigin: "https://app.example.com"
     allowMethods: ["GET", "POST"]</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The Traefik <code>headers</code> middleware is a kitchen sink: standard request/response headers go to VirtualServer fields or NIC annotations; HSTS to ConfigMap keys; CORS to the Policy CRD; security headers (CSP, X-Frame-Options, Referrer-Policy) to <code>responseHeaders.add</code>.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> The Traefik <code>headers</code> middleware is a kitchen sink: standard request/response headers go to VirtualServer fields or NIC annotations; HSTS to ConfigMap keys; CORS to the Policy CRD; security headers (CSP, X-Frame-Options, Referrer-Policy) to <code>responseHeaders.add</code>.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-security"><td><code>inFlightReq</code></td><td>ConfigMap <code>limit-conn-zones</code> + <code>nginx.org/limit-conn</code> (or server-snippets)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>inFlightReq</code></td><td><span class="badge badge-configmap">ConfigMap <code>limit-conn-zones</code></span> + <code>nginx.org/limit-conn</code> (or server-snippets)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1380,10 +1315,10 @@ metadata:
   annotations:
     nginx.org/limit-conn: "perip 100"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Different from <code>rateLimit</code>: concurrent connections, not requests-per-second. NIC's RateLimitPolicy is not a substitute &mdash; you need <code>limit_conn</code> via the connection-zone annotation/ConfigMap pair.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Different from <code>rateLimit</code>: concurrent connections, not requests-per-second. NIC's RateLimitPolicy is not a substitute &mdash; you need <code>limit_conn</code> via the connection-zone annotation/ConfigMap pair.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-security"><td><code>ipAllowList</code></td><td><span class="badge badge-policy">Policy CRD <code>accessControl</code></span></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>ipAllowList</code></td><td><span class="badge badge-policy">Policy CRD <code>accessControl</code></span></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1416,10 +1351,10 @@ data:
   real-ip-header: "X-Forwarded-For"
   set-real-ip-from: "10.0.0.0/8"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik's <code>ipStrategy.depth</code> / <code>excludedIPs</code> have no per-Middleware equivalent. NIC determines the client IP once globally via ConfigMap (<code>real-ip-header</code>, <code>set-real-ip-from</code>); the AccessControl Policy then operates on that determined value.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Traefik's <code>ipStrategy.depth</code> / <code>excludedIPs</code> have no per-Middleware equivalent. NIC determines the client IP once globally via ConfigMap (<code>real-ip-header</code>, <code>set-real-ip-from</code>); the AccessControl Policy then operates on that determined value.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-auth"><td><code>passTLSClientCert</code></td><td><span class="badge badge-policy">Policy CRD <code>ingressMTLS</code></span> + server-snippets for cert propagation</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>passTLSClientCert</code></td><td><span class="badge badge-policy">Policy CRD <code>ingressMTLS</code></span> + server-snippets for cert propagation</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1447,10 +1382,10 @@ metadata:
       proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert;
       proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Two-step: Policy verifies the client cert; snippet propagates it as a header. Traefik bundles both into one middleware; NIC separates concerns. Requires <code>-enable-snippets</code>.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Two-step: Policy verifies the client cert; snippet propagates it as a header. Traefik bundles both into one middleware; NIC separates concerns. Requires <code>-enable-snippets</code>.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-security"><td><code>rateLimit</code></td><td><span class="badge badge-policy">Policy CRD <code>rateLimit</code></span> (clean 1:1)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>rateLimit</code></td><td><span class="badge badge-policy">Policy CRD <code>rateLimit</code></span> (clean 1:1)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1478,10 +1413,10 @@ spec:
     - path: /api
       policies: [{ name: api-rl }]</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Cleanest mapping in the table. Traefik <code>average</code> + <code>period</code> &rarr; NIC <code>rate</code> in <code>r/s</code> or <code>r/m</code>. <code>sourceCriterion.requestHeaderName</code> &rarr; <code>key: ${http_<header_name>}</code>.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Cleanest mapping in the table. Traefik <code>average</code> + <code>period</code> &rarr; NIC <code>rate</code> in <code>r/s</code> or <code>r/m</code>. <code>sourceCriterion.requestHeaderName</code> &rarr; <code>key: ${http_<header_name>}</code>.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-routing"><td><code>redirectRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> directive</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>redirectRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> directive</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1497,10 +1432,10 @@ spec:
     nginx.org/server-snippets: |-
       rewrite ^/old/(.*)$ /new/$1 permanent;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No first-class annotation. Uses NGINX's <code>rewrite</code> directive directly. Requires <code>-enable-snippets</code> on the NIC controller.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> No first-class annotation. Uses NGINX's <code>rewrite</code> directive directly. Requires <code>-enable-snippets</code> on the NIC controller.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-routing"><td><code>redirectScheme</code></td><td><code>nginx.org/redirect-to-https</code> or ConfigMap <code>ssl-redirect</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>redirectScheme</code></td><td><code>nginx.org/redirect-to-https</code> or ConfigMap <code>ssl-redirect</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1519,10 +1454,10 @@ metadata:
 data:
   ssl-redirect: "True"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">http &rarr; https only. For custom <code>port</code> overrides (e.g. redirect to <code>:8443</code>), fall back to <code>nginx.org/server-snippets</code> with an explicit <code>rewrite</code>.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> http &rarr; https only. For custom <code>port</code> overrides (e.g. redirect to <code>:8443</code>), fall back to <code>nginx.org/server-snippets</code> with an explicit <code>rewrite</code>.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-routing"><td><code>replacePath</code></td><td><code>nginx.org/rewrites</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>replacePath</code></td><td><code>nginx.org/rewrites</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1535,10 +1470,10 @@ spec:
   annotations:
     nginx.org/rewrites: "serviceName=app rewrite=/v2/api"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Per-service path replacement. The <code>serviceName=</code> token in the rewrite value scopes the rewrite to a specific upstream by Service name.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Per-service path replacement. The <code>serviceName=</code> token in the rewrite value scopes the rewrite to a specific upstream by Service name.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-routing"><td><code>replacePathRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> regex</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>replacePathRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> regex</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1553,10 +1488,10 @@ spec:
     nginx.org/server-snippets: |-
       rewrite ^/api/v[0-9]+/(.*)$ /api/latest/$1 break;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC's <code>nginx.org/rewrites</code> uses NGINX prefix-replacement mode, not regex. Full regex requires a snippet. Use <code>break</code> (not <code>permanent</code>) to keep the rewrite internal &mdash; otherwise it becomes a redirect.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC's <code>nginx.org/rewrites</code> uses NGINX prefix-replacement mode, not regex. Full regex requires a snippet. Use <code>break</code> (not <code>permanent</code>) to keep the rewrite internal &mdash; otherwise it becomes a redirect.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-resilience"><td><code>retry</code></td><td>ConfigMap or <code>nginx.org/proxy-next-upstream*</code> annotations</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>retry</code></td><td>ConfigMap or <code>nginx.org/proxy-next-upstream*</code> annotations</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1572,10 +1507,10 @@ spec:
     nginx.org/proxy-next-upstream-tries: "3"
     nginx.org/proxy-next-upstream-timeout: "10s"</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);"><code>initialInterval</code> (backoff) has no direct equivalent &mdash; NGINX retries the next upstream immediately without delay. If exponential backoff matters, implement at the client.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> <code>initialInterval</code> (backoff) has no direct equivalent &mdash; NGINX retries the next upstream immediately without delay. If exponential backoff matters, implement at the client.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-routing"><td><code>stripPrefix</code></td><td><code>nginx.org/rewrites</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>stripPrefix</code></td><td><code>nginx.org/rewrites</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1591,10 +1526,10 @@ spec:
 # The Ingress path is matched (e.g. /api), then the rewrite
 # strips the prefix and forwards "/" + the remainder.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Direct prefix strip per service. For multiple prefixes in one Middleware, declare multiple rewrites or split into multiple Ingress paths.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Direct prefix strip per service. For multiple prefixes in one Middleware, declare multiple rewrites or split into multiple Ingress paths.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="mw-routing"><td><code>stripPrefixRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> regex</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>stripPrefixRegex</code></td><td><code>nginx.org/server-snippets</code> with <code>rewrite</code> regex</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1609,7 +1544,7 @@ spec:
     nginx.org/server-snippets: |-
       rewrite ^/api/v[0-9]+/?(.*)$ /$1 break;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Regex-based prefix strip requires the snippet escape hatch. Same constraint as <code>replacePathRegex</code>: <code>nginx.org/rewrites</code> uses prefix replacement, not regex.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Regex-based prefix strip requires the snippet escape hatch. Same constraint as <code>replacePathRegex</code>: <code>nginx.org/rewrites</code> uses prefix replacement, not regex.</div>
                             </div></td></tr>
                         </tbody>
                     </table>
@@ -1620,7 +1555,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik TCP middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable" data-category="tcp"><td><code>ipAllowList</code> (TCP)</td><td>ConfigMap <code>stream-snippets</code> with <code>allow</code> / <code>deny</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>ipAllowList</code> (TCP)</td><td><span class="badge badge-configmap">ConfigMap <code>stream-snippets</code></span> with <code>allow</code> / <code>deny</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1643,10 +1578,10 @@ data:
     allow 192.168.1.0/24;
     deny all;</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC has no L4 Policy CRD for access control. Stream-snippets apply at the stream context globally &mdash; for per-listener scoping, embed an explicit <code>server { listen <em>port</em>; allow ...; }</code> block inside the snippet.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC has no L4 Policy CRD for access control. Stream-snippets apply at the stream context globally &mdash; for per-listener scoping, embed an explicit <code>server { listen <em>port</em>; allow ...; }</code> block inside the snippet.</div>
                             </div></td></tr>
 
-                            <tr class="expandable" data-category="tcp"><td><code>inFlightConn</code></td><td>ConfigMap <code>stream-snippets</code> with <code>limit_conn</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>inFlightConn</code></td><td><span class="badge badge-configmap">ConfigMap <code>stream-snippets</code></span> with <code>limit_conn</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik</h5><pre><code>apiVersion: traefik.io/v1alpha1
@@ -1664,7 +1599,7 @@ spec:
       # ...
     }</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Uses NGINX's <code>ngx_stream_limit_conn_module</code>. The zone has to be defined once at the stream context, then referenced from each server block where it applies.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Uses NGINX's <code>ngx_stream_limit_conn_module</code>. The zone has to be defined once at the stream context, then referenced from each server block where it applies.</div>
                             </div></td></tr>
                         </tbody>
                     </table>
@@ -1677,7 +1612,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik CRD</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable">
+                            <tr class="expandable" aria-expanded="false">
                                 <td>Basic <code>IngressRoute</code> &mdash; single host, two paths</td>
                                 <td><span class="badge badge-virtualserver">VirtualServer CRD</span></td>
                             </tr>
@@ -1737,7 +1672,7 @@ spec:
                 <div class="info-box note" style="margin: 12px 0 0;"><strong>Mapping notes:</strong> Traefik <code>entryPoints: [websecure]</code> is implied by NIC's TLS configuration on the controller side. The match-DSL <code>Host(`...`) &amp;&amp; PathPrefix(`...`)</code> splits into VirtualServer <code>host</code> + <code>routes[].path</code>. Each Traefik <code>service</code> becomes an <code>upstreams[]</code> entry; routes reference them by upstream name in <code>action.pass</code>.</div>
                             </div></td></tr>
 
-                            <tr class="expandable">
+                            <tr class="expandable" aria-expanded="false">
                                 <td><code>IngressRoute</code> + <code>Chain</code> middleware &mdash; chain flatten</td>
                                 <td><span class="badge badge-policy">Policy CRDs</span> + <span class="badge badge-virtualserver">VirtualServer CRD</span></td>
                             </tr>
@@ -1848,7 +1783,7 @@ spec:
                 <div class="info-box warning" style="margin: 12px 0 0;"><strong>Chain flatten lossiness:</strong> The Traefik <code>Chain</code> middleware <code>api-chain</code> is gone &mdash; its three middlewares are now directly listed on the VS route. If <code>api-chain</code> was attached to multiple IngressRoutes, you must copy the same <code>policies[]</code> + <code>rewritePath</code> to every VS that consumed it. There is no shared, reusable chain abstraction in NIC.</div>
                             </div></td></tr>
 
-                            <tr class="expandable">
+                            <tr class="expandable" aria-expanded="false">
                                 <td><code>IngressRouteTCP</code> &mdash; TCP and TLS passthrough</td>
                                 <td><span class="badge badge-transportserver">TransportServer CRD</span> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
                             </tr>
@@ -1943,9 +1878,9 @@ spec:
                 <div class="info-box note" style="margin: 12px 0 0;"><strong>Mapping notes:</strong> NIC's <code>tls-passthrough</code> listener is pre-configured on the controller via the <code>-enable-tls-passthrough</code> command-line flag (or the corresponding Helm value); it does not need a <code>GlobalConfiguration</code> listener entry. The Traefik <code>HostSNI(<em>x</em>)</code> matcher becomes NIC's <code>host</code> field.</div>
                             </div></td></tr>
 
-                            <tr class="expandable">
+                            <tr class="expandable" aria-expanded="false">
                                 <td><code>TraefikService</code> &mdash; weighted services (canary)</td>
-                                <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].splits[]</code></td>
+                                <td><span class="badge badge-virtualserver">VirtualServer CRD <code>routes[].splits[]</code></span></td>
                             </tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <p>Weighted Round Robin across two backends &mdash; the classic canary pattern. Maps cleanly to NIC's <code>routes[].splits[]</code>.</p>
@@ -2018,374 +1953,6 @@ spec:
                 </div>
             </section><!-- /#mappings -->
 
-            <!-- ConfigMap Mappings -->
-            <section id="configmap-mappings">
-                <h2>ConfigMap Mappings</h2>
-                <p>Traefik does not use a single Kubernetes ConfigMap &mdash; static config is set via CLI args, env vars, or a mounted file (TOML/YAML). The toggles users most often touch map to NIC's <code>nginx-config</code> <code>ConfigMap</code> keys, NIC controller CLI flags, or Helm values.</p>
-
-                <div class="info-box tip" style="margin: 20px 0;">
-                    <strong>How to Read the Mappings</strong>
-                    <ul style="margin: 10px 0 0 20px;">
-                        <li>The left column shows the equivalent Traefik static-config key (TOML/YAML or CLI flag).</li>
-                        <li>The right column shows the NIC mapping &mdash; usually a <code>nginx-config</code> ConfigMap key, but sometimes a Helm value or a CLI flag where NIC does not expose a ConfigMap key.</li>
-                        <li>Click any row to expand a side-by-side example.</li>
-                    </ul>
-                </div>
-
-                <div class="controls">
-                    <input type="search" id="searchInputConfigMap" placeholder="Search ConfigMap keys..." data-filter-source="configmap" aria-label="Search ConfigMap keys">
-                    <select id="categoryFilterConfigMap" data-filter-source="configmap" aria-label="Filter by category">
-                        <option value="">All Categories</option>
-                    </select>
-                    <span id="searchCountConfigMap" class="search-count" aria-live="polite"></span>
-                    <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
-                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
-                </div>
-
-                <h3 id="configmap-redirects">Redirects</h3>
-                <div class="table-wrapper">
-                    <table class="mapping-table">
-                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                        <tbody>
-                            <tr class="expandable"><td><code>entryPoints.<em>name</em>.http.redirections.entryPoint.to</code></td><td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-redirect</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik (static config / CLI args)</h5><pre><code># Global http → https redirect:
-entryPoints:
-  web:
-    address: ":80"
-    http:
-      redirections:
-        entryPoint:
-          to: websecure
-          scheme: https
-          permanent: true
-  websecure:
-    address: ":443"</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-  namespace: nginx-ingress
-data:
-  ssl-redirect: "True"   # applies to every Ingress with TLS</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">For per-Ingress redirect control use <code>nginx.org/redirect-to-https: "true"</code> instead.</p>
-                            </div></td></tr>
-
-                        </tbody>
-                    </table>
-                </div>
-
-                <h3 id="configmap-tls">TLS Defaults</h3>
-                <div class="table-wrapper">
-                    <table class="mapping-table">
-                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                        <tbody>
-                            <tr class="expandable"><td><code>entryPoints.<em>name</em>.http.tls</code> (default TLS)</td><td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-protocols</code>, <code>ssl-ciphers</code>; CLI <code>-default-server-tls-secret</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik (static config)</h5><pre><code>entryPoints:
-  websecure:
-    address: ":443"
-    http:
-      tls:
-        certResolver: letsencrypt
-        domains:
-          - main: example.com
-            sans: ["*.example.com"]</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># TLS handshake parameters → ConfigMap (controller-wide):
-data:
-  ssl-protocols: "TLSv1.2 TLSv1.3"
-  ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384:..."
-  ssl-prefer-server-ciphers: "True"
-
-# Default cert (served when SNI doesn't match) →
-# NIC CLI flag / Helm value:
-# helm install ... \
-#   --set controller.defaultTLS.secret=nginx-ingress/default-tls</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC TLS defaults are controller-wide. Per-Ingress TLS handshake overrides aren't supported &mdash; deploy distinct NIC controllers if different workloads need different TLS profiles.</p>
-                            </div></td></tr>
-
-                        </tbody>
-                    </table>
-                </div>
-
-                <h3 id="configmap-logging">Logging</h3>
-                <div class="table-wrapper">
-                    <table class="mapping-table">
-                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                        <tbody>
-                            <tr class="expandable"><td><code>log.level</code></td><td><span class="badge badge-configmap">ConfigMap</span> <code>error-log-level</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>log:
-  level: DEBUG
-  format: json</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
-  error-log-level: "debug"
-  # NGINX log levels (debug | info | notice | warn |
-  # error | crit | alert | emerg).</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Traefik DEBUG ↔ NIC debug. Traefik INFO ↔ NIC info. Traefik WARN ↔ NIC warn. Traefik ERROR ↔ NIC error.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="cm-logging"><td><code>log.format</code> (json / common)</td><td>ConfigMap <code>log-format</code>, <code>log-format-escaping</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>log:
-  format: json
-accessLog:
-  format: json
-  filePath: /var/log/traefik/access.log</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
-  log-format: |-
-    {"time": "$time_iso8601",
-     "remote_addr": "$remote_addr",
-     "request": "$request",
-     "status": $status,
-     "bytes_sent": $bytes_sent,
-     "upstream": "$upstream_addr",
-     "upstream_response_time": "$upstream_response_time"}
-  log-format-escaping: "json"</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC writes logs to stdout/stderr by default. JSON format requires a custom <code>log-format</code> string with NGINX variables plus <code>log-format-escaping: json</code> for proper escaping.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="cm-logging"><td><code>accessLog.filePath</code>, <code>accessLog.format</code></td><td>ConfigMap <code>access-log</code>, <code>log-format</code>; or CLI <code>-access-log-off</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>accessLog:
-  filePath: /var/log/traefik/access.log
-  format: json
-  bufferingSize: 100</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC writes access logs to stdout by default (a Pod-level
-# concept; collect with your log aggregator).
-data:
-  access-log-off: "False"  # explicit: keep access logs on
-
-# To write to a non-stdout path use a server-snippet
-# on the specific Ingress:
-metadata:
-  annotations:
-    nginx.org/server-snippets: |-
-      access_log /var/log/nginx/app.log main;</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC-managed log files aren't a first-class concept &mdash; the Kubernetes pattern is to log to stdout and collect with FluentBit/Loki/etc. If you absolutely need on-disk logs, configure via server-snippets.</p>
-                            </div></td></tr>
-
-                        </tbody>
-                    </table>
-                </div>
-
-                <h3 id="configmap-observability">Metrics &amp; Tracing</h3>
-                <div class="table-wrapper">
-                    <table class="mapping-table">
-                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                        <tbody>
-                            <tr class="expandable"><td><code>metrics.prometheus.entryPoint</code></td><td>CLI flag <code>-enable-prometheus-metrics</code> / Helm value</td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metrics:
-  prometheus:
-    entryPoint: metrics
-    addEntryPointsLabels: true
-    addServicesLabels: true</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Helm value:
-controller:
-  prometheus:
-    create: true
-    port: 9113
-
-# Or NIC CLI flag (when deploying via manifests):
-#   -enable-prometheus-metrics
-#   -prometheus-metrics-listen-port=9113</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Process-level Prometheus metrics. No per-route toggle; default port is 9113. NIC exposes NGINX process metrics plus controller workqueue metrics.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="cm-observability"><td><code>tracing.serviceName</code> + exporter</td><td>ConfigMap <code>otel-exporter-endpoint</code>, <code>otel-trace-in-http</code>, <code>otel-service-name</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>tracing:
-  serviceName: traefik
-  otlp:
-    grpc:
-      endpoint: otel-collector.observability:4317
-      insecure: true</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
-  otel-exporter-endpoint: "otel-collector.observability:4317"
-  otel-trace-in-http: "True"       # enable globally
-  otel-service-name: "nginx-ingress"
-  otel-exporter-trusted-ca: ""     # for TLS-secured collectors</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC's OpenTelemetry integration covers OTLP exporters. For Jaeger / Zipkin, route through an OTel Collector (which speaks all three).</p>
-                            </div></td></tr>
-
-                        </tbody>
-                    </table>
-                </div>
-
-                <h3 id="configmap-providers">Providers</h3>
-                <div class="table-wrapper">
-                    <table class="mapping-table">
-                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                        <tbody>
-                            <tr class="expandable"><td><code>providers.kubernetesIngress.ingressClass</code></td><td>CLI <code>-ingress-class</code> / Helm <code>controller.ingressClass.name</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
-  kubernetesIngress:
-    ingressClass: traefik</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Helm value:
-controller:
-  ingressClass:
-    name: nginx-nic
-
-# Or NIC CLI flag:
-#   -ingress-class=nginx-nic</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Set distinct from Traefik's class when running side-by-side. Workloads opt into NIC by setting <code>ingressClassName</code> on their Ingress.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="cm-providers"><td><code>providers.kubernetesIngress.ingressEndpoint</code></td><td>CLI <code>-external-service</code> / <code>-report-ingress-status</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
-  kubernetesIngress:
-    ingressEndpoint:
-      ip: "203.0.113.10"
-      # or:
-      # hostname: "ingress.example.com"
-      # publishedService: "kube-system/traefik"</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC CLI flag (publishedService equivalent):
-#   -external-service=nginx-ingress/nginx-ingress
-#   -report-ingress-status
-
-# Helm:
-controller:
-  service:
-    name: nginx-ingress     # the LB Service
-  reportIngressStatus:
-    enable: true</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Determines which LB IP / hostname appears in <code>Ingress.status.loadBalancer</code>. NIC reads it from the named LB Service.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="cm-providers"><td><code>providers.kubernetesIngress.namespaces</code> / <code>.allowCrossNamespace</code></td><td>CLI <code>-watch-namespace</code>; cross-namespace requires <code>-enable-cross-namespace-secrets</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
-  kubernetesCRD:
-    namespaces:
-      - default
-      - app-team
-    allowCrossNamespace: true</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC CLI flags:
-#   -watch-namespace=default,app-team
-#   -enable-cross-namespace-secrets   # opt-in, default OFF
-
-# Helm:
-controller:
-  watchNamespace: "default,app-team"
-  enableCrossNamespaceSecrets: true</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC restricts cross-namespace Secret/Service references by default for safety. Explicitly opt in if VirtualServers in one namespace need to reference Secrets in another.</p>
-                            </div></td></tr>
-
-                            <tr class="expandable" data-category="cm-providers"><td><code>providers.kubernetesCRD.allowEmptyServices</code></td><td>No analog</td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
-  kubernetesCRD:
-    allowEmptyServices: true   # tolerate Services with no endpoints</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># No equivalent. NIC requires backing Services to resolve to
-# at least one endpoint at config-generation time.
-#
-# If a Service can be empty during transitions, options:
-# (a) Always have a placeholder Pod (e.g. ErrorPages).
-# (b) Use VirtualServer with a route that returns a fixed
-#     response when the upstream is unhealthy.</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC's strict resolution prevents configuration that would produce empty upstreams. If you relied on this flag, plan to maintain at least one always-ready endpoint per Service.</p>
-                            </div></td></tr>
-
-                        </tbody>
-                    </table>
-                </div>
-
-                <h3 id="configmap-transport">Transport</h3>
-                <div class="table-wrapper">
-                    <table class="mapping-table">
-                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                        <tbody>
-                            <tr class="expandable"><td><code>serversTransport.insecureSkipVerify</code></td><td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-verify</code>; per-VS <code>upstream.tls</code></td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>serversTransport:
-  insecureSkipVerify: true
-  rootCAs:
-    - "/etc/ssl/private/ca-bundle.crt"
-  maxIdleConnsPerHost: 100</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Global skip-verify (NOT recommended in production):
-data:
-  ssl-verify: "False"
-
-# Per-VirtualServer trusted CA (recommended):
-spec:
-  upstreams:
-    - name: backend
-      service: backend-svc
-      port: 443
-      tls:
-        enable: true
-        trustedCertSecret: backend-ca   # Secret with ca.crt
-
-# Keepalive / connection pooling:
-data:
-  keepalive: "100"
-  keepalive-timeout: "60s"</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Prefer per-VirtualServer trusted CA configuration over global skip-verify. The keepalive ConfigMap keys cover Traefik's <code>maxIdleConnsPerHost</code>.</p>
-                            </div></td></tr>
-
-                        </tbody>
-                    </table>
-                </div>
-
-                <h3 id="configmap-api">API &amp; Dashboard</h3>
-                <div class="table-wrapper">
-                    <table class="mapping-table">
-                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                        <tbody>
-                            <tr class="expandable"><td><code>api.dashboard</code>, <code>api.insecure</code></td><td>OSS NIC: no built-in dashboard; <span class="badge badge-plus">NIC Plus</span>: dashboard endpoint</td></tr>
-                            <tr class="example-row"><td colspan="2"><div class="example-content">
-                                <div class="comparison">
-                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>api:
-  dashboard: true
-  insecure: true        # expose on the entry point</code></pre></div>
-                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># OSS NIC: stub_status + Grafana
-controller:
-  nginxStatus:
-    enable: true
-    port: 8080
-    allowCidrs: "127.0.0.1,10.0.0.0/8"
-# Scrape /nginx_status with Prometheus + visualize in Grafana
-# using a standard NGINX dashboard.
-
-# NIC Plus: built-in dashboard
-controller:
-  nginxPlus: true
-# Plus exposes /dashboard.html with live request/upstream stats.</code></pre></div>
-                                </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">OSS NIC has no equivalent first-class dashboard. The Plus dashboard is comparable to Traefik's in spirit (live request rates, upstream stats, server zones).</p>
-                            </div></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
             <!-- NGINX Plus Mappings -->
             <section id="plus-mappings">
                 <h2>NGINX Plus Mappings</h2>
@@ -2416,7 +1983,7 @@ controller:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>apiKey</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>apiKey</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>apiKey</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>apiKey</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2440,7 +2007,7 @@ spec:
     - path: /api
       policies: [{ name: api-keys }]</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Validates API keys present in a configurable header or query parameter against a Secret-mounted lookup map. The Secret data is <code>key=identity</code> pairs.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Validates API keys present in a configurable header or query parameter against a Secret-mounted lookup map. The Secret data is <code>key=identity</code> pairs.</div>
                             </div></td></tr>
 
                         </tbody>
@@ -2452,7 +2019,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>distributedRateLimit</code></td><td>Partial via <span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>rateLimit</code> + Redis</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>distributedRateLimit</code></td><td>Partial via <span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>rateLimit</code> + Redis</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2481,7 +2048,7 @@ spec:
 # need shared limits, run a single NIC instance behind
 # an external L4 proxy, or stay on the source.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">NIC Plus supports cluster-wide rate limiting via shared-zone synchronization. OSS NIC limits are per-pod and don't share state.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC Plus supports cluster-wide rate limiting via shared-zone synchronization. OSS NIC limits are per-pod and don't share state.</div>
                             </div></td></tr>
 
                         </tbody>
@@ -2493,7 +2060,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>hmac</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>hmac</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2518,7 +2085,7 @@ spec:
 # (b) NJS module for in-process signature verification
 #     (requires custom NIC data-plane build).</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">No first-class HMAC policy. The externalAuth + sidecar pattern is the standard NGINX way to do this.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> No first-class HMAC policy. The externalAuth + sidecar pattern is the standard NGINX way to do this.</div>
                             </div></td></tr>
 
                         </tbody>
@@ -2530,7 +2097,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>jwt</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>jwt</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>jwt</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>jwt</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2556,7 +2123,7 @@ spec:
     - path: /api
       policies: [{ name: api-jwt }]</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Clean Plus mapping. NIC validates JWTs against a Secret-mounted JWK set or remote <code>jwksURI</code>. Supports <code>jwtToken</code> claim extraction for downstream propagation.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Clean Plus mapping. NIC validates JWTs against a Secret-mounted JWK set or remote <code>jwksURI</code>. Supports <code>jwtToken</code> claim extraction for downstream propagation.</div>
                             </div></td></tr>
 
                         </tbody>
@@ -2568,7 +2135,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>ldap</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>ldap</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2598,7 +2165,7 @@ spec:
 # nginx-ldap-auth) is a small reference daemon that runs
 # next to NIC and handles LDAP binds.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The reference daemon approach keeps LDAP credentials inside one validator service, with NIC just relaying via externalAuth.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> The reference daemon approach keeps LDAP credentials inside one validator service, with NIC just relaying via externalAuth.</div>
                             </div></td></tr>
 
                         </tbody>
@@ -2610,7 +2177,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>oAuthClientCredentials</code></td><td>Partial via <span class="badge badge-policy">Policy CRD</span> <code>externalAuth</code> (OSS) + token broker</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>oAuthClientCredentials</code></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (OSS) + token broker</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2639,10 +2206,10 @@ spec:
 # The oauth-broker handles the token exchange with the
 # IdP and returns Authorization headers for NIC to forward.</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Standing up a small token broker keeps OAuth2 credentials in one place. NIC then relays via externalAuth without ever holding the client_secret.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Standing up a small token broker keeps OAuth2 credentials in one place. NIC then relays via externalAuth without ever holding the client_secret.</div>
                             </div></td></tr>
 
-                            <tr class="expandable"><td><code>oAuthIntrospection</code></td><td>Partial via <span class="badge badge-policy">Policy CRD</span> <code>externalAuth</code> (OSS) + introspection endpoint</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>oAuthIntrospection</code></td><td>Partial via <span class="badge badge-policy">Policy CRD <code>externalAuth</code></span> (OSS) + introspection endpoint</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2664,7 +2231,7 @@ spec:
     authSnippets: |-
       proxy_set_header Authorization "Bearer $http_authorization";</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Point externalAuth's <code>authURI</code> at a service that introspects opaque tokens (RFC 7662 <code>POST /introspect</code>) and forwards an HTTP 2xx/4xx.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Point externalAuth's <code>authURI</code> at a service that introspects opaque tokens (RFC 7662 <code>POST /introspect</code>) and forwards an HTTP 2xx/4xx.</div>
                             </div></td></tr>
 
                         </tbody>
@@ -2676,7 +2243,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>oidc</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>oidc</code></td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>oidc</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>oidc</code></td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2702,7 +2269,7 @@ spec:
     scope: openid+profile+email
     redirectURI: /_codexchange</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Native OIDC integration (authorization code flow with PKCE). The OAuth2 sign-in redirect location is shared across all routes on the same host.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Native OIDC integration (authorization code flow with PKCE). The OAuth2 sign-in redirect location is shared across all routes on the same host.</div>
                             </div></td></tr>
 
                         </tbody>
@@ -2714,7 +2281,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>opa</code></td><td>No equivalent</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>opa</code></td><td>No direct equivalent</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2739,7 +2306,7 @@ spec:
 # (b) NJS module for in-process policy evaluation (custom
 #     data-plane build required).</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">The OPA team publishes <code>opa-envoy-plugin</code> and similar HTTP-fronted OPA evaluators that work with externalAuth without modification.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> The OPA team publishes <code>opa-envoy-plugin</code> and similar HTTP-fronted OPA evaluators that work with externalAuth without modification.</div>
                             </div></td></tr>
 
                         </tbody>
@@ -2751,7 +2318,7 @@ spec:
                     <table class="mapping-table">
                         <thead><tr><th scope="col">Traefik Hub middleware</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                         <tbody>
-                            <tr class="expandable"><td><code>waf</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>waf</code> (F5 App Protect)</td></tr>
+                            <tr class="expandable" aria-expanded="false"><td><code>waf</code></td><td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>waf</code> (F5 App Protect)</td></tr>
                             <tr class="example-row"><td colspan="2"><div class="example-content">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h5>Traefik Hub</h5><pre><code>apiVersion: hub.traefik.io/v1alpha1
@@ -2781,12 +2348,381 @@ spec:
     - path: /
       policies: [{ name: app-waf }]</code></pre></div>
                                 </div>
-                                <p style="margin: 12px 0 0; font-size: 0.85rem; color: var(--text-secondary);">F5 NGINX App Protect WAF with declarative policy bundles. Requires the App Protect data plane module + an <code>APPolicy</code> / <code>APLogConf</code> CRD. The two-CRD split (APPolicy + Policy) means rule sets can be reused across multiple workloads.</p>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> F5 NGINX App Protect WAF with declarative policy bundles. Requires the App Protect data plane module + an <code>APPolicy</code> / <code>APLogConf</code> CRD. The two-CRD split (APPolicy + Policy) means rule sets can be reused across multiple workloads.</div>
                             </div></td></tr>
                         </tbody>
                     </table>
                 </div>
             </section>
+
+            <!-- ConfigMap Mappings -->
+            <section id="configmap-mappings">
+                <h2>ConfigMap Mappings</h2>
+                <p>Traefik does not use a single Kubernetes ConfigMap &mdash; static config is set via CLI args, env vars, or a mounted file (TOML/YAML). The toggles users most often touch map to NIC's <code>nginx-config</code> <code>ConfigMap</code> keys, NIC controller CLI flags, or Helm values.</p>
+
+                <div class="info-box tip" style="margin: 20px 0;">
+                    <strong>How to Read the Mappings</strong>
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li>The left column shows the equivalent Traefik static-config key (TOML/YAML or CLI flag).</li>
+                        <li>The right column shows the NIC mapping &mdash; usually a <code>nginx-config</code> ConfigMap key, but sometimes a Helm value or a CLI flag where NIC does not expose a ConfigMap key.</li>
+                        <li>Click any row to expand a side-by-side example.</li>
+                    </ul>
+                </div>
+
+                <div class="controls">
+                    <input type="search" id="searchInputConfigMap" placeholder="Search ConfigMap keys..." data-filter-source="configmap" aria-label="Search ConfigMap keys">
+                    <select id="categoryFilterConfigMap" data-filter-source="configmap" aria-label="Filter by category">
+                        <option value="">All Categories</option>
+                    </select>
+                    <span id="searchCountConfigMap" class="search-count" aria-live="polite"></span>
+                    <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
+                    <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
+                </div>
+
+                <h3 id="configmap-redirects">Redirects</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable" aria-expanded="false"><td><code>entryPoints.<em>name</em>.http.redirections.entryPoint.to</code></td><td><span class="badge badge-configmap">ConfigMap <code>ssl-redirect</code></span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik (static config / CLI args)</h5><pre><code># Global http → https redirect:
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: nginx-ingress
+data:
+  ssl-redirect: "True"   # applies to every Ingress with TLS</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> For per-Ingress redirect control use <code>nginx.org/redirect-to-https: "true"</code> instead.</div>
+                            </div></td></tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-tls">TLS Defaults</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable" aria-expanded="false"><td><code>entryPoints.<em>name</em>.http.tls</code> (default TLS)</td><td><span class="badge badge-configmap">ConfigMap <code>ssl-protocols</code></span>, <code>ssl-ciphers</code>; CLI <code>-default-server-tls-secret</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik (static config)</h5><pre><code>entryPoints:
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: example.com
+            sans: ["*.example.com"]</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># TLS handshake parameters → ConfigMap (controller-wide):
+data:
+  ssl-protocols: "TLSv1.2 TLSv1.3"
+  ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384:..."
+  ssl-prefer-server-ciphers: "True"
+
+# Default cert (served when SNI doesn't match) →
+# NIC CLI flag / Helm value:
+# helm install ... \
+#   --set controller.defaultTLS.secret=nginx-ingress/default-tls</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC TLS defaults are controller-wide. Per-Ingress TLS handshake overrides aren't supported &mdash; deploy distinct NIC controllers if different workloads need different TLS profiles.</div>
+                            </div></td></tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-logging">Logging</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable" aria-expanded="false"><td><code>log.level</code></td><td><span class="badge badge-configmap">ConfigMap <code>error-log-level</code></span></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>log:
+  level: DEBUG
+  format: json</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
+  error-log-level: "debug"
+  # NGINX log levels (debug | info | notice | warn |
+  # error | crit | alert | emerg).</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Traefik DEBUG ↔ NIC debug. Traefik INFO ↔ NIC info. Traefik WARN ↔ NIC warn. Traefik ERROR ↔ NIC error.</div>
+                            </div></td></tr>
+
+                            <tr class="expandable" aria-expanded="false"><td><code>log.format</code> (json / common)</td><td><span class="badge badge-configmap">ConfigMap <code>log-format</code></span>, <code>log-format-escaping</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>log:
+  format: json
+accessLog:
+  format: json
+  filePath: /var/log/traefik/access.log</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
+  log-format: |-
+    {"time": "$time_iso8601",
+     "remote_addr": "$remote_addr",
+     "request": "$request",
+     "status": $status,
+     "bytes_sent": $bytes_sent,
+     "upstream": "$upstream_addr",
+     "upstream_response_time": "$upstream_response_time"}
+  log-format-escaping: "json"</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC writes logs to stdout/stderr by default. JSON format requires a custom <code>log-format</code> string with NGINX variables plus <code>log-format-escaping: json</code> for proper escaping.</div>
+                            </div></td></tr>
+
+                            <tr class="expandable" aria-expanded="false"><td><code>accessLog.filePath</code>, <code>accessLog.format</code></td><td><span class="badge badge-configmap">ConfigMap <code>access-log</code></span>, <code>log-format</code>; or CLI <code>-access-log-off</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>accessLog:
+  filePath: /var/log/traefik/access.log
+  format: json
+  bufferingSize: 100</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC writes access logs to stdout by default (a Pod-level
+# concept; collect with your log aggregator).
+data:
+  access-log-off: "False"  # explicit: keep access logs on
+
+# To write to a non-stdout path use a server-snippet
+# on the specific Ingress:
+metadata:
+  annotations:
+    nginx.org/server-snippets: |-
+      access_log /var/log/nginx/app.log main;</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC-managed log files aren't a first-class concept &mdash; the Kubernetes pattern is to log to stdout and collect with FluentBit/Loki/etc. If you absolutely need on-disk logs, configure via server-snippets.</div>
+                            </div></td></tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-observability">Metrics &amp; Tracing</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable" aria-expanded="false"><td><code>metrics.prometheus.entryPoint</code></td><td>CLI flag <code>-enable-prometheus-metrics</code> / Helm value</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Helm value:
+controller:
+  prometheus:
+    create: true
+    port: 9113
+
+# Or NIC CLI flag (when deploying via manifests):
+#   -enable-prometheus-metrics
+#   -prometheus-metrics-listen-port=9113</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Process-level Prometheus metrics. No per-route toggle; default port is 9113. NIC exposes NGINX process metrics plus controller workqueue metrics.</div>
+                            </div></td></tr>
+
+                            <tr class="expandable" aria-expanded="false"><td><code>tracing.serviceName</code> + exporter</td><td><span class="badge badge-configmap">ConfigMap <code>otel-exporter-endpoint</code></span>, <code>otel-trace-in-http</code>, <code>otel-service-name</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>tracing:
+  serviceName: traefik
+  otlp:
+    grpc:
+      endpoint: otel-collector.observability:4317
+      insecure: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code>data:
+  otel-exporter-endpoint: "otel-collector.observability:4317"
+  otel-trace-in-http: "True"       # enable globally
+  otel-service-name: "nginx-ingress"
+  otel-exporter-trusted-ca: ""     # for TLS-secured collectors</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC's OpenTelemetry integration covers OTLP exporters. For Jaeger / Zipkin, route through an OTel Collector (which speaks all three).</div>
+                            </div></td></tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-providers">Providers</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable" aria-expanded="false"><td><code>providers.kubernetesIngress.ingressClass</code></td><td>CLI <code>-ingress-class</code> / Helm <code>controller.ingressClass.name</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
+  kubernetesIngress:
+    ingressClass: traefik</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Helm value:
+controller:
+  ingressClass:
+    name: nginx-nic
+
+# Or NIC CLI flag:
+#   -ingress-class=nginx-nic</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Set distinct from Traefik's class when running side-by-side. Workloads opt into NIC by setting <code>ingressClassName</code> on their Ingress.</div>
+                            </div></td></tr>
+
+                            <tr class="expandable" aria-expanded="false"><td><code>providers.kubernetesIngress.ingressEndpoint</code></td><td>CLI <code>-external-service</code> / <code>-report-ingress-status</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
+  kubernetesIngress:
+    ingressEndpoint:
+      ip: "203.0.113.10"
+      # or:
+      # hostname: "ingress.example.com"
+      # publishedService: "kube-system/traefik"</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC CLI flag (publishedService equivalent):
+#   -external-service=nginx-ingress/nginx-ingress
+#   -report-ingress-status
+
+# Helm:
+controller:
+  service:
+    name: nginx-ingress     # the LB Service
+  reportIngressStatus:
+    enable: true</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Determines which LB IP / hostname appears in <code>Ingress.status.loadBalancer</code>. NIC reads it from the named LB Service.</div>
+                            </div></td></tr>
+
+                            <tr class="expandable" aria-expanded="false"><td><code>providers.kubernetesIngress.namespaces</code> / <code>.allowCrossNamespace</code></td><td>CLI <code>-watch-namespace</code>; cross-namespace requires <code>-enable-cross-namespace-secrets</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
+  kubernetesCRD:
+    namespaces:
+      - default
+      - app-team
+    allowCrossNamespace: true</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># NIC CLI flags:
+#   -watch-namespace=default,app-team
+#   -enable-cross-namespace-secrets   # opt-in, default OFF
+
+# Helm:
+controller:
+  watchNamespace: "default,app-team"
+  enableCrossNamespaceSecrets: true</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC restricts cross-namespace Secret/Service references by default for safety. Explicitly opt in if VirtualServers in one namespace need to reference Secrets in another.</div>
+                            </div></td></tr>
+
+                            <tr class="expandable" aria-expanded="false"><td><code>providers.kubernetesCRD.allowEmptyServices</code></td><td>No analog</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>providers:
+  kubernetesCRD:
+    allowEmptyServices: true   # tolerate Services with no endpoints</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># No equivalent. NIC requires backing Services to resolve to
+# at least one endpoint at config-generation time.
+#
+# If a Service can be empty during transitions, options:
+# (a) Always have a placeholder Pod (e.g. ErrorPages).
+# (b) Use VirtualServer with a route that returns a fixed
+#     response when the upstream is unhealthy.</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> NIC's strict resolution prevents configuration that would produce empty upstreams. If you relied on this flag, plan to maintain at least one always-ready endpoint per Service.</div>
+                            </div></td></tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-transport">Transport</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable" aria-expanded="false"><td><code>serversTransport.insecureSkipVerify</code></td><td><span class="badge badge-configmap">ConfigMap <code>ssl-verify</code></span>; per-VS <code>upstream.tls</code></td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>serversTransport:
+  insecureSkipVerify: true
+  rootCAs:
+    - "/etc/ssl/private/ca-bundle.crt"
+  maxIdleConnsPerHost: 100</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># Global skip-verify (NOT recommended in production):
+data:
+  ssl-verify: "False"
+
+# Per-VirtualServer trusted CA (recommended):
+spec:
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 443
+      tls:
+        enable: true
+        trustedCertSecret: backend-ca   # Secret with ca.crt
+
+# Keepalive / connection pooling:
+data:
+  keepalive: "100"
+  keepalive-timeout: "60s"</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> Prefer per-VirtualServer trusted CA configuration over global skip-verify. The keepalive ConfigMap keys cover Traefik's <code>maxIdleConnsPerHost</code>.</div>
+                            </div></td></tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="configmap-api">API &amp; Dashboard</h3>
+                <div class="table-wrapper">
+                    <table class="mapping-table">
+                        <thead><tr><th scope="col">Traefik static-config key</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                        <tbody>
+                            <tr class="expandable" aria-expanded="false"><td><code>api.dashboard</code>, <code>api.insecure</code></td><td>OSS NIC: no built-in dashboard; <span class="badge badge-plus">NIC Plus</span>: dashboard endpoint</td></tr>
+                            <tr class="example-row"><td colspan="2"><div class="example-content">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h5>Traefik</h5><pre><code>api:
+  dashboard: true
+  insecure: true        # expose on the entry point</code></pre></div>
+                                    <div class="comparison-block new"><h5>F5 NGINX Ingress Controller</h5><pre><code># OSS NIC: stub_status + Grafana
+controller:
+  nginxStatus:
+    enable: true
+    port: 8080
+    allowCidrs: "127.0.0.1,10.0.0.0/8"
+# Scrape /nginx_status with Prometheus + visualize in Grafana
+# using a standard NGINX dashboard.
+
+# NIC Plus: built-in dashboard
+controller:
+  nginxPlus: true
+# Plus exposes /dashboard.html with live request/upstream stats.</code></pre></div>
+                                </div>
+                                <div class="info-box note" style="margin: 12px 0 0;"><strong>Note:</strong> OSS NIC has no equivalent first-class dashboard. The Plus dashboard is comparable to Traefik's in spirit (live request rates, upstream stats, server zones).</div>
+                            </div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             </div><!-- /.tool-page #page-reference -->
 
             </div>

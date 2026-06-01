@@ -3811,25 +3811,26 @@ controller:
             return deduped;
         }
 
-        // Register the source with the shared analyzer engine. Must happen
-        // AFTER TRAEFIK_LOOKUP is built (above) and BEFORE any user click
-        // on Analyze. renderAnalyzerResults is a hoisted function so the
-        // forward reference resolves at registration time.
+        // Register the source with the shared analyzer engine. Deferred until
+        // DOMContentLoaded so the `defer`red migration-shared.js (which
+        // defines window.MigrationSources) has executed first.
         window.CURRENT_SOURCE = 'traefik';
-        window.MigrationSources['traefik'] = {
-            name: 'traefik',
-            prefix: 'traefik.ingress.kubernetes.io/',
-            mappings: TRAEFIK_MAPPINGS,
-            lookup: TRAEFIK_LOOKUP,
-            parseAnnotations: parseTraefikYaml,
-            parseSpec: parseTraefikSpec,
-            typeOrder: { policy: 0, virtualserver: 1, virtualserverroute: 2, transportserver: 3, globalconfiguration: 4, annotation: 5, configmap: 6, unsupported: 7 },
-            emptyResultMessage: 'No Traefik features detected.',
-            emptyResultHint: 'Make sure your YAML contains a Traefik IngressRoute, Middleware, TraefikService, or a standard Ingress with traefik.ingress.kubernetes.io/ annotations.',
-            render: function(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec) {
-                return renderAnalyzerResults(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec);
-            }
-        };
+        document.addEventListener('DOMContentLoaded', function() {
+            window.MigrationSources['traefik'] = {
+                name: 'traefik',
+                prefix: 'traefik.ingress.kubernetes.io/',
+                mappings: TRAEFIK_MAPPINGS,
+                lookup: TRAEFIK_LOOKUP,
+                parseAnnotations: parseTraefikYaml,
+                parseSpec: parseTraefikSpec,
+                typeOrder: { policy: 0, virtualserver: 1, virtualserverroute: 2, transportserver: 3, globalconfiguration: 4, annotation: 5, configmap: 6, unsupported: 7 },
+                emptyResultMessage: 'No Traefik features detected.',
+                emptyResultHint: 'Make sure your YAML contains a Traefik IngressRoute, Middleware, TraefikService, or a standard Ingress with traefik.ingress.kubernetes.io/ annotations.',
+                render: function(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec) {
+                    return renderAnalyzerResults(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec);
+                }
+            };
+        });
 
         // Analyzer action handlers (analyzeYaml/runAnalyzeYaml live in shared.js).
         window.MigrationActions = window.MigrationActions || {};

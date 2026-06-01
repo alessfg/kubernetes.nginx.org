@@ -5282,23 +5282,25 @@ data:
             return value;
         };
 
-        // Register this tool with the shared analyzer engine. renderAnalyzerResults
-        // is declared later via a hoisted `function` statement, so the forward
-        // reference resolves at registration time.
+        // Register this tool with the shared analyzer engine. Deferred until
+        // DOMContentLoaded so the `defer`red migration-shared.js (which defines
+        // window.MigrationSources and parseIngressSpec) has executed first.
         window.CURRENT_SOURCE = 'ingress-nginx';
-        window.MigrationSources['ingress-nginx'] = {
-            name: 'ingress-nginx',
-            prefix: 'nginx.ingress.kubernetes.io/',
-            mappings: ANNOTATION_MAPPINGS,
-            lookup: ANNOTATION_LOOKUP,
-            parseSpec: parseIngressSpec,
-            typeOrder: { policy: 0, virtualserver: 1, virtualserverroute: 2, transportserver: 3, globalconfiguration: 4, annotation: 5, configmap: 6, unsupported: 7 },
-            emptyResultMessage: 'No community NGINX annotations found.',
-            emptyResultHint: 'Make sure your YAML contains annotations with the nginx.ingress.kubernetes.io/ prefix.',
-            render: function(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec) {
-                return renderAnalyzerResults(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec);
-            }
-        };
+        document.addEventListener('DOMContentLoaded', function() {
+            window.MigrationSources['ingress-nginx'] = {
+                name: 'ingress-nginx',
+                prefix: 'nginx.ingress.kubernetes.io/',
+                mappings: ANNOTATION_MAPPINGS,
+                lookup: ANNOTATION_LOOKUP,
+                parseSpec: parseIngressSpec,
+                typeOrder: { policy: 0, virtualserver: 1, virtualserverroute: 2, transportserver: 3, globalconfiguration: 4, annotation: 5, configmap: 6, unsupported: 7 },
+                emptyResultMessage: 'No community NGINX annotations found.',
+                emptyResultHint: 'Make sure your YAML contains annotations with the nginx.ingress.kubernetes.io/ prefix.',
+                render: function(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec) {
+                    return renderAnalyzerResults(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec);
+                }
+            };
+        });
 
         let CRD_GENERATORS = {
             generateAccessControlPolicy: function(found) {
@@ -6597,7 +6599,10 @@ data:
         // Live input status
         let yamlInputEl = document.getElementById('yamlInput');
         yamlInputEl.addEventListener('input', function() { updateInputStatus(); updateYamlHighlight(); });
-        yamlInputEl.addEventListener('scroll', syncEditorScroll);
+        // Wrap so the syncEditorScroll identifier (defined in the `defer`red
+        // migration-shared.js) is only resolved at scroll time, not at
+        // addEventListener call time.
+        yamlInputEl.addEventListener('scroll', function() { syncEditorScroll(); });
 
         // Keyboard shortcuts for textarea
         yamlInputEl.addEventListener('keydown', function(e) {
@@ -6623,8 +6628,9 @@ data:
             }
         });
 
-        // Show empty state on page load
-        showEmptyState();
+        // Show empty state on page load. Deferred until DOMContentLoaded so
+        // showEmptyState (defined in the `defer`red migration-shared.js) exists.
+        document.addEventListener('DOMContentLoaded', function() { showEmptyState(); });
 
         // Page switching (Analyzer / Reference)
         (function() {

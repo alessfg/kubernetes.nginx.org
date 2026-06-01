@@ -8,7 +8,7 @@
     <meta name="author" content="F5, Inc.">
     <link rel="canonical" href="https://kubernetes.nginx.org/traefik-migration.html">
     <meta property="og:title" content="NGINX Traefik Migration Tool">
-    <meta property="og:description" content="Interactive migration tool for transitioning from Traefik Proxy to the F5 NGINX Ingress Controller.">
+    <meta property="og:description" content="Interactive migration tool for transitioning from Traefik Proxy to the F5 NGINX Ingress Controller. Config analyzer for IngressRoute/Middleware/TraefikService CRDs, 50+ feature mappings, and NIC Policy/VirtualServer/TransportServer YAML generation.">
     <meta property="og:url" content="https://kubernetes.nginx.org/traefik-migration.html">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary">
@@ -19,7 +19,7 @@
         "@type": "WebApplication",
         "name": "NGINX Traefik Migration Tool",
         "url": "https://kubernetes.nginx.org/traefik-migration.html",
-        "description": "Interactive migration tool for transitioning from Traefik Proxy to the F5 NGINX Ingress Controller.",
+        "description": "Interactive migration tool for transitioning from Traefik Proxy to the F5 NGINX Ingress Controller. Includes a config analyzer that parses IngressRoute, IngressRouteTCP, Middleware, MiddlewareTCP, TraefikService, and TLSOption CRDs (plus standard Ingress with traefik.ingress.kubernetes.io/ annotations), a full v3 match-DSL parser, 50+ annotation and middleware mappings, and NIC Policy, VirtualServer, and TransportServer YAML generators.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Any",
         "browserRequirements": "Requires JavaScript",
@@ -371,10 +371,71 @@
             </div><!-- /.tool-page #page-getting-started -->
 
             <div class="tool-page" id="page-analyzer">
-            <section>
-                <h2>Config Analyzer</h2>
-                <div class="info-box tip" style="margin: 20px 0;"><strong>Coming soon.</strong> The Traefik configuration analyzer will accept Traefik <code>IngressRoute</code>, <code>Middleware</code>, and <code>TraefikService</code> CRDs (plus standard <code>Ingress</code> resources with <code>traefik.ingress.kubernetes.io/</code> annotations) and generate F5 NGINX Ingress Controller equivalents.</div>
+            <div class="info-box note" style="margin: 0 0 24px;"><strong>Version Reference:</strong> This tool is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.1" target="_blank" rel="noopener">Traefik <span data-traefik-version>v3.7.1</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.0</span></a>.</div>
+            <!-- YAML Migration Analyzer -->
+            <section id="analyzer">
+                <h2 id="yaml-analyzer">Traefik Config Analyzer</h2>
+                <p>Paste a Traefik configuration &mdash; an <code>IngressRoute</code> / <code>IngressRouteTCP</code> CRD, a <code>Middleware</code> CRD, a <code>TraefikService</code> CRD, or a standard Kubernetes <code>Ingress</code> with <code>traefik.ingress.kubernetes.io/</code> annotations &mdash; to get F5 NGINX Ingress Controller migration suggestions.</p>
+                <div class="analyzer-drop-zone" id="dropZone">
+                    <div class="analyzer-drop-overlay"><span class="analyzer-drop-label">Drop YAML file here</span></div>
+                    <div class="yaml-editor">
+                        <pre class="yaml-highlight-layer" id="yamlHighlight" aria-hidden="true"></pre>
+                        <textarea id="yamlInput" aria-label="YAML input for migration analysis" spellcheck="false" placeholder="apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: my-route
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`app.example.com`) &amp;&amp; PathPrefix(`/api`)
+      kind: Rule
+      services:
+        - name: app-svc
+          port: 80
+      middlewares:
+        - name: rate-limit
+        - name: ip-allowlist
+  tls:
+    secretName: app-tls"></textarea>
+                    </div>
+                </div>
+                <div class="analyzer-input-status" id="inputStatus">
+                    <span class="status-item"><span class="status-dot inactive" id="statusDot"></span><span id="statusLines">0 lines</span></span>
+                    <span class="status-item" id="statusAnnotations" style="display:none;"><span class="status-dot active"></span><span id="statusAnnotationCount">0 annotations detected</span></span>
+                </div>
+                <div class="strategy-toggle">
+                    <span class="strategy-toggle-label">Migration strategy:</span>
+                    <div class="strategy-toggle-options">
+                        <button class="strategy-option active" data-strategy="crd" data-action="setStrategy" data-strategy="crd">CRD-first (recommended)</button>
+                        <button class="strategy-option" data-strategy="annotation" data-action="setStrategy" data-strategy="annotation">Annotation-first</button>
+                    </div>
+                    <span class="strategy-desc" id="strategyDesc">Prefer VirtualServer and Policy CRDs (closer 1:1 match for IngressRoute + Middleware), fall back to annotations on standard Ingress when no CRD path exists</span>
+                </div>
+                <div class="analyzer-actions">
+                    <button class="btn btn-primary" data-action="analyzeYaml">Analyze YAML</button>
+                    <button class="btn btn-secondary" data-action="clearAnalyzer">Clear</button>
+                    <div class="sample-dropdown">
+                        <button class="btn btn-secondary sample-dropdown-btn" data-action="toggleSampleDropdown" aria-expanded="false" aria-haspopup="true" aria-controls="sampleDropdown">Load Sample</button>
+                        <div class="sample-dropdown-menu" id="sampleDropdown" role="menu" aria-label="Sample YAML presets">
+                            <div class="sample-dropdown-item" role="menuitem" tabindex="0" data-action="loadSampleYaml" data-preset="simple">
+                                <div class="sample-title"><span class="sample-badge simple">Simple</span> IngressRoute + rateLimit + TLS</div>
+                                <div class="sample-desc">Single <code>IngressRoute</code> with one <code>Middleware</code> (rateLimit) and a TLS secret &mdash; minimal CRD migration</div>
+                            </div>
+                            <div class="sample-dropdown-item" role="menuitem" tabindex="0" data-action="loadSampleYaml" data-preset="moderate">
+                                <div class="sample-title"><span class="sample-badge moderate">Moderate</span> Chain + TLSOption</div>
+                                <div class="sample-desc"><code>IngressRoute</code> + <code>chain</code> middleware (shows flatten warning) + <code>TLSOption</code> (cipher pinning) &mdash; ConfigMap + Policy migration</div>
+                            </div>
+                            <div class="sample-dropdown-item" role="menuitem" tabindex="0" data-action="loadSampleYaml" data-preset="advanced">
+                                <div class="sample-title"><span class="sample-badge advanced">Advanced</span> TraefikService canary + ForwardAuth</div>
+                                <div class="sample-desc"><code>IngressRoute</code> + weighted <code>TraefikService</code> (90/10 canary split) + <code>forwardAuth</code> (clean ExternalAuth Policy mapping) + <code>ipAllowList</code></div>
+                            </div>
+                        </div>
+                    </div>
+                    <span style="font-size:0.78rem;color:#767676;margin-left:4px;align-self:center;">Ctrl+Enter to analyze</span>
+                </div>
+                <div id="analyzerResults" role="region" aria-label="Analysis results"><div id="analyzerLiveStatus" aria-live="polite" class="sr-only"></div></div>
             </section>
+
             </div><!-- /.tool-page #page-analyzer -->
 
             <div class="tool-page" id="page-reference">
@@ -2774,6 +2835,1011 @@ controller:
         const NIC_RELEASE_URL = 'https://github.com/nginx/kubernetes-ingress/releases/tag/' + NIC_VERSION;
 
         // Generic reference-table helpers + dispatcher + wiring live in migration-shared.js.
+
+        // ============================================================
+        // Traefik mapping data (subset — to be expanded with v3 docs)
+        //
+        // Mirrors ingress-nginx's ANNOTATION_MAPPINGS shape so the shared
+        // analyzer engine (runAnalyzeYaml in migration-shared.js) can
+        // consume both. `community` holds bare Traefik annotation names
+        // (prefix `traefik.ingress.kubernetes.io/` stripped) or bare
+        // middleware-CRD field names (`basicAuth`, `rateLimit`, etc.).
+        // ============================================================
+        const TRAEFIK_MAPPINGS = [
+            { community: ['router.entrypoints'], nic: 'No direct equivalent — exposure controlled by Service/listener', type: 'unsupported', category: 'Routing', anchor: 'routing', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['router.middlewares'], nic: 'nginx.org/policies (Policy CRDs) — or VirtualServer policies[]', type: 'annotation', category: 'Routing', anchor: 'routing', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: { to: 'nginx.org/policies', transform: 'direct' } },
+            { community: ['router.priority'], nic: 'No direct equivalent — NIC matches longest path first', type: 'unsupported', category: 'Routing', anchor: 'routing', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['router.tls'], nic: 'Standard Ingress spec.tls[]', type: 'annotation', category: 'TLS', anchor: 'tls', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['router.tls.certresolver', 'router.tls.domains.n.main', 'router.tls.domains.n.sans'], nic: 'No direct equivalent — install cert-manager and reference the issued Secret from spec.tls[].secretName', type: 'unsupported', category: 'TLS', anchor: 'tls', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['service.sticky.cookie', 'service.sticky.cookie.domain', 'service.sticky.cookie.httponly', 'service.sticky.cookie.maxage', 'service.sticky.cookie.name', 'service.sticky.cookie.path', 'service.sticky.cookie.samesite', 'service.sticky.cookie.secure'], nic: 'VirtualServer CRD upstreams[].sessionCookie — or nginx.com/sticky-cookie-services (Plus)', type: 'virtualserver', category: 'Load Balancing', anchor: 'load-balancing', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['service.serversscheme'], nic: 'nginx.org/ssl-services (per-service) — or VirtualServer upstreams[].tls', type: 'annotation', category: 'Backend Protocol', anchor: 'backend-protocol', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: { to: 'nginx.org/ssl-services', transform: 'direct' } },
+            { community: ['service.passhostheader'], nic: 'proxy_set_header Host (default in NIC) — controlled via VirtualServer routes[].action.proxy.requestHeaders', type: 'virtualserver', category: 'Headers', anchor: 'headers', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            // HTTP Middleware mappings (bare middleware kind name as the key)
+            { community: ['basicAuth'], nic: 'Policy CRD basicAuth + nginx.org/policies', type: 'policy', category: 'Authentication', anchor: 'authentication', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['headers'], nic: 'nginx.org/add-header / nginx.org/proxy-set-headers — or VirtualServer routes[].action.proxy.requestHeaders / responseHeaders', type: 'annotation', category: 'Headers', anchor: 'headers', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['ipAllowList', 'ipWhiteList'], nic: 'Policy CRD accessControl + nginx.org/policies', type: 'policy', category: 'Access Control', anchor: 'access-control', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['rateLimit'], nic: 'Policy CRD rateLimit + nginx.org/policies', type: 'policy', category: 'Rate Limiting', anchor: 'rate-limiting', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['redirectScheme'], nic: 'nginx.org/redirect-to-https — or VirtualServer redirect action', type: 'annotation', category: 'Redirects', anchor: 'redirects', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['redirectRegex'], nic: 'No direct equivalent — use VirtualServer routes[].action.redirect with a path-prefix match', type: 'virtualserver', category: 'Redirects', anchor: 'redirects', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['stripPrefix', 'stripPrefixRegex'], nic: 'rewrites annotation (nginx.org/rewrites) — or VirtualServer routes[].action.proxy.rewritePath', type: 'annotation', category: 'Rewrites', anchor: 'rewrites', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['addPrefix'], nic: 'No direct annotation — use VirtualServer routes[].action.proxy.rewritePath', type: 'virtualserver', category: 'Rewrites', anchor: 'rewrites', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['retry'], nic: 'nginx.org/max-fails / nginx.org/fail-timeout — or VirtualServer upstreams[].maxFails / failTimeout', type: 'annotation', category: 'Retries', anchor: 'retries', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['circuitBreaker'], nic: 'NGINX Plus active health checks via VirtualServer upstreams[].healthCheck', type: 'virtualserver', category: 'Resilience', anchor: 'resilience', section: 'plus', dualApproach: false, plusRequired: true, nicMapping: {} },
+            { community: ['compress'], nic: 'gzip directives via nginx.org/server-snippets — or ConfigMap http-snippets', type: 'annotation', category: 'Compression', anchor: 'compression', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['buffering'], nic: 'nginx.org/client-max-body-size + proxy-buffer-size', type: 'annotation', category: 'Buffering', anchor: 'buffering', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['inFlightReq'], nic: 'No direct equivalent — concurrent-request limiting requires snippet annotations', type: 'unsupported', category: 'Rate Limiting', anchor: 'rate-limiting', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['passTLSClientCert'], nic: 'No direct annotation — VirtualServer routes[].action.proxy.requestHeaders.set with ssl_client_cert variables', type: 'virtualserver', category: 'mTLS', anchor: 'mtls', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['forwardAuth'], nic: 'Policy CRD externalAuth + nginx.org/policies (new in v5.5.0)', type: 'policy', category: 'Authentication', anchor: 'authentication', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['chain'], nic: 'No direct equivalent — chains flatten into ordered nginx.org/policies list', type: 'unsupported', category: 'Composition', anchor: 'composition', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            // ---- Remaining v3.7.1 HTTP middleware kinds ----
+            { community: ['contentType'], nic: 'No direct equivalent — NIC keeps upstream Content-Type by default; override via nginx.org/proxy-set-headers or VirtualServer responseHeaders', type: 'unsupported', category: 'Headers', anchor: 'headers', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['digestAuth'], nic: 'No direct equivalent — NIC supports basicAuth (Policy CRD) and JWT/OIDC (Plus); digest auth typically requires a custom auth_request via snippets', type: 'unsupported', category: 'Authentication', anchor: 'authentication', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['encodedCharacters'], nic: 'No direct equivalent — URL encoding/decoding handled by NGINX core; configure via location-snippets if upstream requires specific encoding', type: 'unsupported', category: 'URL Handling', anchor: 'url-handling', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['errors'], nic: 'nginx.org/server-snippets with custom error_page directive — or VirtualServer routes[].errorPages', type: 'virtualserver', category: 'Error Handling', anchor: 'error-handling', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['grpcWeb'], nic: 'nginx.org/grpc-services for gRPC backends — gRPC-Web protocol translation needs upstream support or a sidecar (no direct NIC middleware)', type: 'annotation', category: 'gRPC', anchor: 'grpc', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['plugin'], nic: 'No direct equivalent — Traefik plugins are out-of-tree extensions; map to NIC via custom njs modules or snippet annotations on a case-by-case basis', type: 'unsupported', category: 'Plugins', anchor: 'plugins', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['replacePath'], nic: 'nginx.org/rewrites with full path substitution — or VirtualServer routes[].action.proxy.rewritePath', type: 'annotation', category: 'Rewrites', anchor: 'rewrites', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['replacePathRegex'], nic: 'VirtualServer routes[].action.proxy.rewritePath with regex match — annotation form (nginx.org/rewrites) accepts simple regex too', type: 'annotation', category: 'Rewrites', anchor: 'rewrites', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            // ---- Detected from match DSL (synthetic keys, value = backtick args) ----
+            { community: ['match.Host'], nic: 'spec.rules[].host (Ingress) — or VirtualServer spec.host', type: 'annotation', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.HostRegexp'], nic: 'No direct equivalent — Ingress host is an exact/wildcard match. Workaround: VirtualServer per host + shared upstream', type: 'unsupported', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.Path'], nic: 'spec.rules[].http.paths[].path with pathType: Exact', type: 'annotation', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.PathPrefix'], nic: 'spec.rules[].http.paths[].path with pathType: Prefix — or VirtualServer routes[].path', type: 'annotation', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.PathRegexp'], nic: 'VirtualServer routes[].path with ~ or ~* regex prefix', type: 'virtualserver', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.Header'], nic: 'VirtualServer routes[].matches[].conditions (header equals)', type: 'virtualserver', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.HeaderRegexp'], nic: 'VirtualServer routes[].matches[].conditions with regex (~* / ~)', type: 'virtualserver', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.Method'], nic: 'VirtualServer routes[].matches[].conditions ($request_method)', type: 'virtualserver', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.Query'], nic: 'VirtualServer routes[].matches[].conditions ($arg_<name>)', type: 'virtualserver', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.QueryRegexp'], nic: 'VirtualServer routes[].matches[].conditions with regex', type: 'virtualserver', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.ClientIP'], nic: 'Policy CRD accessControl + nginx.org/policies (allow / deny by CIDR)', type: 'policy', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.HostSNI'], nic: 'TransportServer CRD spec.host (TLS passthrough)', type: 'transportserver', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['match.HostSNIRegexp'], nic: 'No direct equivalent — TransportServer matches exact SNI hostnames', type: 'unsupported', category: 'Match DSL', anchor: 'match-dsl', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            // ---- IngressRoute service-level fields (CRD-only, no annotation form) ----
+            { community: ['service.strategy'], nic: 'nginx.org/lb-method — or VirtualServer upstreams[].lb-method', type: 'annotation', category: 'Load Balancing', anchor: 'load-balancing', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['service.healthCheck'], nic: 'VirtualServer upstreams[].healthCheck (NGINX Plus required for active checks)', type: 'virtualserver', category: 'Health Checks', anchor: 'health-checks', section: 'plus', dualApproach: false, plusRequired: true, nicMapping: {} },
+            { community: ['service.serversTransport'], nic: 'No direct equivalent — use VirtualServer upstreams[].tls / .client-* fields for backend TLS settings', type: 'virtualserver', category: 'Backend Transport', anchor: 'backend-transport', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            // ---- IngressRouteTCP service-level fields ----
+            { community: ['service.proxyProtocol'], nic: 'TransportServer CRD upstreams[].proxyProtocol — or ConfigMap proxy-protocol', type: 'transportserver', category: 'TCP Routing', anchor: 'tcp-routing', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['service.terminationDelay'], nic: 'No direct equivalent — TransportServer relies on NGINX stream module defaults', type: 'unsupported', category: 'TCP Routing', anchor: 'tcp-routing', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['service.tcp.tls'], nic: 'TransportServer CRD upstreams[].tls (backend TLS for TCP services)', type: 'transportserver', category: 'TCP Routing', anchor: 'tcp-routing', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['router.tls.passthrough'], nic: 'TransportServer CRD with TLS passthrough listener', type: 'transportserver', category: 'TLS', anchor: 'tls', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            // ---- MiddlewareTCP kinds ----
+            { community: ['middlewaretcp.inFlightConn'], nic: 'No direct equivalent — concurrent-connection limiting needs ConfigMap stream-snippets', type: 'unsupported', category: 'TCP Middlewares', anchor: 'tcp-middlewares', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['middlewaretcp.ipAllowList'], nic: 'TransportServer CRD with accessControl on upstream (ConfigMap stream-snippet for allow/deny)', type: 'transportserver', category: 'TCP Middlewares', anchor: 'tcp-middlewares', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['middlewaretcp.ipWhiteList'], nic: 'TransportServer CRD with accessControl on upstream (deprecated alias of ipAllowList)', type: 'transportserver', category: 'TCP Middlewares', anchor: 'tcp-middlewares', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            // ---- TraefikService kinds ----
+            { community: ['traefikservice.weighted'], nic: 'VirtualServer upstreams[].weight (Weighted Round Robin natively)', type: 'virtualserver', category: 'TraefikService', anchor: 'traefik-service', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['traefikservice.mirroring'], nic: 'NGINX mirror module via VirtualServer routes[].action.mirror — or nginx.org/server-snippets', type: 'virtualserver', category: 'TraefikService', anchor: 'traefik-service', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['traefikservice.failover'], nic: 'Use VirtualServer upstreams[] backup directive via snippets — or multiple upstreams with health checks (Plus)', type: 'unsupported', category: 'TraefikService', anchor: 'traefik-service', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            { community: ['traefikservice.highestRandomWeight'], nic: 'nginx.org/lb-method: random two least_conn (closest approximation)', type: 'annotation', category: 'TraefikService', anchor: 'traefik-service', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} },
+            // ---- TLSOption CRD (cipher suite / TLS version pinning) ----
+            { community: ['tlsoption'], nic: 'NIC ConfigMap (ssl-protocols, ssl-ciphers, ssl-prefer-server-ciphers) — or VirtualServer tls options for per-host overrides', type: 'configmap', category: 'TLS', anchor: 'tls', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            { community: ['router.tls.options'], nic: 'Reference to TLSOption CRD — translates to NIC ConfigMap ssl-* keys (cluster-wide) or VirtualServer tls options (per host)', type: 'configmap', category: 'TLS', anchor: 'tls', section: 'oss', dualApproach: true, plusRequired: false, nicMapping: {} },
+            // ---- API group (legacy detection) ----
+            { community: ['apiversion.containo.us'], nic: 'Pre-v3 manifests must be regenerated against traefik.io/v1alpha1 schemas first — fields such as IPWhiteList were renamed (IPAllowList) and several field types changed in the v2 → v3 transition', type: 'unsupported', category: 'API Group', anchor: 'api-group', section: 'oss', dualApproach: false, plusRequired: false, nicMapping: {} }
+        ];
+
+        const TRAEFIK_LOOKUP = new Map();
+        TRAEFIK_MAPPINGS.forEach(function(mapping, idx) {
+            mapping.community.forEach(function(name) { TRAEFIK_LOOKUP.set(name, idx); });
+        });
+
+        // Minimal spec extractor for Traefik standard Ingress. CRD-aware
+        // extraction (IngressRoute, IngressRouteTCP, TraefikService) is a
+        // follow-up — for now we reuse parseIngressSpec from shared.js
+        // since it handles the networking.k8s.io/v1 Ingress shape used by
+        // Traefik's standard-Ingress mode.
+        function parseTraefikSpec(yamlText) {
+            return parseIngressSpec(yamlText);
+        }
+
+        // ============================================================
+        // Traefik → NIC YAML generators
+        //
+        // Each generator returns either { name, yaml } for a discrete
+        // NIC resource, or null when the detected feature does not need
+        // a NIC resource of its own. Tone matches the ingress-nginx
+        // generators: emit realistic skeletons with TODO comments where
+        // the source manifest carries values we can't safely transplant
+        // (secrets, tunable thresholds, host names). The user is
+        // expected to copy values from their Traefik manifest into the
+        // TODO slots.
+        // ============================================================
+        function tHas(sorted, key) {
+            for (let i = 0; i < sorted.length; i++) {
+                if (sorted[i].foundAnnotations.some(function(a) { return a.annotation === key; })) return true;
+            }
+            return false;
+        }
+
+        function tSpecOr(spec, k, fallback) { return (spec && spec[k]) || fallback; }
+
+        function genPolicyBasicAuth() {
+            return { name: 'basic-auth-policy', yaml: buildBasicAuthPolicy(null, null, 'Kubernetes Secret with htpasswd-formatted entries (Traefik Middleware.basicAuth.secret)') };
+        }
+
+        function genPolicyAccessControl() {
+            return { name: 'access-control-policy', yaml: [
+                'apiVersion: k8s.nginx.org/v1',
+                'kind: Policy',
+                'metadata:',
+                '  name: access-control-policy',
+                'spec:',
+                '  accessControl:',
+                '    allow:',
+                '      - # TODO: Copy Middleware.ipAllowList.sourceRange CIDRs here, one per line'
+            ].join('\n') };
+        }
+
+        function genPolicyRateLimit() {
+            return { name: 'rate-limit-policy', yaml: [
+                'apiVersion: k8s.nginx.org/v1',
+                'kind: Policy',
+                'metadata:',
+                '  name: rate-limit-policy',
+                'spec:',
+                '  rateLimit:',
+                '    rate: 100r/s   # TODO: Match Middleware.rateLimit.average (Traefik measures req/s)',
+                '    burst: 50      # TODO: Match Middleware.rateLimit.burst',
+                '    key: ${binary_remote_addr}',
+                '    zoneSize: 10M'
+            ].join('\n') };
+        }
+
+        function genPolicyExternalAuth() {
+            return { name: 'external-auth-policy', yaml: [
+                'apiVersion: k8s.nginx.org/v1',
+                'kind: Policy',
+                'metadata:',
+                '  name: external-auth-policy',
+                'spec:',
+                '  externalAuth:',
+                '    authEndpoint: https://auth.example.com/verify  # TODO: Match Middleware.forwardAuth.address',
+                '    authResponseHeaders:',
+                '      - # TODO: List headers from Middleware.forwardAuth.authResponseHeaders'
+            ].join('\n') };
+        }
+
+        // Map sorted-entry key → policy generator. Aggregates uniquely so
+        // a single Policy CRD is emitted even if the source feature is
+        // referenced from multiple routes.
+        function buildPolicySet(sorted) {
+            let policies = {};
+            let sourceFeatures = {};
+            function add(key, polFn) {
+                let p = polFn();
+                if (!policies[p.name]) { policies[p.name] = p.yaml; sourceFeatures[p.name] = []; }
+                sourceFeatures[p.name].push(key);
+            }
+            sorted.forEach(function(entry) {
+                let key = entry.foundAnnotations[0].annotation;
+                if (key === 'basicAuth') add('basicAuth', genPolicyBasicAuth);
+                if (key === 'ipAllowList' || key === 'ipWhiteList') add(key, genPolicyAccessControl);
+                if (key === 'rateLimit') add('rateLimit', genPolicyRateLimit);
+                if (key === 'forwardAuth') add('forwardAuth', genPolicyExternalAuth);
+                if (key === 'match.ClientIP') add('match.ClientIP', genPolicyAccessControl);
+            });
+            return { policies: policies, sourceFeatures: sourceFeatures };
+        }
+
+        function genVirtualServer(sorted, ingressSpec, policyNames) {
+            let host = tSpecOr(ingressSpec, 'host', 'app.example.com');
+            let svc = tSpecOr(ingressSpec, 'service', 'app-svc');
+            let port = tSpecOr(ingressSpec, 'port', '80');
+            let path = tSpecOr(ingressSpec, 'path', '/');
+            let name = tSpecOr(ingressSpec, 'name', 'app');
+            let lines = [
+                'apiVersion: k8s.nginx.org/v1',
+                'kind: VirtualServer',
+                'metadata:',
+                '  name: ' + name,
+                'spec:',
+                '  host: ' + host
+            ];
+            if (tHas(sorted, 'router.tls')) {
+                lines.push('  tls:');
+                lines.push('    secret: ' + tSpecOr(ingressSpec, 'tlsSecret', name + '-tls'));
+                if (tHas(sorted, 'router.tls.certresolver')) {
+                    lines.push('    # NOTE: NIC has no built-in ACME client. Use cert-manager to issue the Secret referenced above.');
+                }
+            }
+            lines.push('  upstreams:');
+            lines.push('    - name: app');
+            lines.push('      service: ' + svc);
+            lines.push('      port: ' + (typeof port === 'string' && /^\d+$/.test(port) ? port : port));
+            if (tHas(sorted, 'service.serversscheme')) {
+                lines.push('      tls:');
+                lines.push('        enable: true   # Detected service.scheme: https / h2c');
+            }
+            if (tHas(sorted, 'service.sticky.cookie')) {
+                lines.push('      sessionCookie:');
+                lines.push('        enable: true');
+                lines.push('        name: app-session  # TODO: Match IngressRoute services[].sticky.cookie.name');
+                lines.push('        expires: 1h        # TODO: Convert sticky.cookie.maxAge (seconds → duration string)');
+            }
+            if (tHas(sorted, 'service.strategy')) {
+                lines.push('      lb-method: round_robin  # TODO: Map service.strategy (wrr→round_robin, p2c→least_conn, hrw→random, leasttime→least_time header)');
+            }
+            if (tHas(sorted, 'service.healthCheck')) {
+                lines.push('      healthCheck:');
+                lines.push('        enable: true   # NOTE: active health checks require NGINX Plus');
+                lines.push('        path: /        # TODO: Match IngressRoute services[].healthCheck.path');
+            }
+            if (tHas(sorted, 'service.passhostheader')) {
+                lines.push('      # Default NIC behaviour forwards Host. Traefik passHostHeader: false ≈ explicit Host override.');
+            }
+            lines.push('  routes:');
+            lines.push('    - path: ' + path);
+            if (policyNames.length > 0) {
+                lines.push('      policies:');
+                policyNames.forEach(function(p) { lines.push('        - name: ' + p); });
+            }
+            // Method match
+            let methodFeatures = sorted.filter(function(e) { return e.foundAnnotations[0].annotation === 'match.Method'; });
+            if (methodFeatures.length > 0) {
+                let methodVal = methodFeatures[0].foundAnnotations[0].value || 'GET';
+                lines.push('      matches:');
+                lines.push('        - conditions:');
+                lines.push('            - variable: $request_method');
+                lines.push('              value: ' + methodVal + '   # Detected match.Method');
+                lines.push('          action:');
+                lines.push('            pass: app');
+            }
+            lines.push('      action:');
+            lines.push('        pass: app');
+            return { name: name, yaml: lines.join('\n') };
+        }
+
+        function genTransportServer(sorted, ingressSpec) {
+            let name = tSpecOr(ingressSpec, 'name', 'app') + '-tcp';
+            let svc = tSpecOr(ingressSpec, 'service', 'tcp-svc');
+            let port = tSpecOr(ingressSpec, 'port', '8443');
+            let host = tSpecOr(ingressSpec, 'host', 'tcp.example.com');
+            let lines = [
+                'apiVersion: k8s.nginx.org/v1',
+                'kind: TransportServer',
+                'metadata:',
+                '  name: ' + name,
+                'spec:'
+            ];
+            if (tHas(sorted, 'router.tls.passthrough')) {
+                lines.push('  listener:');
+                lines.push('    name: tls-passthrough   # TODO: Match IngressRouteTCP entryPoints listener name');
+                lines.push('    protocol: TLS_PASSTHROUGH');
+                lines.push('  host: ' + host);
+            } else {
+                lines.push('  listener:');
+                lines.push('    name: tcp-' + port);
+                lines.push('    protocol: TCP');
+            }
+            lines.push('  upstreams:');
+            lines.push('    - name: tcp');
+            lines.push('      service: ' + svc);
+            lines.push('      port: ' + port);
+            if (tHas(sorted, 'service.tcp.tls')) {
+                lines.push('      # NOTE: Backend TLS detected on TCP service — see TransportServer upstream tls fields');
+            }
+            if (tHas(sorted, 'service.proxyProtocol')) {
+                lines.push('      # NOTE: PROXY protocol detected — set proxyProtocol on the listener or upstream as appropriate');
+            }
+            lines.push('  action:');
+            lines.push('    pass: tcp');
+            return { name: name, yaml: lines.join('\n') };
+        }
+
+        function generateTraefikMigration(sorted, ingressSpec) {
+            let polSet = buildPolicySet(sorted);
+            let policyNames = Object.keys(polSet.policies);
+            // Features that have no annotation path — emitting VirtualServer
+            // is unavoidable regardless of the user's strategy preference.
+            let crdOnlyDetected = sorted.some(function(e) {
+                let k = e.foundAnnotations[0].annotation;
+                return /^match\.(Path|PathPrefix|PathRegexp|Header|HeaderRegexp|Query|QueryRegexp|Method)$/.test(k)
+                    || /^service\.(strategy|healthCheck|serversTransport)/.test(k)
+                    || k === 'router.middlewares'
+                    || policyNames.length > 0;
+            });
+            // Features that have a workable annotation path (sticky-cookie via Plus
+            // annotation, scheme via nginx.org/ssl-services, passHostHeader is NIC default).
+            let crdPreferredDetected = sorted.some(function(e) {
+                let k = e.foundAnnotations[0].annotation;
+                return /^match\.Host$/.test(k)
+                    || /^service\.(sticky|serversscheme|passhostheader)/.test(k)
+                    || (e.mapping.type === 'virtualserver' && !/TCP/.test(e.mapping.category));
+            });
+            // Strategy controls whether dual-path features go to VS or to annotation
+            // swaps. CRD-only features always force a VS.
+            let strategy = (typeof _migrationStrategy !== 'undefined') ? _migrationStrategy : 'crd';
+            let hasHTTPCrd = crdOnlyDetected || (crdPreferredDetected && strategy !== 'annotation');
+            let hasTCPCrd = sorted.some(function(e) {
+                let k = e.foundAnnotations[0].annotation;
+                return /^match\.(HostSNI|HostSNIRegexp)$/.test(k) || /^service\.(tcp\.tls|proxyProtocol|terminationDelay)/.test(k)
+                    || k === 'router.tls.passthrough' || /^middlewaretcp\./.test(k)
+                    || e.mapping.type === 'transportserver';
+            });
+            let vs = hasHTTPCrd ? genVirtualServer(sorted, ingressSpec, policyNames) : null;
+            let ts = hasTCPCrd ? genTransportServer(sorted, ingressSpec) : null;
+            let unsupported = sorted.filter(function(e) { return e.mapping.type === 'unsupported'; });
+            // Annotation swaps cover the standard-Ingress path: features
+            // whose mapping is `type: 'annotation'` and which weren't already
+            // absorbed by VirtualServer/TransportServer generation.
+            let annotationSwaps = sorted.filter(function(e) {
+                if (e.mapping.type !== 'annotation') return false;
+                if (e.mapping.type === 'unsupported') return false;
+                let k = e.foundAnnotations[0].annotation;
+                // Skip features the VS/TS skeleton already represents.
+                if (vs && (k === 'service.sticky.cookie' || k === 'service.passhostheader' || k === 'service.strategy' || k === 'service.serversscheme')) return false;
+                return true;
+            });
+            let warnings = [];
+            if (tHas(sorted, 'apiversion.containo.us')) {
+                warnings.push({ kind: 'api-group', message: 'Pre-v3 manifest detected (traefik.containo.us/v1alpha1). Regenerate against traefik.io/v1alpha1 schemas before migrating — several fields were renamed (e.g. IPWhiteList → IPAllowList).' });
+            }
+            return { policies: polSet.policies, policySourceFeatures: polSet.sourceFeatures, virtualServer: vs, transportServer: ts, annotationSwaps: annotationSwaps, unsupported: unsupported, warnings: warnings };
+        }
+
+        // ============================================================
+        // Step-by-step Traefik renderer
+        // ============================================================
+        function makeStep(num, title, count) {
+            let step = document.createElement('div');
+            step.className = 'analyzer-step';
+            step.id = 'analyzer-step-' + num;
+            let h = document.createElement('div');
+            h.className = 'analyzer-step-header';
+            let n = document.createElement('div');
+            n.className = 'analyzer-step-number';
+            n.textContent = String(num);
+            let t = document.createElement('div');
+            t.className = 'analyzer-step-title';
+            t.textContent = title;
+            h.appendChild(n);
+            h.appendChild(t);
+            if (count != null) {
+                let c = document.createElement('span');
+                c.className = 'analyzer-step-count';
+                c.textContent = String(count);
+                h.appendChild(c);
+            }
+            step.appendChild(h);
+            return step;
+        }
+
+        function makeYamlBlockSafe(text) {
+            // Reuse the shared helper if available; fall back to a plain pre.
+            if (typeof buildYamlBlock === 'function') return buildYamlBlock(text);
+            let pre = document.createElement('pre');
+            let code = document.createElement('code');
+            code.textContent = text;
+            pre.appendChild(code);
+            return pre;
+        }
+
+        function renderAnalyzerResults(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec) {
+            container.textContent = '';
+            let migration = generateTraefikMigration(sorted, ingressSpec || {});
+
+            // Summary banner: count + pills + complexity dots
+            let banner = document.createElement('div');
+            banner.className = 'analyzer-summary-banner';
+            let summary = document.createElement('div');
+            summary.className = 'analyzer-summary-text';
+            let summaryParts = [totalAnnotations + ' Traefik feature' + (totalAnnotations !== 1 ? 's' : '') + ' detected'];
+            if (sorted.length) summaryParts.push(sorted.length + ' mapped');
+            if (unrecognized.length) summaryParts.push(unrecognized.length + ' unrecognized');
+            summary.textContent = summaryParts.join(' · ');
+            banner.appendChild(summary);
+            let pills = document.createElement('div');
+            pills.className = 'analyzer-pills';
+            function addPill(cls, txt) {
+                let p = document.createElement('span');
+                p.className = 'analyzer-pill ' + cls;
+                p.textContent = txt;
+                pills.appendChild(p);
+            }
+            let polCount = Object.keys(migration.policies).length;
+            if (polCount) addPill('crds', polCount + ' Polic' + (polCount !== 1 ? 'ies' : 'y'));
+            if (migration.virtualServer) addPill('crds', '1 VirtualServer');
+            if (migration.transportServer) addPill('crds', '1 TransportServer');
+            if (migration.annotationSwaps && migration.annotationSwaps.length) addPill('paths', migration.annotationSwaps.length + ' annotation swap' + (migration.annotationSwaps.length !== 1 ? 's' : ''));
+            if (migration.unsupported.length) addPill('unsupported', migration.unsupported.length + ' unsupported');
+            banner.appendChild(pills);
+            // Complexity badge — simple/moderate/advanced based on what's needed
+            let complexityLevel = (migration.transportServer || polCount >= 2) ? 'advanced'
+                : (migration.virtualServer || polCount > 0) ? 'moderate'
+                : 'simple';
+            let complexityLabels = { simple: 'Simple Migration', moderate: 'Moderate Migration', advanced: 'Advanced Migration' };
+            let complexityFilled = { simple: 1, moderate: 2, advanced: 3 };
+            let complexBadge = document.createElement('span');
+            complexBadge.className = 'analyzer-complexity ' + complexityLevel;
+            let dotsDiv = document.createElement('span');
+            dotsDiv.className = 'analyzer-complexity-dots';
+            for (let ci = 0; ci < 3; ci++) {
+                let dot = document.createElement('span');
+                if (ci < complexityFilled[complexityLevel]) dot.className = 'filled';
+                dotsDiv.appendChild(dot);
+            }
+            complexBadge.appendChild(dotsDiv);
+            complexBadge.appendChild(document.createTextNode(complexityLabels[complexityLevel]));
+            banner.appendChild(complexBadge);
+            container.appendChild(banner);
+
+            let stepNum = 0;
+
+            // Step: legacy API group warning
+            migration.warnings.forEach(function(w) {
+                if (w.kind === 'api-group') {
+                    stepNum++;
+                    let step = makeStep(stepNum, 'Migrate API group first');
+                    let d = document.createElement('div');
+                    d.className = 'analyzer-step-desc';
+                    d.textContent = w.message;
+                    step.appendChild(d);
+                    container.appendChild(step);
+                }
+            });
+
+            // Step: Install NIC CRDs (only when we're about to generate any)
+            let willGenerateCRD = polCount > 0 || migration.virtualServer || migration.transportServer;
+            if (willGenerateCRD) {
+                stepNum++;
+                let step = makeStep(stepNum, 'Install F5 NGINX Ingress Controller CRDs');
+                let d = document.createElement('div');
+                d.className = 'analyzer-step-desc';
+                d.textContent = 'Apply the NIC CRD bundle once per cluster before creating Policies, VirtualServer, or TransportServer resources.';
+                step.appendChild(d);
+                let installPre = document.createElement('pre');
+                let installCode = document.createElement('code');
+                installCode.textContent = 'kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/' + NIC_VERSION + '/deploy/crds.yaml';
+                installPre.appendChild(installCode);
+                step.appendChild(installPre);
+                container.appendChild(step);
+            }
+
+            // Step: Policy CRDs
+            if (polCount > 0) {
+                stepNum++;
+                let step = makeStep(stepNum, 'Create Policy CRDs', polCount + ' polic' + (polCount !== 1 ? 'ies' : 'y'));
+                let d = document.createElement('div');
+                d.className = 'analyzer-step-desc';
+                d.textContent = 'Each Traefik Middleware referenced from your routes becomes a standalone NIC Policy CRD. Reference these from the VirtualServer below.';
+                step.appendChild(d);
+                Object.keys(migration.policies).forEach(function(polName) {
+                    let comp = document.createElement('div');
+                    comp.className = 'analyzer-comparison';
+                    let oldBlock = document.createElement('div');
+                    oldBlock.className = 'analyzer-comparison-block old';
+                    let oh = document.createElement('h5');
+                    oh.textContent = 'Traefik ';
+                    let oBadge = document.createElement('span');
+                    oBadge.className = 'analyzer-comparison-badge';
+                    oBadge.textContent = (migration.policySourceFeatures[polName] || []).join(', ') || 'middleware';
+                    oh.appendChild(oBadge);
+                    oldBlock.appendChild(oh);
+                    let oldNote = document.createElement('div');
+                    oldNote.style.cssText = 'padding:8px;color:#666;font-size:0.85rem;';
+                    oldNote.textContent = 'Source Middleware values are not transcribed — copy them into the TODO slots on the right.';
+                    oldBlock.appendChild(oldNote);
+                    let newBlock = document.createElement('div');
+                    newBlock.className = 'analyzer-comparison-block new';
+                    let nh = document.createElement('h5');
+                    nh.textContent = 'F5 NGINX Ingress Controller ';
+                    let nBadge = document.createElement('span');
+                    nBadge.className = 'analyzer-comparison-badge';
+                    nBadge.textContent = 'Policy';
+                    nh.appendChild(nBadge);
+                    newBlock.appendChild(nh);
+                    newBlock.appendChild(makeYamlBlockSafe(migration.policies[polName]));
+                    comp.appendChild(oldBlock);
+                    comp.appendChild(newBlock);
+                    step.appendChild(comp);
+                });
+                container.appendChild(step);
+            }
+
+            // Step: VirtualServer
+            if (migration.virtualServer) {
+                stepNum++;
+                let step = makeStep(stepNum, 'Create VirtualServer (replaces IngressRoute)', '1 resource');
+                let d = document.createElement('div');
+                d.className = 'analyzer-step-desc';
+                d.textContent = 'Replace your Traefik IngressRoute with a NIC VirtualServer. The skeleton below wires in any Policy CRDs generated above and surfaces detected upstream features (sticky, scheme, strategy, health checks).';
+                step.appendChild(d);
+                let newBlock = document.createElement('div');
+                newBlock.className = 'analyzer-comparison-block new';
+                let nh = document.createElement('h5');
+                nh.textContent = 'F5 NGINX Ingress Controller ';
+                let nBadge = document.createElement('span');
+                nBadge.className = 'analyzer-comparison-badge';
+                nBadge.textContent = 'VirtualServer';
+                nh.appendChild(nBadge);
+                newBlock.appendChild(nh);
+                newBlock.appendChild(makeYamlBlockSafe(migration.virtualServer.yaml));
+                step.appendChild(newBlock);
+                container.appendChild(step);
+            }
+
+            // Step: TransportServer
+            if (migration.transportServer) {
+                stepNum++;
+                let step = makeStep(stepNum, 'Create TransportServer (replaces IngressRouteTCP)', '1 resource');
+                let d = document.createElement('div');
+                d.className = 'analyzer-step-desc';
+                d.textContent = 'TCP routes (IngressRouteTCP) map to NIC TransportServer. Passthrough TLS is handled via the TLS_PASSTHROUGH listener.';
+                step.appendChild(d);
+                let newBlock = document.createElement('div');
+                newBlock.className = 'analyzer-comparison-block new';
+                let nh = document.createElement('h5');
+                nh.textContent = 'F5 NGINX Ingress Controller ';
+                let nBadge = document.createElement('span');
+                nBadge.className = 'analyzer-comparison-badge';
+                nBadge.textContent = 'TransportServer';
+                nh.appendChild(nBadge);
+                newBlock.appendChild(nh);
+                newBlock.appendChild(makeYamlBlockSafe(migration.transportServer.yaml));
+                step.appendChild(newBlock);
+                container.appendChild(step);
+            }
+
+            // Step: Annotation swaps (standard-Ingress path) — side-by-side diff
+            if (migration.annotationSwaps && migration.annotationSwaps.length > 0) {
+                stepNum++;
+                let step = makeStep(stepNum, 'Swap annotations on standard Ingress', migration.annotationSwaps.length + ' feature' + (migration.annotationSwaps.length !== 1 ? 's' : ''));
+                let d = document.createElement('div');
+                d.className = 'analyzer-step-desc';
+                d.textContent = 'For workloads kept on a standard Kubernetes Ingress, these Traefik annotations have direct NIC equivalents. Copy the annotations: block on the right into your Ingress metadata.';
+                step.appendChild(d);
+
+                // Build before/after annotations: blocks
+                let oldLines = ['annotations:'];
+                let newLines = ['annotations:'];
+                migration.annotationSwaps.forEach(function(entry) {
+                    entry.foundAnnotations.forEach(function(a) {
+                        oldLines.push('  traefik.ingress.kubernetes.io/' + a.annotation + ': ' + ((a.value === 'detected' || !a.value) ? '"…"' : '"' + a.value + '"'));
+                    });
+                    // NIC side: emit a comment line with the NIC target description and the original key as a comment
+                    let nicTarget = entry.mapping.nic;
+                    let firstSrc = entry.foundAnnotations[0].annotation;
+                    newLines.push('  # ' + firstSrc + ' → ' + nicTarget);
+                });
+
+                let comp = document.createElement('div');
+                comp.className = 'analyzer-comparison';
+                let oldBlock = document.createElement('div');
+                oldBlock.className = 'analyzer-comparison-block old';
+                let oh = document.createElement('h5');
+                oh.textContent = 'Traefik ';
+                let oBadge = document.createElement('span');
+                oBadge.className = 'analyzer-comparison-badge';
+                oBadge.textContent = 'current';
+                oh.appendChild(oBadge);
+                oldBlock.appendChild(oh);
+                oldBlock.appendChild(makeYamlBlockSafe(oldLines.join('\n')));
+                let newBlock = document.createElement('div');
+                newBlock.className = 'analyzer-comparison-block new';
+                let nh = document.createElement('h5');
+                nh.textContent = 'F5 NGINX Ingress Controller ';
+                let nBadge = document.createElement('span');
+                nBadge.className = 'analyzer-comparison-badge';
+                nBadge.textContent = 'migrated';
+                nh.appendChild(nBadge);
+                newBlock.appendChild(nh);
+                newBlock.appendChild(makeYamlBlockSafe(newLines.join('\n')));
+                comp.appendChild(oldBlock);
+                comp.appendChild(newBlock);
+                step.appendChild(comp);
+            }
+
+            // Step: Unsupported features
+            if (migration.unsupported.length > 0) {
+                stepNum++;
+                let step = makeStep(stepNum, 'Unsupported features', migration.unsupported.length + ' item' + (migration.unsupported.length !== 1 ? 's' : ''));
+                let d = document.createElement('div');
+                d.className = 'analyzer-step-desc';
+                d.textContent = 'These Traefik features have no direct F5 NGINX Ingress Controller equivalent. Review the workarounds in the Reference Guide before migrating.';
+                step.appendChild(d);
+                let ul = document.createElement('ul');
+                ul.style.cssText = 'list-style:none;padding:0;margin:0;';
+                migration.unsupported.forEach(function(entry) {
+                    let li = document.createElement('li');
+                    li.style.cssText = 'padding:10px 12px;border-left:3px solid #d97706;background:#fffbeb;margin:6px 0;border-radius:4px;';
+                    let code = document.createElement('code');
+                    code.textContent = entry.foundAnnotations.map(function(a) { return a.annotation; }).join(', ');
+                    li.appendChild(code);
+                    let arrow = document.createElement('span');
+                    arrow.textContent = ' → ';
+                    arrow.style.color = '#666';
+                    li.appendChild(arrow);
+                    let workaround = document.createElement('span');
+                    workaround.textContent = entry.mapping.nic;
+                    li.appendChild(workaround);
+                    ul.appendChild(li);
+                });
+                step.appendChild(ul);
+                container.appendChild(step);
+            }
+
+            // Unrecognized section (not numbered — these are unknown features, not migration steps)
+            if (unrecognized.length > 0) {
+                let unrecHeader = document.createElement('h3');
+                unrecHeader.textContent = 'Unrecognized features';
+                unrecHeader.style.marginTop = '24px';
+                container.appendChild(unrecHeader);
+                let unrecList = document.createElement('ul');
+                unrecList.style.cssText = 'list-style:none;padding:0;margin:0;';
+                unrecognized.forEach(function(u) {
+                    let li = document.createElement('li');
+                    li.style.cssText = 'padding:8px 12px;border-left:3px solid #d97706;background:#fffbeb;margin:4px 0;border-radius:4px;font-family:monospace;font-size:0.85rem;';
+                    li.textContent = u.annotation;
+                    unrecList.appendChild(li);
+                });
+                container.appendChild(unrecList);
+            }
+            // YAML-block copy buttons are baked into buildYamlBlock (one
+            // analyzer-copy-btn per generated block) — no extra wiring needed.
+        }
+
+        // Analyzer action stubs — clearAnalyzer, setStrategy, loadSampleYaml.
+        // Sample YAMLs are minimal starters; richer presets will land with
+        // the full IngressRoute/Middleware/TraefikService parsers.
+        let _migrationStrategy = 'crd';
+        function setStrategy(strategy, btn) {
+            _migrationStrategy = strategy;
+            document.querySelectorAll('.strategy-option').forEach(function(b) { b.classList.remove('active'); });
+            if (btn) btn.classList.add('active');
+            // Re-render any current analyzer results so the toggle is live.
+            let results = document.getElementById('analyzerResults');
+            if (results && results.firstChild && results.firstChild.id !== 'analyzerLiveStatus' && document.getElementById('yamlInput') && document.getElementById('yamlInput').value.trim()) {
+                runAnalyzeYaml();
+            }
+        }
+
+        function clearAnalyzer() {
+            let ta = document.getElementById('yamlInput');
+            if (ta) { ta.value = ''; updateYamlHighlight(); updateInputStatus(); }
+            let results = document.getElementById('analyzerResults');
+            if (results) { results.textContent = ''; results.appendChild(Object.assign(document.createElement('div'), { id: 'analyzerLiveStatus', className: 'sr-only' })); }
+        }
+
+        // Sample manifests mirror the Phase 4 plan:
+        //   simple    — single IngressRoute + one Middleware (rateLimit) + TLS
+        //   moderate  — IngressRoute + Chain middleware (showcases the chain-flatten warning) + TLSOption
+        //   advanced  — IngressRoute + TraefikService weighted services + ForwardAuth + IPAllowList
+        const TRAEFIK_SAMPLES = {
+            simple: 'apiVersion: traefik.io/v1alpha1\nkind: IngressRoute\nmetadata:\n  name: app\nspec:\n  entryPoints: [websecure]\n  routes:\n    - match: Host(`app.example.com`) && PathPrefix(`/`)\n      kind: Rule\n      services:\n        - name: app-svc\n          port: 80\n      middlewares:\n        - name: rate-limit\n  tls:\n    secretName: app-tls\n---\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: rate-limit\nspec:\n  rateLimit:\n    average: 100\n    burst: 50\n    period: 1s\n',
+
+            moderate: 'apiVersion: traefik.io/v1alpha1\nkind: IngressRoute\nmetadata:\n  name: app\nspec:\n  entryPoints: [websecure]\n  routes:\n    - match: Host(`app.example.com`)\n      kind: Rule\n      services:\n        - name: app-svc\n          port: 80\n      middlewares:\n        - name: secure-headers-chain\n  tls:\n    secretName: app-tls\n    options:\n      name: modern-tls\n---\n# Chain middleware composes basicAuth + rateLimit + IP allowlist.\n# NIC has no `Chain` equivalent — the analyzer flags it as unsupported\n# and the migration step suggests flattening into an ordered\n# `nginx.org/policies` list referencing each child Policy CRD.\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: secure-headers-chain\nspec:\n  chain:\n    middlewares:\n      - name: basic-auth\n      - name: rate-limit\n      - name: ip-allowlist\n---\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: basic-auth\nspec:\n  basicAuth:\n    secret: app-credentials\n---\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: rate-limit\nspec:\n  rateLimit:\n    average: 100\n    burst: 50\n---\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: ip-allowlist\nspec:\n  ipAllowList:\n    sourceRange:\n      - 10.0.0.0/8\n      - 192.168.0.0/16\n---\n# TLSOption pins ciphers + min TLS version — maps to NIC ConfigMap\n# (ssl-protocols, ssl-ciphers) for cluster-wide config, or to a per-host\n# VirtualServer tls block.\napiVersion: traefik.io/v1alpha1\nkind: TLSOption\nmetadata:\n  name: modern-tls\nspec:\n  minVersion: VersionTLS13\n  cipherSuites:\n    - TLS_AES_128_GCM_SHA256\n    - TLS_AES_256_GCM_SHA384\n    - TLS_CHACHA20_POLY1305_SHA256\n',
+
+            advanced: 'apiVersion: traefik.io/v1alpha1\nkind: IngressRoute\nmetadata:\n  name: app\nspec:\n  entryPoints: [websecure]\n  routes:\n    - match: Host(`app.example.com`) && PathPrefix(`/api`)\n      kind: Rule\n      services:\n        - name: app-canary-split\n          kind: TraefikService    # references the TraefikService below\n      middlewares:\n        - name: ip-allowlist\n        - name: forward-auth\n  tls:\n    secretName: app-tls\n---\n# TraefikService weighted services — 90/10 canary split between v1 and v2\n# backends. Maps to NIC VirtualServer upstreams[] with `weight:` fields\n# (Weighted Round Robin is native to NIC).\napiVersion: traefik.io/v1alpha1\nkind: TraefikService\nmetadata:\n  name: app-canary-split\nspec:\n  weighted:\n    services:\n      - name: app-v1-svc\n        port: 80\n        weight: 90\n      - name: app-v2-svc\n        port: 80\n        weight: 10\n---\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: ip-allowlist\nspec:\n  ipAllowList:\n    sourceRange:\n      - 10.0.0.0/8\n      - 192.168.0.0/16\n---\n# ForwardAuth maps cleanly to the NIC ExternalAuth Policy CRD (new in v5.5.0)\n# — OSS-capable, no NGINX Plus required.\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: forward-auth\nspec:\n  forwardAuth:\n    address: https://auth.example.com/verify\n    trustForwardHeader: true\n    authResponseHeaders:\n      - X-Auth-User\n      - X-Auth-Token\n'
+        };
+
+        function loadSampleYaml(preset) {
+            let sample = TRAEFIK_SAMPLES[preset];
+            if (!sample) return;
+            let ta = document.getElementById('yamlInput');
+            if (ta) {
+                ta.value = sample;
+                updateYamlHighlight();
+                updateInputStatus();
+            }
+            let menu = document.getElementById('sampleDropdown');
+            if (menu) menu.classList.remove('open');
+            let btn = document.querySelector('[data-action="toggleSampleDropdown"]');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+
+        // ============================================================
+        // Traefik v3 match-rule DSL parser
+        //
+        // Grammar (Traefik v3, see doc.traefik.io/traefik/v3.7/.../rules-and-priority/):
+        //   expr   = or
+        //   or     = and ('||' and)*
+        //   and    = unary ('&&' unary)*
+        //   unary  = '!' unary | atom
+        //   atom   = '(' expr ')' | matcher
+        //   matcher = ident '(' [backtickStr (',' backtickStr)*] ')'
+        //
+        // We don't need to evaluate the expression — just collect the
+        // matcher names (and their args) that appear, plus any syntax
+        // errors. The analyzer uses the matcher list to surface features
+        // that need NIC-side attention (HostRegexp has no direct mapping,
+        // ClientIP becomes a Policy, etc.). Errors get surfaced as parser
+        // warnings via the shared engine.
+        // ============================================================
+        function parseTraefikMatch(rule) {
+            let matchers = [];
+            let errors = [];
+            let pos = 0;
+            let src = rule || '';
+
+            function eatSpace() { while (pos < src.length && /\s/.test(src[pos])) pos++; }
+            function peek2(s) { eatSpace(); return src.substring(pos, pos + s.length) === s; }
+            function eat2(s) { if (peek2(s)) { pos += s.length; return true; } return false; }
+
+            function parseBacktickStr() {
+                eatSpace();
+                if (src[pos] !== '`') { errors.push('Expected backtick at ' + pos); return null; }
+                pos++;
+                let start = pos;
+                while (pos < src.length && src[pos] !== '`') pos++;
+                if (pos >= src.length) { errors.push('Unterminated backtick string'); return null; }
+                let str = src.substring(start, pos);
+                pos++;
+                return str;
+            }
+
+            function parseMatcher() {
+                eatSpace();
+                let m = /^[A-Za-z][A-Za-z0-9]*/.exec(src.substring(pos));
+                if (!m) { errors.push('Expected matcher name at ' + pos); pos = src.length; return; }
+                let name = m[0];
+                pos += name.length;
+                eatSpace();
+                if (src[pos] !== '(') { errors.push('Expected ( after matcher ' + name); return; }
+                pos++;
+                let args = [];
+                eatSpace();
+                if (src[pos] !== ')') {
+                    while (true) {
+                        let s = parseBacktickStr();
+                        if (s === null) return;
+                        args.push(s);
+                        eatSpace();
+                        if (src[pos] === ',') { pos++; continue; }
+                        if (src[pos] === ')') break;
+                        errors.push('Expected , or ) at ' + pos);
+                        return;
+                    }
+                }
+                pos++;
+                matchers.push({ name: name, args: args });
+            }
+
+            function parseAtom() {
+                eatSpace();
+                if (eat2('(')) {
+                    parseExpr();
+                    eatSpace();
+                    if (!eat2(')')) errors.push('Expected ) at ' + pos);
+                    return;
+                }
+                parseMatcher();
+            }
+
+            function parseUnary() {
+                eatSpace();
+                if (eat2('!')) { parseUnary(); return; }
+                parseAtom();
+            }
+
+            function parseAnd() {
+                parseUnary();
+                while (peek2('&&')) { eat2('&&'); parseUnary(); }
+            }
+
+            function parseExpr() {
+                parseAnd();
+                while (peek2('||')) { eat2('||'); parseAnd(); }
+            }
+
+            if (src.trim()) {
+                parseExpr();
+                eatSpace();
+                if (pos < src.length) errors.push('Trailing input at position ' + pos + ': ' + src.substring(pos, Math.min(pos + 24, src.length)));
+            }
+            return { matchers: matchers, errors: errors };
+        }
+
+        // ============================================================
+        // Traefik CRD body scanner
+        //
+        // Recognizes IngressRoute, IngressRouteTCP, Middleware,
+        // MiddlewareTCP, and TraefikService at apiVersion
+        // traefik.io/v1alpha1 (new) and traefik.containo.us/v1alpha1
+        // (pre-v3, deprecated). Pre-v3 manifests emit an
+        // apiversion.containo.us warning feature in addition to
+        // whatever else is detected.
+        //
+        // The scanner extracts features by pattern-matching against the
+        // textual YAML rather than building a full AST — sufficient for
+        // typical Kubernetes manifests, brittle on adversarial inputs.
+        // ============================================================
+        const HTTP_MIDDLEWARE_KINDS = ['addPrefix','basicAuth','buffering','chain','circuitBreaker','compress','contentType','digestAuth','encodedCharacters','errors','forwardAuth','grpcWeb','headers','inFlightReq','ipAllowList','ipWhiteList','passTLSClientCert','plugin','rateLimit','redirectRegex','redirectScheme','replacePath','replacePathRegex','retry','stripPrefix','stripPrefixRegex'];
+        const TCP_MIDDLEWARE_KINDS = ['inFlightConn','ipAllowList','ipWhiteList'];
+        const TRAEFIKSERVICE_KINDS = ['weighted','mirroring','failover','highestRandomWeight'];
+
+        function pushFeature(features, key, value, docIndex) {
+            features.push({ annotation: key, value: value || 'detected', docIndex: docIndex });
+        }
+
+        function extractMatchRules(doc, docIndex, features, warnings) {
+            // Find every `match: <rule>` line (Routes element). Match strings
+            // may be quoted, unquoted, or in flow form. We capture everything
+            // after the colon on the same line.
+            let re = /^[ \t]*-?[ \t]*match:[ \t]*(.+?)[ \t]*$/gm;
+            let m;
+            while ((m = re.exec(doc)) !== null) {
+                let rule = m[1].replace(/^["']|["']$/g, '');
+                let parsed = parseTraefikMatch(rule);
+                parsed.matchers.forEach(function(matcher) {
+                    pushFeature(features, 'match.' + matcher.name, matcher.args.join(','), docIndex);
+                });
+                parsed.errors.forEach(function(err) {
+                    warnings.push('match: ' + rule.substring(0, 40) + ' — ' + err);
+                });
+            }
+        }
+
+        function extractIngressRoute(doc, docIndex, features, warnings) {
+            extractMatchRules(doc, docIndex, features, warnings);
+            // Router-level middleware refs
+            if (/^[ \t]+middlewares:[ \t]*$/m.test(doc) || /\bmiddlewares:[ \t]*\[/m.test(doc)) {
+                pushFeature(features, 'router.middlewares', 'detected', docIndex);
+            }
+            // Service-level fields
+            if (/^[ \t]+sticky:[ \t]*$/m.test(doc) || /^[ \t]+sticky:[ \t]*\{/m.test(doc)) {
+                pushFeature(features, 'service.sticky.cookie', 'detected', docIndex);
+            }
+            let scheme = doc.match(/^[ \t]+scheme:[ \t]*["']?(\w+)["']?[ \t]*$/m);
+            if (scheme && (scheme[1] === 'https' || scheme[1] === 'h2c')) {
+                pushFeature(features, 'service.serversscheme', scheme[1], docIndex);
+            }
+            if (/^[ \t]+passHostHeader:[ \t]*(true|false)/m.test(doc)) {
+                pushFeature(features, 'service.passhostheader', 'detected', docIndex);
+            }
+            if (/^[ \t]+strategy:[ \t]*["']?(wrr|p2c|hrw|leasttime|RoundRobin)["']?/m.test(doc)) {
+                pushFeature(features, 'service.strategy', 'detected', docIndex);
+            }
+            if (/^[ \t]+healthCheck:[ \t]*$/m.test(doc) || /^[ \t]+healthCheck:[ \t]*\{/m.test(doc)) {
+                pushFeature(features, 'service.healthCheck', 'detected', docIndex);
+            }
+            if (/^[ \t]+serversTransport:[ \t]*\S+/m.test(doc)) {
+                pushFeature(features, 'service.serversTransport', 'detected', docIndex);
+            }
+            // TLS block — only flag if it's nested under spec, not an unrelated `tls:` deeper down
+            if (/^[ \t]+secretName:[ \t]*\S+/m.test(doc)) {
+                pushFeature(features, 'router.tls', 'detected', docIndex);
+            }
+            if (/^[ \t]+certResolver:[ \t]*\S+/m.test(doc)) {
+                pushFeature(features, 'router.tls.certresolver', 'detected', docIndex);
+            }
+            // tls.options.name reference to a TLSOption CRD — surfaces even
+            // when the TLSOption body isn't in the same manifest.
+            if (/^[ \t]+options:[ \t]*$/m.test(doc) && /^[ \t]+name:[ \t]*\S+/m.test(doc)) {
+                pushFeature(features, 'router.tls.options', 'detected', docIndex);
+            }
+        }
+
+        function extractIngressRouteTCP(doc, docIndex, features, warnings) {
+            // TCP match DSL — HostSNI / HostSNIRegexp / ClientIP / ALPN are the
+            // typical matchers; reuse the generic DSL parser. (ALPN may show up
+            // but is rare; we don't have a mapping for it yet.)
+            extractMatchRules(doc, docIndex, features, warnings);
+            if (/^[ \t]+proxyProtocol:[ \t]*$/m.test(doc) || /^[ \t]+proxyProtocol:[ \t]*\{/m.test(doc)) {
+                pushFeature(features, 'service.proxyProtocol', 'detected', docIndex);
+            }
+            if (/^[ \t]+terminationDelay:[ \t]*-?\d+/m.test(doc)) {
+                pushFeature(features, 'service.terminationDelay', 'detected', docIndex);
+            }
+            if (/^[ \t]+tls:[ \t]*true/m.test(doc)) {
+                pushFeature(features, 'service.tcp.tls', 'detected', docIndex);
+            }
+            if (/^[ \t]+passthrough:[ \t]*true/m.test(doc)) {
+                pushFeature(features, 'router.tls.passthrough', 'detected', docIndex);
+            }
+            if (/^[ \t]+secretName:[ \t]*\S+/m.test(doc)) {
+                pushFeature(features, 'router.tls', 'detected', docIndex);
+            }
+            if (/^[ \t]+certResolver:[ \t]*\S+/m.test(doc)) {
+                pushFeature(features, 'router.tls.certresolver', 'detected', docIndex);
+            }
+        }
+
+        function extractMiddleware(doc, docIndex, features) {
+            HTTP_MIDDLEWARE_KINDS.forEach(function(name) {
+                // Look for `<indent><name>:` as a direct child of spec. The
+                // typical indent is 2 or 4 spaces. We require at least 2 so we
+                // don't match metadata.name or similar.
+                let re = new RegExp('^[ \\t]{2,}' + name + ':[ \\t]*(?:$|\\{)', 'm');
+                if (re.test(doc)) pushFeature(features, name, 'detected', docIndex);
+            });
+        }
+
+        function extractMiddlewareTCP(doc, docIndex, features) {
+            TCP_MIDDLEWARE_KINDS.forEach(function(name) {
+                let re = new RegExp('^[ \\t]{2,}' + name + ':[ \\t]*(?:$|\\{)', 'm');
+                if (re.test(doc)) pushFeature(features, 'middlewaretcp.' + name, 'detected', docIndex);
+            });
+        }
+
+        function extractTraefikService(doc, docIndex, features) {
+            TRAEFIKSERVICE_KINDS.forEach(function(name) {
+                let re = new RegExp('^[ \\t]{2,}' + name + ':[ \\t]*(?:$|\\{)', 'm');
+                if (re.test(doc)) pushFeature(features, 'traefikservice.' + name, 'detected', docIndex);
+            });
+        }
+
+        function parseTraefikCRD(doc, docIndex, features, warnings) {
+            // Identify apiVersion + kind. We tolerate quoted forms and trailing
+            // whitespace. Only Traefik CRDs (traefik.io or pre-v3
+            // traefik.containo.us) are handled here; non-Traefik docs fall
+            // through to the annotation-based parser.
+            let av = doc.match(/^\s*apiVersion:\s*["']?(traefik\.(?:io|containo\.us))\/v1alpha1["']?\s*$/m);
+            let kd = doc.match(/^\s*kind:\s*["']?([A-Za-z]+)["']?\s*$/m);
+            if (!av || !kd) return;
+            if (av[1] === 'traefik.containo.us') {
+                pushFeature(features, 'apiversion.containo.us', av[1], docIndex);
+            }
+            switch (kd[1]) {
+                case 'IngressRoute':    extractIngressRoute(doc, docIndex, features, warnings); break;
+                case 'IngressRouteTCP': extractIngressRouteTCP(doc, docIndex, features, warnings); break;
+                case 'Middleware':      extractMiddleware(doc, docIndex, features); break;
+                case 'MiddlewareTCP':   extractMiddlewareTCP(doc, docIndex, features); break;
+                case 'TraefikService':  extractTraefikService(doc, docIndex, features); break;
+                case 'TLSOption':       pushFeature(features, 'tlsoption', 'detected', docIndex); break;
+                // IngressRouteUDP, ServersTransport(TCP), TLSStore aren't yet
+                // handled — they fall through silently and surface as
+                // unrecognized via the standard mapping miss path.
+            }
+        }
+
+        // Combined parser used as source.parseAnnotations: annotation-style
+        // features first (standard Ingress with traefik prefix), then CRD
+        // body scanning. Deduplicates by (key, value) so the same sticky-
+        // cookie config detected on multiple routes only renders once.
+        // Match-DSL warnings are stashed on the function object for the
+        // shared engine to surface if/when we wire a warnings channel.
+        function parseTraefikYaml(yamlText, prefix) {
+            let results = [];
+            let warnings = [];
+            // Standard Ingress annotations (traefik.ingress.kubernetes.io/*)
+            let anns = parseYamlAnnotations(yamlText, prefix);
+            anns.forEach(function(a) { results.push(a); });
+            // Per-document CRD scanning
+            let docs = yamlText.split(/^---\s*$/m);
+            docs.forEach(function(doc, docIndex) {
+                parseTraefikCRD(doc, docIndex, results, warnings);
+            });
+            // Dedup by (annotation, value)
+            let seen = new Set();
+            let deduped = [];
+            results.forEach(function(r) {
+                let key = r.annotation + '|' + (r.value || '');
+                if (!seen.has(key)) { seen.add(key); deduped.push(r); }
+            });
+            parseTraefikYaml._lastWarnings = warnings;
+            return deduped;
+        }
+
+        // Register the source with the shared analyzer engine. Must happen
+        // AFTER TRAEFIK_LOOKUP is built (above) and BEFORE any user click
+        // on Analyze. renderAnalyzerResults is a hoisted function so the
+        // forward reference resolves at registration time.
+        window.CURRENT_SOURCE = 'traefik';
+        window.MigrationSources['traefik'] = {
+            name: 'traefik',
+            prefix: 'traefik.ingress.kubernetes.io/',
+            mappings: TRAEFIK_MAPPINGS,
+            lookup: TRAEFIK_LOOKUP,
+            parseAnnotations: parseTraefikYaml,
+            parseSpec: parseTraefikSpec,
+            typeOrder: { policy: 0, virtualserver: 1, virtualserverroute: 2, transportserver: 3, globalconfiguration: 4, annotation: 5, configmap: 6, unsupported: 7 },
+            emptyResultMessage: 'No Traefik features detected.',
+            emptyResultHint: 'Make sure your YAML contains a Traefik IngressRoute, Middleware, TraefikService, or a standard Ingress with traefik.ingress.kubernetes.io/ annotations.',
+            render: function(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec) {
+                return renderAnalyzerResults(container, totalAnnotations, sorted, crdCount, unrecognized, ingressSpec);
+            }
+        };
+
+        // Analyzer action handlers (analyzeYaml/runAnalyzeYaml live in shared.js).
+        window.MigrationActions = window.MigrationActions || {};
+        Object.assign(window.MigrationActions, {
+            toggleSampleDropdown: function(el, e) { toggleSampleDropdown(e); },
+            setStrategy: function(el) { setStrategy(el.getAttribute('data-strategy'), el); },
+            loadSampleYaml: function(el) { loadSampleYaml(el.getAttribute('data-preset')); },
+            clearAnalyzer: function() { clearAnalyzer(); },
+            analyzeYaml: function() { analyzeYaml(); }
+        });
 
         function init() {
             // Version banner population

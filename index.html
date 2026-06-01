@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="NGINX on Kubernetes — official NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources.">
+    <meta name="description" content="NGINX on Kubernetes — official NGINX Ingress Controller, NGINX Gateway Fabric, migration tools for Ingress-NGINX and Traefik, and ingress2gateway resources.">
     <meta name="author" content="F5, Inc.">
     <link rel="canonical" href="https://kubernetes.nginx.org/">
     <link rel="preconnect" href="https://api.github.com" crossorigin>
     <link rel="preconnect" href="https://www.youtube-nocookie.com" crossorigin>
     <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
     <link rel="dns-prefetch" href="https://nginxblog-8de1046ff5a84f2c-endpoint.azureedge.net">
-    <meta property="og:title" content="NGINX on Kubernetes">
-    <meta property="og:description" content="NGINX on Kubernetes — official NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources.">
+    <meta property="og:title" content="NGINX on Kubernetes — Ingress Controllers, Gateway Fabric &amp; Migration Tools">
+    <meta property="og:description" content="NGINX on Kubernetes — official NGINX Ingress Controller, NGINX Gateway Fabric, migration tools for Ingress-NGINX and Traefik, and ingress2gateway resources.">
     <meta property="og:url" content="https://kubernetes.nginx.org/">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary">
@@ -22,12 +22,26 @@
         "@type": "WebSite",
         "name": "NGINX on Kubernetes",
         "url": "https://kubernetes.nginx.org/",
-        "description": "NGINX on Kubernetes — official NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources.",
+        "description": "NGINX on Kubernetes — official NGINX Ingress Controller, NGINX Gateway Fabric, migration tools for Ingress-NGINX and Traefik, and ingress2gateway resources.",
         "publisher": {
             "@type": "Organization",
             "name": "F5, Inc.",
             "url": "https://www.f5.com/"
-        }
+        },
+        "hasPart": [
+            {
+                "@type": "WebApplication",
+                "name": "Ingress-NGINX to NGINX Ingress Controller Migration Tool",
+                "url": "https://kubernetes.nginx.org/ingress-nginx-migration.html",
+                "applicationCategory": "DeveloperApplication"
+            },
+            {
+                "@type": "WebApplication",
+                "name": "Traefik to NGINX Ingress Controller Migration Tool",
+                "url": "https://kubernetes.nginx.org/traefik-migration.html",
+                "applicationCategory": "DeveloperApplication"
+            }
+        ]
     }
     </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='53' height='60' viewBox='0 0 53 60'%3E%3Cg transform='translate(-7.198 -0.359)'%3E%3Cpath fill='%23009639' d='M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544'/%3E%3Cpath fill='%23fff' d='M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z'/%3E%3C/g%3E%3C/svg%3E">
@@ -491,6 +505,13 @@
                             <span class="sidebar-link-desc">Ingress NGINX &rarr; NGINX Ingress</span>
                         </span>
                     </button></li>
+                    <li><button class="sidebar-link" data-product="traefik-migration">
+                        <span class="dot" data-color="blue"></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-name">Migration Tool</span>
+                            <span class="sidebar-link-desc">Traefik &rarr; NGINX Ingress</span>
+                        </span>
+                    </button></li>
                     <li><button class="sidebar-link" data-product="ingress2gateway">
                         <span class="dot" data-color="blue"></span>
                         <span class="sidebar-link-text">
@@ -565,6 +586,12 @@
                             <span class="project-card-badge blue">Tool</span>
                             <h3>Ingress-NGINX to NGINX Ingress Controller Migration Tool</h3>
                             <p>Interactive guide for migrating from the community Ingress-NGINX controller with 130+ annotation mappings and CRD examples.</p>
+                            <span class="card-link blue" aria-hidden="true">Learn more &rarr;</span>
+                        </a>
+                        <a class="project-card" href="#traefik-migration" data-navigate="traefik-migration">
+                            <span class="project-card-badge blue">Tool</span>
+                            <h3>Traefik to NGINX Ingress Controller Migration Tool</h3>
+                            <p>Interactive guide for migrating from Traefik Proxy &mdash; annotation, Middleware, IngressRoute, IngressRouteTCP, and TraefikService translation to NIC VirtualServer + Policy CRDs.</p>
                             <span class="card-link blue" aria-hidden="true">Learn more &rarr;</span>
                         </a>
                         <a class="project-card" href="#ingress2gateway" data-navigate="ingress2gateway">
@@ -956,6 +983,57 @@
             </div>
 
             <!-- ════════════════════════════════════════════ -->
+            <!-- Traefik Migration Tool Page                  -->
+            <!-- ════════════════════════════════════════════ -->
+            <div class="product-page" id="page-traefik-migration">
+                <div class="page-hero migration">
+                    <div class="page-hero-content">
+                        <span class="page-hero-badge migration">
+                            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                            Migration Tool
+                        </span>
+                        <h1>Traefik to NGINX Ingress Controller Migration Tool</h1>
+                        <p>Migrate from Traefik Proxy to the NGINX Ingress Controller. Interactive YAML analysis for standard <code>Ingress</code> annotations, <code>IngressRoute</code> / <code>IngressRouteTCP</code> / <code>Middleware</code> / <code>TraefikService</code> CRDs, with translation to VirtualServer, TransportServer, and Policy CRDs.</p>
+                    </div>
+                </div>
+                <div class="page-body">
+                    <div class="cta-row">
+                        <a class="cta cta-primary migration" href="traefik-migration.html">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><polyline points="12 5 19 12 12 19"/></svg>
+                            Migration Tool
+                        </a>
+                    </div>
+
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8m8 4H8m2-8H8"/></svg> Interactive YAML Analyzer</h3>
+                            <p>Paste Traefik <code>IngressRoute</code>, <code>Middleware</code>, or standard <code>Ingress</code> manifests &mdash; the analyzer extracts annotations and CRD fields and emits NIC Policy, VirtualServer, and TransportServer skeletons.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> Annotation &amp; Middleware Mappings</h3>
+                            <p>Mapping table covering Traefik router/service annotations, the full HTTP &amp; TCP middleware catalog, IngressRoute/IngressRouteTCP fields, and TraefikService kinds.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Full v3 Match-Rule Parser</h3>
+                            <p>The analyzer parses Traefik v3 router rules (<code>Host(`...`) &amp;&amp; PathPrefix(`...`) &amp;&amp; Header(`X`, `y`)</code>) and surfaces each matcher with its NIC equivalent (VirtualServer path / matches / Policy CRDs).</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> CRD Translation</h3>
+                            <p>IngressRoute <span style="white-space: nowrap;">&rarr;</span> VirtualServer, IngressRouteTCP <span style="white-space: nowrap;">&rarr;</span> TransportServer, Middleware (basicAuth, rateLimit, ipAllowList, forwardAuth) <span style="white-space: nowrap;">&rarr;</span> Policy CRDs.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> Legacy API Group Detection</h3>
+                            <p>Detects pre-v3 manifests using the deprecated <code>traefik.containo.us/v1alpha1</code> API group and flags fields that need rewriting (e.g. <code>IPWhiteList</code> &rarr; <code>IPAllowList</code>) before applying to NIC.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> Copy-Ready Output</h3>
+                            <p>Every generated Policy, VirtualServer, and TransportServer skeleton includes a copy button and TODO comments where the source manifest carries values to transcribe.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════════════ -->
             <!-- ingress2gateway Page                         -->
             <!-- ════════════════════════════════════════════ -->
             <div class="product-page" id="page-ingress2gateway">
@@ -1056,6 +1134,7 @@
             'nginx-ingress-controller': 'NGINX Ingress Controller',
             'nginx-gateway-fabric': 'NGINX Gateway Fabric',
             'migration-tool': 'Migration Tool',
+            'traefik-migration': 'Migration Tool',
             'ingress2gateway': 'ingress2gateway'
         };
 

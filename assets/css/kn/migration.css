@@ -23,21 +23,25 @@ main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding
   .kn-migration .kn-tool-sidebar { position: static; max-height: none; flex-basis: auto; width: 100%; border-right: none; border-bottom: 1px solid var(--kn-border); }
 }
 
-/* ── Tool section-nav base (ported from the old shared.css, scoped) ── */
-.kn-migration .kn-tool-sidebar .sidebar-section { padding: 0 16px; margin-bottom: 8px; }
-.kn-migration .sidebar-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--kn-text-secondary); padding: 8px 12px; }
-.kn-migration .sidebar-nav { list-style: none; }
-.kn-migration .sidebar-nav li { margin: 2px 0; }
-.kn-migration .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; text-decoration: none; color: var(--kn-text-secondary); font-size: 0.88rem; font-weight: 500; transition: background 0.2s, color 0.2s; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; }
-.kn-migration .sidebar-link:hover { background: var(--kn-bg); color: var(--kn-text); }
-.kn-migration .sidebar-link:focus-visible { outline: 2px solid var(--kn-green); outline-offset: -2px; border-radius: 8px; }
-.kn-migration .sidebar-link.active { background: var(--kn-bg); color: var(--kn-text); font-weight: 600; }
-.kn-migration .sidebar-link .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--kn-text-secondary); }
-.kn-migration .sidebar-link.active .dot { box-shadow: 0 0 0 3px var(--kn-bg); }
-.kn-migration .sidebar-link-text { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
-.kn-migration .sidebar-link-name { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--kn-text); }
-.kn-migration .sidebar-link-desc { font-size: 0.68rem; color: var(--kn-text-secondary); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.kn-migration .sidebar-divider { height: 1px; background: var(--kn-border); margin: 12px 16px; }
+/* ── Tool section-nav, styled to match the theme's sidebar menu ──
+   Uses the theme's own color vars (--color-foreground/brand/divider) and item
+   padding tokens, so it matches the theme nav in both light and dark mode. */
+.kn-migration .kn-tool-sidebar .sidebar-section { padding: 0 8px; margin-bottom: 8px; }
+.kn-migration .sidebar-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: oklch(var(--color-foreground) / 0.55); padding: 0.25rem 0.75rem 0.5rem; }
+.kn-migration .sidebar-nav, .kn-migration .sidebar-subnav { list-style: none; padding: 0; margin: 0; }
+.kn-migration .sidebar-nav > li { margin: 0; }
+.kn-migration .sidebar-link { display: flex; align-items: center; gap: 0.25rem; width: 100%; text-align: left; background: none; border: none; cursor: pointer; text-decoration: none; font-family: inherit; font-size: 0.9rem; font-weight: 400; line-height: 1.4; padding: var(--sidebar-item-padding-tb, 0.25rem) var(--sidebar-item-padding-lr, 0.75rem); margin: 2px 0; border-radius: 5px 0 0 5px; color: oklch(var(--color-foreground)); transition: background-color 0.15s, color 0.15s; }
+.kn-migration .sidebar-link:hover { background-color: oklch(var(--color-foreground) / 0.06); }
+.kn-migration .sidebar-link:focus-visible { outline: 2px solid oklch(var(--color-brand)); outline-offset: -2px; }
+.kn-migration .sidebar-link.active { color: oklch(var(--color-brand) / 1); background-color: oklch(var(--color-brand) / 0.1); font-weight: 600; }
+.kn-migration .sidebar-link .dot { display: none; }
+.kn-migration .sidebar-link-text { display: block; min-width: 0; }
+.kn-migration .sidebar-link-name { font-size: inherit; color: inherit; }
+.kn-migration .sidebar-link-desc { display: none; }
+/* Chevron for expandable items (Getting Started / Reference Guide); rotates when open. */
+.kn-migration .sidebar-link[aria-controls]::after { content: ''; flex: 0 0 auto; margin-left: auto; width: 0.45em; height: 0.45em; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform 0.2s; opacity: 0.6; }
+.kn-migration .sidebar-link[aria-controls][aria-expanded="true"]::after { transform: rotate(45deg); }
+.kn-migration .sidebar-divider { height: 1px; background: oklch(var(--color-divider)); margin: 12px 8px; }
 .kn-migration .sidebar-ext-links { padding: 0 16px; }
 .kn-migration .sidebar-ext { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: var(--kn-text); font-size: 0.82rem; transition: background 0.2s, color 0.2s; }
 .kn-migration .sidebar-ext:link, .kn-migration .sidebar-ext:visited { color: var(--kn-text); }
@@ -48,16 +52,11 @@ main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding
 .kn-migration .sidebar-tagline { margin-top: 6px; font-style: italic; opacity: 0.7; }
 
 .kn-migration .container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
-.kn-migration .sidebar-link[data-page="analyzer"] .dot { background: var(--kn-green); }
-.kn-migration .sidebar-link[data-page="reference"] .dot { background: var(--kn-green); }
-.kn-migration .sidebar-link[data-page="getting-started"] .dot { background: var(--kn-green); }
-.kn-migration .sidebar-subnav { list-style: none; padding-left: 28px; overflow: hidden; max-height: 0; transition: max-height 0.3s ease; border-left: 1px solid var(--kn-border); margin-left: 16px; margin-top: 2px; margin-bottom: 2px; }
-.kn-migration .sidebar-subnav.open { max-height: 500px; }
-.kn-migration .sidebar-subnav .sidebar-link { font-size: 0.84rem; padding: 6px 12px; color: var(--kn-text-secondary); }
-.kn-migration .sidebar-subnav .sidebar-link .dot { width: 5px; height: 5px; background: var(--kn-text-secondary); }
-.kn-migration .sidebar-subnav .sidebar-link.active .dot { background: var(--kn-green); }
-.kn-migration .sidebar-subnav .sidebar-link-name { font-size: 0.84rem; color: var(--kn-text-secondary); }
-.kn-migration .sidebar-subnav .sidebar-link.active .sidebar-link-name { color: var(--kn-text); }
+.kn-migration .sidebar-subnav { padding-inline-start: 0.75rem; margin-left: 0.5rem; border-left: 1px solid oklch(var(--color-divider)); overflow: hidden; max-height: 0; transition: max-height 0.3s ease; }
+.kn-migration .sidebar-subnav.open { max-height: 600px; }
+.kn-migration .sidebar-subnav .sidebar-link { font-size: 0.85rem; color: oklch(var(--color-foreground) / 0.78); }
+.kn-migration .sidebar-subnav .sidebar-link.active { color: oklch(var(--color-brand) / 1); background-color: oklch(var(--color-brand) / 0.1); }
+.kn-migration .sidebar-subnav .sidebar-link-name { font-size: inherit; color: inherit; }
 .kn-migration .tool-page { display: none; }
 .kn-migration .tool-page.active { display: block; }
 .kn-migration .main-inner { max-width: 1300px; padding: 40px 48px 60px; }

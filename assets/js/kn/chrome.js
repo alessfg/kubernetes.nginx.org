@@ -70,6 +70,12 @@ function showCopied(btn) {
 document.addEventListener('DOMContentLoaded', function() {
     initDarkMode();
 
+    // This hub's product pages have no doc-tree below the theme's product-selector,
+    // so the left rail looks empty with the dropdown collapsed. Open it by default so
+    // the product list is always visible as the cross-product nav. (Native <details>.)
+    var psel = document.querySelector('details.product-selector__section');
+    if (psel) psel.setAttribute('open', '');
+
     var darkToggle = document.getElementById('darkToggle');
     if (darkToggle) {
         darkToggle.addEventListener('click', function() {

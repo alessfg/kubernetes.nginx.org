@@ -8,6 +8,14 @@
 .kn-main *, .kn-main *::before, .kn-main *::after { box-sizing: border-box; }
 .kn-main h1, .kn-main h2, .kn-main h3, .kn-main p, .kn-main ul { margin: 0; }
 
+/* Escape the theme's docs .content grid: it centers at max-width 88rem, double-pads,
+   and (>=55rem) forces every block into a 12-col grid jammed in columns 1-7 (~58%).
+   Make the landing full-bleed like the tool and let the hero/page-body manage their
+   own width/padding (matches the original full-width hero + 1000px page-body). */
+main.kn-main.content { max-width: none; width: 100%; justify-self: stretch; padding: 0; }
+.kn-main.content > * { display: block; }
+.kn-main.content > * > *:not([data-grid]) { grid-column: auto; }
+
 /* ── Hero ── */
 .kn-main .page-hero { padding: 32px 48px 64px; position: relative; overflow: hidden; }
 .kn-main .page-hero::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 25%; background: linear-gradient(to bottom, transparent, var(--kn-bg)); pointer-events: none; z-index: 1; }

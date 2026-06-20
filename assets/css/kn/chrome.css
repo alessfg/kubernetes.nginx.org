@@ -84,6 +84,9 @@
 :is(html, body).dark-mode .sidebar,
 :is(html, body).dark-mode .header,
 :is(html, body).dark-mode .footer { background: oklch(var(--color-background)); }
+/* The sidebar product-selector bar draws its text from --color-background (white in
+   light mode) on a green --color-brand fill; keep it light in dark mode for contrast. */
+:is(html, body).dark-mode .product-selector__toggle { color: #fff; }
 
 @media (prefers-reduced-motion: reduce) {
     .kn-main *, .kn-main *::before, .kn-main *::after,

@@ -13,8 +13,10 @@
 .grid-container:has(.kn-fullbleed) .sidebar,
 .grid-container:has(.kn-fullbleed) .header__control--sidebar { display: none; }
 main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding: 0; }
-.kn-migration .kn-migration-shell { display: flex; align-items: flex-start; }
-.kn-migration .kn-tool-sidebar { display: flex; flex-direction: column; flex: 0 0 260px; align-self: stretch; background: var(--kn-surface); border-right: 1px solid var(--kn-border); padding: 20px 0; position: sticky; top: 56px; max-height: calc(100vh - 56px); overflow-y: auto; }
+/* gap:0 cancels the theme's `.content > * { display:grid; gap }` leaking into the flex shell. */
+.kn-migration .kn-migration-shell { display: flex; gap: 0; align-items: flex-start; }
+/* Sticky offset must match the theme header height (--header-height: 4rem/64px), not 56px. */
+.kn-migration .kn-tool-sidebar { display: flex; flex-direction: column; flex: 0 0 260px; align-self: stretch; background: var(--kn-surface); border-right: 1px solid var(--kn-border); padding: 20px 0; position: sticky; top: var(--header-height, 4rem); max-height: calc(100vh - var(--header-height, 4rem)); overflow-y: auto; }
 .kn-migration .kn-tool-main { flex: 1 1 auto; min-width: 0; }
 @media (max-width: 900px) {
   .kn-migration .kn-migration-shell { flex-direction: column; }
@@ -103,7 +105,7 @@ main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding
 .kn-migration .comparison-block h4 { padding: 10px 15px; margin: 0; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
 .kn-migration .comparison-block.old h4 { background: #ffebee; color: #c62828; }
 .kn-migration .comparison-block.new h4 { background: #e8f5e9; color: #2e7d32; }
-.kn-migration .comparison-copy-btn { background: rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.12); color: inherit; padding: 2px 10px; border-radius: 4px; font-size: 0.72rem; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; font-family: var(--kn-font); }
+.kn-migration .comparison-copy-btn { background: rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.12); color: inherit; padding: 2px 10px; border-radius: 4px; font-size: 0.72rem; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; font-family: inherit; }
 .kn-migration .comparison-copy-btn:hover { opacity: 1; }
 .kn-migration .comparison-copy-btn.copied { background: #4caf50; color: white; border-color: #4caf50; opacity: 1; }
 .kn-migration .comparison-block pre { margin: 0; border-radius: 0 0 8px 8px; }
@@ -132,7 +134,7 @@ main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding
 .kn-migration .info-box.warning code { background: rgba(230,81,0,0.1); color: #bf4000; }
 .kn-migration .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
 .kn-migration .controls input[type="search"] { padding: 10px 16px; border: 2px solid var(--kn-border); border-radius: 6px; font-size: 0.9rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; min-width: 240px; flex: 1; max-width: 400px; }
-.kn-migration .controls select { padding: 10px 12px; border: 2px solid var(--kn-border); border-radius: 6px; font-size: 0.85rem; font-family: var(--kn-font); background: var(--kn-surface); color: var(--kn-text); outline: none; cursor: pointer; transition: border-color 0.2s; }
+.kn-migration .controls select { padding: 10px 12px; border: 2px solid var(--kn-border); border-radius: 6px; font-size: 0.85rem; font-family: inherit; background: var(--kn-surface); color: var(--kn-text); outline: none; cursor: pointer; transition: border-color 0.2s; }
 .kn-migration .controls select:focus { border-color: var(--kn-green-text); }
 .kn-migration .controls input[type="search"]:focus { border-color: var(--kn-green-text); box-shadow: 0 0 0 3px rgba(0,150,57,0.12); }
 .kn-migration .controls input[type="search"]::placeholder { color: #767676; }
@@ -416,7 +418,7 @@ main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding
 :is(html, body).dark-mode .kn-migration .analyzer-drop-label { background: var(--kn-surface); }
 :is(html, body).dark-mode .kn-migration .controls input[type="search"] { background: var(--kn-surface); color: var(--kn-text); border-color: var(--kn-border); }
 .kn-migration .annotation-tooltip { position: relative; cursor: help; }
-.kn-migration .annotation-tooltip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; white-space: nowrap; max-width: 320px; white-space: normal; line-height: 1.4; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-family: var(--kn-font); }
+.kn-migration .annotation-tooltip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; white-space: nowrap; max-width: 320px; white-space: normal; line-height: 1.4; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-family: inherit; }
 .kn-migration .annotation-tooltip::before { content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #333; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 20; }
 .kn-migration .annotation-tooltip:hover::after, .kn-migration .annotation-tooltip:hover::before, .kn-migration .annotation-tooltip:focus::after, .kn-migration .annotation-tooltip:focus::before { opacity: 1; }
 .kn-migration .sample-dropdown { position: relative; display: inline-block; }
@@ -436,7 +438,7 @@ main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding
 .kn-migration .strategy-toggle { display: flex; align-items: center; gap: 12px; margin: 16px 0; padding: 12px 16px; background: var(--kn-surface); border: 1px solid var(--kn-border); border-radius: 8px; font-size: 0.85rem; }
 .kn-migration .strategy-toggle-label { font-weight: 600; color: var(--kn-text); white-space: nowrap; }
 .kn-migration .strategy-toggle-options { display: flex; gap: 0; border: 1px solid var(--kn-border); border-radius: 6px; overflow: hidden; }
-.kn-migration .strategy-option { padding: 6px 14px; cursor: pointer; font-size: 0.82rem; font-weight: 500; border: none; background: none; color: var(--kn-text-secondary); transition: background 0.2s, color 0.2s; font-family: var(--kn-font); }
+.kn-migration .strategy-option { padding: 6px 14px; cursor: pointer; font-size: 0.82rem; font-weight: 500; border: none; background: none; color: var(--kn-text-secondary); transition: background 0.2s, color 0.2s; font-family: inherit; }
 .kn-migration .strategy-option.active { background: var(--kn-green-dark); color: #fff; }
 .kn-migration .strategy-option:not(.active):hover { background: var(--kn-bg); }
 .kn-migration .strategy-desc { font-size: 0.78rem; color: var(--kn-text-secondary); margin-left: 4px; }
@@ -449,7 +451,7 @@ main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding
 :is(html, body).dark-mode .kn-migration .scroll-to-top { background: var(--kn-green); color: var(--kn-bg); }
 :is(html, body).dark-mode .kn-migration .scroll-to-top:hover { background: #81c784; }
 @media print{
-.kn-migration .topbar, .kn-tool-sidebar, .kn-migration .sidebar-backdrop, .kn-migration .analyzer-actions, .kn-migration .analyzer-input-status, .kn-migration .analyzer-drop-zone, .kn-migration .analyzer-copy-btn, .kn-migration .analyzer-copy-all, .kn-migration .analyzer-download-btn, .kn-migration .analyzer-edit-btn, .kn-migration .analyzer-yaml-expand, .kn-migration .analyzer-empty-state, .kn-migration .controls, .kn-migration .analyzer-export-actions, .kn-migration .comparison-copy-btn, .kn-migration .copy-btn { display: none !important; }
+.header, .footer, .kn-migration .kn-tool-sidebar, .kn-migration .analyzer-actions, .kn-migration .analyzer-input-status, .kn-migration .analyzer-drop-zone, .kn-migration .analyzer-copy-btn, .kn-migration .analyzer-copy-all, .kn-migration .analyzer-download-btn, .kn-migration .analyzer-edit-btn, .kn-migration .analyzer-yaml-expand, .kn-migration .analyzer-empty-state, .kn-migration .controls, .kn-migration .analyzer-export-actions, .kn-migration .comparison-copy-btn, .kn-migration .copy-btn { display: none !important; }
 .kn-tool-main { margin-left: 0 !important; }
 .kn-migration section { box-shadow: none; break-inside: avoid; }
 .kn-migration .analyzer-yaml-output { background: #f5f5f5 !important; color: #333 !important; border: 1px solid #ccc; }

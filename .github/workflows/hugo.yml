@@ -1,0 +1,76 @@
+name: Deploy Hugo site to Pages
+
+# Fork-only deploy of the Hugo rebuild. One-time setup on the fork:
+#   Settings -> Pages -> Source = "GitHub Actions".
+# The build's baseURL is taken from the Pages URL (configure-pages), so it works
+# at the project subpath (alessfg.github.io/kubernetes.nginx.org/) or a custom domain.
+
+on:
+  push:
+    branches: [feat/hugo-theme-migration]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HUGO_VERSION: "0.152.2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # for .GitInfo / .Lastmod
+
+      - name: Set up Go (required for Hugo Modules)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: "**/go.sum"
+
+      - name: Install Hugo Extended
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: ${{ env.HUGO_VERSION }}
+          extended: true
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Resolve theme module
+        run: hugo mod get github.com/nginxinc/nginx-hugo-theme/v2@v2.0.9
+
+      - name: Build
+        env:
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: hugo --minify --gc -e production --baseURL "${BASE_URL}/"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

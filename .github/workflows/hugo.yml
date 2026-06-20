@@ -7,7 +7,7 @@ name: Deploy Hugo site to Pages
 
 on:
   push:
-    branches: [feat/hugo-theme-migration]
+    branches: [main, feat/hugo-theme-migration]
   workflow_dispatch:
 
 permissions:
@@ -65,6 +65,10 @@ jobs:
           path: ./public
 
   deploy:
+    # GitHub Pages' environment protection only allows deploys from the default
+    # branch, so deploy from the fork's main (build still validates on the feature
+    # branch). The fork's main is independent of upstream production.
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:

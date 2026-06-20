@@ -60,9 +60,30 @@
 :is(html, body).dark-mode .kn-dark-icon-moon { display: none; }
 :is(html, body).dark-mode .kn-dark-icon-sun { display: block; }
 
-/* ── Dark mode for the content area (theme chrome remains light) ── */
+/* ── Dark mode for the content area ── */
 :is(html, body).dark-mode .kn-main,
 :is(html, body).dark-mode .kn-migration { background: var(--kn-bg); color: var(--kn-text); }
+
+/* ── Dark mode for the theme chrome ──
+   The theme is light-only but variable-driven: it derives header/sidebar/footer
+   colors from OKLCH component vars defined in :root. Override those component
+   values under .dark-mode so the stock chrome darkens cohesively. The flash
+   script sets .dark-mode on <html>, so html.dark-mode wins over :root. */
+:is(html, body).dark-mode {
+    --color-background: 0.19 0.008 264;
+    --color-foreground: 0.92 0 0;
+    --color-divider: 0.30 0.004 264;
+    --color-footer-text: 0.92 0 0 / 65%;
+    --color-shadow: 0.10 0 0;
+    --color-product-title: 0.80 0 0;
+    --color-codeblock-background: 0.16 0.006 264;
+    --color-codeblock-border: 0.35 0 0;
+}
+/* Safety net for chrome surfaces that may not read the var directly. */
+:is(html, body).dark-mode .grid-container,
+:is(html, body).dark-mode .sidebar,
+:is(html, body).dark-mode .header,
+:is(html, body).dark-mode .footer { background: oklch(var(--color-background)); }
 
 @media (prefers-reduced-motion: reduce) {
     .kn-main *, .kn-main *::before, .kn-main *::after,

@@ -1,0 +1,7 @@
+{{ define "main" }}
+{{/* Full-bleed app layout: the .kn-fullbleed marker triggers the theme grid to
+     collapse its left sidebar (see kn/migration.css), giving the tool full width. */}}
+<main class="content kn-migration kn-fullbleed" id="maincontent" data-testid="content">
+    {{ partial "migration-tool-body.html" . }}
+</main>
+{{ end }}

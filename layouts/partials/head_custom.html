@@ -3,6 +3,12 @@
      (must run before paint) and PWA manifest/icon. */}}
 <script>try{var s=localStorage.getItem('darkMode');if(s==='1'||(s===null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark-mode')}catch(e){}</script>
 
+{{ if or .Params.kn_landing .Params.kn_migration }}
+{{/* Build-time version fallbacks from data/versions.yaml (single source). site.js
+     and migration.js read these; the runtime GitHub fetch still upgrades them live. */}}
+<script>window.NGINX_K8S_VERSIONS = {{ site.Data.versions | jsonify | safeJS }};</script>
+{{ end }}
+
 {{ if .Params.kn_migration }}
 {{/* Migration-tool data injected at build time from data/ — the analyzer's single
      source of truth. crdInstall is recomputed in JS so it tracks version bumps. */}}

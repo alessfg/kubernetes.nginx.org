@@ -1,0 +1,26 @@
+# Single source of truth for versions in the Hugo build. Injected at build time as
+# window.NGINX_K8S_VERSIONS (site.js fallbacks + migration.js consts) and consumed
+# server-side by the product compat tables. The runtime GitHub-release fetch still
+# upgrades the release/helm fields live; these are the build-time fallbacks.
+#
+# Release-update checklist: editing this file updates the version pills (runtime),
+# the migration tool's NIC/Ingress-NGINX version references, and the compat tables.
+nic:
+  release: v5.5.1
+  helm: v2.6.1
+  repo: nginx/kubernetes-ingress
+  nginxOss: "1.31.2"
+  k8s: ["1.34", "1.35", "1.36"]   # latest 3 K8s minors (upstream support window)
+ngf:
+  release: v2.6.5
+  helm: v2.6.5
+  repo: nginx/nginx-gateway-fabric
+  nginxOss: "1.31.2"
+  k8s: ["1.34", "1.35", "1.36"]
+  gatewayApi: v1.5.1
+i2g:
+  release: v1.1.0
+  repo: kubernetes-sigs/ingress2gateway
+ingressNginx:                       # the community controller (migration tool reference)
+  release: v1.15.1
+  repo: kubernetes/ingress-nginx

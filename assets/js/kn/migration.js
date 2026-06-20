@@ -14,9 +14,10 @@
         'use strict';
         // Single source of truth for the controller versions this tool is documented against.
         // Bump these when updating the Version Reference (and also update the version pills/install URLs in index.html).
-        const NIC_VERSION = 'v5.5.1';
-        const INGRESS_NGINX_VERSION = 'v1.15.1';
-        const NIC_HELM_VERSION = '2.6.1';
+        const _KNV = (typeof window !== 'undefined' && window.NGINX_K8S_VERSIONS) || {};
+        const NIC_VERSION = (_KNV.nic && _KNV.nic.release) || 'v5.5.1';
+        const INGRESS_NGINX_VERSION = (_KNV.ingressNginx && _KNV.ingressNginx.release) || 'v1.15.1';
+        const NIC_HELM_VERSION = (_KNV.nic && _KNV.nic.helm) ? String(_KNV.nic.helm).replace(/^v/, '') : '2.6.1';
         const NIC_CRD_INSTALL_CMD = 'kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/' + NIC_VERSION + '/deploy/crds.yaml';
         const NIC_HELM_INSTALL_CMD = 'helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version ' + NIC_HELM_VERSION + ' --set controller.enableCustomResources=true';
         const NIC_RELEASE_URL = 'https://github.com/nginx/kubernetes-ingress/releases/tag/' + NIC_VERSION;

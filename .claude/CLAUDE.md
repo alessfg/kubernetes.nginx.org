@@ -131,6 +131,13 @@ When bumping the referenced version, audit the release notes to identify genuine
 
 ### Release update checklist
 
+> **Hugo build (fork `feat/hugo-theme-migration`):** versions are consolidated in a
+> single source — **`data/versions.yaml`**. Editing that one file updates the version
+> pills (at runtime), the migration tool's NIC/Ingress-NGINX references, and the NIC/NGF
+> compatibility tables (rendered server-side). The checklist below applies to the legacy
+> static site (`index.html` / `ingress-nginx-migration.html`), which stays in place until
+> the production cutover.
+
 When updating the sites for a new release, update **all** of the following.
 
 **Kubernetes compatibility (applies to both NIC and NGF):** the compat tables always show the **latest 3 Kubernetes minor versions** (matches upstream's support window — verify via `kubernetes/kubernetes` releases), not the project's full supported range. Bump these alongside any release update if a newer K8s minor has shipped.

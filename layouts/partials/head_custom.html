@@ -3,6 +3,15 @@
      (must run before paint) and PWA manifest/icon. */}}
 <script>try{var s=localStorage.getItem('darkMode');if(s==='1'||(s===null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark-mode')}catch(e){}</script>
 
+{{ if .Params.kn_migration }}
+{{/* Migration-tool data injected at build time from data/ — the analyzer's single
+     source of truth. crdInstall is recomputed in JS so it tracks version bumps. */}}
+<script>
+window.KN_ANNOTATIONS = {{ site.Data.annotations | jsonify | safeJS }};
+window.KN_PRESETS = {{ site.Data.presets | jsonify | safeJS }};
+</script>
+{{ end }}
+
 {{ $chrome := resources.Get "css/kn/chrome.css" | minify | fingerprint "sha512" }}
 <link rel="stylesheet" href="{{ $chrome.RelPermalink }}" integrity="{{ $chrome.Data.Integrity }}">
 

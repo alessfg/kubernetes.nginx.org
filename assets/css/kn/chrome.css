@@ -88,6 +88,11 @@
    light mode) on a green --color-brand fill; keep it light in dark mode for contrast. */
 :is(html, body).dark-mode .product-selector__toggle { color: #fff; }
 
+/* Landing/product pages: the (auto-opened) product-selector is the product nav.
+   Hide the theme's doc-tree below it — it's empty on product pages and duplicates
+   the selector list on the home page. (The tool page hides the whole sidebar.) */
+[data-kn-landing] .sidebar__content__wrapper { display: none !important; }
+
 @media (prefers-reduced-motion: reduce) {
     .kn-main *, .kn-main *::before, .kn-main *::after,
     .kn-migration *, .kn-migration *::before, .kn-migration *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

@@ -27,7 +27,7 @@
 
   </head>
 
-  <body id="body"{{ if .IsHome }} data-kn-home="true"{{ end }}>
+  <body id="body"{{ if .IsHome }} data-kn-home="true"{{ end }}{{ if .Params.kn_landing }} data-kn-landing="true"{{ end }}>
     <div class="sr-only" aria-live="polite" id="page-announce"></div>
     <input type="checkbox" id="search-standalone-header-panel" class="search-standalone-header-panel" hidden/>
     <input type="checkbox" id="sidebar-panel" class="sidebar-panel" hidden/>

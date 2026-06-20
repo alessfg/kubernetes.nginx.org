@@ -9,9 +9,8 @@
 {{ $browserIncompatibility := resources.Get "/js/browser-incompatibility.js" | fingerprint "sha512" }}
 <script src="{{ $browserIncompatibility.RelPermalink }}" type="text/javascript"></script>
 
-<!-- load site dropdown js -->
-{{ $siteDropdown := resources.Get "/js/site-dropdown.js" | fingerprint "sha512" }}
-<script src="{{ $siteDropdown.RelPermalink }}" type="text/javascript"></script>
+<!-- site-dropdown.js omitted: it unconditionally wires #navbar-sites-button, which
+     doesn't exist without an f5-sites dropdown (see header.html), throwing on every page. -->
 
 <!-- load tabs js -->
 {{ $tabs := resources.Get "/js/tabs.js" | fingerprint "sha512" }}

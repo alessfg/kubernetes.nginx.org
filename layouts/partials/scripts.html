@@ -1,0 +1,48 @@
+{{/* Override of the theme scripts.html — stock theme JS, then our bespoke JS
+     appended after (so copyToClipboard etc. are defined before the page script). */}}
+
+<!-- load code copy v2 js -->
+{{ $codecopyv2 := resources.Get "/js/code-copy-v2.js" | fingerprint "sha512" }}
+<script src="{{ $codecopyv2.RelPermalink }}" type="text/javascript"></script>
+
+<!-- load browser incompatibility js -->
+{{ $browserIncompatibility := resources.Get "/js/browser-incompatibility.js" | fingerprint "sha512" }}
+<script src="{{ $browserIncompatibility.RelPermalink }}" type="text/javascript"></script>
+
+<!-- load site dropdown js -->
+{{ $siteDropdown := resources.Get "/js/site-dropdown.js" | fingerprint "sha512" }}
+<script src="{{ $siteDropdown.RelPermalink }}" type="text/javascript"></script>
+
+<!-- load tabs js -->
+{{ $tabs := resources.Get "/js/tabs.js" | fingerprint "sha512" }}
+<script src="{{ $tabs.RelPermalink }}" type="text/javascript"></script>
+
+<!-- load mermaid.js -->
+{{ if .Page.Store.Get "hasMermaid" }}
+{{ $mermaid := resources.Get "js/mermaid.min.js" | fingerprint "sha512" }}
+<script src="{{ $mermaid.RelPermalink }}" type="text/javascript" integrity="{{ $mermaid.Data.Integrity }}"></script>
+{{ end }}
+
+<!-- load data-table.js (conditional) -->
+{{ if .Page.Store.Get "hasDataTable" }}
+{{ $dataTable := resources.Get "js/data-table.js" | minify | fingerprint "sha512" }}
+<script src="{{ $dataTable.RelPermalink }}" type="text/javascript" integrity="{{ $dataTable.Data.Integrity }}"></script>
+{{ end }}
+
+<!-- Load Sidebar v2 javascript -->
+{{ $jsSidebarV2 := resources.Get "js/sidebar-v2.js" | minify | fingerprint "sha512" }}
+<script src="{{ $jsSidebarV2.RelPermalink }}" type="text/javascript" integrity="{{ $jsSidebarV2.Data.Integrity }}"></script>
+
+{{/* ── Bespoke JS (kn/) — loaded after theme JS ── */}}
+{{ $chrome := resources.Get "js/kn/chrome.js" | minify | fingerprint "sha512" }}
+<script src="{{ $chrome.RelPermalink }}" integrity="{{ $chrome.Data.Integrity }}" type="text/javascript"></script>
+
+{{ if .Params.kn_landing }}
+{{ $site := resources.Get "js/kn/site.js" | minify | fingerprint "sha512" }}
+<script src="{{ $site.RelPermalink }}" integrity="{{ $site.Data.Integrity }}" type="text/javascript"></script>
+{{ end }}
+
+{{ if .Params.kn_migration }}
+{{ $mig := resources.Get "js/kn/migration.js" | minify | fingerprint "sha512" }}
+<script src="{{ $mig.RelPermalink }}" integrity="{{ $mig.Data.Integrity }}" type="text/javascript"></script>
+{{ end }}

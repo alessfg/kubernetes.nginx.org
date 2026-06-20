@@ -11,4 +11,4 @@ baseURL = "https://alessfg.github.io/kubernetes.nginx.org/"
   [params.featureFlags]
     disable_coveo = true
     disable_qualtrics = true
-    disable_rich_meta = false
+    disable_rich_meta = true

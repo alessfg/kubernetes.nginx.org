@@ -5,6 +5,8 @@ languageCode = "en-us"
 title = "NGINX - Networking for Kubernetes"
 enableGitInfo = true
 enableRobotsTXT = true
+# No taxonomies on this hub site — drop the stray /categories/ and /tags/ pages.
+disableKinds = ["taxonomy", "term"]
 
 # Import the docs.nginx.com theme as a Hugo Module (pinned to v2.0.9 in go.mod).
 [module]
@@ -38,11 +40,12 @@ enableRobotsTXT = true
   # buildtype gates the theme's TrustArc/Tealium/GTM analytics partials off for the fork.
   buildtype = "package"
   github_repo = "https://github.com/alessfg/kubernetes.nginx.org"
+  # The theme adds noindex to section/taxonomy kinds by default; our product pages are
+  # sections and must stay indexable, so exclude "section".
+  noindex_kinds = ["taxonomy", "taxonomyTerm"]
   # Feature flags: disable docs.nginx.com-only services so the theme runs standalone.
-  disable_coveo = true
-  disable_qualtrics = true
-  disable_rich_meta = false
+  # disable_rich_meta=true suppresses the theme's OG/Twitter so we emit our own (meta/inject.html).
   [params.featureFlags]
     disable_coveo = true
     disable_qualtrics = true
-    disable_rich_meta = false
+    disable_rich_meta = true

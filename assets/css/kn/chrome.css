@@ -1,0 +1,70 @@
+/* shared-chrome.css — bespoke design tokens + dark-mode + the injected dark-mode
+   toggle, shared by the landing pages and the migration tool. Loaded through Hugo
+   Pipes from head_custom.html (after the theme CSS) so it wins on specificity ties.
+
+   The theme (nginx-hugo-theme) owns the topbar/sidebar/footer chrome, so all the
+   old bespoke chrome CSS is dropped. What remains here is namespaced to --kn-* to
+   avoid colliding with the theme's own design tokens. Component styles live in the
+   per-page files (index.css / migration.css), scoped under .kn-main / .kn-migration. */
+
+/* ── Design tokens (namespaced --kn-*) ── */
+:root {
+    --kn-green: #009639;
+    --kn-green-dark: #006b2b;
+    --kn-green-text: #006b2b;
+    --kn-blue: #0072B0;
+    --kn-blue-dark: #005e91;
+    --kn-purple: #62228B;
+    --kn-purple-dark: #4e1a6f;
+    --kn-teal: #00838f;
+    --kn-teal-dark: #006064;
+    --kn-red: #c62828;
+    --kn-red-dark: #a01c1c;
+    --kn-orange: #F29A36;
+    --kn-orange-dark: #d88a2e;
+    --kn-bg: #f4f5f6;
+    --kn-surface: #ffffff;
+    --kn-text: #1a1a2e;
+    --kn-text-secondary: #555;
+    --kn-border: #e2e4e8;
+    --kn-radius: 12px;
+    --kn-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    --kn-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+:is(html, body).dark-mode {
+    --kn-bg: #0f1117;
+    --kn-surface: #1a1c25;
+    --kn-text: #e4e6eb;
+    --kn-text-secondary: #9ca3af;
+    --kn-border: #2a2d38;
+    --kn-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    --kn-green: #34d058;
+    --kn-green-text: #34d058;
+    --kn-blue: #58a6ff;
+    --kn-purple: #b07ee8;
+    --kn-teal: #4dd0e1;
+    --kn-red: #f48fb1;
+    --kn-orange: #ffb74d;
+}
+
+/* ── Accessibility helper (theme also ships .sr-only; harmless to repeat) ── */
+.kn-main .sr-only,
+.kn-migration .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* ── Dark-mode toggle (injected into the theme header) ── */
+.kn-dark-toggle { background: none; border: 1px solid var(--kn-border); border-radius: 6px; padding: 5px 9px; cursor: pointer; color: var(--kn-text); font-size: 0.95rem; transition: background 0.2s, border-color 0.2s; display: inline-flex; align-items: center; gap: 5px; min-width: 40px; min-height: 40px; justify-content: center; }
+.kn-dark-toggle:hover { background: var(--kn-bg); }
+.kn-dark-toggle:focus-visible { outline: 2px solid var(--kn-green); outline-offset: 2px; }
+.kn-dark-toggle svg { width: 16px; height: 16px; }
+.kn-dark-icon-sun { display: none; }
+:is(html, body).dark-mode .kn-dark-icon-moon { display: none; }
+:is(html, body).dark-mode .kn-dark-icon-sun { display: block; }
+
+/* ── Dark mode for the content area (theme chrome remains light) ── */
+:is(html, body).dark-mode .kn-main,
+:is(html, body).dark-mode .kn-migration { background: var(--kn-bg); color: var(--kn-text); }
+
+@media (prefers-reduced-motion: reduce) {
+    .kn-main *, .kn-main *::before, .kn-main *::after,
+    .kn-migration *, .kn-migration *::before, .kn-migration *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

@@ -1,0 +1,59 @@
+{{/* Custom head injection. The theme's rich_meta (OG/Twitter) is disabled
+     (disable_rich_meta=true) so we emit our own for exact parity + JSON-LD. */}}
+<meta name="theme-color" content="#009639">
+<meta name="author" content="{{ .Site.Params.author | default "F5, Inc." }}">
+<link rel="preconnect" href="https://api.github.com" crossorigin>
+<link rel="preconnect" href="https://www.youtube-nocookie.com" crossorigin>
+<link rel="preconnect" href="https://i.ytimg.com" crossorigin>
+<link rel="dns-prefetch" href="https://nginxblog-8de1046ff5a84f2c-endpoint.azureedge.net">
+
+{{- $desc := .Description | default .Site.Params.description -}}
+{{- $ogTitle := .Title -}}
+{{- if .IsHome -}}{{- $ogTitle = .Site.Title -}}{{- else -}}{{- $ogTitle = printf "%s | %s" .Title .Site.Title -}}{{- end -}}
+{{- $ogImage := "img/og-image.png" | absURL -}}
+
+<meta property="og:title" content="{{ $ogTitle }}">
+<meta property="og:description" content="{{ $desc }}">
+<meta property="og:url" content="{{ .Permalink }}">
+<meta property="og:type" content="{{ if .IsHome }}website{{ else }}article{{ end }}">
+<meta property="og:image" content="{{ $ogImage }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ $ogImage }}">
+
+{{ if .IsHome }}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": {{ .Site.Title | jsonify }},
+    "url": {{ .Site.BaseURL | jsonify }},
+    "description": {{ $desc | jsonify }},
+    "publisher": {
+        "@type": "Organization",
+        "name": "F5, Inc.",
+        "url": "https://www.f5.com/"
+    }
+}
+</script>
+{{ else if eq (.Params.kn_schema | default "") "WebApplication" }}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": {{ .Title | jsonify }},
+    "url": {{ .Permalink | jsonify }},
+    "description": {{ $desc | jsonify }},
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "All",
+    "browserRequirements": "Requires JavaScript",
+    "isAccessibleForFree": true,
+    "publisher": {
+        "@type": "Organization",
+        "name": "F5, Inc.",
+        "url": "https://www.f5.com/"
+    }
+}
+</script>
+{{ end }}

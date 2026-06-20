@@ -1,0 +1,78 @@
+{{ define "main" }}
+<main class="kn-main content" id="maincontent" data-testid="content">
+    {{ partial "kn-icon-sprite.html" . }}
+
+    <div class="page-hero home">
+        <div class="page-hero-content">
+            <span class="page-hero-badge home">
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                NGINX on Kubernetes
+            </span>
+            <h1>Networking for Kubernetes</h1>
+            <p>Your hub for NGINX's Kubernetes ecosystem — Ingress controllers, Gateway API implementations, migration tools, and conversion utilities.</p>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <h2 class="section-heading">Explore the Ecosystem</h2>
+        <div class="project-grid">
+            {{ range site.Data.products }}
+            <a class="project-card" href="{{ .url | relURL }}">
+                <span class="project-card-badge {{ .badgeColor }}">{{ .badge }}</span>
+                <h3>{{ .title }}</h3>
+                <p>{{ .desc }}</p>
+                <span class="card-link {{ if eq .linkColor "blue" }}blue{{ end }}" aria-hidden="true">Learn more &rarr;</span>
+            </a>
+            {{ end }}
+        </div>
+
+        <h2 class="section-heading">Featured Content</h2>
+        <div class="feature-grid">
+            <div class="feature-card feature-card-flush" data-yt-id="hA3bb_5jGJw" data-yt-title="CNCF On-Demand: Ingress-NGINX Is Retiring, NGINX Is Not">
+                <div class="video-embed video-poster" role="button" tabindex="0" aria-label="Play video: CNCF On-Demand: Ingress-NGINX Is Retiring, NGINX Is Not">
+                    <img class="video-poster-img" src="https://i.ytimg.com/vi/hA3bb_5jGJw/maxresdefault.jpg" alt="" loading="lazy" decoding="async">
+                    <span class="video-poster-play" aria-hidden="true">
+                        <svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74a8.21 8.21 0 0 0-5.79-5.81C55.59.5 34 .5 34 .5s-21.59 0-26.73 1.43A8.21 8.21 0 0 0 1.48 7.74 85.86 85.86 0 0 0 0 24a85.86 85.86 0 0 0 1.48 16.26 8.21 8.21 0 0 0 5.79 5.81C12.41 47.5 34 47.5 34 47.5s21.59 0 26.73-1.43a8.21 8.21 0 0 0 5.79-5.81A85.86 85.86 0 0 0 68 24a85.86 85.86 0 0 0-1.48-16.26z" fill="#f00"/><path d="M45.01 24L27 14v20z" fill="#fff"/></svg>
+                    </span>
+                </div>
+                <div class="feature-card-body">
+                    <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--kn-green)" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Featured Video</h3>
+                    <p class="feature-card-eyebrow">CNCF On-Demand</p>
+                    <p>Ingress-NGINX Is Retiring, NGINX Is Not</p>
+                </div>
+            </div>
+            <div class="feature-card feature-card-flush" data-yt-id="gJrB3-w2_tM" data-yt-title="Cutting Through the Kubernetes Confusion: NGINX Ingress, Gateway Fabric, and What's Next">
+                <div class="video-embed video-poster" role="button" tabindex="0" aria-label="Play video: Cutting Through the Kubernetes Confusion: NGINX Ingress, Gateway Fabric, and What's Next">
+                    <img class="video-poster-img" src="https://i.ytimg.com/vi/gJrB3-w2_tM/maxresdefault.jpg" alt="" loading="lazy" decoding="async">
+                    <span class="video-poster-play" aria-hidden="true">
+                        <svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74a8.21 8.21 0 0 0-5.79-5.81C55.59.5 34 .5 34 .5s-21.59 0-26.73 1.43A8.21 8.21 0 0 0 1.48 7.74 85.86 85.86 0 0 0 0 24a85.86 85.86 0 0 0 1.48 16.26 8.21 8.21 0 0 0 5.79 5.81C12.41 47.5 34 47.5 34 47.5s21.59 0 26.73-1.43a8.21 8.21 0 0 0 5.79-5.81A85.86 85.86 0 0 0 68 24a85.86 85.86 0 0 0-1.48-16.26z" fill="#f00"/><path d="M45.01 24L27 14v20z" fill="#fff"/></svg>
+                    </span>
+                </div>
+                <div class="feature-card-body">
+                    <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--kn-green)" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Featured Video</h3>
+                    <p class="feature-card-eyebrow">Cutting Through the Kubernetes Confusion</p>
+                    <p>NGINX Ingress, Gateway Fabric, and What's Next</p>
+                </div>
+            </div>
+            <a class="feature-card feature-card-flush" href="https://blog.nginx.org/blog/the-nginx-kubernetes-open-source-roadmap-first-half-of-2026" target="_blank" rel="noopener">
+                <img class="feature-card-thumb" src="https://nginxblog-8de1046ff5a84f2c-endpoint.azureedge.net/blobnginxbloga72cde487e/wp-content/uploads/2026/03/image-1.png" alt="NGINX Kubernetes Open Source Roadmap" loading="lazy">
+                <div class="feature-card-body">
+                    <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--kn-green)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Featured Blog</h3>
+                    <p class="feature-card-eyebrow">The NGINX Kubernetes Open Source Roadmap: First Half of 2026</p>
+                    <p>What's coming next for NGINX Ingress Controller, NGINX Gateway Fabric, and the broader Kubernetes ecosystem.</p>
+                    <span class="feature-card-cta">Read on blog.nginx.org &rarr;</span>
+                </div>
+            </a>
+            <a class="feature-card feature-card-flush" href="https://blog.nginx.org/blog/nginx-ingress-controller-v5-4-0-making-migration-easier-than-ever" target="_blank" rel="noopener">
+                <img class="feature-card-thumb" src="https://nginxblog-8de1046ff5a84f2c-endpoint.azureedge.net/blobnginxbloga72cde487e/wp-content/uploads/2025/03/K8s-blog2.png" alt="NGINX Ingress Controller v5.4.0" loading="lazy">
+                <div class="feature-card-body">
+                    <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--kn-green)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Featured Blog</h3>
+                    <p class="feature-card-eyebrow">NGINX Ingress Controller v5.4.0: Making Migration Easier Than Ever</p>
+                    <p>New features designed to simplify migration from Ingress-NGINX, including CORS support, configuration validation, and expanded annotation compatibility.</p>
+                    <span class="feature-card-cta">Read on blog.nginx.org &rarr;</span>
+                </div>
+            </a>
+        </div>
+    </div>
+</main>
+{{ end }}

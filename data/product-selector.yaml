@@ -1,0 +1,23 @@
+# Feeds the theme's sidebar product-selector dropdown (data-driven, no chrome override).
+# URLs are relative (no leading slash) so the theme's absURL keeps the fork's
+# /kubernetes.nginx.org/ subpath in preview builds AND resolves correctly in production.
+- productGroup: "NGINX on Kubernetes"
+  products:
+    - title: "Home"
+      url: ""
+      productOrder: 1
+    - title: "NGINX Ingress Controller"
+      url: "nginx-ingress-controller/"
+      productOrder: 2
+    - title: "NGINX Gateway Fabric"
+      url: "nginx-gateway-fabric/"
+      productOrder: 3
+    - title: "Migration Tool"
+      url: "migration-tool/"
+      productOrder: 4
+    - title: "Migration Analyzer"
+      url: "ingress-nginx-migration/"
+      productOrder: 5
+    - title: "ingress2gateway"
+      url: "ingress2gateway/"
+      productOrder: 6

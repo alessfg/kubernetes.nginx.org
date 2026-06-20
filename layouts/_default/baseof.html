@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+
+  {{ block "head" . }}
+
+  {{ partial "meta.html" . }}
+  {{ partial "meta/inject.html" . }}
+
+  {{ partial "favicon.html" . }}
+
+  {{ partial "styles.html" . }}
+
+  {{ if in .Params.doctypes "devportal" }}
+  {{ partial "devportal/style.html" . }}
+  {{ end }}
+
+  {{ if fileExists "/layouts/partials/head_custom.html" }}
+  {{ partial "head_custom.html" . }}
+  {{ end }}
+
+  {{ end }}
+
+  {{/* GTM / TrustArc / Tealium / universal-tag intentionally removed for this fork:
+       this is a standalone GitHub Pages site, not part of docs.nginx.com's analytics. */}}
+
+  </head>
+
+  <body id="body"{{ if .IsHome }} data-kn-home="true"{{ end }}>
+    <div class="sr-only" aria-live="polite" id="page-announce"></div>
+    <input type="checkbox" id="search-standalone-header-panel" class="search-standalone-header-panel" hidden/>
+    <input type="checkbox" id="sidebar-panel" class="sidebar-panel" hidden/>
+    <div class="grid-container">
+        <aside class="sidebar" data-testid="sidebar" id="sidebar">
+            {{ partial "sidebar-v2.html" . }}
+        </aside>
+
+        <header class="header" data-testid="header" id="header">
+            {{ block "header" . }}{{end}}
+        </header>
+
+        {{ block "main" . }}{{ end }}
+
+        <footer class="footer" data-testid="footer" id="footer">
+          {{ block "footer-v2" . }}
+            {{ partial "footer-v2.html" . }}
+          {{ end }}
+        </footer>
+    </div>
+
+  {{ partial "scripts.html" . }}
+  <div id="consent_blackbar"></div>
+</body>
+</html>

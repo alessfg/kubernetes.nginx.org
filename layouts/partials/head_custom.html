@@ -1,0 +1,20 @@
+{{/* head_custom.html — included by baseof AFTER the theme's styles.html, so our
+     CSS wins specificity ties. Also carries the dark-mode flash-prevention script
+     (must run before paint) and PWA manifest/icon. */}}
+<script>try{var s=localStorage.getItem('darkMode');if(s==='1'||(s===null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark-mode')}catch(e){}</script>
+
+{{ $chrome := resources.Get "css/kn/chrome.css" | minify | fingerprint "sha512" }}
+<link rel="stylesheet" href="{{ $chrome.RelPermalink }}" integrity="{{ $chrome.Data.Integrity }}">
+
+{{ if .Params.kn_landing }}
+{{ $landing := resources.Get "css/kn/landing.css" | minify | fingerprint "sha512" }}
+<link rel="stylesheet" href="{{ $landing.RelPermalink }}" integrity="{{ $landing.Data.Integrity }}">
+{{ end }}
+
+{{ if .Params.kn_migration }}
+{{ $migration := resources.Get "css/kn/migration.css" | minify | fingerprint "sha512" }}
+<link rel="stylesheet" href="{{ $migration.RelPermalink }}" integrity="{{ $migration.Data.Integrity }}">
+{{ end }}
+
+<link rel="apple-touch-icon" href="{{ "img/apple-touch-icon.png" | relURL }}">
+<link rel="manifest" href="{{ "site.webmanifest" | relURL }}">

@@ -1,0 +1,64 @@
+{{/* Override of the theme header — identical to stock, plus the bespoke dark-mode
+     toggle (the theme ships none). Coveo search stays gated off by buildtype=package. */}}
+{{ define "header" }}
+<div class="header-base">
+  <div class="header-container">
+      <div class="header__control" data-testid="header__control">
+          <div class="header__control--sidebar">
+              <label class="header__control--sidebar--close" for="sidebar-panel" data-testid="header__control--sidebar--close">
+              {{ partial "lucide" (dict "context" . "icon" "panel-left-close") }}
+              </label>
+              <label class="header__control--sidebar--open" for="sidebar-panel" data-testid="header__control--sidebar--open">
+              {{ partial "lucide" (dict "context" . "icon" "panel-left-open") }}
+              </label>
+          </div>
+          {{ if ( not ( in .Site.Params.buildtype "package" ) ) }}
+          <!-- Mobile button -->
+          {{ $coveoEnabled := partial "get-feature-flags.html" "disable_coveo" }}
+          {{ if $coveoEnabled }}
+            <label class="header__search--mobile--search--button"for="search-standalone-header-panel" data-testid="header__search--mobile--search--button">
+              {{ partial "lucide" (dict "context" . "icon" "search") }}
+            </label>
+          {{ end }}
+          <div class="header__search" data-testid="header__search">
+            {{ if in .RelPermalink "search.html" }}
+              <atomic-external selector="#search-v2" id="search-standalone-header">
+                {{ $redirectUrl := default .Site.Params.coveo_search_redirect "/search.html" }}
+                <atomic-search-box redirection-url={{ $redirectUrl }} class="header-search-box"></atomic-search-box>
+              </atomic-external>
+            {{ else }}
+              {{ partial "coveo-atomic-search.html" (dict "id" "search-standalone-header") }}
+            {{ end }}
+          </div>
+          {{ end }}
+      </div>
+
+      <div class="header__logo" data-testid="header__logo">
+          <a class="header__logo-link" href="{{ .Site.BaseURL | relLangURL }}" alt="NGINX Docs Home">
+              <img class="header__img" src="{{ "images/icons/NGINX-Open-Source-product-icon.svg" | absURL }}" alt="NGINX Docs">
+          </a>
+      </div>
+
+      <div class="header__control--end" style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+        {{ partial "f5-sites.html" . }}
+        <button class="kn-dark-toggle" id="darkToggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+          <svg aria-hidden="true" class="kn-dark-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          <svg aria-hidden="true" class="kn-dark-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+      </div>
+
+  </div>
+  <div class="header-search-dropdown" data-testid="header-search-dropdown-mobile">
+    {{ if ( not ( in .Site.Params.buildtype "package" ) ) }}
+    {{ if in .RelPermalink "search.html" }}
+      <atomic-external selector="#search-v2">
+        {{ $redirectUrl := default .Site.Params.coveo_search_redirect "/search.html" }}
+        <atomic-search-box redirection-url={{ $redirectUrl }} class="header-search-box"></atomic-search-box>
+      </atomic-external>
+    {{ else }}
+      {{ partial "coveo-atomic-search.html" (dict "id" "search-standalone-header-dropdown") }}
+    {{ end }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}

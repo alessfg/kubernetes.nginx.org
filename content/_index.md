@@ -1,6 +1,5 @@
 ---
-title: "NGINX on Kubernetes"
+title: "NGINX - Networking for Kubernetes"
 description: "NGINX on Kubernetes — the NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources."
+kn_landing: true
 ---
-
-Scaffold placeholder — landing page content is built in Phase 1.

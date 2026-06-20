@@ -1,0 +1,6 @@
+{{ define "main" }}
+<main class="kn-main content" id="maincontent" data-testid="content">
+    {{ partial "kn-icon-sprite.html" . }}
+    {{ partial (printf "products/%s.html" .Params.product_key) . }}
+</main>
+{{ end }}

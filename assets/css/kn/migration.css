@@ -3,13 +3,18 @@
    leaks into theme chrome. Tokens renamed --kn-*. The tool's own section-nav base
    styles (formerly in shared.css) are re-included here, scoped. */
 
+/* ── Base reset (the tool relied on shared.css's global reset, now dropped; the
+   theme has no global box-sizing reset, so re-establish border-box for the tool) ── */
+.kn-migration, .kn-migration *, .kn-migration *::before, .kn-migration *::after { box-sizing: border-box; }
+.kn-migration { line-height: 1.6; }
+
 /* ── Full-bleed app layout inside the theme chrome ── */
 .grid-container:has(.kn-fullbleed) { grid-template-columns: 1fr; grid-template-areas: "header" "content" "footer"; }
 .grid-container:has(.kn-fullbleed) .sidebar,
 .grid-container:has(.kn-fullbleed) .header__control--sidebar { display: none; }
 main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding: 0; }
 .kn-migration .kn-migration-shell { display: flex; align-items: flex-start; }
-.kn-migration .kn-tool-sidebar { flex: 0 0 260px; align-self: stretch; background: var(--kn-surface); border-right: 1px solid var(--kn-border); padding: 20px 0; position: sticky; top: 56px; max-height: calc(100vh - 56px); overflow-y: auto; }
+.kn-migration .kn-tool-sidebar { display: flex; flex-direction: column; flex: 0 0 260px; align-self: stretch; background: var(--kn-surface); border-right: 1px solid var(--kn-border); padding: 20px 0; position: sticky; top: 56px; max-height: calc(100vh - 56px); overflow-y: auto; }
 .kn-migration .kn-tool-main { flex: 1 1 auto; min-width: 0; }
 @media (max-width: 900px) {
   .kn-migration .kn-migration-shell { flex-direction: column; }
@@ -31,6 +36,14 @@ main.kn-migration { max-width: none; width: 100%; justify-self: stretch; padding
 .kn-migration .sidebar-link-name { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--kn-text); }
 .kn-migration .sidebar-link-desc { font-size: 0.68rem; color: var(--kn-text-secondary); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kn-migration .sidebar-divider { height: 1px; background: var(--kn-border); margin: 12px 16px; }
+.kn-migration .sidebar-ext-links { padding: 0 16px; }
+.kn-migration .sidebar-ext { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: var(--kn-text); font-size: 0.82rem; transition: background 0.2s, color 0.2s; }
+.kn-migration .sidebar-ext:link, .kn-migration .sidebar-ext:visited { color: var(--kn-text); }
+.kn-migration .sidebar-ext:hover { background: var(--kn-bg); color: var(--kn-text); }
+.kn-migration .sidebar-ext:focus-visible { outline: 2px solid var(--kn-green); outline-offset: -2px; border-radius: 8px; }
+.kn-migration .sidebar-ext svg { flex-shrink: 0; opacity: 0.6; }
+.kn-migration .sidebar-copyright { padding: 16px 16px 8px; margin-top: auto; font-size: 0.68rem; color: var(--kn-text-secondary); }
+.kn-migration .sidebar-tagline { margin-top: 6px; font-style: italic; opacity: 0.7; }
 
 .kn-migration .container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
 .kn-migration .sidebar-link[data-page="analyzer"] .dot { background: var(--kn-green); }

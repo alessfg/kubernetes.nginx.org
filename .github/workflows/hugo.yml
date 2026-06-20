@@ -1,13 +1,14 @@
 name: Deploy Hugo site to Pages
 
-# Fork-only deploy of the Hugo rebuild. One-time setup on the fork:
-#   Settings -> Pages -> Source = "GitHub Actions".
+# Fork-only deploy of the Hugo rebuild, from this branch only (no main, no
+# production). Requires: Pages source = "GitHub Actions", and this branch added to
+# the github-pages environment's deployment branch policies (done via the API).
 # The build's baseURL is taken from the Pages URL (configure-pages), so it works
 # at the project subpath (alessfg.github.io/kubernetes.nginx.org/) or a custom domain.
 
 on:
   push:
-    branches: [main, feat/hugo-theme-migration]
+    branches: [feat/hugo-theme-migration]
   workflow_dispatch:
 
 permissions:
@@ -65,10 +66,9 @@ jobs:
           path: ./public
 
   deploy:
-    # GitHub Pages' environment protection only allows deploys from the default
-    # branch, so deploy from the fork's main (build still validates on the feature
-    # branch). The fork's main is independent of upstream production.
-    if: github.ref == 'refs/heads/main'
+    # Deploy from the Hugo feature branch (authorized in the github-pages
+    # environment's deployment branch policies). No main, no production.
+    if: github.ref == 'refs/heads/feat/hugo-theme-migration'
     needs: build
     runs-on: ubuntu-latest
     environment:

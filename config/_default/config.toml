@@ -1,0 +1,48 @@
+# Base Hugo config. baseURL is intentionally relative here so local dev / PR
+# previews resolve identically; config/production/config.toml overrides it.
+baseURL = "/"
+languageCode = "en-us"
+title = "NGINX - Networking for Kubernetes"
+enableGitInfo = true
+enableRobotsTXT = true
+
+# Import the docs.nginx.com theme as a Hugo Module (pinned to v2.0.9 in go.mod).
+[module]
+  [[module.imports]]
+    path = "github.com/nginxinc/nginx-hugo-theme/v2"
+
+[caches]
+  [caches.modules]
+    maxAge = -1
+
+[markup]
+  [markup.goldmark.renderer]
+    unsafe = true              # required for raw-html shortcode + embedded analyzer/JSON-LD
+  [markup.highlight]
+    noClasses = false
+    guessSyntax = true
+
+[outputs]
+  home = ["HTML", "RSS"]
+  section = ["HTML"]
+  page = ["HTML"]
+
+[sitemap]
+  changefreq = "weekly"
+  priority = 0.5
+  filename = "sitemap.xml"
+
+[params]
+  description = "NGINX on Kubernetes — the NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources."
+  author = "F5, Inc."
+  # buildtype gates the theme's TrustArc/Tealium/GTM analytics partials off for the fork.
+  buildtype = "package"
+  github_repo = "https://github.com/alessfg/kubernetes.nginx.org"
+  # Feature flags: disable docs.nginx.com-only services so the theme runs standalone.
+  disable_coveo = true
+  disable_qualtrics = true
+  disable_rich_meta = false
+  [params.featureFlags]
+    disable_coveo = true
+    disable_qualtrics = true
+    disable_rich_meta = false

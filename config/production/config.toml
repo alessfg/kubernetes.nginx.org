@@ -1,0 +1,14 @@
+# Production overrides. During fork exploration the deploy target is the fork's
+# GitHub Pages subpath; flip baseURL to the custom domain only at production cutover.
+#
+# Fork preview (default during exploration):
+baseURL = "https://alessfg.github.io/kubernetes.nginx.org/"
+#
+# Production cutover (later): set baseURL = "https://kubernetes.nginx.org/" and add static/CNAME.
+
+[params]
+  buildtype = "package"
+  [params.featureFlags]
+    disable_coveo = true
+    disable_qualtrics = true
+    disable_rich_meta = false

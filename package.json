@@ -1,0 +1,13 @@
+{
+  "name": "kubernetes.nginx.org",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Hugo build for kubernetes.nginx.org",
+  "scripts": {
+    "build": "hugo --minify --gc -e production",
+    "watch": "hugo server --disableFastRender"
+  },
+  "comments": {
+    "hugo": "Requires a system Hugo Extended >= 0.151 (CI pins 0.152.2 via peaceiris/actions-hugo). Install locally with 'brew install hugo'. hugo-bin is not used because its npm releases predate the theme's 0.151 minimum."
+  }
+}

@@ -62,9 +62,10 @@
             return indent + key + ': "' + escaped + '"';
         }
 
-        // Normalize CRLF/CR and split a manifest into YAML documents.
+        // Normalize CRLF/CR and split a manifest into YAML documents
+        // ("---" separators, optionally followed by a comment).
         function splitDocuments(yamlText) {
-            return yamlText.replace(/\r\n?/g, '\n').split(/^---\s*$/m);
+            return yamlText.replace(/\r\n?/g, '\n').split(/^---(?:\s+#.*)?\s*$/m);
         }
 
         // Detect syntax we don't fully parse and surface it to the user, so confusing

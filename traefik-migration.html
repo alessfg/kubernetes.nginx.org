@@ -806,7 +806,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware digestAuth</code></td>
-                            <td>No direct equivalent — NGINX has no digest-auth module; re-issue credentials as htpasswd and use <code>basicAuth</code></td>
+                            <td>No direct equivalent (use <code>basicAuth</code>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -828,6 +828,7 @@ spec:
 # then create a Secret of type nginx.org/htpasswd (key "htpasswd") and a
 # basicAuth Policy referencing it.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX has no digest-auth module — re-issue the credentials as htpasswd and migrate to <code>basicAuth</code>.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -911,7 +912,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>ServersTransportTCP</code></td>
-                            <td>No direct equivalent — TransportServer has no backend-TLS fields; use <code>serverSnippets</code>/<code>streamSnippets</code> as an escape hatch (requires <code>-enable-snippets</code>)</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -953,6 +954,7 @@ spec:
   action:
     pass: backend</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> TransportServer has no backend-TLS fields; use <code>serverSnippets</code>/<code>streamSnippets</code> as an escape hatch (requires <code>-enable-snippets</code>).</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -1674,7 +1676,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.observability.*</code><br>(<code>accesslogs</code>, <code>metrics</code>, <code>traceVerbosity</code>, <code>tracing</code>)</td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log-off</code> (accesslogs) / <code>otel-trace-in-http</code> (tracing) — global; metrics: <code>-enable-prometheus-metrics</code> CLI flag</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log-off</code> (accesslogs) / <code>otel-trace-in-http</code> (tracing); <code>-enable-prometheus-metrics</code> flag (metrics)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1735,7 +1737,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.rulesyntax</code></td>
-                            <td>Not applicable — deprecated Traefik v2-syntax toggle; convert v2 matchers to their v3 forms during migration</td>
+                            <td>Not applicable</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1753,6 +1755,7 @@ metadata:
 # Then map the v3 rule to VirtualServer host/routes/matches
 # (see the Routing section).</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> Rule syntax is a deprecated Traefik-only toggle; convert v2 matchers to their v3 forms during migration.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.tls</code></td>
@@ -1994,7 +1997,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.priority</code></td>
-                            <td>No direct equivalent — NGINX location precedence is fixed (exact &gt; longest prefix &gt; regex order)</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2011,10 +2014,11 @@ metadata:
 # Reorder VirtualServer regex routes to influence matching;
 # exact and prefix routes need no manual priority.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX location precedence is fixed (exact, then longest prefix, then regex order).</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/service.nodeportlb</code></td>
-                            <td>No direct equivalent — NIC load-balances pod endpoints (or the Service ClusterIP with <code>nginx.org/use-cluster-ip</code>), never NodePorts</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2029,6 +2033,7 @@ metadata:
 # when nginx.org/use-cluster-ip is set), never NodePorts.
 # Remove the annotation; endpoint load balancing is the default.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller load-balances pod endpoints directly — or the Service ClusterIP via <code>nginx.org/use-cluster-ip</code> — never NodePorts.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2041,7 +2046,7 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware chain</code></td>
-                            <td>No single equivalent construct — flatten into multiple <span class="badge badge-policy">Policy CRD</span> resources listed in <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>policies[]</code><span class="or-text">— or —</span><code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span> (order preserved)</td>
+                            <td><span class="badge badge-policy">Policy CRD</span> in <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>policies[]</code><span class="or-text">— or —</span><code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2127,7 +2132,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware contentType</code></td>
-                            <td>No direct equivalent — NGINX proxies the upstream <code>Content-Type</code> header untouched</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2144,10 +2149,11 @@ spec:
 # If the backend omits Content-Type, set the header in the
 # application itself.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX proxies the upstream <code>Content-Type</code> header untouched.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware encodedCharacters</code></td>
-                            <td>No direct equivalent — NGINX URI normalization is fixed</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2163,10 +2169,11 @@ spec:
 # NGINX URI normalization is fixed — per-route allowances for encoded
 # characters (%2F, %3B, and so on) cannot be configured.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX URI normalization is fixed, so per-route allowances for encoded characters cannot be configured.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware grpcWeb</code></td>
-                            <td>No direct equivalent — no gRPC-Web-to-gRPC translation (<code>nginx.org/grpc-services</code> proxies native gRPC only)</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2182,6 +2189,7 @@ spec:
 # proxy sidecar in front of the backend, or serve gRPC-Web from the
 # application itself.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller has no gRPC-Web-to-gRPC translation; <code>nginx.org/grpc-services</code> proxies native gRPC only.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2246,7 +2254,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.observability.metrics</code></td>
-                            <td>No direct equivalent — Prometheus metrics are controller-global (<code>-enable-prometheus-metrics</code>)</td>
+                            <td>No direct equivalent (metrics are controller-global)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2570,7 +2578,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware circuitBreaker</code> (<code>checkPeriod</code>, <code>expression</code>, <code>fallbackDuration</code>, <code>recoveryDuration</code>)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].fail-timeout</code> + <code>upstreams[].max-fails</code> (passive approximation; expression semantics cannot be translated)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].fail-timeout</code> + <code>upstreams[].max-fails</code> (passive approximation)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2890,7 +2898,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware stripPrefixRegex</code><br>(<code>regex</code>)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> regex <code>path</code> + <code>action.proxy.rewritePath</code> (add a capture for the remainder)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> regex <code>path</code> + <code>action.proxy.rewritePath</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2936,7 +2944,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>ClientIP(...)</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[].conditions[]</code> with <code>variable: $remote_addr</code> (exact IP)<span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>accessControl</code> (CIDR — see <a href="#access-control">Access Control</a>)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[].conditions[]</code> <code>$remote_addr</code> (exact IP)<span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>accessControl</code> (CIDR — see <a href="#access-control">Access Control</a>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3184,7 +3192,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td>Rule operators — <code>&amp;&amp;</code> / <code>||</code> / <code>!</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>&amp;&amp;</code> → <code>conditions[]</code> in one match (AND-only); <code>||</code> → separate <code>routes[]</code>/<code>matches[]</code>; <code>!</code> → <code>!value</code> prefix on individual condition values</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>&amp;&amp;</code> → <code>conditions[]</code>; <code>||</code> → separate <code>routes[]</code>; <code>!</code> → <code>!value</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3233,7 +3241,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>HostRegexp(...)</code></td>
-                            <td>No direct equivalent — create one VirtualServer per concrete host</td>
+                            <td>No direct equivalent — <span class="badge badge-virtualserver">VirtualServer CRD</span> per host</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3721,7 +3729,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>IngressRouteTCP services[].proxyProtocol</code><br>(<code>version</code>)</td>
-                            <td>No direct equivalent — no TransportServer field; add <code>proxy_protocol on;</code> via <code>spec.serverSnippets</code> as a workaround</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3761,6 +3769,7 @@ spec:
   action:
     pass: backend</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> TransportServer has no field for sending PROXY protocol to the backend; enable it manually with <code>proxy_protocol on;</code> via <code>spec.serverSnippets</code> as a workaround.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4068,7 +4077,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>TLSOption spec.sniStrict</code></td>
-                            <td>Automatic — with <code>-default-server-tls-secret</code> unset and no fallback certificate, the default server rejects unmatched TLS handshakes</td>
+                            <td>Automatic <span class="or-text">—</span> unmatched SNI rejected</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4093,7 +4102,7 @@ args:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>TLSStore</code><br>(<code>certificates[]</code>, <code>defaultCertificate.secretName</code>, <code>defaultGeneratedCert</code>)</td>
-                            <td>Per-app TLS Secrets on <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.secret</code> / Ingress <code>spec.tls</code> + <code>-default-server-tls-secret</code> deployment flag</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.secret</code> / Ingress <code>spec.tls</code> + <code>-default-server-tls-secret</code> flag</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4134,7 +4143,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>TLSOption spec.alpnProtocols</code></td>
-                            <td>No direct equivalent — no verified ALPN control at F5 NGINX Ingress Controller v5.5.1</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4156,6 +4165,7 @@ spec:
 # ConfigMap key, which turns HTTP/2 support on or off — it is
 # not a general ALPN protocol list.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> no ConfigMap key, annotation, or CRD field is verified to control the advertised ALPN protocol list at v5.5.1.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4324,7 +4334,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>TraefikService failover</code><br>(+ <code>errors.maxRequestBodyBytes</code>, <code>errors.status</code>, <code>fallback</code>, <code>service</code>)</td>
-                            <td>No direct equivalent for HTTP — TransportServer upstreams support <code>backup</code>/<code>backupPort</code> for TCP only; approximate with passive health checks (<code>max-fails</code>/<code>fail-timeout</code>)</td>
+                            <td>No direct equivalent (HTTP) <span class="badge badge-transportserver">TransportServer CRD</span> <code>backup</code>/<code>backupPort</code> (TCP only)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4358,10 +4368,11 @@ spec:
 # Passive checks skip failed endpoints within the same upstream — they
 # cannot switch traffic to a different fallback Service.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller has no HTTP fallback-service field; approximate with passive health checks (<code>max-fails</code>/<code>fail-timeout</code>) on the main upstream.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>TraefikService highestRandomWeight</code></td>
-                            <td>No direct equivalent — NIC upstreams support the <code>hash</code>, <code>ip_hash</code>, <code>least_conn</code>, <code>least_time</code>, <code>random</code>, and <code>round_robin</code> lb-methods</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4385,6 +4396,7 @@ spec:
 # For the weighted 3:1 distribution itself, use routes[].splits[]
 # (see the weighted row above).</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX upstreams have no highest-random-weight selection; the available load-balancing methods are <code>hash</code>, <code>ip_hash</code>, <code>least_conn</code>, <code>least_time</code>, <code>random</code>, and <code>round_robin</code>.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4690,7 +4702,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware waf</code> (Traefik Hub)</td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>waf</code> (F5 WAF for NGINX; on Ingress via <code>nginx.com/policies</code>)</td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>waf</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -4770,7 +4782,7 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware hmac</code> / <code>Middleware ldap</code> / <code>Middleware oauth2ClientCredentials</code> / <code>Middleware oauth2TokenIntrospection</code> / <code>Middleware opa</code> (Traefik Hub)</td>
-                            <td>No direct equivalent — nearest paths: <code>externalAuth</code> Policy fronting an LDAP/OPA auth service, or the <code>oidc</code> Policy (NGINX Plus) for OAuth2 flows</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5053,7 +5065,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>entryPoints.&lt;name&gt;.http3</code></td>
-                            <td>No direct equivalent — no HTTP/3 or QUIC support at v5.5.1</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5068,6 +5080,7 @@ entryPoints:
 # NGINX templates). Clients negotiate down to HTTP/2
 # (http2: "true" in the ConfigMap) or HTTP/1.1.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller v5.5.1 ships no HTTP/3 or QUIC support.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -5218,7 +5231,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>accesslog.fields.*</code> / <code>accesslog.filters.*</code></td>
-                            <td>No direct equivalent — filter in the log pipeline instead</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5238,6 +5251,7 @@ accesslog:
 # Filter or drop fields downstream in your log pipeline
 # (Fluent Bit, Logstash, ...) instead.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX has no per-field access-log allow/drop control — filter fields in the log pipeline instead.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -5294,7 +5308,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>metrics.prometheus.{addEntryPointsLabels, addRoutersLabels, addServicesLabels, buckets, headerLabels}</code><br><code>tracing.capturedRequestHeaders</code> / <code>tracing.capturedResponseHeaders</code><br><code>tracing.otlp.http</code><br><code>tracing.sampleRate</code></td>
-                            <td>No direct equivalent — fixed metric labels; OTLP/gRPC exporter with no sampling or header-capture options</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5318,6 +5332,7 @@ tracing:
 #   otel-exporter-endpoint at a collector's gRPC port (4317)
 #   and let the collector fan out over OTLP/HTTP if needed</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> Metric labels are fixed, the OTLP exporter is gRPC-only, and tracing offers no sampling or request-header capture.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -5347,7 +5362,7 @@ args:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>providers.kubernetesCRD</code> / <code>providers.kubernetesIngress</code></td>
-                            <td>No configuration needed — Ingress is watched natively; <code>-enable-custom-resources</code> (CRDs)</td>
+                            <td>No configuration needed; <code>-enable-custom-resources</code> (CRDs)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5366,7 +5381,7 @@ args:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>api.dashboard</code></td>
-                            <td>No direct equivalent — use Prometheus + Grafana</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5379,10 +5394,11 @@ api:
 #   2. scrape port 9113 (/metrics)
 #   3. build Grafana dashboards on those metrics</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller has no built-in dashboard; use Prometheus + Grafana for equivalent visibility.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>experimental.plugins</code></td>
-                            <td>No direct equivalent — snippets are the extension escape hatch</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5400,6 +5416,7 @@ experimental:
 # headers) — check the mapping tables above before reaching
 # for snippets.</code></pre></div>
                             </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller has no plugin system; snippets are the extension escape hatch for injecting raw NGINX config.</div>
                         </div></td></tr>
                     </tbody>
                 </table>

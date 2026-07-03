@@ -841,7 +841,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>ServersTransport</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>egressMTLS</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code> transport fields</td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>egressMTLS</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1039,7 +1039,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware compress</code><br>(<code>defaultEncoding</code>, <code>encodings</code>, <code>excludedContentTypes</code>, <code>includedContentTypes</code>, <code>minResponseBodyBytes</code>)</td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code> (gzip directives)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1607,7 +1607,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.middlewares</code><br><code>traefik.ingress.kubernetes.io/service.middlewares</code></td>
-                            <td><code>nginx.org/policies</code> (converted Policy names) <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>policies[]</code></td>
+                            <td><code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>policies[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -1676,7 +1676,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.observability.*</code><br>(<code>accesslogs</code>, <code>metrics</code>, <code>traceVerbosity</code>, <code>tracing</code>)</td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log-off</code> (accesslogs) / <code>otel-trace-in-http</code> (tracing); <code>-enable-prometheus-metrics</code> flag (metrics)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log-off</code> / <code>otel-trace-in-http</code>; <code>-enable-prometheus-metrics</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1701,7 +1701,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.pathmatcher</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].path</code> syntax (<code>=</code>, prefix, <code>~</code>)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].path</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1759,7 +1759,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.tls</code></td>
-                            <td>Ingress <code>spec.tls</code> / <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.secret</code> (remove the annotation)</td>
+                            <td>Ingress <code>spec.tls</code> / <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.secret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1829,7 +1829,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.tls.options</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-ciphers</code> / <code>ssl-protocols</code> (global)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-ciphers</code> / <code>ssl-protocols</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1881,7 +1881,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/service.passhostheader</code></td>
-                            <td>Default behavior (<code>Host: $host</code>) — override via <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>action.proxy.requestHeaders.set</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>action.proxy.requestHeaders.set</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1916,7 +1916,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/service.serversscheme</code></td>
-                            <td><code>nginx.org/grpc-services</code> (h2c) / <code>nginx.org/ssl-services</code> (https)</td>
+                            <td><code>nginx.org/grpc-services</code> / <code>nginx.org/ssl-services</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1939,7 +1939,7 @@ annotations:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/service.serverstransport</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>egressMTLS</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code> transport fields</td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>egressMTLS</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2046,7 +2046,7 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware chain</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> in <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>policies[]</code><span class="or-text">— or —</span><code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>policies[]</code><span class="or-text">— or —</span><code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2203,7 +2203,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.observability.accesslogs</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log-off</code> (global)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log-off</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2228,7 +2228,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.observability.tracing</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>otel-exporter-endpoint</code> + <code>otel-service-name</code> + <code>otel-trace-in-http</code> (global)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>otel-exporter-endpoint</code> + <code>otel-service-name</code> + <code>otel-trace-in-http</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2433,7 +2433,7 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware redirectRegex</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>action.redirect</code> (static <code>url</code>)<span class="or-text">— or —</span><code>nginx.org/server-snippets</code> <code>rewrite</code> (capture groups)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>action.redirect</code><span class="or-text">— or —</span><code>nginx.org/server-snippets</code> <code>rewrite</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2578,7 +2578,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware circuitBreaker</code> (<code>checkPeriod</code>, <code>expression</code>, <code>fallbackDuration</code>, <code>recoveryDuration</code>)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].fail-timeout</code> + <code>upstreams[].max-fails</code> (passive approximation)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].fail-timeout</code> + <code>upstreams[].max-fails</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2681,7 +2681,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Middleware addPrefix</code><br>(<code>prefix</code>)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> regex <code>path</code> + <code>action.proxy.rewritePath</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>path</code> + <code>action.proxy.rewritePath</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2766,7 +2766,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware replacePathRegex</code><br>(<code>regex</code>, <code>replacement</code>)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> regex <code>path</code> (<code>~</code>) + <code>action.proxy.rewritePath</code> (<code>$1</code>–<code>$9</code>)<span class="or-text">— or —</span><code>nginx.org/path-regex</code> + <code>nginx.org/rewrite-target</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>path</code> + <code>action.proxy.rewritePath</code><span class="or-text">— or —</span><code>nginx.org/path-regex</code> + <code>nginx.org/rewrite-target</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2836,7 +2836,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware stripPrefix</code><br>(<code>prefixes</code>)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> regex <code>path</code> + <code>action.proxy.rewritePath: /$1</code><span class="or-text">— or —</span><code>nginx.org/rewrites</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>path</code> + <code>action.proxy.rewritePath: /$1</code><span class="or-text">— or —</span><code>nginx.org/rewrites</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2898,7 +2898,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware stripPrefixRegex</code><br>(<code>regex</code>)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> regex <code>path</code> + <code>action.proxy.rewritePath</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>path</code> + <code>action.proxy.rewritePath</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2944,7 +2944,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>ClientIP(...)</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[].conditions[]</code> <code>$remote_addr</code> (exact IP)<span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>accessControl</code> (CIDR — see <a href="#access-control">Access Control</a>)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[].conditions[]</code> <code>$remote_addr</code><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>accessControl</code> (see <a href="#access-control">Access Control</a>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3062,7 +3062,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Method(...)</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[].conditions[]</code> with <code>variable: $request_method</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[].conditions[]</code> <code>variable: $request_method</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3192,7 +3192,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td>Rule operators — <code>&amp;&amp;</code> / <code>||</code> / <code>!</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>&amp;&amp;</code> → <code>conditions[]</code>; <code>||</code> → separate <code>routes[]</code>; <code>!</code> → <code>!value</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>&amp;&amp;</code> → <code>conditions[]</code>; <code>||</code> → <code>routes[]</code>; <code>!</code> → <code>!value</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3286,7 +3286,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>IngressRoute</code> (entryPoints, routes[].match/middlewares/services, tls.secretName)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> — full resource conversion (<code>policies[]</code>, <code>routes[]</code> with <code>matches</code>/<code>splits</code>, <code>spec.host</code>, <code>spec.tls.secret</code>, <code>upstreams[]</code>)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> (<code>policies[]</code>, <code>routes[]</code>, <code>spec.host</code>, <code>spec.tls.secret</code>, <code>upstreams[]</code>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3340,7 +3340,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
-                            <td><span class="badge badge-virtualserverroute">VirtualServerRoute CRD</span> — cross-namespace route delegation</td>
+                            <td><span class="badge badge-virtualserverroute">VirtualServerRoute CRD</span> (cross-namespace delegation)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3516,7 +3516,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>IngressRouteTCP</code><br>(TLS terminating: <code>routes[].match: HostSNI(`...`)</code> + <code>tls.secretName</code>)</td>
-                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.host</code> + <code>spec.tls.secret</code> on a <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> TCP listener</td>
+                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.host</code> + <code>spec.tls.secret</code> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3608,7 +3608,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>IngressRouteUDP</code></td>
-                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>protocol: UDP</code> + <code>upstreamParameters.udpRequests</code> / <code>udpResponses</code> on a <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> UDP listener</td>
+                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>protocol: UDP</code> + <code>upstreamParameters.udpRequests</code> / <code>udpResponses</code> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3657,7 +3657,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>MiddlewareTCP inFlightConn</code><br>(<code>amount</code>)</td>
-                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>upstreams[].maxConns</code> (per-upstream-server cap — closest equivalent)</td>
+                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>upstreams[].maxConns</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3691,7 +3691,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>MiddlewareTCP ipAllowList</code><br>(<code>sourceRange</code>)</td>
-                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.serverSnippets</code> (<code>allow</code>/<code>deny</code> directives)</td>
+                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.serverSnippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4102,7 +4102,7 @@ args:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>TLSStore</code><br>(<code>certificates[]</code>, <code>defaultCertificate.secretName</code>, <code>defaultGeneratedCert</code>)</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.secret</code> / Ingress <code>spec.tls</code> + <code>-default-server-tls-secret</code> flag</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.secret</code> / Ingress <code>spec.tls</code> + <code>-default-server-tls-secret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4949,7 +4949,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>entryPoints.&lt;name&gt;.http2.maxConcurrentStreams</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http2</code> (enable only) + <code>http-snippets</code> (<code>http2_max_concurrent_streams</code>)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http2</code> + <code>http-snippets</code> (<code>http2_max_concurrent_streams</code>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5264,7 +5264,7 @@ accesslog:
                     <tbody>
                         <tr class="expandable">
                             <td><code>metrics.prometheus</code></td>
-                            <td><code>-enable-prometheus-metrics</code> + <code>-prometheus-metrics-listen-port</code> + <code>-prometheus-tls-secret</code> (deployment flags)</td>
+                            <td><code>-enable-prometheus-metrics</code> + <code>-prometheus-metrics-listen-port</code> + <code>-prometheus-tls-secret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5345,7 +5345,7 @@ tracing:
                     <tbody>
                         <tr class="expandable">
                             <td><code>ping</code></td>
-                            <td><code>-ready-status</code> + <code>-ready-status-port</code> (deployment flags, on by default)</td>
+                            <td><code>-ready-status</code> + <code>-ready-status-port</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5362,7 +5362,7 @@ args:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>providers.kubernetesCRD</code> / <code>providers.kubernetesIngress</code></td>
-                            <td>No configuration needed; <code>-enable-custom-resources</code> (CRDs)</td>
+                            <td>No configuration needed; <code>-enable-custom-resources</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">

@@ -58,6 +58,7 @@ Loading rules (all pages): `shared.css` is linked before the page CSS; `shared.j
 - **"No direct equivalent" rows**: source features without an NIC equivalent (right cell says "No direct equivalent") go after all real mappings; NIC-only features (left cell says "No direct equivalent") go last.
 - **NIC-only features must not be bundled** into source mapping rows — they get their own row.
 - **Within a single row**, when multiple items are listed on either side, they should be in alphabetical order.
+- **Collapsed cells stay terse** — the always-visible mapping cells (both columns of a `tr.expandable`) show only badges + `<code>` + a short blurb (≤ ~6 words of prose, e.g. `No direct equivalent`, `Not applicable`, `No direct equivalent (use <code>basicAuth</code>)`). Never put a full explanatory sentence, caveat, or workaround in a collapsed cell. Any such explanation belongs in the expanded panel (`tr.example-row`) as an `info-box` banner: `info-box warning` for hard "no equivalent / no replacement" cases (bold lead-in like `<strong>No direct equivalent:</strong>`), `info-box note` for softer guidance. A `warning` added alongside an existing `note` precedes it.
 
 ## Shared UI Elements
 

@@ -6,12 +6,13 @@
         'use strict';
 
         /* ── Constants ── */
-        let PRODUCTS = ['home', 'nginx-ingress-controller', 'nginx-gateway-fabric', 'migration-tool', 'ingress2gateway'];
+        let PRODUCTS = ['home', 'nginx-ingress-controller', 'nginx-gateway-fabric', 'migration-tool', 'traefik-migration-tool', 'ingress2gateway'];
         let PAGE_NAMES = {
             'home': 'Home',
             'nginx-ingress-controller': 'NGINX Ingress Controller',
             'nginx-gateway-fabric': 'NGINX Gateway Fabric',
             'migration-tool': 'Ingress-NGINX Migration',
+            'traefik-migration-tool': 'Traefik Migration',
             'ingress2gateway': 'ingress2gateway'
         };
 

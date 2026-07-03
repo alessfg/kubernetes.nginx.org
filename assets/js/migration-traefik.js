@@ -1655,6 +1655,15 @@
         };
         Object.keys(GENERATORS_ANNOTATIONS).forEach(function(k) { GENERATORS[k] = GENERATORS_ANNOTATIONS[k]; });
 
+        // Traefik Hub (commercial) middlewares → NGINX Plus policy pointers.
+        GENERATORS.generateHubMiddlewareNote = function(finding) {
+            let out = contribution();
+            let type = finding.key.replace('middleware:', '');
+            let plusPolicy = { jwt: 'jwt', oidc: 'oidc', apiKey: 'apiKey', waf: 'waf', distributedRateLimit: 'rateLimit (+ zone-sync ConfigMap keys)' }[type];
+            out.notes.push({ code: finding.label, message: 'Traefik Hub middleware — maps to the NGINX Plus ' + plusPolicy + ' Policy. See the NGINX Plus Mappings section for the worked example.' });
+            return out;
+        };
+
         // --- Mapping registry ----------------------------------------------------
         // keys: parseInput finding keys. grouped: true = one generator call with all
         // findings of the entry (Ingress annotations); false = one call per finding
@@ -1722,7 +1731,15 @@
             { keys: ['kind:TLSOption'], source: 'TLSOption', nic: 'ConfigMap ssl-protocols / ssl-ciphers + Policy ingressMTLS (clientAuth)', type: 'configmap', category: 'TLS & Certificates', anchor: 'tls-certificates', section: 'oss', generator: 'generateTLSOptionContributions' },
             { keys: ['kind:TLSStore'], source: 'TLSStore', nic: '-default-server-tls-secret deployment flag + per-app TLS Secrets', type: 'configmap', category: 'TLS & Certificates', anchor: 'tls-certificates', section: 'oss', generator: 'generateTLSStoreNote' },
             { keys: ['kind:ServersTransport'], source: 'ServersTransport', nic: 'Policy CRD egressMTLS + VirtualServer upstream tuning', type: 'policy', category: 'Backend Transport', anchor: 'backend-transport', section: 'oss', generator: 'generateEgressMTLSFromServersTransport' },
-            { keys: ['kind:ServersTransportTCP'], source: 'ServersTransportTCP', nic: 'No direct equivalent — TransportServer has no backend-TLS fields; use serverSnippets/streamSnippets as an escape hatch', type: 'unsupported', category: 'Backend Transport', anchor: 'backend-transport', section: 'oss' }
+            { keys: ['kind:ServersTransportTCP'], source: 'ServersTransportTCP', nic: 'No direct equivalent — TransportServer has no backend-TLS fields; use serverSnippets/streamSnippets as an escape hatch', type: 'unsupported', category: 'Backend Transport', anchor: 'backend-transport', section: 'oss' },
+
+            // Traefik Hub (commercial) middlewares → NGINX Plus
+            { keys: ['middleware:jwt'], source: 'Middleware jwt (Hub)', nic: 'Policy CRD jwt (NGINX Plus)', type: 'policy', category: 'JWT Authentication', anchor: 'jwt-authentication', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
+            { keys: ['middleware:oidc'], source: 'Middleware oidc (Hub)', nic: 'Policy CRD oidc (NGINX Plus)', type: 'policy', category: 'OIDC Authentication', anchor: 'oidc-authentication', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
+            { keys: ['middleware:apiKey'], source: 'Middleware apiKey (Hub)', nic: 'Policy CRD apiKey (NGINX Plus)', type: 'policy', category: 'API Key Authentication', anchor: 'api-key-authentication', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
+            { keys: ['middleware:waf'], source: 'Middleware waf (Hub)', nic: 'Policy CRD waf (NGINX Plus, via nginx.com/policies on Ingress)', type: 'policy', category: 'WAF', anchor: 'waf', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
+            { keys: ['middleware:distributedRateLimit'], source: 'Middleware distributedRateLimit (Hub)', nic: 'Policy CRD rateLimit + zone-sync ConfigMap keys (NGINX Plus)', type: 'policy', category: 'Distributed Rate Limiting', anchor: 'distributed-rate-limiting', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
+            { keys: ['middleware:hmac', 'middleware:ldap', 'middleware:oAuth2ClientCredentials', 'middleware:oauth2ClientCredentials', 'middleware:oauth2TokenIntrospection', 'middleware:opa'], source: 'Middleware hmac / ldap / oauth2* / opa (Hub)', nic: 'No direct equivalent — nearest paths: externalAuth Policy fronting an LDAP/OPA auth service, or the oidc Policy for OAuth2 flows', type: 'unsupported', category: 'Other Hub Middlewares', anchor: 'hub-other', section: 'plus' }
         ];
 
         const TRAEFIK_LOOKUP = new Map();

@@ -23,6 +23,12 @@ The community site for NGINX's Kubernetes ecosystem, served via GitHub Pages at 
   - CRD migration examples
   - ConfigMap migration guidance
 
+- **[Traefik Migration Tool](https://kubernetes.nginx.org/traefik-migration.html)** (`traefik-migration.html`) — Interactive tool for migrating from Traefik Proxy (`traefik/traefik`) to the NGINX Ingress Controller. Features include:
+  - Interactive analyzer for IngressRoute, Middleware, TraefikService, and annotated Ingress resources
+  - Mappings for all 24 OSS HTTP middlewares, TCP/UDP routing, and static configuration
+  - Match-rule translation (Host, PathPrefix, Header, ClientIP, …) to VirtualServer routes
+  - TLS and cert-manager migration guidance (replacing Traefik's built-in ACME)
+
 ## Project Structure
 
 This is a documentation-only project with no build system, tests, or package manager. All pages are static HTML with first-party CSS/JS under `assets/` and no third-party runtime dependencies.

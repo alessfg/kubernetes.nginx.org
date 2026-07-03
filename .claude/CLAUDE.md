@@ -30,7 +30,6 @@ assets/
         migration-core.js           # source-agnostic migration-tool engine: analyzer orchestration/rendering, table filtering, page nav, checklist; defines window.MigrationTool (NIC target versions + shared utils)
         migration-ingress-nginx.js  # ingress-nginx SOURCE module: INGRESS_NGINX_VERSION, ANNOTATION_MAPPINGS, parsers, CRD generators, sample presets; defines window.MIGRATION_SOURCE
         migration-traefik.js        # Traefik SOURCE module: TRAEFIK_VERSION, TRAEFIK_MAPPINGS, YAML-subset + match-rule parsers, NIC generators, sample presets; defines window.MIGRATION_SOURCE
-        migration.js                # FROZEN pre-split copy kept unreferenced for the GitHub Pages cache grace window — delete ~1 week after the split shipped; do not edit
   img/  icon.svg, icon-512.png, apple-touch-icon.{svg,png}, og-image.{svg,png}
 ```
 

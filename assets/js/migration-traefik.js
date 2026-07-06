@@ -583,6 +583,25 @@
             return secs + 's';
         }
 
+        // Traefik `status` entries ("400", "500-599", arrays, comma lists) → Set of ints.
+        function expandStatusCodes(status) {
+            let set = new Set();
+            let list = Array.isArray(status) ? status : (status != null ? [status] : []);
+            list.forEach(function(s) {
+                String(s).split(',').forEach(function(part) {
+                    part = part.trim();
+                    let range = part.match(/^(\d{3})-(\d{3})$/);
+                    if (range) {
+                        let from = parseInt(range[1], 10), to = parseInt(range[2], 10);
+                        for (let c = from; c <= to && c - from <= 200; c++) set.add(c);
+                    } else if (/^\d{3}$/.test(part)) {
+                        set.add(parseInt(part, 10));
+                    }
+                });
+            });
+            return set;
+        }
+
         function yamlQuote(v) {
             return '"' + String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, '\\n') + '"';
         }
@@ -679,6 +698,7 @@
                 out.crds.push({ kind: 'Policy', yaml: lines.join('\n') });
                 let noEquiv = [];
                 if (opts.authResponseHeaders || opts.authResponseHeadersRegex) noEquiv.push('authResponseHeaders (auth-server response headers are not copied to the backend request — replicate via authSnippets, see the generated Policy)');
+                if (opts.addAuthCookiesToResponse) noEquiv.push('addAuthCookiesToResponse (auth-server Set-Cookie headers are not copied to the client response — replicate via authSnippets: auth_request_set + add_header Set-Cookie, or use authSigninURI/authSigninRedirectBasePath)');
                 if (opts.authRequestHeaders) noEquiv.push('authRequestHeaders (NIC always forwards all client request headers)');
                 if (opts.forwardBody || opts.maxBodySize != null) noEquiv.push('forwardBody/maxBodySize (NIC never forwards the request body to the auth server)');
                 if (opts.trustForwardHeader) noEquiv.push('trustForwardHeader');
@@ -745,7 +765,7 @@
                 let out = contribution();
                 let opts = finding.data.options || {};
                 let amount = opts.amount != null ? opts.amount : 'N';
-                out.notes.push({ code: 'Middleware ' + finding.data.middlewareName + ' (inFlightReq)', message: 'No Policy CRD equivalent for concurrent-request limiting — use nginx.org/location-snippets with "limit_conn addr ' + amount + ';" plus a limit_conn_zone in ConfigMap http-snippets ("limit_conn_zone $binary_remote_addr zone=addr:10m;"). sourceCriterion has no equivalent.' });
+                out.notes.push({ code: 'Middleware ' + finding.data.middlewareName + ' (inFlightReq)', message: 'No Policy CRD equivalent for concurrent-request limiting — use nginx.org/location-snippets with "limit_conn addr ' + amount + ';" plus "limit_conn_status 429;" (Traefik inFlightReq rejects with HTTP 429; NGINX limit_conn defaults to 503), and a limit_conn_zone in ConfigMap http-snippets. inFlightReq groups by Host by default (its default sourceCriterion is requestHost, unlike rateLimit which defaults to the client remote address), so key the zone on $host ("limit_conn_zone $host zone=addr:10m;") to mirror that default; the ipStrategy/requestHeaderName strategies have no equivalent.' });
                 return out;
             },
 
@@ -822,7 +842,10 @@
                 if (opts.frameDeny === true) securityHeaders.push('X-Frame-Options: DENY');
                 if (opts.customFrameOptionsValue) securityHeaders.push('X-Frame-Options: ' + opts.customFrameOptionsValue);
                 if (opts.contentTypeNosniff === true) securityHeaders.push('X-Content-Type-Options: nosniff');
+                if (opts.customBrowserXSSValue) securityHeaders.push('X-XSS-Protection: ' + opts.customBrowserXSSValue);  // customBrowserXSSValue overrides browserXssFilter
+                else if (opts.browserXssFilter === true) securityHeaders.push('X-XSS-Protection: 1; mode=block');
                 if (opts.contentSecurityPolicy) securityHeaders.push('Content-Security-Policy: ' + opts.contentSecurityPolicy);
+                if (opts.contentSecurityPolicyReportOnly) securityHeaders.push('Content-Security-Policy-Report-Only: ' + opts.contentSecurityPolicyReportOnly);
                 if (opts.referrerPolicy) securityHeaders.push('Referrer-Policy: ' + opts.referrerPolicy);
                 if (opts.permissionsPolicy) securityHeaders.push('Permissions-Policy: ' + opts.permissionsPolicy);
                 if (securityHeaders.length > 0) {
@@ -865,6 +888,7 @@
                 let basics = context.firstIngressBasics || {};
                 let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  upstreams:', '    - name: backend', '      service: ' + (basics.serviceName || '# TODO: Set your service'), '      port: ' + (basics.servicePort || '80'), '  routes:', '    - path: ' + (basics.path || '/'), '      action:', '        proxy:', '          upstream: backend', '          rewritePath: ' + (opts.path || '/') + '  # replacePath.path'];
                 out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                out.notes.push({ code: 'Middleware ' + mwName + ' (X-Replaced-Path)', message: 'Traefik replacePath also injects the original request path into an X-Replaced-Path request header sent upstream; NIC rewritePath does not reproduce it. If the backend reads X-Replaced-Path, re-add it via action.proxy.requestHeaders.set (name: X-Replaced-Path, value: ${request_uri} or the pre-rewrite path).' });
                 return out;
             },
 
@@ -877,6 +901,7 @@
                 let replacement = String(opts.replacement || '/new/$1');
                 let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  upstreams:', '    - name: backend', '      service: ' + (basics.serviceName || '# TODO: Set your service'), '      port: ' + (basics.servicePort || '80'), '  routes:', '    - path: ~' + regex + '  # replacePathRegex.regex (verify: Traefik uses RE2, NGINX uses PCRE)', '      action:', '        proxy:', '          upstream: backend', '          rewritePath: ' + replacement.replace(/\$\{(\d)\}/g, '$$$1') + '  # replacePathRegex.replacement ($1-$9 captures)'];
                 out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                out.notes.push({ code: 'Middleware ' + mwName + ' (X-Replaced-Path)', message: 'Traefik replacePathRegex also stores the original request path in an X-Replaced-Path request header sent upstream, which NIC rewritePath does not reproduce. If the backend reads X-Replaced-Path, re-add it via action.proxy.requestHeaders.set (name: X-Replaced-Path, value: ${request_uri}).' });
                 return out;
             },
 
@@ -892,13 +917,14 @@
                     if (isRegex) {
                         // Don't graft capture groups onto a user-supplied regex — route on it
                         // as-is and leave the rewrite target as an explicit TODO.
-                        lines.push('    - path: ~' + cmt(p) + '  # stripPrefixRegex (Traefik RE2 → NGINX PCRE: verify)', '      action:', '        proxy:', '          upstream: backend', '          rewritePath: /  # TODO: stripPrefixRegex removes the matched prefix — add a capture to your regex and reference it here ($1)');
+                        lines.push('    - path: ~' + cmt(p) + '  # stripPrefixRegex (Traefik RE2 → NGINX PCRE: verify)', '      action:', '        proxy:', '          upstream: backend', '          rewritePath: /  # TODO: stripPrefixRegex removes the matched prefix — add a capture to your regex and reference it here ($1)', '          # requestHeaders:  # Traefik stripPrefixRegex also sends X-Forwarded-Prefix (the stripped prefix); NIC rewritePath does not — uncomment if the backend needs it', '          #   set:', '          #     - name: X-Forwarded-Prefix', '          #       value: # TODO: the stripped prefix');
                     } else {
-                        lines.push('    - path: ~^' + cmt(p) + '(?:/(.*))?$  # stripPrefix: ' + cmt(p), '      action:', '        proxy:', '          upstream: backend', '          rewritePath: /$1');
+                        lines.push('    - path: ~^' + cmt(p) + '(?:/(.*))?$  # stripPrefix: ' + cmt(p), '      action:', '        proxy:', '          upstream: backend', '          rewritePath: /$1', '          # requestHeaders:  # Traefik stripPrefix also sends X-Forwarded-Prefix; NIC rewritePath does not — uncomment if the backend needs it', '          #   set:', '          #     - name: X-Forwarded-Prefix', '          #       value: ' + cmt(p));
                     }
                 });
                 lines.push('', '# Ingress alternative: nginx.org/rewrites: "serviceName=' + (basics.serviceName || '<svc>') + ' rewrite=/" (prefix replacement, no regex).');
                 out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                out.notes.push({ code: 'Middleware ' + mwName + ' (X-Forwarded-Prefix)', message: 'Traefik stripPrefix/stripPrefixRegex also store the stripped prefix in an X-Forwarded-Prefix request header sent upstream; NIC rewritePath only rewrites the path and does not set it. If the backend relies on X-Forwarded-Prefix (e.g. to build relative asset URLs), re-add it via action.proxy.requestHeaders.set (see the commented stub).' });
                 return out;
             },
 
@@ -907,13 +933,15 @@
                 let opts = finding.data.options || {};
                 let mwName = finding.data.middlewareName;
                 let permanent = opts.permanent === true;
-                let code = permanent ? '308' : '302';
+                // 308 (permanent) / 307 (temporary) preserve the request method, matching
+                // Traefik's own method-adaptive codes (301/308 permanent, 302/307 temporary).
+                let code = permanent ? '308' : '307';
                 if (context.ingresses.length > 0 || strategy === 'annotation') {
                     out.swaps.push({ fromLabel: 'Middleware ' + mwName + ' (redirectScheme)', to: 'nginx.org/redirect-to-https', value: 'true', note: null });
-                    out.swaps.push({ fromLabel: 'Middleware ' + mwName + ' (redirectScheme.permanent)', to: 'nginx.org/http-redirect-code', value: code, note: permanent ? 'permanent: true → 308 preserves method and body' : 'temporary redirect' });
+                    out.swaps.push({ fromLabel: 'Middleware ' + mwName + ' (redirectScheme.permanent)', to: 'nginx.org/http-redirect-code', value: code, note: permanent ? 'permanent: true — Traefik sends 301 (GET)/308 (other); 308 preserves the method' : 'permanent: false — Traefik sends 302 (GET)/307 (other); 307 preserves the method' });
                 } else {
                     let basics = context.firstIngressBasics || {};
-                    let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  tls:', '    secret: ' + (basics.tlsSecret || '# TODO: Set your TLS secret'), '    redirect:', '      enable: true  # redirectScheme scheme: https', '      code: ' + code + (permanent ? '  # permanent: true' : ''), '      basedOn: scheme'];
+                    let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  tls:', '    secret: ' + (basics.tlsSecret || '# TODO: Set your TLS secret'), '    redirect:', '      enable: true  # redirectScheme scheme: https', '      code: ' + code + (permanent ? '  # permanent: true → 308 (method-preserving; Traefik: 301 GET / 308 other)' : '  # permanent: false → 307 (method-preserving; Traefik: 302 GET / 307 other)'), '      basedOn: scheme'];
                     out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
                 }
                 return out;
@@ -932,9 +960,10 @@
                     let rewriteLine = 'rewrite ' + cmt(opts.regex || '<regex>') + ' ' + cmt(String(opts.replacement).replace(/\$\{(\d)\}/g, '$$$1')) + ' ' + (opts.permanent === true ? 'permanent' : 'redirect') + ';';
                     lines = ['# redirectRegex uses capture groups — VirtualServer action.redirect.url is static,', '# so the redirect must be an NGINX rewrite via snippets (requires -enable-snippets):', 'apiVersion: networking.k8s.io/v1', 'kind: Ingress', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', '  annotations:', '    nginx.org/server-snippets: |', '      ' + rewriteLine + '  # redirectRegex.regex → replacement'];
                 } else {
-                    lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  routes:', '    - path: /', '      action:', '        redirect:', '          url: ' + yamlQuote(opts.replacement || 'https://example.com/  # TODO: Set redirect URL') + '  # redirectRegex.replacement', '          code: ' + (opts.permanent === true ? '301' : '302')];
+                    lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  routes:', '    - path: /', '      action:', '        redirect:', '          url: ' + yamlQuote(opts.replacement || 'https://example.com/  # TODO: Set redirect URL') + '  # redirectRegex.replacement', '          code: ' + (opts.permanent === true ? '308' : '307') + '  # ' + (opts.permanent === true ? 'permanent: true → 308' : 'permanent: false → 307') + ' (method-preserving; Traefik is method-adaptive 301/308·302/307)'];
                 }
                 out.crds.push({ kind: hasCaptures ? 'Ingress' : 'VirtualServer', yaml: lines.join('\n') });
+                out.notes.push({ code: 'Middleware ' + mwName + ' (redirectRegex)', message: 'Traefik redirectRegex matches the full URL (e.g. ^https?://host/path), but ' + (hasCaptures ? 'the NGINX rewrite directive matches the request path only and its "permanent" flag emits 301 (use "return 308 <url>" to preserve non-GET methods)' : 'NGINX routing matches the request path only') + ' — move any scheme/host portion of the regex into the resource host (or drop it) before applying this. Traefik regexes are RE2 while NGINX uses PCRE — verify the pattern.' });
                 return out;
             },
 
@@ -945,10 +974,30 @@
                 let mwName = finding.data.middlewareName;
                 let basics = context.firstIngressBasics || {};
                 let attempts = opts.attempts != null ? parseInt(opts.attempts, 10) : 3;
-                let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  upstreams:', '    - name: backend', '      service: ' + (basics.serviceName || '# TODO: Set your service'), '      port: ' + (basics.servicePort || '80'), '      next-upstream: "error timeout http_502 http_503"  # retry on network errors + 5xx', '      next-upstream-tries: ' + (isNaN(attempts) ? 3 : attempts) + '  # retry.attempts', '  routes:', '    - path: ' + (basics.path || '/'), '      action:', '        pass: backend', '', '# Ingress alternative: nginx.org/proxy-next-upstream + nginx.org/proxy-next-upstream-tries (v5.4.0+).'];
+                // Traefik retry is network-error-only by default; HTTP-status retry is opt-in via `status`.
+                let nginxRetryCodes = [403, 404, 429, 500, 502, 503, 504];  // the only codes NGINX next-upstream accepts
+                let conds = [];
+                if (opts.disableRetryOnNetworkError !== true) conds.push('error', 'timeout');
+                let wanted = expandStatusCodes(opts.status);
+                nginxRetryCodes.forEach(function(c) { if (wanted.has(c)) conds.push('http_' + c); });
+                if (opts.retryNonIdempotentMethod === true) conds.push('non_idempotent');
+                if (conds.length === 0) conds = ['error', 'timeout'];  // never emit an empty next-upstream
+                let condComment = opts.status != null ? 'retry.status → NGINX http_* codes (+ network errors)' : 'Traefik retry: network errors only by default';
+                let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  upstreams:', '    - name: backend', '      service: ' + (basics.serviceName || '# TODO: Set your service'), '      port: ' + (basics.servicePort || '80'), '      next-upstream: ' + yamlQuote(conds.join(' ')) + '  # ' + condComment, '      next-upstream-tries: ' + (isNaN(attempts) ? 3 : attempts) + '  # retry.attempts'];
+                let timeoutSecs = durationToSeconds(opts.timeout);
+                if (timeoutSecs) lines.push('      next-upstream-timeout: ' + Math.round(timeoutSecs) + 's  # retry.timeout (overall retry budget)');
+                lines.push('  routes:', '    - path: ' + (basics.path || '/'), '      action:', '        pass: backend', '', '# Ingress alternative: nginx.org/proxy-next-upstream + nginx.org/proxy-next-upstream-tries (v5.4.0+).');
                 out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
                 if (opts.initialInterval) {
-                    out.notes.push({ code: 'Middleware ' + mwName + ' (retry.initialInterval)', message: 'NGINX retries the next upstream immediately — exponential backoff between attempts has no equivalent.' });
+                    out.notes.push({ code: 'Middleware ' + mwName + ' (retry.initialInterval)', message: 'NGINX retries the next upstream immediately — exponential backoff (initialInterval) between attempts has no equivalent.' });
+                }
+                let hasUnsupported = false;
+                wanted.forEach(function(c) { if (nginxRetryCodes.indexOf(c) === -1) hasUnsupported = true; });
+                if (hasUnsupported) {
+                    out.notes.push({ code: 'Middleware ' + mwName + ' (retry.status)', message: 'NGINX next-upstream can only retry on ' + nginxRetryCodes.join(', ') + '; any other code in retry.status (' + (Array.isArray(opts.status) ? opts.status.join(', ') : opts.status) + ') has no next-upstream equivalent.' });
+                }
+                if (opts.maxRequestBodyBytes != null) {
+                    out.notes.push({ code: 'Middleware ' + mwName + ' (retry.maxRequestBodyBytes)', message: 'No direct equivalent — NGINX has no per-retry request-body cap (use nginx.org/client-max-body-size for the overall request-body limit).' });
                 }
                 return out;
             },
@@ -1009,11 +1058,11 @@
                     });
                 });
                 if (codes.length === 0) codes = [502, 503];
-                // NIC redirect URLs only allow the ${scheme} / ${http_x_forwarded_proto}
-                // variables — expand Traefik's {status} placeholder per code instead.
+                // NIC redirect URLs support only ${scheme}, ${host}, ${request_uri}, ${http_x_forwarded_proto}
+                // — none carries the response status, so expand Traefik's {status} placeholder per code instead.
                 let query = String(opts.query || '/{status}.html');
                 let urlExample = 'https://errors.example.com' + query.replace('{status}', String(codes[0]));
-                let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  upstreams:', '    - name: backend', '      service: ' + (basics.serviceName || '# TODO: Set your service'), '      port: ' + (basics.servicePort || '80'), '  routes:', '    - path: ' + (basics.path || '/'), '      action:', '        pass: backend', '      errorPages:', '        - codes: [' + codes.join(', ') + ']  # status (ranges expanded — errorPages codes must be explicit integers)', '          redirect:', '            code: 302', '            url: ' + yamlQuote(urlExample) + '  # query — redirect URLs allow no per-request variables: use one errorPages entry per code for per-status URLs'];
+                let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(mwName) + '-app', 'spec:', '  host: ' + (basics.host || '# TODO: Set your host'), '  upstreams:', '    - name: backend', '      service: ' + (basics.serviceName || '# TODO: Set your service'), '      port: ' + (basics.servicePort || '80'), '  routes:', '    - path: ' + (basics.path || '/'), '      action:', '        pass: backend', '      errorPages:', '        - codes: [' + codes.join(', ') + ']  # status (ranges expanded — errorPages codes must be explicit integers)', '          redirect:', '            code: 302', '            url: ' + yamlQuote(urlExample) + '  # query — redirect URLs support ${scheme}/${host}/${request_uri}/${http_x_forwarded_proto} but none carries the status — use one errorPages entry per code for per-status URLs'];
                 if (truncatedRanges.length > 0) {
                     lines.push('', '# Range' + (truncatedRanges.length !== 1 ? 's' : '') + ' truncated for readability: ' + truncatedRanges.join(', ') + ' — add the remaining codes explicitly.');
                     out.notes.push({ code: 'Middleware ' + mwName + ' (errors.status)', message: 'Status range' + (truncatedRanges.length !== 1 ? 's' : '') + ' ' + truncatedRanges.join(', ') + ' truncated in the generated errorPages — NIC needs explicit codes; add the rest manually.' });
@@ -1036,7 +1085,7 @@
                     lines.push('              - name: X-Forwarded-Tls-Client-Cert  # pem: true', '                value: ${ssl_client_escaped_cert}');
                 }
                 if (opts.info) {
-                    lines.push('              - name: X-Forwarded-Tls-Client-Cert-Info  # info.* (subject DN shown; extend as needed)', '                value: ${ssl_client_s_dn}');
+                    lines.push('              - name: X-Forwarded-Tls-Client-Cert-Info  # info.subject.*', '                value: ${ssl_client_s_dn}', '              - name: X-Forwarded-Tls-Client-Cert-Issuer  # info.issuer.*', '                value: ${ssl_client_i_dn}');
                 }
                 if (opts.pem !== true && !opts.info) {
                     lines.push('              - name: X-Forwarded-Tls-Client-Cert', '                value: ${ssl_client_escaped_cert}');
@@ -1110,7 +1159,7 @@
             });
             let methods = facts.methods || [];
             if (methods.length > 1) {
-                notes.push({ code: resourceLabel, message: 'Method() lists multiple methods (OR semantics) — conditions in one match are AND-only; the generated condition uses the first method, add one match block per additional method: ' + methods.map(function(m) { return m.value; }).join(', ') + '.' });
+                notes.push({ code: resourceLabel, message: 'Multiple Method() matchers combined with || express OR — e.g. Method(`GET`) || Method(`HEAD`) (each Method() matcher takes exactly one method in v3 syntax). Conditions in one NIC match are AND-only, so the generated condition uses the first method — add one matches[] block per additional method: ' + methods.map(function(m) { return m.value; }).join(', ') + '.' });
                 methods = [methods[0]];
             }
             methods.forEach(function(m) {
@@ -1392,6 +1441,25 @@
                 return out;
             },
 
+            generateFailoverVS: function(finding) {
+                let out = contribution();
+                let d = finding.data;
+                let fo = d.failover || {};
+                let main = fo.service || {};
+                let fb = fo.fallback || {};
+                let mainName = main.name || '# TODO: main service';
+                let fbName = fb.name ? sanitizeName(fb.name) + '-external' : '# TODO: fallback ExternalName service';
+                let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ' + sanitizeName(d.name), 'spec:', '  host: # TODO: Set your host', '  upstreams:', '    - name: main', '      service: ' + mainName + '  # failover.service', '      port: ' + (main.port || 80), '      max-fails: 3       # mark the main servers unavailable after 3 failures...', '      fail-timeout: 30s  # ...for 30s — this is what triggers failover to backup', '      backup: ' + fbName + '  # failover.fallback (must be a Service of type ExternalName — NGINX Plus)', '      backupPort: ' + (fb.port || 80), '  routes:', '    - path: /', '      action:', '        pass: main'];
+                out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                let msgs = ['backup/backupPort are a partial equivalent: NIC fails over when the main servers are unavailable (connection failures counted by max-fails/fail-timeout), not on specific HTTP responses'];
+                let errs = fo.errors || {};
+                if (errs.status != null) msgs.push('failover.errors.status (' + (Array.isArray(errs.status) ? errs.status.join(', ') : errs.status) + ') has no trigger equivalent — NIC cannot fail over on HTTP status codes');
+                if (errs.maxRequestBodyBytes != null) msgs.push('failover.errors.maxRequestBodyBytes has no equivalent');
+                msgs.push('backup must reference a Service of type ExternalName (NGINX Plus only) and cannot be combined with the random, hash, or ip_hash lb-methods; TransportServer upstreams expose the same fields for TCP');
+                out.notes.push({ code: 'TraefikService ' + d.name + ' (failover)', message: msgs.join('. ') + '.' });
+                return out;
+            },
+
             generateTLSOptionContributions: function(finding) {
                 let out = contribution();
                 let o = finding.data.options || {};
@@ -1449,7 +1517,7 @@
                 if (o.serverName) lines.push('    sslName: ' + o.serverName + '  # serverName', '    serverName: true  # send SNI');
                 if (o.minVersion || o.maxVersion) lines.push('    protocols: ' + yamlQuote(tlsProtocolsFrom(o.minVersion, o.maxVersion)) + '  # minVersion/maxVersion (approximate)');
                 if (Array.isArray(o.cipherSuites) && o.cipherSuites.length > 0) lines.push('    ciphers: ' + yamlQuote(o.cipherSuites.join(':')) + '  # cipherSuites (Go names shown — translate to OpenSSL names; NIC does not validate)');
-                lines.push('', '# Attach via VirtualServer spec.policies or nginx.org/policies (v5.5.0+). On Ingress this only', '# sets proxy_ssl_* — pair with nginx.org/ssl-services to switch the upstream to HTTPS.');
+                lines.push('', '# Attach via VirtualServer spec.policies or nginx.org/policies (v5.5.0+). egressMTLS only sets', '# proxy_ssl_* — it never switches the upstream to HTTPS on either path. Set the upstream scheme', '# separately: on VirtualServer add upstreams[].tls.enable: true; on Ingress use nginx.org/ssl-services.');
                 out.crds.push({ kind: 'Policy', yaml: lines.join('\n') });
                 if (roots.some(function(r) { return r.indexOf('!configmap:') === 0; })) {
                     out.notes.push({ code: label, message: 'ConfigMap-sourced rootCAs are not supported — re-create the CA bundle as a Secret of type nginx.org/ca.' });
@@ -1659,7 +1727,13 @@
         GENERATORS.generateHubMiddlewareNote = function(finding) {
             let out = contribution();
             let type = finding.key.replace('middleware:', '');
-            let plusPolicy = { jwt: 'jwt', oidc: 'oidc', apiKey: 'apiKey', waf: 'waf', distributedRateLimit: 'rateLimit (+ zone-sync ConfigMap keys)' }[type];
+            if (type === 'apiKey') {
+                // The Traefik apiKey middleware is Hub-commercial, but its NIC counterpart —
+                // the apiKey Policy — is NOT Plus-gated: it runs on NGINX OSS (auth_request + NJS).
+                out.notes.push({ code: finding.label, message: 'Traefik Hub (commercial) middleware — maps to the NIC apiKey Policy, which is available on NGINX OSS (not Plus-gated). See the NGINX Plus Mappings section for the worked example.' });
+                return out;
+            }
+            let plusPolicy = { jwt: 'jwt', oidc: 'oidc', waf: 'waf', distributedRateLimit: 'rateLimit (+ zone-sync ConfigMap keys)' }[type];
             out.notes.push({ code: finding.label, message: 'Traefik Hub middleware — maps to the NGINX Plus ' + plusPolicy + ' Policy. See the NGINX Plus Mappings section for the worked example.' });
             return out;
         };
@@ -1726,8 +1800,8 @@
             { keys: ['kind:IngressRouteUDP'], source: 'IngressRouteUDP', nic: 'TransportServer CRD (UDP) + GlobalConfiguration listener', type: 'transportserver', category: 'TCP & UDP', anchor: 'tcp-udp', section: 'oss', generator: 'generateTransportServerFromUDP' },
             { keys: ['traefikservice:weighted'], source: 'TraefikService (weighted)', nic: 'VirtualServer routes[].splits', type: 'virtualserver', category: 'Traffic Splitting', anchor: 'traffic-splitting', section: 'oss', generator: 'generateSplitsFromWeighted' },
             { keys: ['traefikservice:mirroring'], source: 'TraefikService (mirroring)', nic: 'nginx.org/location-snippets + nginx.org/server-snippets (mirror directives)', type: 'annotation', category: 'Traffic Splitting', anchor: 'traffic-splitting', section: 'oss', generator: 'generateMirroringNote' },
-            { keys: ['traefikservice:failover'], source: 'TraefikService (failover)', nic: 'No direct equivalent for HTTP — TransportServer upstreams support backup/backupPort for TCP only; approximate with passive health checks (max-fails/fail-timeout)', type: 'unsupported', category: 'Traffic Splitting', anchor: 'traffic-splitting', section: 'oss' },
-            { keys: ['traefikservice:highestRandomWeight'], source: 'TraefikService (highestRandomWeight)', nic: 'No direct equivalent — NIC upstreams support round_robin/least_conn/ip_hash/hash/least_time/random lb-methods', type: 'unsupported', category: 'Traffic Splitting', anchor: 'traffic-splitting', section: 'oss' },
+            { keys: ['traefikservice:failover'], source: 'TraefikService (failover)', nic: 'VirtualServer/VirtualServerRoute upstreams[].backup + backupPort — partial (fires on upstream unavailability, not errors.status; backup must be an ExternalName Service, NGINX Plus)', type: 'virtualserver', category: 'Traffic Splitting', anchor: 'traffic-splitting', section: 'oss', generator: 'generateFailoverVS' },
+            { keys: ['traefikservice:highestRandomWeight'], source: 'TraefikService (highestRandomWeight)', nic: 'No direct equivalent — NIC upstreams support round_robin/least_conn/ip_hash/hash/random (least_time on NGINX Plus) lb-methods', type: 'unsupported', category: 'Traffic Splitting', anchor: 'traffic-splitting', section: 'oss' },
             { keys: ['kind:TLSOption'], source: 'TLSOption', nic: 'ConfigMap ssl-protocols / ssl-ciphers + Policy ingressMTLS (clientAuth)', type: 'configmap', category: 'TLS & Certificates', anchor: 'tls-certificates', section: 'oss', generator: 'generateTLSOptionContributions' },
             { keys: ['kind:TLSStore'], source: 'TLSStore', nic: '-default-server-tls-secret deployment flag + per-app TLS Secrets', type: 'configmap', category: 'TLS & Certificates', anchor: 'tls-certificates', section: 'oss', generator: 'generateTLSStoreNote' },
             { keys: ['kind:ServersTransport'], source: 'ServersTransport', nic: 'Policy CRD egressMTLS + VirtualServer upstream tuning', type: 'policy', category: 'Backend Transport', anchor: 'backend-transport', section: 'oss', generator: 'generateEgressMTLSFromServersTransport' },
@@ -1736,7 +1810,7 @@
             // Traefik Hub (commercial) middlewares → NGINX Plus
             { keys: ['middleware:jwt'], source: 'Middleware jwt (Hub)', nic: 'Policy CRD jwt (NGINX Plus)', type: 'policy', category: 'JWT Authentication', anchor: 'jwt-authentication', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
             { keys: ['middleware:oidc'], source: 'Middleware oidc (Hub)', nic: 'Policy CRD oidc (NGINX Plus)', type: 'policy', category: 'OIDC Authentication', anchor: 'oidc-authentication', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
-            { keys: ['middleware:apiKey'], source: 'Middleware apiKey (Hub)', nic: 'Policy CRD apiKey (NGINX Plus)', type: 'policy', category: 'API Key Authentication', anchor: 'api-key-authentication', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
+            { keys: ['middleware:apiKey'], source: 'Middleware apiKey (Hub)', nic: 'Policy CRD apiKey (NGINX OSS)', type: 'policy', category: 'API Key Authentication', anchor: 'api-key-authentication', section: 'plus', generator: 'generateHubMiddlewareNote' },
             { keys: ['middleware:waf'], source: 'Middleware waf (Hub)', nic: 'Policy CRD waf (NGINX Plus, via nginx.com/policies on Ingress)', type: 'policy', category: 'WAF', anchor: 'waf', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
             { keys: ['middleware:distributedRateLimit'], source: 'Middleware distributedRateLimit (Hub)', nic: 'Policy CRD rateLimit + zone-sync ConfigMap keys (NGINX Plus)', type: 'policy', category: 'Distributed Rate Limiting', anchor: 'distributed-rate-limiting', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },
             { keys: ['middleware:hmac', 'middleware:ldap', 'middleware:oAuth2ClientCredentials', 'middleware:oauth2ClientCredentials', 'middleware:oauth2TokenIntrospection', 'middleware:opa'], source: 'Middleware hmac / ldap / oauth2* / opa (Hub)', nic: 'No direct equivalent — nearest paths: externalAuth Policy fronting an LDAP/OPA auth service, or the oidc Policy for OAuth2 flows', type: 'unsupported', category: 'Other Hub Middlewares', anchor: 'hub-other', section: 'plus' }

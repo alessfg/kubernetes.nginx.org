@@ -144,6 +144,15 @@ Prefer GitHub MCP tools over WebFetch for documentation sites.
 
 When bumping the referenced version, audit the release notes to identify genuinely new features and update accordingly — but do not pre-document features from versions that haven't shipped yet.
 
+### Bidirectional accuracy (guard against staleness, not just fabrication)
+
+The rule above catches **fabrication** (documenting something that doesn't exist). It does NOT catch **staleness** — describing a construct that *does* exist with outdated semantics, wrong defaults/status codes, or an incomplete field set. Both are accuracy failures, and staleness is the more dangerous because "does it exist?" checks pass right over it. When documenting or reviewing **any** construct (mapping row, generator, note), verify all four — against the tagged source in both repos, never from memory (adversarial intuition about these constructs is wrong roughly half the time):
+
+1. **Exists** — the annotation/field/middleware exists in the pinned version (the rule above).
+2. **Semantics match** — the behavior, status codes, defaults, and value formats the tool states match the pinned source. (E.g. Traefik's redirect middlewares are method-adaptive — 301/308 permanent, 302/307 temporary, by request method — not a flat 301/302.)
+3. **Complete** — the tool has not omitted fields/sub-options that exist in the pinned version and that a migrator would hit. (E.g. Traefik `retry` gained `status` / `disableRetryOnNetworkError` / `retryNonIdempotentMethod`; omitting them mis-describes *when* it retries.)
+4. **NIC side checked both ways** — NIC-side claims are neither overstated (e.g. "no HTTP fallback-service field" when VirtualServer/VirtualServerRoute upstreams have `backup`/`backupPort`) nor understated, and any Plus-only NIC capability (e.g. `least_time`, ExternalName upstream services) is labeled as such.
+
 ### Release update checklist
 
 When updating the sites for a new release, update **all** of the following.

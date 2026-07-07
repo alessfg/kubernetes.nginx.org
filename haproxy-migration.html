@@ -183,7 +183,7 @@
 
         <section id="overview">
             <h2 id="migration-overview">Overview</h2>
-            <p>This interactive guide helps you migrate from the HAProxy Kubernetes Ingress Controller (<code>haproxytech/kubernetes-ingress</code>) to the F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). It covers the <code>haproxy.org/</code> annotations at all three HAProxy scopes (ConfigMap, Ingress, and Service &mdash; note that NIC has <strong>no Service-level annotation tier</strong>), the controller ConfigMap, both CRD API groups (<code>ingress.v1.haproxy.org</code> and <code>ingress.v3.haproxy.org</code>: Global, Defaults, Backend, Frontend, TCP), the legacy <code>tcp-services</code> ConfigMap, and <code>route-acl</code> canary routing &mdash; across three tabs:</p>
+            <p>This interactive guide helps you migrate from the HAProxy Kubernetes Ingress Controller (<code>haproxytech/kubernetes-ingress</code>) to the F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). It covers the <code>haproxy.org/</code> annotations at all three HAProxy scopes (ConfigMap, Ingress, and Service &mdash; note that NIC has <strong>no Service-level annotation tier</strong>), the controller ConfigMap, both CRD API groups (<code>ingress.v1.haproxy.org</code> and <code>ingress.v3.haproxy.org</code>: Global, Defaults, Backend, TCP in both, plus Frontend and ValidationRules in v3 only), the legacy <code>tcp-services</code> ConfigMap, and <code>route-acl</code> canary routing &mdash; across three tabs:</p>
             <ul class="doc-list">
                 <li><strong>Getting Started</strong> &mdash; Why teams migrate, NIC CRD overviews, installation, and a migration checklist</li>
                 <li><strong>HAProxy Config Analyzer</strong> &mdash; Paste annotated Ingress/Service manifests, the HAProxy ConfigMap, or Global/Defaults/Backend/TCP CRs and get automatic migration suggestions with ready-to-use YAML</li>
@@ -319,7 +319,7 @@
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="install-crds"><span>Install NIC CRDs via Helm (<code>controller.enableCustomResources=true</code>) or manifests (<code>deploy/crds.yaml</code>)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="inventory-annotations"><span>Inventory <code>haproxy.org/</code> annotations at all three scopes &mdash; ConfigMap, Ingress, <strong>and Service objects</strong> (NIC has no Service-level annotation tier)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="inventory-configmap"><span>Catalog the HAProxy controller ConfigMap keys and any <code>cr-*</code> pointers (<code>cr-global</code>/<code>cr-defaults</code>/<code>cr-backend</code>/<code>cr-frontend-*</code>)</span></li>
-                <li role="checkbox" aria-checked="false" tabindex="0" data-id="inventory-crds"><span>Inventory both CRD groups (<code>ingress.v1.haproxy.org</code> &amp; <code>ingress.v3.haproxy.org</code>: Global/Defaults/Backend/Frontend/TCP) and drop the <code>cr-*</code> pointer indirection &mdash; migrate the referenced CR's content, not the pointer</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="inventory-crds"><span>Inventory both CRD groups (<code>ingress.v1.haproxy.org</code> &amp; <code>ingress.v3.haproxy.org</code>: Global/Defaults/Backend/TCP in both, Frontend/ValidationRules v3-only) and drop the <code>cr-*</code> pointer indirection &mdash; migrate the referenced CR's content, not the pointer</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-basic-auth-secret"><span>Convert <code>auth-secret</code> Secrets to type <code>nginx.org/htpasswd</code> (concatenate the per-user entries into one htpasswd file under key <code>htpasswd</code>)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="retype-ca-secrets"><span>Re-type <code>client-ca</code>/<code>server-ca</code> Secrets to <code>nginx.org/ca</code> &mdash; move the CA from <code>tls.crt</code> to <code>ca.crt</code></span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-access-control"><span>Convert <code>allow-list</code>/<code>deny-list</code> (and the deprecated <code>whitelist</code>/<code>blacklist</code> aliases) to <code>accessControl</code> Policies &mdash; allow XOR deny, so a rule needing both becomes two Policies</span></li>
@@ -2498,37 +2498,6 @@ data:
                 <table class="mapping-table" aria-labelledby="routing"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>spec.defaultBackend</code></td>
-                            <td>Ingress <code>spec.defaultBackend</code> (honored 1:1)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-spec:
-  ingressClassName: haproxy
-  defaultBackend:
-    service:
-      name: fallback-svc
-      port:
-        number: 80</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-spec:
-  ingressClassName: nginx  # was haproxy
-  defaultBackend:  # honored as-is by the F5 NGINX Ingress Controller
-    service:
-      name: fallback-svc
-      port:
-        number: 80</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>spec.defaultBackend</code> is honored 1:1. NIC's host-less default server otherwise returns <code>404</code> (matching HAProxy's built-in). There is no <code>--default-backend-service</code> flag equivalent — a cluster-wide fallback is a host-less catch-all Ingress carrying only <code>spec.defaultBackend</code>. (The separate <code>-default-server-tls-secret</code> flag is a TLS concern, not routing.)</div>
-                        </div></td></tr>
-                        <tr class="expandable">
                             <td><code>kubernetes.io/ingress.class</code></td>
                             <td>Ingress <code>spec.ingressClassName</code></td>
                         </tr>
@@ -2592,6 +2561,37 @@ spec:
                             </div>
                             <div class="info-box warning"><strong>Prefix boundary trap:</strong> on a plain NIC Ingress, <code>Prefix</code> and <code>ImplementationSpecific</code> both render as a raw NGINX prefix location <strong>without</strong> the Kubernetes path-segment boundary (<code>/foo</code> also matches <code>/foobar</code>). The boundary-preserving form <code>~^/foo(/.*)?$</code> is available only on a VirtualServer route. <code>Exact</code> renders as <code>=/foo</code> and ports 1:1.</div>
                             <div class="info-box note"><strong>Note:</strong> NIC's regex engine is PCRE while HAProxy's <code>-m reg</code> differs on anchoring/lookaround — verify complex patterns after migrating.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>spec.defaultBackend</code></td>
+                            <td>Ingress <code>spec.defaultBackend</code> (honored 1:1)</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  ingressClassName: haproxy
+  defaultBackend:
+    service:
+      name: fallback-svc
+      port:
+        number: 80</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  ingressClassName: nginx  # was haproxy
+  defaultBackend:  # honored as-is by the F5 NGINX Ingress Controller
+    service:
+      name: fallback-svc
+      port:
+        number: 80</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>spec.defaultBackend</code> is honored 1:1. NIC's host-less default server otherwise returns <code>404</code> (matching HAProxy's built-in). There is no <code>--default-backend-service</code> flag equivalent — a cluster-wide fallback is a host-less catch-all Ingress carrying only <code>spec.defaultBackend</code>. (The separate <code>-default-server-tls-secret</code> flag is a TLS concern, not routing.)</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>Wildcard host <code>*.example.com</code></td>
@@ -2682,7 +2682,8 @@ spec:
     frontend:
       name: mqtt
       binds:
-        - name: mqtt
+        mqtt:
+          name: mqtt
           port: 1883
     service:
       name: mqtt-svc
@@ -2716,7 +2717,7 @@ spec:
     pass: backend</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>No direct equivalent for L4 rules:</strong> TransportServer has no ACL / content-switching / tcp-request fields (<code>acl_list</code>, <code>backend_switching_rule_list</code>, <code>tcp_request_rule_list</code>, <code>capture_list</code>, <code>filter_list</code>) — the only escape hatch is <code>spec.streamSnippets</code> (<code>-enable-snippets</code>). Extra <code>services[]</code> on one entry have no routing mechanism; each backend needs its own listener + TransportServer.</div>
-                            <div class="info-box note"><strong>Note:</strong> The GlobalConfiguration port must be exposed on the controller Service. For SSL offload (a bind with <code>ssl: true</code>), add <code>spec.host</code> (an SNI hostname is <strong>required</strong> — NIC TCP TLS termination is SNI-routed) and <code>spec.tls.secret</code> (a <code>kubernetes.io/tls</code> Secret in the TransportServer namespace). Per-service TCP logs collapse into the global <code>stream-log-format</code>.</div>
+                            <div class="info-box note"><strong>Note:</strong> The GlobalConfiguration port must be exposed on the controller Service. For SSL offload (a bind with <code>ssl: true</code>), add <code>spec.tls.secret</code> (a <code>kubernetes.io/tls</code> Secret in the TransportServer namespace) — NIC terminates TLS over TCP from the Secret alone, so <code>spec.host</code> is <strong>not</strong> required (add an SNI <code>spec.host</code> only to differentiate multiple TransportServers sharing one listener). Per-service TCP logs collapse into the global <code>stream-log-format</code>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--configmap-tcp-services</code></td>
@@ -2759,7 +2760,7 @@ spec:
   action:
     pass: backend</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Each ConfigMap entry becomes one GlobalConfiguration listener + one TransportServer. A trailing <code>:ssl</code> (SSL offload) is hostless in HAProxy, but NIC TransportServer TLS termination is SNI-based — assign each entry an SNI <code>spec.host</code> plus a <code>spec.tls.secret</code>. Truly hostless TLS-over-TCP is not expressible.</div>
+                            <div class="info-box note"><strong>Note:</strong> Each ConfigMap entry becomes one GlobalConfiguration listener + one TransportServer. A trailing <code>:ssl</code> (SSL offload) is hostless in HAProxy — NIC reproduces it from <code>spec.tls.secret</code> alone, with no <code>spec.host</code> required. Assign an SNI <code>spec.host</code> only to differentiate multiple TransportServers sharing one listener.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -2977,13 +2978,23 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># route-acl is a SERVICE-scoped annotation — it lives on the Service,
+# not the Ingress.
+apiVersion: v1
+kind: Service
 metadata:
-  name: canary
+  name: canary-svc
   annotations:
     # send 25% of traffic to the canary Service
     haproxy.org/route-acl: rand(100) lt 25
+spec:
+  ports:
+    - port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canary
 spec:
   rules:
     - host: app.example.com
@@ -2993,7 +3004,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: canary-svc
+                name: canary-svc  # references the annotated Service
                 port:
                   number: 80</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
@@ -3004,10 +3015,10 @@ spec:
   host: app.example.com
   upstreams:
     - name: main
-      service: main-svc
+      service: canary-svc
       port: 80
     - name: canary
-      service: canary-svc
+      service: # TODO: canary service
       port: 80
   routes:
     - path: /
@@ -3933,7 +3944,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> int64 milliseconds → NGINX time. Caps old-worker drain after a reload (approximate analogue of HAProxy's whole-process soft-stop cap).</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>log</code> / <code>log_targets</code></td>
+                            <td><code>log</code> / <code>log_target_list</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log</code> + <code>error-log-level</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3949,23 +3960,25 @@ data:
 kind: Global
 metadata:
   name: haproxy-global
-spec:                    # v1 wraps these under spec.config
-  maxconn: 40000
+spec:
   nbthread: 4
   ulimit_n: 200000
-  ssl_default_bind_ciphers: ECDHE-RSA-AES256-GCM-SHA384
-  ssl_dh_param_file: /etc/ssl/dhparam.pem</code></pre></div>
+  performance_options:
+    maxconn: 40000
+  ssl_options:
+    default_bind_ciphers: ECDHE-RSA-AES256-GCM-SHA384
+    dh_param_file: /etc/ssl/dhparam.pem</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
   namespace: nginx-ingress
 data:
-  worker-connections: "40000"  # maxconn — per-worker (divide by worker-processes)
+  worker-connections: "40000"  # performance_options.maxconn — per-worker (divide by worker-processes)
   worker-processes: "4"        # nbthread — processes, not threads
   worker-rlimit-nofile: "200000"  # ulimit_n
-  ssl-ciphers: "ECDHE-RSA-AES256-GCM-SHA384"  # ssl_default_bind_ciphers
-  ssl-dhparam-file: "/etc/ssl/dhparam.pem"    # ssl_dh_param_file</code></pre></div>
+  ssl-ciphers: "ECDHE-RSA-AES256-GCM-SHA384"  # ssl_options.default_bind_ciphers
+  ssl-dhparam-file: "/etc/ssl/dhparam.pem"    # ssl_options.dh_param_file</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Approximate:</strong> <code>worker-connections</code> is per-worker where HAProxy <code>maxconn</code> is process-wide — divide by <code>worker-processes</code>.</div>
                         </div></td></tr>
@@ -4411,7 +4424,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td>TCP bind SSL offloading (<code>:ssl</code> / <code>ssl_certificate</code>)</td>
-                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.tls.secret</code> + <code>spec.host</code></td>
+                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.tls.secret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4421,7 +4434,7 @@ spec:
   listener:
     name: redis-6379-tcp
     protocol: TCP
-  host: redis.example.com  # REQUIRED — NIC TCP TLS termination is SNI-routed
+  host: # OPTIONAL — only needed to SNI-differentiate multiple TransportServers on one listener
   tls:
     secret: redis-tls  # kubernetes.io/tls Secret in this namespace
   upstreams:
@@ -4431,7 +4444,7 @@ spec:
   action:
     pass: backend</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>Partial:</strong> NIC TCP TLS termination is SNI-based, so a <code>spec.host</code> is <strong>required</strong> — HAProxy's hostless SSL offload is not reproducible without inventing an SNI hostname. Filesystem-path certificates have no equivalent (Secrets only). This is termination, not passthrough (see <code>ssl-passthrough</code>).</div>
+                            <div class="info-box warning"><strong>Partial:</strong> NIC terminates TLS over TCP from <code>spec.tls.secret</code> alone — <code>spec.host</code> is <strong>not</strong> required, so HAProxy's hostless SSL offload <em>is</em> reproducible (add an SNI <code>spec.host</code> only to differentiate multiple TransportServers on one listener). Filesystem-path certificates have no equivalent (Secrets only). This is termination, not passthrough (see <code>ssl-passthrough</code>).</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4542,13 +4555,6 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> Drop the namespace prefix (the Service lives in the controller namespace). <code>-external-service</code> XOR <code>-ingresslink</code> (BIG-IP); or use the <code>external-status-address</code> ConfigMap key. Also reports VirtualServer/VirtualServerRoute status.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>--controller-port</code></td>
-                            <td><code>-nginx-status-port</code> / <code>-prometheus-metrics-listen-port</code> / <code>-ready-status-port</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Partial:</strong> no single combined port — HAProxy's one port splits into three (status 8080, metrics 9113, readiness 8081). There is no pprof port in NIC. Range 1024-65535.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
                             <td><code>--disable-service-external-name</code></td>
                             <td><span class="badge badge-plus">NGINX Plus</span> ExternalName upstream (off unless used)</td>
                         </tr>
@@ -4602,7 +4608,7 @@ spec:
                             <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> set the port on the catch-all <code>spec.defaultBackend.service.port</code>. HAProxy also reuses this as the controller/metrics port (6060); NIC splits those (9113/8081).</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> set the port on the catch-all <code>spec.defaultBackend.service.port</code>. HAProxy also reuses this single port as the controller/metrics port (6060); NIC splits those into separate ports (status 8080, metrics 9113, readiness 8081).</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--default-backend-service</code></td>

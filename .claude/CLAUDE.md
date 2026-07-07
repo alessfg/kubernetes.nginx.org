@@ -50,7 +50,11 @@ Loading rules (all pages): `shared.css` is linked before the page CSS; `shared.j
 ### Migration tools (`ingress-nginx-migration.html`, `traefik-migration.html`)
 
 - Both migration tools are linked from the landing page with relative paths (`href="ingress-nginx-migration.html"`, `href="traefik-migration.html"`) so the links resolve identically when opened locally, in PR previews, and in production. Do not change them to absolute FQDNs — that only works in production and breaks local testing.
-- Both pages run on the shared engine: the page's SOURCE module (`migration-<source>.js`) supplies mapping data + `parseInput`/`buildPlan`; `migration-core.js` owns rendering/nav/checklist. The analyzer's mappings (`ANNOTATION_MAPPINGS` / `TRAEFIK_MAPPINGS` in the source modules) and the static reference tables in the HTML must stay in agreement — when you change a mapping, change both.
+- Both pages run on the shared engine: the page's SOURCE module (`migration-<source>.js`) supplies mapping data + `parseInput`/`buildPlan`; `migration-core.js` owns rendering/nav/checklist. The analyzer's mappings (`ANNOTATION_MAPPINGS` / `TRAEFIK_MAPPINGS` in the source modules) and the static reference tables in the HTML must stay in agreement — when you change a mapping, change both, **including the example YAML in the expanded panels, which must match what the corresponding generator emits**. A recurring bug is a hand-written example drifting from its still-correct generator; treat the generator as the source of truth and fix the example to match it.
+
+#### Verifying analyzer changes (there is no build system or test suite)
+
+The analyzer is pure data — a source module's `parseInput` → `buildPlan` returns a plain `MigrationPlan` object with no DOM. Test generator/mapping edits in Node by loading `assets/js/migration-<source>.js` + `assets/js/migration-core.js` under a hand-rolled `window`/`document` stub (its `createElement`/`getElementById`/etc. return a chainable no-op element) and calling `MIGRATION_SOURCE.analyzer.parseInput`/`buildPlan` on the sample presets. **Load-bearing gotcha:** `buildPlan` runs each generator in a `try/catch` that only `console.warn`s on failure, so a broken generator **silently drops its resource** from the output instead of throwing — capturing `console.warn` (count > 0, not a thrown exception) is the only way to detect it. `node --check` catches syntax only. Also sanity-check generated `k8s.nginx.org/v1` field names against the `json:` tags in `nginx/kubernetes-ingress/pkg/apis/configuration/v1/types.go` to catch invalid CRD fields.
 
 #### Migration tool ordering and structure rules (both pages)
 
@@ -172,7 +176,7 @@ When updating the sites for a new release, update **all** of the following.
 **Migration tool:**
 
 - Update the NIC target versions in the `MigrationTool.NIC` block at the **top of `assets/js/migration-core.js`** (`VERSION`, `HELM_VERSION` — the install commands and release URL derive from them). This is the single source of truth for the NIC side of the Version Reference banners, the standalone `kubectl apply` example, and the analyzer's CRD-install references on **every** migration page.
-- Update the `INGRESS_NGINX_VERSION` constant at the **top of `assets/js/migration-ingress-nginx.js`** (source-controller side of the banner; the release link derives from it). Banner text and release-tag links are populated from these constants at `DOMContentLoaded` via `data-*` attributes.
+- Update the `INGRESS_NGINX_VERSION` constant at the **top of `assets/js/migration-ingress-nginx.js`** (source-controller side of the banner; the release link derives from it). Banner text and release-tag links are populated from these constants at `DOMContentLoaded` via `data-*` attributes. Note: `kubernetes/ingress-nginx` was archived (Mar 2026) and `controller-v1.15.1` is its final release, so this constant should not need bumping again.
 - Update the static fallback text inside the `data-*-version` spans / `data-*-release-link` anchors in `ingress-nginx-migration.html` (so no-JS users see the correct version before the JS runs).
 - The NIC version in `MigrationTool.NIC` also drives the **Traefik tool's** banners and install commands — after bumping it, audit the NIC release notes for features that change Traefik mappings too (`assets/js/migration-traefik.js` + `traefik-migration.html`).
 

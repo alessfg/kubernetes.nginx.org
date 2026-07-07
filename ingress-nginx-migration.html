@@ -261,7 +261,7 @@
                         <li><strong>Basic Auth:</strong> Username/password authentication via htpasswd</li>
                         <li><strong>JWT Validation:</strong> Validate JSON Web Tokens (Plus)</li>
                         <li><strong>OIDC:</strong> Native OpenID Connect integration (Plus)</li>
-                        <li><strong>API Key Auth:</strong> Authenticate via API keys in headers/query (Plus)</li>
+                        <li><strong>API Key Auth:</strong> Authenticate via API keys in headers/query</li>
                         <li><strong>mTLS:</strong> Client certificate verification (ingress) and backend TLS (egress)</li>
                         <li><strong>WAF:</strong> F5 WAF for NGINX web application firewall (Plus)</li>
                     </ul>
@@ -895,6 +895,44 @@ annotations:
 # No migration action needed for this annotation.</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> The community controller supports global external authentication via ConfigMap keys (<code>global-auth-url</code>, etc.). The <code>enable-global-auth: "false"</code> annotation opts an Ingress out of this global setting. The F5 NGINX Ingress Controller does not have global external auth — authentication is always configured per-resource (via the <code>externalAuth</code>/<code>oidc</code>/<code>jwt</code> Policy CRDs or <code>location-snippets</code>). This annotation can be safely removed during migration.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Authentication (API Key) -->
+            <h3 id="authentication-api-key">Authentication (API Key)</h3>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="authentication-api-key"><thead><tr><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td>No direct equivalent</td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>apiKey</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># No direct equivalent
+# Requires custom Lua or external service</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
+kind: Secret
+metadata:
+  name: api-keys
+type: nginx.org/apikey
+data:
+  client1: YXBpa2V5MTIzNDU=
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: api-key-auth
+spec:
+  apiKey:
+    clientSecret: api-keys
+    suppliedIn:
+      header: [X-API-Key]
+      query: [api_key]</code></pre></div>
+                            </div>
+                                <div class="info-box note"><strong>Note:</strong> The <code>apiKey</code> Policy works with NGINX Open Source &mdash; unlike the <code>jwt</code>, <code>oidc</code>, and <code>waf</code> Policies, it is <strong>not</strong> gated on NGINX Plus. Attach it to a VirtualServer or VirtualServerRoute via <code>spec.policies</code> (the <code>apiKey</code> Policy is not attachable to an Ingress via <code>nginx.org/policies</code>).</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -3468,43 +3506,6 @@ spec:
         statusMatch: "200-399"
       slowStart: 30s  # slow-start</code></pre>
                                 <div class="info-box note"><strong>Note:</strong> The VirtualServer CRD provides the most granular control over active health checks. Active health checks and <code>slowStart</code> require NGINX Plus. For passive health checks (OSS), see <a href="#passive-health-checks">Passive Health Checks</a> in OSS Mappings.</div>
-                            </div>
-                        </div></td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- API Key Authentication -->
-            <h3 id="api-key-authentication">API Key Authentication</h3>
-            <div class="table-wrapper">
-                <table class="mapping-table" aria-labelledby="api-key-authentication"><thead><tr><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                    <tbody>
-                        <tr class="expandable">
-                            <td>No direct equivalent</td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>apiKey</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># No direct equivalent
-# Requires custom Lua or external service</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller (Plus)</h4><pre><code>apiVersion: v1
-kind: Secret
-metadata:
-  name: api-keys
-type: nginx.org/apikey
-data:
-  client1: YXBpa2V5MTIzNDU=
----
-apiVersion: k8s.nginx.org/v1
-kind: Policy
-metadata:
-  name: api-key-auth
-spec:
-  apiKey:
-    clientSecret: api-keys
-    suppliedIn:
-      header: [X-API-Key]
-      query: [api_key]</code></pre></div>
                             </div>
                         </div></td></tr>
                     </tbody>

@@ -31,7 +31,7 @@ The community site for NGINX's Kubernetes ecosystem, served via GitHub Pages at 
 
 ## Project Structure
 
-This is a documentation-only project with no build system, tests, or package manager. All pages are static HTML with first-party CSS/JS under `assets/` and no third-party runtime dependencies.
+This is a documentation-only project with no build system or package manager. All pages are static HTML with first-party CSS/JS under `assets/` and no third-party runtime dependencies. A dependency-free test suite under `test/` (`node --test`, run in CI) covers the migration tools' analyzer behavior, value-conversion semantics, and page/engine wiring.
 
 ## Contributing
 

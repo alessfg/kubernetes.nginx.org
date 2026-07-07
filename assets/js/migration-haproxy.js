@@ -279,10 +279,12 @@
             if ((m = s.match(/^rand\((\d+)\)\s+(lt|le|gt|ge)\s+(\d+)$/i))) {
                 let base = parseInt(m[1], 10) || 100;
                 let n = parseInt(m[3], 10);
-                let pct = Math.round((n / base) * 100);
-                // gt/ge select the complement of the low range.
-                if (/^g/i.test(m[2])) pct = 100 - pct;
-                pct = Math.min(100, Math.max(0, pct));
+                // rand(<range>) yields integers 0..range-1 (HAProxy 3.2
+                // configuration.txt, fetch methods), so the exact matched counts
+                // are: lt N → N; le N → N+1; ge N → range−N; gt N → range−N−1.
+                let op = m[2].toLowerCase();
+                let matched = op === 'lt' ? n : op === 'le' ? n + 1 : op === 'ge' ? base - n : base - n - 1;
+                let pct = Math.min(100, Math.max(0, Math.round((matched / base) * 100)));
                 return { kind: 'rand', pct: pct, raw: s };
             }
             if ((m = s.match(/^(?:req\.cook|cookie)\(([^)]+)\)(?:\s+-m\s+(str|beg|reg)\s+(.+))?$/i))) {
@@ -302,6 +304,12 @@
             }
             if ((m = s.match(/^src\s+(.+)$/i))) {
                 let cidrs = m[1].split(/[\s,]+/).filter(function(c) { return c !== ''; });
+                // Every operand must look like an IPv4/IPv6 address or CIDR —
+                // otherwise this is a compound ACL ("src A or src B", negation,
+                // extra matchers) that must not leak keywords into a Policy list.
+                let looksLikeCidr = function(c) { return /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(c) || /^[0-9a-fA-F:]+(\/\d{1,3})?$/.test(c) && c.indexOf(':') !== -1; };
+                let bad = cidrs.find(function(c) { return !looksLikeCidr(c); });
+                if (bad) return { kind: 'untranslatable', raw: s, why: 'unrecognized src operand "' + bad + '" (compound ACLs do not convert)' };
                 return { kind: 'src', cidrs: cidrs, raw: s };
             }
             return { kind: 'untranslatable', raw: s, why: null };

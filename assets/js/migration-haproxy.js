@@ -624,7 +624,7 @@
                 out.configMap.push({ fromLabel: f.label + ' (inbound PROXY accept)', to: 'proxy-protocol', value: 'True', note: null });
                 out.configMap.push({ fromLabel: f.label, to: 'set-real-ip-from', value: isPatternFileRef(f.value) ? '# TODO: inline CIDRs from pattern file "' + cmt(f.value) + '"' : (f.value || '# TODO: trusted CIDRs'), note: 'HAProxy CIDR accept-list scopes only real-IP trust here' });
                 out.configMap.push({ fromLabel: f.label, to: 'real-ip-header', value: 'proxy_protocol', note: null });
-                out.notes.push({ code: 'proxy-protocol (ConfigMap)', message: 'NIC enables PROXY protocol globally for all listeners — it cannot restrict acceptance to specific source IPs (HAProxy rejects non-listed senders with 400). Every connection reaching NGINX must then send a PROXY header.' });
+                out.notes.push({ code: 'proxy-protocol (ConfigMap)', message: 'NIC enables PROXY protocol globally for all listeners — it cannot restrict acceptance to specific source IPs (HAProxy returns 400 if a listed source IP connects without sending the PROXY header). Every connection reaching NGINX must then send a PROXY header.' });
                 return out;
             },
 
@@ -851,10 +851,17 @@
                     // NIC validates allowMethods against a fixed set — no "*" wildcard,
                     // and HAProxy's CONNECT/TRACE are rejected outright.
                     let NIC_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'];
+                    // NIC's validateCORSMethods rejects HEAD listed alongside GET, so the
+                    // "*" wildcard expands WITHOUT HEAD (browsers cover HEAD for GET endpoints).
+                    let WILDCARD_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'];
                     let requested = splitCommaList(methods).map(function(m) { return m.toUpperCase(); });
-                    let expanded = requested.indexOf('*') !== -1 ? NIC_METHODS.slice() : requested;
+                    let expanded = requested.indexOf('*') !== -1 ? WILDCARD_METHODS.slice() : requested;
                     let dropped = expanded.filter(function(m) { return NIC_METHODS.indexOf(m) === -1; });
                     expanded = expanded.filter(function(m) { return NIC_METHODS.indexOf(m) !== -1; });
+                    // GET and HEAD cannot both be listed — drop HEAD when GET is present.
+                    if (expanded.indexOf('GET') !== -1 && expanded.indexOf('HEAD') !== -1) {
+                        expanded = expanded.filter(function(m) { return m !== 'HEAD'; });
+                    }
                     if (expanded.length > 0) {
                         lines.push('    allowMethods:' + (requested.indexOf('*') !== -1 ? '  # "*" is not accepted by NIC — enumerated' : ''));
                         expanded.forEach(function(m) { lines.push('      - ' + m); });
@@ -973,7 +980,9 @@
                 }
                 let dest = 'syslog:server=' + (fields.address || '# TODO: syslog address') + (fields.port ? ':' + fields.port : '');
                 if (fields.facility) dest += ',facility=' + fields.facility;
-                if (fields.level) dest += ',severity=' + fields.level;
+                // HAProxy and nginx share the syslog level vocabulary except for two
+                // names — translate err->error and warning->warn (all others map 1:1).
+                if (fields.level) { let lvl = fields.level.toLowerCase(); if (lvl === 'err') lvl = 'error'; else if (lvl === 'warning') lvl = 'warn'; dest += ',severity=' + lvl; }
                 out.configMap.push({ fromLabel: f.label, to: 'access-log', value: dest, note: 'NIC ignores access-log values that do not start with syslog:' });
                 out.notes.push({ code: 'syslog-server', message: 'Only the ACCESS log can go to syslog (single destination — no multi-server fan-out); the NGINX error log stays on stderr with error-log-level controlling verbosity. HAProxy format/length/minlevel fields have no equivalent.' });
                 return out;
@@ -1572,9 +1581,31 @@
                 let label = finding.label;
                 let dropped = [];
                 let managed = [];
+                // v3 Global CRs nest several fields under sub-objects
+                // (performance_options.maxconn; ssl_options.default_bind_ciphers /
+                // default_bind_options / dh_param_file; log_target_list), whereas v1
+                // uses the flat client-native names. Flatten the v3 nesting into the
+                // flat keys the switch below already handles, so the container objects
+                // themselves never fall through to dropped[].
+                let flat = {};
                 Object.keys(config).forEach(function(rawKey) {
-                    let k = String(rawKey).toLowerCase().replace(/_/g, '-');
+                    let nk = String(rawKey).toLowerCase().replace(/_/g, '-');
                     let v = config[rawKey];
+                    if (nk === 'performance-options' && v && typeof v === 'object') {
+                        if (v.maxconn != null) flat['maxconn'] = v.maxconn;
+                    } else if (nk === 'ssl-options' && v && typeof v === 'object') {
+                        if (v.default_bind_ciphers != null) flat['ssl_default_bind_ciphers'] = v.default_bind_ciphers;
+                        if (v.default_bind_options != null) flat['ssl_default_bind_options'] = v.default_bind_options;
+                        if (v.dh_param_file != null) flat['ssl_dh_param_file'] = v.dh_param_file;
+                    } else if (nk === 'log-target-list') {
+                        flat['log_targets'] = v;
+                    } else {
+                        flat[rawKey] = v;
+                    }
+                });
+                Object.keys(flat).forEach(function(rawKey) {
+                    let k = String(rawKey).toLowerCase().replace(/_/g, '-');
+                    let v = flat[rawKey];
                     switch (k) {
                         case 'maxconn':
                             out.configMap.push({ fromLabel: label + ' maxconn', to: 'worker-connections', value: String(v), note: 'per-worker in NGINX (HAProxy maxconn is process-wide) — divide by worker-processes' });
@@ -1787,7 +1818,7 @@
                     let ts = ['apiVersion: k8s.nginx.org/v1', 'kind: TransportServer', 'metadata:', '  name: ' + name, 'spec:',
                         '  listener:', '    name: ' + name + '-tcp', '    protocol: TCP'];
                     if (ssl) {
-                        ts.push('  host: # TODO: SNI hostname — NIC TCP TLS termination is SNI-routed (REQUIRED with tls)');
+                        ts.push('  host: # OPTIONAL — only needed to SNI-differentiate multiple TransportServers on one listener');
                         ts.push('  tls:', '    secret: ' + (sslCert && String(sslCert).indexOf('/') === -1 ? sslCert : '# TODO: kubernetes.io/tls Secret in this namespace' + (sslCert ? ' (from ' + cmt(sslCert) + ')' : '')));
                     }
                     ts.push('  upstreams:', '    - name: backend', '      service: ' + (svc.name || '# TODO: service'), '      port: ' + (svc.port || '# TODO: port'),
@@ -1824,7 +1855,7 @@
                     let ts = ['apiVersion: k8s.nginx.org/v1', 'kind: TransportServer', 'metadata:', '  name: ' + sanitizeName(e.service) + '-' + e.listenPort, '  namespace: ' + e.namespace, 'spec:',
                         '  listener:', '    name: ' + lname, '    protocol: TCP'];
                     if (e.ssl) {
-                        ts.push('  host: # TODO: SNI hostname — HAProxy ssl-offload was hostless, but NIC TCP TLS termination is SNI-routed');
+                        ts.push('  host: # OPTIONAL — only needed to SNI-differentiate multiple TransportServers on one listener');
                         ts.push('  tls:', '    secret: # TODO: kubernetes.io/tls Secret with the certificate HAProxy used');
                     }
                     ts.push('  upstreams:', '    - name: backend', '      service: ' + e.service, '      port: ' + e.servicePort,
@@ -1835,7 +1866,7 @@
                 out.crds.push({ kind: 'GlobalConfiguration', yaml: gc.join('\n') });
                 servers.forEach(function(y) { out.crds.push({ kind: 'TransportServer', yaml: y }); });
                 if (entries.some(function(e) { return e.ssl; })) {
-                    out.notes.push({ code: 'tcp-services :ssl entries', message: 'HAProxy tcp-services SSL offload terminates without a hostname; NIC TransportServer TLS termination is SNI-based — assign each entry an SNI host. Truly hostless TLS-over-TCP is not expressible.' });
+                    out.notes.push({ code: 'tcp-services :ssl entries', message: 'NIC terminates TLS over TCP from spec.tls.secret alone — spec.host is NOT required. The single-service-per-port tcp-services case is hostless and fully expressible; assign a host only to SNI-differentiate multiple TransportServers sharing one listener.' });
                 }
                 return out;
             }
@@ -1851,8 +1882,8 @@
             // Access control & real IP
             { keys: ['annotation:allow-list', 'annotation:deny-list', 'annotation:blacklist', 'annotation:whitelist'], source: 'allow-list / deny-list (+ deprecated blacklist/whitelist)', nic: 'Policy CRD accessControl allow[]/deny[] (+ nginx.org/policies on Ingress)', type: 'policy', category: 'Access Control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'generateAccessControl' },
             { keys: ['annotation:src-ip-header'], source: 'src-ip-header', nic: 'ConfigMap real-ip-header + set-real-ip-from + real-ip-recursive (global)', type: 'configmap', category: 'Access Control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'generateSrcIpHeader' },
-            { keys: ['configmap:proxy-protocol'], source: 'proxy-protocol (inbound)', nic: 'ConfigMap proxy-protocol + set-real-ip-from + real-ip-header: proxy_protocol', type: 'configmap', category: 'Access Control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'generateProxyProtocol' },
-            { keys: ['annotation:send-proxy-protocol'], source: 'send-proxy-protocol', nic: 'No direct equivalent — PROXY-to-backend does not exist for HTTP upstreams; TCP/UDP only via TransportServer streamSnippets (proxy_protocol on; sends PROXY v1 only, requires -enable-snippets)', type: 'unsupported', category: 'Access Control', anchor: 'access-control', section: 'oss', grouped: true },
+            { keys: ['configmap:proxy-protocol'], source: 'proxy-protocol (inbound)', nic: 'ConfigMap proxy-protocol + set-real-ip-from + real-ip-header: proxy_protocol', type: 'configmap', category: 'Access Control', anchor: 'client-mtls-proxy', section: 'oss', grouped: true, generator: 'generateProxyProtocol' },
+            { keys: ['annotation:send-proxy-protocol'], source: 'send-proxy-protocol', nic: 'No direct equivalent — PROXY-to-backend does not exist for HTTP upstreams; TCP/UDP only via TransportServer streamSnippets (proxy_protocol on; sends PROXY v1 only, requires -enable-snippets)', type: 'unsupported', category: 'Access Control', anchor: 'backend-tls', section: 'oss', grouped: true },
             { keys: ['annotation:forwarded-for'], source: 'forwarded-for', nic: 'Automatic — NIC always sends X-Forwarded-For', type: 'annotation', category: 'Access Control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'generateForwardedFor' },
 
             // Authentication

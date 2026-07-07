@@ -37,7 +37,7 @@ Loading rules (all pages): `shared.css` is linked before the page CSS; `shared.j
 
 ## Key Files
 
-- `index.html` — **The live landing page** served via GitHub Pages. Hub page linking to all four projects/tools above. Styles/scripts live in `assets/css/{shared,index}.css` and `assets/js/{shared,index}.js`.
+- `index.html` — **The live landing page** served via GitHub Pages. Hub page linking to all five projects/tools above. Styles/scripts live in `assets/css/{shared,index}.css` and `assets/js/{shared,index}.js`.
 - `ingress-nginx-migration.html` — **The live migration tool** at `https://kubernetes.nginx.org/ingress-nginx-migration.html`. Interactive YAML analyzer, 130+ annotation mappings, CRD migration examples, and ConfigMap migration guidance. Styles live in `assets/css/{shared,migration}.css`; scripts are `assets/js/shared.js` + `assets/js/migration-ingress-nginx.js` + `assets/js/migration-core.js` (in that order).
 - `haproxy-migration.html` — **The live HAProxy migration tool** at `https://kubernetes.nginx.org/haproxy-migration.html`. Interactive analyzer for HAProxy resources (annotated Ingress/Service objects, the controller ConfigMap including tcp-services, and the Global/Defaults/Backend/Frontend/TCP CRDs in both API groups), 80+ annotation mappings, controller-flag and CRD-field tables, and route-acl canary translation. Same CSS; scripts are `assets/js/shared.js` + `assets/js/migration-haproxy.js` + `assets/js/migration-core.js`.
 

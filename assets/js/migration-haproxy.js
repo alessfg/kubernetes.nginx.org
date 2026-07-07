@@ -1006,11 +1006,25 @@
             },
 
             // -- Health checks & load balancing --
-            generateCheck: function(findings, context) {
+            generateCheck: function(findings, context, strategy) {
                 let out = contribution();
                 let f = findings[0];
                 if (String(f.value).toLowerCase() !== 'true') {
                     out.notes.push({ code: f.label + ': "' + cmt(f.value) + '"', message: 'Health checking disabled — nothing to migrate.' });
+                    return out;
+                }
+                if (strategy === 'crd') {
+                    // CRD-first: passive health on the VirtualServer upstream (active probes = Plus).
+                    let basics = basicsOf(f, context);
+                    let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: health-check-app', 'spec:',
+                        '  host: ' + specHost(basics), '  upstreams:', '    - name: backend', '      service: ' + specService(basics), '      port: ' + specPort(basics),
+                        '      max-fails: 1  # check → OSS passive health (eject after N failed client requests)',
+                        '      fail-timeout: 10s  # failure window + ejection time',
+                        '      # healthCheck:  # NGINX Plus only — active probes (idle backends are tested too)',
+                        '      #   enable: true',
+                        '  routes:', '    - path: ' + specPath(basics), '      action:', '        pass: backend'];
+                    out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                    out.notes.push({ code: 'haproxy.org/check', message: 'HAProxy runs ACTIVE TCP probes; NIC OSS only supports PASSIVE health (VirtualServer upstreams[].max-fails/fail-timeout — failed real requests eject the server, idle backends are never probed). Active probes require NGINX Plus (upstreams[].healthCheck).' });
                     return out;
                 }
                 out.swaps.push({ fromKey: f.label, fromValue: f.value, to: 'nginx.org/max-fails', value: '1', note: 'OSS passive health: eject after N failed client requests' });
@@ -1052,7 +1066,7 @@
                 return out;
             },
 
-            generateLoadBalance: function(findings) {
+            generateLoadBalance: function(findings, context, strategy) {
                 let out = contribution();
                 let f = findings[0];
                 let v = String(f.value || '').trim();
@@ -1081,7 +1095,17 @@
                     out.notes.push({ code: f.label + ': "' + cmt(v) + '"', message: 'Unrecognized load-balance algorithm — map it manually to one of: round_robin, least_conn, ip_hash, random, random two, hash <key> [consistent] (least_time requires NGINX Plus).' });
                     return out;
                 }
-                emitScoped(out, f, 'lb-method', 'nginx.org/lb-method', mapped, note);
+                if (strategy === 'crd') {
+                    // CRD-first: the load-balancing method lives on the VirtualServer upstream.
+                    let basics = basicsOf(f, context);
+                    let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: lb-method-app', 'spec:',
+                        '  host: ' + specHost(basics), '  upstreams:', '    - name: backend', '      service: ' + specService(basics), '      port: ' + specPort(basics),
+                        '      lb-method: ' + yamlQuote(mapped) + '  # load-balance' + (note ? ' — ' + note : ''),
+                        '  routes:', '    - path: ' + specPath(basics), '      action:', '        pass: backend'];
+                    out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                } else {
+                    emitScoped(out, f, 'lb-method', 'nginx.org/lb-method', mapped, note);
+                }
                 return out;
             },
 
@@ -1104,12 +1128,38 @@
             },
 
             // -- Rewrites / redirects --
-            generatePathRewrite: function(findings, context) {
+            generatePathRewrite: function(findings, context, strategy) {
                 let out = contribution();
                 let f = findings[0];
                 let ruleLines = String(f.value || '').split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l !== ''; });
+                if (strategy === 'crd') {
+                    // CRD-first: one VirtualServer regex route per rule — capture groups
+                    // resolve against the route's own ~ regex path (not the Ingress path).
+                    let basics = basicsOf(f, context);
+                    let routeLines = [];
+                    ruleLines.forEach(function(rl) {
+                        let p = rl.split(/\s+/);
+                        let pathExpr, repl;
+                        if (p.length >= 2) {
+                            pathExpr = '~ ^' + p[0];
+                            repl = p.slice(1).join(' ').replace(/\\(\d)/g, '$$$1');
+                        } else {
+                            pathExpr = specPath(basics);
+                            repl = rl;
+                        }
+                        routeLines.push('    - path: ' + pathExpr, '      action:', '        proxy:', '          upstream: backend',
+                            '          rewritePath: ' + yamlQuote(repl) + '  # path-rewrite: ' + cmt(rl));
+                    });
+                    if (routeLines.length === 0) return out;
+                    let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: rewrite-app', 'spec:',
+                        '  host: ' + specHost(basics), '  upstreams:', '    - name: backend', '      service: ' + specService(basics), '      port: ' + specPort(basics),
+                        '  routes:'].concat(routeLines);
+                    out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                    return out;
+                }
+                // Annotation-first: nginx.org/rewrite-target (+ nginx.org/path-regex).
                 if (ruleLines.length > 1) {
-                    out.notes.push({ code: f.label, message: 'Multiple path-rewrite rules found — nginx.org/rewrite-target holds ONE rewrite; express additional rules as separate VirtualServer routes with action.proxy.rewritePath.' });
+                    out.notes.push({ code: f.label, message: 'Multiple path-rewrite rules found — nginx.org/rewrite-target holds ONE rewrite; express additional rules as separate VirtualServer routes with action.proxy.rewritePath (switch the migration strategy to CRD-first to generate them).' });
                 }
                 let rule = ruleLines[0] || '';
                 let parts = rule.split(/\s+/);
@@ -1152,28 +1202,50 @@
                 return out;
             },
 
-            generateSSLRedirect: function(findings, context) {
+            generateSSLRedirect: function(findings, context, strategy) {
                 let out = contribution();
                 let enabled = findingValue(findings, 'ssl-redirect');
                 let codeRaw = findingValue(findings, 'ssl-redirect-code');
                 let f = findingFor(findings, 'ssl-redirect') || findings[0];
+                let disabled = String(enabled).toLowerCase() === 'false';
+                // Redirect code: preserve HAProxy's 302 default (NIC defaults to 301);
+                // 303 clamps to 302 (not in the NIC set).
+                let code = '302';
+                let note = 'HAProxy default 302; NIC would default to 301 — set explicitly';
+                if (codeRaw != null) {
+                    let n = parseInt(codeRaw, 10);
+                    if (n === 303) {
+                        code = '302';
+                        note = '303 is not in the NIC set (301/302/307/308) — 302 is the closest non-permanent, non-method-preserving fallback';
+                    } else if ([301, 302, 307, 308].indexOf(n) !== -1) {
+                        code = String(n);
+                        note = null;
+                    }
+                }
+                if (strategy === 'crd') {
+                    // CRD-first: the HTTPS redirect lives on the VirtualServer's own TLS block.
+                    if (disabled) {
+                        out.notes.push({ code: f.label + ': "false"', message: 'ssl-redirect is disabled — no VirtualServer spec.tls.redirect block is generated (plain HTTP is served).' });
+                        return out;
+                    }
+                    let basics = basicsOf(f, context);
+                    let secret = (basics && basics.tlsSecret) || '# TODO: kubernetes.io/tls Secret';
+                    let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: ssl-redirect-app', 'spec:',
+                        '  host: ' + specHost(basics),
+                        '  tls:', '    secret: ' + secret,
+                        '    redirect:',
+                        '      enable: true  # ssl-redirect (auto-on with spec.tls on both controllers)',
+                        '      code: ' + code + '  # ' + (note || 'ssl-redirect-code'),
+                        '  upstreams:', '    - name: backend', '      service: ' + specService(basics), '      port: ' + specPort(basics),
+                        '  routes:', '    - path: ' + specPath(basics), '      action:', '        pass: backend'];
+                    out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                    return out;
+                }
+                // Annotation-first: nginx.org/ssl-redirect (+ explicit http-redirect-code).
                 if (enabled != null) {
                     emitScoped(out, f, 'ssl-redirect', 'nginx.org/ssl-redirect', String(enabled).toLowerCase() === 'true' ? 'true' : 'false', 'auto-enabled with spec.tls on both controllers; use nginx.org/redirect-to-https instead when TLS terminates at an external load balancer');
                 }
-                if (String(enabled).toLowerCase() !== 'false') {
-                    // Preserve HAProxy's 302 default — NIC defaults to 301.
-                    let code = '302';
-                    let note = 'HAProxy default 302; NIC would default to 301 — set explicitly';
-                    if (codeRaw != null) {
-                        let n = parseInt(codeRaw, 10);
-                        if (n === 303) {
-                            code = '302';
-                            note = '303 is not in the NIC set (301/302/307/308) — 302 is the closest non-permanent, non-method-preserving fallback';
-                        } else if ([301, 302, 307, 308].indexOf(n) !== -1) {
-                            code = String(n);
-                            note = null;
-                        }
-                    }
+                if (!disabled) {
                     let cf = findingFor(findings, 'ssl-redirect-code') || f;
                     emitScoped(out, cf, 'http-redirect-code', 'nginx.org/http-redirect-code', code, note);
                 }
@@ -1269,9 +1341,19 @@
                 return out;
             },
 
-            generatePodMaxconn: function(findings) {
+            generatePodMaxconn: function(findings, context, strategy) {
                 let out = contribution();
                 let f = findings[0];
+                if (strategy === 'crd') {
+                    // CRD-first: the per-server connection cap lives on the VirtualServer upstream.
+                    let basics = basicsOf(f, context);
+                    let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: max-conns-app', 'spec:',
+                        '  host: ' + specHost(basics), '  upstreams:', '    - name: backend', '      service: ' + specService(basics), '      port: ' + specPort(basics),
+                        '      max-conns: ' + f.value + '  # pod-maxconn (HAProxy auto-divides by instance count; NIC does not — divide by replicas)',
+                        '  routes:', '    - path: ' + specPath(basics), '      action:', '        pass: backend'];
+                    out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                    return out;
+                }
                 out.swaps.push({ fromKey: f.label, fromValue: f.value, to: 'nginx.org/max-conns', value: f.value, note: 'HAProxy divides pod-maxconn by the controller instance count automatically; NIC does not — divide by your replica count yourself' });
                 return out;
             },
@@ -1460,6 +1542,14 @@
                     '', '# Attach via VirtualServer spec.policies, or on Ingress via nginx.com/policies', '# (waf Policies are rejected on nginx.org/policies).'];
                 out.crds.push({ kind: 'Policy', yaml: lines.join('\n') });
                 out.notes.push({ code: f.label, message: 'HAProxy Enterprise ModSecurity rules (SecRule/CRS Secret) cannot be imported — NGINX App Protect uses its own declarative policy model (APPolicy CRD/bundle). Re-author and re-tune the ruleset, and set the enforcement mode explicitly (HAProxy ships detection-only by default). Requires NGINX Plus with App Protect.' });
+                return out;
+            },
+
+            generateCrBackendRef: function(findings) {
+                let out = contribution();
+                findings.forEach(function(f) {
+                    out.notes.push({ code: f.label + ': "' + cmt(f.value) + '"', message: 'NIC has no CR-reference indirection — drop this pointer and migrate the referenced Backend CR\'s content instead (paste the CR itself into the analyzer, or see the HAProxy CRDs table). If the pointer was ConfigMap-scoped, replicate the settings per application.' });
+                });
                 return out;
             },
 
@@ -1846,6 +1936,7 @@
             { keys: ['configmap:hard-stop-after'], source: 'hard-stop-after', nic: 'ConfigMap worker-shutdown-timeout', type: 'configmap', category: 'Global Settings', anchor: 'global-settings', section: 'oss', grouped: true, generator: 'generateHardStopAfter' },
 
             // HAProxy CRDs
+            { keys: ['annotation:cr-backend'], source: 'cr-backend (CR pointer)', nic: 'Not applicable — NIC has no CR indirection; migrate the referenced Backend CR\'s content', type: 'annotation', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', grouped: true, generator: 'generateCrBackendRef' },
             { keys: ['kind:Global'], source: 'Global CRD', nic: 'NIC ConfigMap global keys (worker-*, ssl-*)', type: 'configmap', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', generator: 'generateGlobalCRD' },
             { keys: ['kind:Defaults'], source: 'Defaults CRD', nic: 'NIC ConfigMap proxy/keepalive/log keys', type: 'configmap', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', generator: 'generateDefaultsCRD' },
             { keys: ['kind:Backend'], source: 'Backend CRD', nic: 'VirtualServer upstreams[] fields / nginx.org/* annotations', type: 'virtualserver', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', generator: 'generateBackendCRD' },
@@ -2204,13 +2295,13 @@
 'apiVersion: networking.k8s.io/v1\n' +
 'kind: Ingress\n' +
 'metadata:\n' +
-'  name: simple-app\n' +
+'  name: web-app\n' +
+'  namespace: default\n' +
 '  annotations:\n' +
 '    haproxy.org/ssl-redirect: "true"\n' +
-'    haproxy.org/ssl-redirect-code: "301"\n' +
-'    haproxy.org/timeout-server: "50s"\n' +
-'    haproxy.org/load-balance: "leastconn"\n' +
-'    haproxy.org/cookie-persistence: "JSESSIONID"\n' +
+'    haproxy.org/load-balance: "roundrobin"\n' +
+'    haproxy.org/check: "true"\n' +
+'    haproxy.org/path-rewrite: "/app/(.*) /\\\\1"\n' +
 'spec:\n' +
 '  ingressClassName: haproxy\n' +
 '  tls:\n' +
@@ -2221,7 +2312,7 @@
 '    - host: app.example.com\n' +
 '      http:\n' +
 '        paths:\n' +
-'          - path: /\n' +
+'          - path: /app\n' +
 '            pathType: Prefix\n' +
 '            backend:\n' +
 '              service:\n' +
@@ -2232,88 +2323,34 @@
 'apiVersion: networking.k8s.io/v1\n' +
 'kind: Ingress\n' +
 'metadata:\n' +
-'  name: api-app\n' +
+'  name: web-app\n' +
+'  namespace: default\n' +
 '  annotations:\n' +
 '    haproxy.org/ssl-redirect: "true"\n' +
-'    haproxy.org/path-rewrite: "/api/(.*) /\\\\1"\n' +
+'    haproxy.org/load-balance: "roundrobin"\n' +
+'    haproxy.org/check: "true"\n' +
+'    haproxy.org/path-rewrite: "/app/(.*) /\\\\1"\n' +
+'    haproxy.com/auth-type: "basic-auth"\n' +
+'    haproxy.com/auth-secret: "default/app-auth"\n' +
+'    haproxy.com/auth-realm: "Restricted Area"\n' +
 '    haproxy.org/rate-limit-requests: "100"\n' +
 '    haproxy.org/rate-limit-period: "1s"\n' +
 '    haproxy.org/rate-limit-status-code: "429"\n' +
-'    haproxy.org/cors-enable: "true"\n' +
-'    haproxy.org/cors-allow-origin: "https://app.example.com"\n' +
-'    haproxy.org/cors-allow-methods: "GET, POST, PUT"\n' +
-'    haproxy.org/cors-allow-credentials: "true"\n' +
-'    haproxy.org/allow-list: "10.0.0.0/8, 192.168.0.0/16"\n' +
 'spec:\n' +
 '  ingressClassName: haproxy\n' +
 '  tls:\n' +
 '    - hosts:\n' +
-'        - api.example.com\n' +
-'      secretName: api-tls\n' +
+'        - app.example.com\n' +
+'      secretName: app-tls\n' +
 '  rules:\n' +
-'    - host: api.example.com\n' +
+'    - host: app.example.com\n' +
 '      http:\n' +
 '        paths:\n' +
-'          - path: /api\n' +
+'          - path: /app\n' +
 '            pathType: Prefix\n' +
 '            backend:\n' +
 '              service:\n' +
-'                name: api-service\n' +
-'                port:\n' +
-'                  number: 8080\n' +
-'---\n' +
-'apiVersion: v1\n' +
-'kind: Service\n' +
-'metadata:\n' +
-'  name: api-service\n' +
-'  annotations:\n' +
-'    haproxy.org/server-ssl: "true"\n' +
-'    haproxy.org/check: "true"\n' +
-'    haproxy.org/pod-maxconn: "100"\n' +
-'spec:\n' +
-'  selector:\n' +
-'    app: api\n' +
-'  ports:\n' +
-'    - port: 8080',
-            advanced:
-'apiVersion: v1\n' +
-'kind: Service\n' +
-'metadata:\n' +
-'  name: canary-service\n' +
-'  annotations:\n' +
-'    haproxy.org/route-acl: "rand(100) lt 25"\n' +
-'spec:\n' +
-'  selector:\n' +
-'    app: canary\n' +
-'  ports:\n' +
-'    - port: 80\n' +
-'---\n' +
-'apiVersion: networking.k8s.io/v1\n' +
-'kind: Ingress\n' +
-'metadata:\n' +
-'  name: enterprise-app\n' +
-'  annotations:\n' +
-'    haproxy.org/ssl-redirect: "true"\n' +
-'    haproxy.org/auth-type: "basic-auth"\n' +
-'    haproxy.org/auth-secret: "default/credentials"\n' +
-'    haproxy.org/auth-realm: "Restricted"\n' +
-'    haproxy.org/backend-config-snippet: |\n' +
-'      http-send-name-header X-Backend\n' +
-'spec:\n' +
-'  ingressClassName: haproxy\n' +
-'  tls:\n' +
-'    - hosts:\n' +
-'        - secure.example.com\n' +
-'      secretName: enterprise-tls\n' +
-'  rules:\n' +
-'    - host: secure.example.com\n' +
-'      http:\n' +
-'        paths:\n' +
-'          - path: /\n' +
-'            pathType: Prefix\n' +
-'            backend:\n' +
-'              service:\n' +
-'                name: web-service\n' +
+'                name: app-service\n' +
 '                port:\n' +
 '                  number: 80\n' +
 '---\n' +
@@ -2324,8 +2361,114 @@
 '  namespace: default\n' +
 'data:\n' +
 '  timeout-connect: "5s"\n' +
-'  syslog-server: "address:10.0.0.5, port:514, facility:local0, level:info"\n' +
-'  maxconn: "50000"\n' +
+'  log-format: "%ci:%cp [%tr] %ft %b/%s %ST %B %tsc %ac/%fc/%bc/%sc"\n' +
+'  ssl-redirect: "true"\n' +
+'---\n' +
+'apiVersion: v1\n' +
+'kind: Service\n' +
+'metadata:\n' +
+'  name: app-service\n' +
+'  namespace: default\n' +
+'  annotations:\n' +
+'    ingress.kubernetes.io/check: "true"\n' +
+'    ingress.kubernetes.io/cookie-persistence: "JSESSIONID"\n' +
+'    haproxy.org/cr-backend: "app-backend"\n' +
+'spec:\n' +
+'  selector:\n' +
+'    app: web\n' +
+'  ports:\n' +
+'    - port: 80\n' +
+'---\n' +
+'apiVersion: v1\n' +
+'kind: Secret\n' +
+'metadata:\n' +
+'  name: app-auth\n' +
+'  namespace: default\n' +
+'type: Opaque\n' +
+'data:\n' +
+'  admin: JDFkYWRtaW5oYXNo\n' +
+'  ops: JDFkb3BzaGFzaA==\n' +
+'---\n' +
+'apiVersion: ingress.v3.haproxy.org/v3\n' +
+'kind: Backend\n' +
+'metadata:\n' +
+'  name: app-backend\n' +
+'  namespace: default\n' +
+'spec:\n' +
+'  mode: http\n' +
+'  balance:\n' +
+'    algorithm: roundrobin\n' +
+'  connect_timeout: 5000\n' +
+'  server_timeout: 50000',
+            advanced:
+'apiVersion: networking.k8s.io/v1\n' +
+'kind: Ingress\n' +
+'metadata:\n' +
+'  name: web-app\n' +
+'  namespace: default\n' +
+'  annotations:\n' +
+'    haproxy.org/ssl-redirect: "true"\n' +
+'    haproxy.org/load-balance: "roundrobin"\n' +
+'    haproxy.org/check: "true"\n' +
+'    haproxy.org/path-rewrite: "/app/(.*) /\\\\1"\n' +
+'    haproxy.com/auth-type: "basic-auth"\n' +
+'    haproxy.com/auth-secret: "default/app-auth"\n' +
+'    haproxy.com/auth-realm: "Restricted Area"\n' +
+'    haproxy.org/rate-limit-requests: "100"\n' +
+'    haproxy.org/rate-limit-period: "1s"\n' +
+'    haproxy.org/rate-limit-status-code: "429"\n' +
+'    ingress.kubernetes.io/cors-enable: "true"\n' +
+'    ingress.kubernetes.io/cors-allow-origin: "https://portal.example.com"\n' +
+'    ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT"\n' +
+'spec:\n' +
+'  ingressClassName: haproxy\n' +
+'  tls:\n' +
+'    - hosts:\n' +
+'        - app.example.com\n' +
+'      secretName: app-tls\n' +
+'  rules:\n' +
+'    - host: app.example.com\n' +
+'      http:\n' +
+'        paths:\n' +
+'          - path: /app\n' +
+'            pathType: Prefix\n' +
+'            backend:\n' +
+'              service:\n' +
+'                name: app-service\n' +
+'                port:\n' +
+'                  number: 80\n' +
+'---\n' +
+'apiVersion: networking.k8s.io/v1\n' +
+'kind: Ingress\n' +
+'metadata:\n' +
+'  name: passthrough-app\n' +
+'  namespace: default\n' +
+'  annotations:\n' +
+'    haproxy.org/ssl-passthrough: "true"\n' +
+'spec:\n' +
+'  ingressClassName: haproxy\n' +
+'  rules:\n' +
+'    - host: secure.example.com\n' +
+'      http:\n' +
+'        paths:\n' +
+'          - path: /\n' +
+'            pathType: Prefix\n' +
+'            backend:\n' +
+'              service:\n' +
+'                name: secure-backend\n' +
+'                port:\n' +
+'                  number: 8443\n' +
+'---\n' +
+'apiVersion: v1\n' +
+'kind: ConfigMap\n' +
+'metadata:\n' +
+'  name: haproxy-kubernetes-ingress\n' +
+'  namespace: default\n' +
+'data:\n' +
+'  timeout-connect: "5s"\n' +
+'  log-format: "%ci:%cp [%tr] %ft %b/%s %ST %B %tsc %ac/%fc/%bc/%sc"\n' +
+'  ssl-redirect: "true"\n' +
+'  client-ca: "default/ca-secret"\n' +
 '---\n' +
 'apiVersion: v1\n' +
 'kind: ConfigMap\n' +
@@ -2334,14 +2477,98 @@
 '  namespace: default\n' +
 'data:\n' +
 '  "5432": "databases/postgres:5432"\n' +
-'  "6443": "secure/ldap:636:ssl"\n' +
+'---\n' +
+'apiVersion: v1\n' +
+'kind: Service\n' +
+'metadata:\n' +
+'  name: app-service\n' +
+'  namespace: default\n' +
+'  annotations:\n' +
+'    ingress.kubernetes.io/check: "true"\n' +
+'    ingress.kubernetes.io/cookie-persistence: "JSESSIONID"\n' +
+'    haproxy.org/cr-backend: "app-backend"\n' +
+'spec:\n' +
+'  selector:\n' +
+'    app: web\n' +
+'  ports:\n' +
+'    - port: 80\n' +
+'---\n' +
+'apiVersion: v1\n' +
+'kind: Service\n' +
+'metadata:\n' +
+'  name: app-canary\n' +
+'  namespace: default\n' +
+'  annotations:\n' +
+'    haproxy.org/route-acl: "rand(100) lt 25"\n' +
+'spec:\n' +
+'  selector:\n' +
+'    app: web-canary\n' +
+'  ports:\n' +
+'    - port: 80\n' +
+'---\n' +
+'apiVersion: v1\n' +
+'kind: Secret\n' +
+'metadata:\n' +
+'  name: app-auth\n' +
+'  namespace: default\n' +
+'type: Opaque\n' +
+'data:\n' +
+'  admin: JDFkYWRtaW5oYXNo\n' +
+'  ops: JDFkb3BzaGFzaA==\n' +
+'---\n' +
+'apiVersion: v1\n' +
+'kind: Secret\n' +
+'metadata:\n' +
+'  name: ca-secret\n' +
+'  namespace: default\n' +
+'type: Opaque\n' +
+'data:\n' +
+'  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t\n' +
+'---\n' +
+'apiVersion: ingress.v3.haproxy.org/v3\n' +
+'kind: Backend\n' +
+'metadata:\n' +
+'  name: app-backend\n' +
+'  namespace: default\n' +
+'spec:\n' +
+'  mode: http\n' +
+'  balance:\n' +
+'    algorithm: roundrobin\n' +
+'  connect_timeout: 5000\n' +
+'  server_timeout: 50000\n' +
+'---\n' +
+'apiVersion: ingress.v3.haproxy.org/v3\n' +
+'kind: TCP\n' +
+'metadata:\n' +
+'  name: mysql-tcp\n' +
+'  namespace: default\n' +
+'spec:\n' +
+'  - name: mysql\n' +
+'    frontend:\n' +
+'      name: fe-mysql\n' +
+'      binds:\n' +
+'        - name: v4\n' +
+'          port: 3306\n' +
+'    service:\n' +
+'      name: mysql\n' +
+'      port: 3306\n' +
+'---\n' +
+'apiVersion: ingress.v3.haproxy.org/v3\n' +
+'kind: Global\n' +
+'metadata:\n' +
+'  name: global-config\n' +
+'  namespace: default\n' +
+'spec:\n' +
+'  maxconn: 60000\n' +
+'  nbthread: 4\n' +
 '---\n' +
 'apiVersion: ingress.v3.haproxy.org/v3\n' +
 'kind: Defaults\n' +
 'metadata:\n' +
-'  name: cr-defaults\n' +
+'  name: app-defaults\n' +
+'  namespace: default\n' +
 'spec:\n' +
-'  server_timeout: 60000\n' +
+'  server_timeout: 50000\n' +
 '  connect_timeout: 5000\n' +
 '  retries: 3'
         };

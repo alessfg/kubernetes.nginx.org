@@ -23,6 +23,12 @@ The community site for NGINX's Kubernetes ecosystem, served via GitHub Pages at 
   - CRD migration examples
   - ConfigMap migration guidance
 
+- **[HAProxy Migration Tool](https://kubernetes.nginx.org/haproxy-migration.html)** (`haproxy-migration.html`) — Interactive tool for migrating from the HAProxy Kubernetes Ingress Controller (`haproxytech/kubernetes-ingress`) to the NGINX Ingress Controller. Features include:
+  - Interactive analyzer for annotated Ingress/Service objects, the HAProxy ConfigMap, and Global/Defaults/Backend/TCP custom resources
+  - 80+ annotation mappings across all three HAProxy config scopes, plus controller-flag and CRD-field tables
+  - route-acl canary translation to VirtualServer traffic splits and matches
+  - TCP services conversion to GlobalConfiguration listeners and TransportServer resources
+
 ## Project Structure
 
 This is a documentation-only project with no build system, tests, or package manager. All pages are static HTML with first-party CSS/JS under `assets/` and no third-party runtime dependencies.

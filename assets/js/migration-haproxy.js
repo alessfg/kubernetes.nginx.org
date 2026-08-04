@@ -2620,7 +2620,7 @@
                 noFindings: { title: 'No HAProxy configuration found.', message: 'Make sure your YAML contains haproxy.org/ annotations (on Ingress or Service objects), the HAProxy controller ConfigMap, or ingress.v1/v3.haproxy.org custom resources.' },
                 emptyStateLead: 'Paste your HAProxy YAML above and click Analyze',
                 emptyStateHint: 'Drag & drop a .yaml file, or try "Load Sample" for an example',
-                pageNames: { 'getting-started': 'Getting Started', analyzer: 'Config Analyzer', reference: 'Reference Guide' }
+                pageNames: { 'getting-started': 'Getting started', analyzer: 'Config analyzer', reference: 'Reference guide' }
             },
             versionBindings: [
                 { attr: 'data-haproxy-version', text: HAPROXY_VERSION },

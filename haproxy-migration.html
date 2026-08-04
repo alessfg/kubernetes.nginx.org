@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#009639" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#1a1c25" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#222222" media="(prefers-color-scheme: dark)">
     <meta name="color-scheme" content="light dark">
     <meta name="description" content="Migrate from the HAProxy Kubernetes Ingress Controller to the F5 NGINX Ingress Controller: config analyzer, annotation and CRD mappings, and migration examples.">
     <meta name="keywords" content="NGINX, Ingress, Kubernetes, HAProxy, Migration, Annotations, ConfigMap, CRD, VirtualServer, Policy">
@@ -71,10 +71,11 @@
                 <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
             </button>
             <a class="topbar-brand" href="index.html">
-                <svg aria-hidden="true" width="28" height="28" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></svg>
-                <span>NGINX <span class="sub">HAProxy Migration Tool</span></span>
+                <img class="brand-logo brand-logo-light" src="assets/img/nginx-logo.svg" alt="NGINX, sponsored by F5" width="106" height="30">
+                <img class="brand-logo brand-logo-dark" src="assets/img/nginx-logo-dark.svg" alt="NGINX, sponsored by F5" width="106" height="30">
+                <span class="sub">HAProxy Migration Tool</span>
             </a>
-            <span class="mobile-breadcrumb" id="mobileBreadcrumb">Getting Started</span>
+            <span class="mobile-breadcrumb" id="mobileBreadcrumb">Getting started</span>
         </div>
         <div class="topbar-right">
             <a class="topbar-link hide-mobile" href="https://nginx.org" target="_blank" rel="noopener" aria-label="Visit nginx.org">
@@ -105,40 +106,40 @@
                         <button class="sidebar-link active" data-page="getting-started" aria-expanded="true" aria-controls="subnav-getting-started">
                             <span class="dot"></span>
                             <span class="sidebar-link-text">
-                                <span class="sidebar-link-name">Getting Started</span>
-                                <span class="sidebar-link-desc">Tool Overview &amp; Migration Strategy</span>
+                                <span class="sidebar-link-name">Getting started</span>
+                                <span class="sidebar-link-desc">Tool overview &amp; migration strategy</span>
                             </span>
                         </button>
                         <ul class="sidebar-subnav open" id="subnav-getting-started">
                             <li><button class="sidebar-link" data-section="overview"><span class="dot"></span><span class="sidebar-link-name">Overview</span></button></li>
-                            <li><button class="sidebar-link" data-section="why-migrate"><span class="dot"></span><span class="sidebar-link-name">Why Migrate?</span></button></li>
-                            <li><button class="sidebar-link" data-section="phased-migration"><span class="dot"></span><span class="sidebar-link-name">Phased Migration</span></button></li>
-                            <li><button class="sidebar-link" data-section="features"><span class="dot"></span><span class="sidebar-link-name">CRDs Summary</span></button></li>
+                            <li><button class="sidebar-link" data-section="why-migrate"><span class="dot"></span><span class="sidebar-link-name">Why migrate?</span></button></li>
+                            <li><button class="sidebar-link" data-section="phased-migration"><span class="dot"></span><span class="sidebar-link-name">Phased migration</span></button></li>
+                            <li><button class="sidebar-link" data-section="features"><span class="dot"></span><span class="sidebar-link-name">CRDs summary</span></button></li>
                             <li><button class="sidebar-link" data-section="installation"><span class="dot"></span><span class="sidebar-link-name">Installing CRDs</span></button></li>
-                            <li><button class="sidebar-link" data-section="checklist"><span class="dot"></span><span class="sidebar-link-name">Migration Checklist</span></button></li>
-                            <li><button class="sidebar-link" data-section="resources"><span class="dot"></span><span class="sidebar-link-name">Additional Resources</span></button></li>
+                            <li><button class="sidebar-link" data-section="checklist"><span class="dot"></span><span class="sidebar-link-name">Migration checklist</span></button></li>
+                            <li><button class="sidebar-link" data-section="resources"><span class="dot"></span><span class="sidebar-link-name">Additional resources</span></button></li>
                         </ul>
                     </li>
                     <li><button class="sidebar-link" data-page="analyzer">
                         <span class="dot"></span>
                         <span class="sidebar-link-text">
-                            <span class="sidebar-link-name">Config Analyzer</span>
-                            <span class="sidebar-link-desc">Analyze, Assess &amp; Migrate</span>
+                            <span class="sidebar-link-name">Config analyzer</span>
+                            <span class="sidebar-link-desc">Analyze, assess &amp; migrate</span>
                         </span>
                     </button></li>
                     <li>
                         <button class="sidebar-link" data-page="reference" aria-expanded="false" aria-controls="subnav-reference">
                             <span class="dot"></span>
                             <span class="sidebar-link-text">
-                                <span class="sidebar-link-name">Reference Guide</span>
-                                <span class="sidebar-link-desc">Annotations, CRDs &amp; Flags</span>
+                                <span class="sidebar-link-name">Reference guide</span>
+                                <span class="sidebar-link-desc">Annotations, CRDs &amp; flags</span>
                             </span>
                         </button>
                         <ul class="sidebar-subnav" id="subnav-reference">
-                            <li><button class="sidebar-link" data-section="differences"><span class="dot"></span><span class="sidebar-link-name">Key Differences</span></button></li>
-                            <li><button class="sidebar-link" data-section="mappings"><span class="dot"></span><span class="sidebar-link-name">NGINX Mappings</span></button></li>
-                            <li><button class="sidebar-link" data-section="plus-mappings"><span class="dot"></span><span class="sidebar-link-name">NGINX Plus Mappings</span></button></li>
-                            <li><button class="sidebar-link" data-section="configmap-mappings"><span class="dot"></span><span class="sidebar-link-name">Static Config Mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="differences"><span class="dot"></span><span class="sidebar-link-name">Key differences</span></button></li>
+                            <li><button class="sidebar-link" data-section="mappings"><span class="dot"></span><span class="sidebar-link-name">NGINX mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="plus-mappings"><span class="dot"></span><span class="sidebar-link-name">NGINX Plus mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="configmap-mappings"><span class="dot"></span><span class="sidebar-link-name">Static config mappings</span></button></li>
                         </ul>
                     </li>
                 </ul>
@@ -163,11 +164,12 @@
                 </a>
                 <a class="sidebar-ext" href="https://community.nginx.org" target="_blank" rel="noopener">
                     <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-                    Community
+                    Community forum
                 </a>
             </div>
             <div class="sidebar-copyright">
                 &copy; <span id="copyright-year">2026</span> F5, Inc. All rights reserved.
+                <div class="sidebar-trademark">NGINX is a registered trademark of F5, Inc.</div>
                 <div class="sidebar-tagline">Created with AI. Maintained by humans.</div>
             </div>
         </aside>
@@ -179,7 +181,7 @@
 
         <div class="tool-page active" id="page-getting-started">
         <div class="info-box note" style="margin: 0 0 12px;"><strong>Migrating from HAProxy?</strong> The HAProxy Kubernetes Ingress Controller is actively maintained &mdash; this guide is for teams standardizing on the NGINX data plane. It translates HAProxy's annotations, ConfigMap, and Global/Defaults/Backend/TCP CRDs into the F5 NGINX Ingress Controller's ConfigMap + annotation + VirtualServer/Policy model, resource by resource.</div>
-        <div class="info-box note" style="margin: 0 0 24px;"><strong>Version Reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 24px;"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
 
         <section id="overview">
             <h2 id="migration-overview">Overview</h2>
@@ -192,7 +194,7 @@
         </section>
 
         <section id="why-migrate">
-            <h2 id="why-migrate-heading">Why Migrate?</h2>
+            <h2 id="why-migrate-heading">Why migrate?</h2>
             <p>The HAProxy Kubernetes Ingress Controller is actively maintained, so moving off it is a choice rather than a forced migration. Teams that migrate usually do it to consolidate:</p>
             <ul class="doc-list">
                 <li><strong>Standardize on the NGINX data plane</strong> &mdash; One proxy technology across VMs, containers, and Kubernetes means one config language to debug and consistent performance characteristics everywhere</li>
@@ -209,7 +211,7 @@
         </section>
 
         <section id="phased-migration">
-            <h2 id="phased-migration-strategy">Phased Migration Strategy</h2>
+            <h2 id="phased-migration-strategy">Phased migration strategy</h2>
             <p>Rather than performing a "big bang" cutover, F5 recommends a phased migration that validates each application before decommissioning HAProxy. Because HAProxy's CRD groups (<code>ingress.v1.haproxy.org</code> / <code>ingress.v3.haproxy.org</code>) and NIC's CRDs (<code>k8s.nginx.org</code>) are entirely separate API groups, both controllers coexist in one cluster without touching each other's resources &mdash; the migration is additive translation, not in-place mutation.</p>
             <ol class="doc-list">
                 <li><strong>Deploy side-by-side</strong> &mdash; Install the F5 NGINX Ingress Controller alongside HAProxy. Existing HAProxy-annotated resources are untouched; plain Ingress resources stay with HAProxy until you flip their <code>ingressClassName</code>.</li>
@@ -221,7 +223,7 @@
 
         <!-- CRD Features Summary -->
         <section id="features">
-            <h2 id="crd-features">CRDs Summary</h2>
+            <h2 id="crd-features">CRDs summary</h2>
             <p>The F5 NGINX Ingress Controller uses Custom Resource Definitions (CRDs) to extend Kubernetes with NGINX-specific configuration. CRDs provide type-safe, validated configuration that goes beyond what standard Ingress annotations can offer.</p>
 
             <div class="feature-grid">
@@ -309,7 +311,7 @@
 
         <!-- Checklist -->
         <section id="checklist">
-            <h2 id="migration-checklist">Migration Checklist</h2>
+            <h2 id="migration-checklist">Migration checklist</h2>
             <div class="checklist-meta">
                 <span class="checklist-progress" id="checklistProgress" aria-live="polite"></span>
                 <span class="checklist-note">Progress is saved in your browser.</span>
@@ -344,7 +346,7 @@
 
         <!-- Resources -->
         <section id="resources">
-            <h2 id="additional-resources">Additional Resources</h2>
+            <h2 id="additional-resources">Additional resources</h2>
             <ul class="doc-list">
                 <li><a href="https://docs.nginx.com/nginx-ingress-controller/" target="_blank" rel="noopener noreferrer">F5 NGINX Ingress Controller Documentation</a></li>
                 <li><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/virtualserver-and-virtualserverroute-resources/" target="_blank" rel="noopener noreferrer">VirtualServer Reference</a></li>
@@ -359,10 +361,10 @@
         </div><!-- /.tool-page #page-getting-started -->
 
         <div class="tool-page" id="page-analyzer" hidden="until-found">
-        <div class="info-box note" style="margin: 0 0 24px;"><strong>Version Reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 24px;"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
         <!-- YAML Migration Analyzer -->
         <section id="analyzer">
-            <h2 id="yaml-analyzer">HAProxy Config Analyzer</h2>
+            <h2 id="yaml-analyzer">HAProxy config analyzer</h2>
             <p>Paste HAProxy Kubernetes resources — an Ingress or Service with <code>haproxy.org/</code> annotations, the HAProxy controller ConfigMap, or Global/Defaults/Backend/Frontend/TCP CRs (<code>ingress.v1.haproxy.org</code> or <code>ingress.v3.haproxy.org</code>) — to get migration suggestions for the F5 NGINX Ingress Controller. Multiple YAML documents separated by <code>---</code> are analyzed together.</p>
             <div class="analyzer-drop-zone" id="dropZone">
                 <div class="analyzer-drop-overlay"><span class="analyzer-drop-label">Drop YAML file here</span></div>
@@ -400,7 +402,7 @@ spec:
                 <button class="btn btn-primary" data-action="analyzeYaml">Analyze YAML</button>
                 <button class="btn btn-secondary" data-action="clearAnalyzer">Clear</button>
                 <div class="sample-dropdown">
-                    <button class="btn btn-secondary sample-dropdown-btn" data-action="toggleSampleDropdown" aria-expanded="false" aria-haspopup="true" aria-controls="sampleDropdown">Load Sample</button>
+                    <button class="btn btn-secondary sample-dropdown-btn" data-action="toggleSampleDropdown" aria-expanded="false" aria-haspopup="true" aria-controls="sampleDropdown">Load sample</button>
                     <div class="sample-dropdown-menu" id="sampleDropdown" role="menu" aria-label="Sample YAML presets">
                         <div class="sample-dropdown-item" role="menuitem" tabindex="0" data-action="loadSampleYaml" data-preset="simple">
                             <div class="sample-title"><span class="sample-badge simple">Simple</span> Annotated Ingress</div>
@@ -411,7 +413,7 @@ spec:
                             <div class="sample-desc">Basic auth, rate limiting, timeouts, ConfigMap keys, Backend CRD &mdash; Policies + ConfigMap</div>
                         </div>
                         <div class="sample-dropdown-item" role="menuitem" tabindex="0" data-action="loadSampleYaml" data-preset="advanced">
-                            <div class="sample-title"><span class="sample-badge advanced">Advanced</span> Complex Stack</div>
+                            <div class="sample-title"><span class="sample-badge advanced">Advanced</span> Complex stack</div>
                             <div class="sample-desc">route-acl canary, Backend CRD, tcp-services, ssl-passthrough &mdash; CRDs + TransportServer</div>
                         </div>
                     </div>
@@ -425,10 +427,10 @@ spec:
         </div><!-- /.tool-page #page-analyzer -->
 
         <div class="tool-page" id="page-reference" hidden="until-found">
-        <div class="info-box note" style="margin: 0 0 24px;"><strong>Version Reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 24px;"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
         <!-- Key Differences -->
         <section id="differences">
-            <h2 id="key-differences">Key Differences</h2>
+            <h2 id="key-differences">Key differences</h2>
             <div class="table-wrapper">
                 <table class="diff-table" aria-labelledby="key-differences">
                     <thead><tr><th scope="col">Aspect</th><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -451,7 +453,7 @@ spec:
 
         <!-- OSS Mappings -->
         <section id="mappings">
-            <h2>NGINX Mappings</h2>
+            <h2>NGINX mappings</h2>
             <p>These features are available in both NGINX Open Source and NGINX Plus editions. Each HAProxy <code>haproxy.org/</code> annotation, ConfigMap key, or CRD field below maps to an NIC Policy CRD, VirtualServer field, <code>nginx.org/</code> annotation, or ConfigMap key, indicated with a badge (e.g. <span class="badge badge-policy">Policy CRD</span>, <span class="badge badge-virtualserver">VirtualServer CRD</span>, <span class="badge badge-configmap">ConfigMap</span>).</p>
 
             <div class="info-box tip" style="margin: 20px 0;">
@@ -467,15 +469,15 @@ spec:
             <div class="controls">
                 <input type="search" id="searchInput" placeholder="Search annotations, keys..." data-filter-source="oss" aria-label="Search mappings">
                 <select id="categoryFilter" data-filter-source="oss" aria-label="Filter by category">
-                    <option value="">All Categories</option>
+                    <option value="">All categories</option>
                 </select>
                 <span id="searchCount" class="search-count" aria-live="polite"></span>
-                <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
-                <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
+                <button class="btn btn-primary" data-action="expandAllExamples">Expand all</button>
+                <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
             </div>
 
             <!-- Access Control -->
-            <h3 id="access-control">Access Control</h3>
+            <h3 id="access-control">Access control</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="access-control"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -685,8 +687,8 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">Policy CRD (Recommended)</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">Policy CRD (recommended)</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation approach</button>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
@@ -1070,7 +1072,7 @@ data:
             </div>
 
             <!-- Rate Limiting -->
-            <h3 id="rate-limiting">Rate Limiting</h3>
+            <h3 id="rate-limiting">Rate limiting</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="rate-limiting"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -1094,8 +1096,8 @@ haproxy.org/rate-limit-period: "1s"</code></pre></div>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">Policy CRD (Recommended)</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">Policy CRD (recommended)</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation approach</button>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
@@ -1217,7 +1219,7 @@ data:
             </div>
 
             <!-- Session Persistence -->
-            <h3 id="session-persistence">Session Persistence</h3>
+            <h3 id="session-persistence">Session persistence</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="session-persistence"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -1452,8 +1454,8 @@ metadata:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation approach</button>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
@@ -1502,8 +1504,8 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation approach</button>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
@@ -1584,8 +1586,8 @@ spec:
             </div>
 
             <!-- Health Checks -->
-            <h3 id="health-checks">Health Checks</h3>
-            <div class="info-box note"><strong>Note:</strong> HAProxy runs <strong>active</strong> TCP/HTTP probes. NGINX OSS supports only <strong>passive</strong> health (a server is ejected after failed client requests); true active probes (<code>upstreams[].healthCheck</code>) require NGINX Plus — see the <a href="#plus-mappings">NGINX Plus Mappings</a>.</div>
+            <h3 id="health-checks">Health checks</h3>
+            <div class="info-box note"><strong>Note:</strong> HAProxy runs <strong>active</strong> TCP/HTTP probes. NGINX OSS supports only <strong>passive</strong> health (a server is ejected after failed client requests); true active probes (<code>upstreams[].healthCheck</code>) require NGINX Plus — see the <a href="#plus-mappings">NGINX Plus mappings</a>.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="health-checks"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -1669,7 +1671,7 @@ spec:
             </div>
 
             <!-- Load Balancing -->
-            <h3 id="load-balancing">Load Balancing</h3>
+            <h3 id="load-balancing">Load balancing</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="load-balancing"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -2027,7 +2029,7 @@ data:
                 </table>
             </div>
 
-            <h3 id="configuration-snippets">Configuration Snippets</h3>
+            <h3 id="configuration-snippets">Configuration snippets</h3>
             <div class="info-box note"><strong>Key difference:</strong> HAProxy snippet annotations inject raw <strong>HAProxy</strong> configuration; the F5 NGINX Ingress Controller injects raw <strong>NGINX</strong> configuration. Snippet <em>content</em> is never copyable — every directive must be rewritten by hand. Resource snippets (<code>nginx.org/*-snippets</code>, VirtualServer/TransportServer snippet fields) require the controller flag <code>-enable-snippets</code>; ConfigMap snippet keys are always available.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="configuration-snippets"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -2155,7 +2157,7 @@ metadata:
                 </table>
             </div>
 
-            <h3 id="connection-handling">Connection Handling</h3>
+            <h3 id="connection-handling">Connection handling</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="connection-handling"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -2260,7 +2262,7 @@ spec:
                 </table>
             </div>
 
-            <h3 id="global-settings">Global Settings</h3>
+            <h3 id="global-settings">Global settings</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="global-settings"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -2418,7 +2420,7 @@ data:
   # tcplog tokens → nginx stream $-vars (hand-rewrite)
   stream-log-format: "$remote_addr [$time_local] $protocol $status $bytes_sent $bytes_received $session_time"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>stream-log-format</code> applies to <strong>all</strong> TransportServer (TCP/UDP) traffic — it is global, not per-TCP-service. Pair it with the TransportServer resources in <a href="#tcp-services">TCP Services</a>.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>stream-log-format</code> applies to <strong>all</strong> TransportServer (TCP/UDP) traffic — it is global, not per-TCP-service. Pair it with the TransportServer resources in <a href="#tcp-services">TCP services</a>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>request-capture</code><br>(<code>request-capture-len</code>)</td>
@@ -2662,7 +2664,7 @@ spec:
                 </table>
             </div>
 
-            <h3 id="tcp-services">TCP Services</h3>
+            <h3 id="tcp-services">TCP services</h3>
             <div class="info-box note"><strong>Key difference:</strong> HAProxy exposes raw TCP with the <code>TCP</code> CRD or the legacy <code>--configmap-tcp-services</code> ConfigMap. The F5 NGINX Ingress Controller uses <code>TransportServer</code> resources bound to TCP listeners defined once per cluster in a <code>GlobalConfiguration</code> (referenced via the <code>-global-configuration &lt;namespace&gt;/&lt;name&gt;</code> flag). L4 content-switching/ACL rules do not port.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="tcp-services"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -2806,7 +2808,7 @@ spec:
                 </table>
             </div>
 
-            <h3 id="tls-certificates">TLS &amp; Certificates</h3>
+            <h3 id="tls-certificates">TLS &amp; certificates</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="tls-certificates"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -2967,7 +2969,7 @@ spec:
                 </table>
             </div>
 
-            <h3 id="traffic-splitting">Traffic Splitting</h3>
+            <h3 id="traffic-splitting">Traffic splitting</h3>
             <div class="info-box note"><strong>Key difference:</strong> HAProxy's <code>route-acl</code> injects a raw <code>use_backend</code> rule (first match wins, config order) with no weight field — canary is expressed purely as an ACL. The F5 NGINX Ingress Controller uses declarative VirtualServer <code>splits[]</code> (percentages) or <code>matches[]</code> (conditions). Only a small set of portable ACL primitives convert.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="traffic-splitting"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -3039,17 +3041,17 @@ spec:
 
         <!-- Plus Mappings -->
         <section id="plus-mappings">
-            <h2>NGINX Plus Mappings</h2>
+            <h2>NGINX Plus mappings</h2>
             <p>HAProxy's commercial tier (<strong>HAProxy Enterprise</strong>) adds WAF, the Global Profiling Engine, and Bot Management — a commercial-to-commercial comparison. These map to <strong>NGINX Plus</strong> policies in the F5 NGINX Ingress Controller (App Protect WAF/DoS, distributed rate limiting via zone-sync). Some HAProxy <em>OSS</em> features also land here because their true equivalent requires NGINX Plus: active health checks, request queuing, and least-time load balancing.</p>
 
             <div class="controls">
                 <input type="search" id="searchInputPlus" placeholder="Search Enterprise features..." data-filter-source="plus" aria-label="Search Plus mappings">
                 <select id="categoryFilterPlus" data-filter-source="plus" aria-label="Filter Plus by category">
-                    <option value="">All Categories</option>
+                    <option value="">All categories</option>
                 </select>
                 <span id="searchCountPlus" class="search-count" aria-live="polite"></span>
-                <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
-                <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
+                <button class="btn btn-primary" data-action="expandAllExamples">Expand all</button>
+                <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
             </div>
 
             <h3 id="waf">WAF</h3>
@@ -3098,7 +3100,7 @@ spec:
                 </table>
             </div>
 
-            <h3 id="enterprise">Enterprise Features</h3>
+            <h3 id="enterprise">Enterprise features</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="enterprise"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -3176,7 +3178,7 @@ data:
 #    Ingress-attachable — on Ingress use nginx.org/limit-req-*,
 #    which is per-pod)</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Cross-replica aggregation requires the <strong>NGINX Plus</strong> <code>zone-sync</code> ConfigMap keys (<code>zone-sync</code>, <code>zone-sync-port</code> default <code>12345</code>, <code>zone-sync-resolver-addresses</code>, <code>zone-sync-resolver-valid</code>, <code>zone-sync-resolver-ipv6</code>) — <strong>keys, not CLI flags</strong>. On NGINX OSS each pod limits independently (per-pod). The <code>rateLimit</code> Policy is not Ingress-attachable; on plain Ingress use <code>nginx.org/limit-req-*</code>. The <code>key</code> accepts <code>${binary_remote_addr}</code>, <code>${request_uri}</code>, <code>${uri}</code>, <code>${args}</code>, <code>${request_method}</code> and <code>arg_</code> / <code>cookie_</code> / <code>http_</code> / <code>jwt_claim_</code> / <code>apikey_</code>-prefixed variables — <code>${host}</code> is not allowed. See <a href="#rate-limiting">Rate Limiting</a> for the single-pod mapping.</div>
+                            <div class="info-box note"><strong>Note:</strong> Cross-replica aggregation requires the <strong>NGINX Plus</strong> <code>zone-sync</code> ConfigMap keys (<code>zone-sync</code>, <code>zone-sync-port</code> default <code>12345</code>, <code>zone-sync-resolver-addresses</code>, <code>zone-sync-resolver-valid</code>, <code>zone-sync-resolver-ipv6</code>) — <strong>keys, not CLI flags</strong>. On NGINX OSS each pod limits independently (per-pod). The <code>rateLimit</code> Policy is not Ingress-attachable; on plain Ingress use <code>nginx.org/limit-req-*</code>. The <code>key</code> accepts <code>${binary_remote_addr}</code>, <code>${request_uri}</code>, <code>${uri}</code>, <code>${args}</code>, <code>${request_method}</code> and <code>arg_</code> / <code>cookie_</code> / <code>http_</code> / <code>jwt_claim_</code> / <code>apikey_</code>-prefixed variables — <code>${host}</code> is not allowed. See <a href="#rate-limiting">Rate limiting</a> for the single-pod mapping.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Intelligent WAF</code> (HAProxy Enterprise)</td>
@@ -3293,17 +3295,17 @@ spec:
 
         <!-- Static Config Mappings -->
         <section id="configmap-mappings">
-            <h2>ConfigMap, CRD &amp; Flag Mappings</h2>
+            <h2>ConfigMap, CRD &amp; flag mappings</h2>
             <p>HAProxy's controller ConfigMap keys, Global/Defaults CRD fields, and controller CLI flags map to the F5 NGINX Ingress Controller's global <code>nginx-config</code> ConfigMap, GlobalConfiguration CRD, or deployment flags. These settings apply controller-wide.</p>
 
             <div class="controls">
                 <input type="search" id="searchInputConfigMap" placeholder="Search static config keys..." data-filter-source="configmap" aria-label="Search static config mappings">
                 <select id="categoryFilterConfigMap" data-filter-source="configmap" aria-label="Filter static config by category">
-                    <option value="">All Categories</option>
+                    <option value="">All categories</option>
                 </select>
                 <span id="searchCountConfigMap" class="search-count" aria-live="polite"></span>
-                <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
-                <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
+                <button class="btn btn-primary" data-action="expandAllExamples">Expand all</button>
+                <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse all</button>
             </div>
 
             <!-- Timeouts -->
@@ -3380,7 +3382,7 @@ metadata:
 data:
   keepalive-timeout: "1m"  # client keep-alive idle (NIC default 75s)</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Governs the <em>client</em> keep-alive idle timeout only. It does <strong>not</strong> control upstream keep-alive — that is the separate <code>keepalive</code> ConfigMap key (a connection count). See <a href="#connection-handling">Connection Handling</a>.</div>
+                            <div class="info-box note"><strong>Note:</strong> Governs the <em>client</em> keep-alive idle timeout only. It does <strong>not</strong> control upstream keep-alive — that is the separate <code>keepalive</code> ConfigMap key (a connection count). See <a href="#connection-handling">Connection handling</a>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>timeout-http-request</code></td>
@@ -3497,7 +3499,7 @@ data:
             </div>
 
             <!-- Connection Handling -->
-            <h3 id="static-connection-handling">Connection Handling</h3>
+            <h3 id="static-connection-handling">Connection handling</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="static-connection-handling"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -3733,7 +3735,7 @@ data:
             </div>
 
             <!-- Configuration Snippets -->
-            <h3 id="static-configuration-snippets">Configuration Snippets</h3>
+            <h3 id="static-configuration-snippets">Configuration snippets</h3>
             <div class="info-box warning"><strong>Snippet content is never copyable:</strong> HAProxy snippet bodies are HAProxy configuration language, <strong>not</strong> NGINX directives. Every snippet migration is a directive-by-directive rewrite — the analyzer wraps each original line in a <code># TODO rewrite as NGINX:</code> comment. ConfigMap snippet keys (<code>main-</code>/<code>http-</code>/<code>server-</code>/<code>location-</code>/<code>stream-snippets</code>) are always on; the <code>-enable-snippets</code> flag gates only <em>resource</em> snippets.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="static-configuration-snippets"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -3818,7 +3820,7 @@ data:
             </div>
 
             <!-- Client mTLS & PROXY Protocol -->
-            <h3 id="client-mtls-proxy">Client mTLS &amp; PROXY Protocol</h3>
+            <h3 id="client-mtls-proxy">Client mTLS &amp; PROXY protocol</h3>
             <div class="info-box note"><strong>Scope shift:</strong> HAProxy resolves these settings from the controller ConfigMap (global, all hosts). NIC attaches client mTLS per VirtualServer (<code>spec.policies</code>) or per Ingress (<code>nginx.org/policies</code>), and PROXY protocol acceptance is a global ConfigMap boolean — apply each to every host that needs it.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="client-mtls-proxy"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -3892,7 +3894,7 @@ data:
             </div>
 
             <!-- Global & Lifecycle -->
-            <h3 id="global-lifecycle">Global &amp; Lifecycle</h3>
+            <h3 id="global-lifecycle">Global &amp; lifecycle</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="global-lifecycle"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -4155,7 +4157,7 @@ data:
             <!-- HAProxy Backend CRD -->
             <h3 id="crd-backend">HAProxy Backend CRD</h3>
             <div class="info-box warning"><strong>CR xor annotations:</strong> mirror HAProxy's no-mixing rule — a migrated backend uses VirtualServer <code>upstreams[]</code> fields <strong>or</strong> <code>nginx.org/*</code> annotations, not both. Drop the <code>cr-backend</code> annotation/pointer; if it was ConfigMap-scoped, replicate the settings per application.</div>
-            <div class="info-box note"><strong>v1 vs v3:</strong> v3 inlines under <code>spec</code>; v1 wraps under <code>spec.config</code> and adds <code>spec.acls</code> + <code>spec.http-requests</code>. TCP-mode Backends migrate to a TransportServer (see <a href="#tcp-services">TCP Services</a>).</div>
+            <div class="info-box note"><strong>v1 vs v3:</strong> v3 inlines under <code>spec</code>; v1 wraps under <code>spec.config</code> and adds <code>spec.acls</code> + <code>spec.http-requests</code>. TCP-mode Backends migrate to a TransportServer (see <a href="#tcp-services">TCP services</a>).</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="crd-backend"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -4224,7 +4226,7 @@ spec:
                             <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].sessionCookie</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> The cookie name maps to <code>sessionCookie.name</code> with <code>enable: true</code>. <code>sessionCookie</code> is OSS-capable at v5.5.1. See <a href="#session-persistence">Session Persistence</a> for the raw-name caveat.</div>
+                            <div class="info-box note"><strong>Note:</strong> The cookie name maps to <code>sessionCookie.name</code> with <code>enable: true</code>. <code>sessionCookie</code> is OSS-capable at v5.5.1. See <a href="#session-persistence">Session persistence</a> for the raw-name caveat.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>default_server</code> (maxconn / ssl / verify / sni)</td>
@@ -4298,7 +4300,7 @@ spec:
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>proxy-protocol</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> Accepting PROXY protocol is the global <code>proxy-protocol: "true"</code> ConfigMap key — see <a href="#client-mtls-proxy">Client mTLS &amp; PROXY Protocol</a>. It cannot be scoped to one listener.</div>
+                            <div class="info-box note"><strong>Note:</strong> Accepting PROXY protocol is the global <code>proxy-protocol: "true"</code> ConfigMap key — see <a href="#client-mtls-proxy">Client mTLS &amp; PROXY protocol</a>. It cannot be scoped to one listener.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>log</code> / <code>httplog</code></td>
@@ -4326,7 +4328,7 @@ spec:
             </div>
 
             <!-- TCP Services -->
-            <h3 id="static-tcp-services">TCP Services</h3>
+            <h3 id="static-tcp-services">TCP services</h3>
             <div class="info-box note"><strong>L4 model:</strong> HAProxy's TCP CRD and the legacy <code>tcp-services</code> ConfigMap both become a GlobalConfiguration TCP listener plus a TransportServer per entry. The listener port must be pre-declared in the single GlobalConfiguration (<code>-global-configuration &lt;ns&gt;/&lt;name&gt;</code>) and exposed on the controller Service. L4 content-switching/ACL rules do not port (streamSnippets only).</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="static-tcp-services"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -4451,7 +4453,7 @@ spec:
             </div>
 
             <!-- Controller CLI Flags -->
-            <h3 id="controller-flags">Controller CLI Flags</h3>
+            <h3 id="controller-flags">Controller CLI flags</h3>
             <div class="info-box note"><strong>Deployment-time settings:</strong> these are controller command-line flags (Deployment <code>args</code>), not config resources. NIC flag names differ from HAProxy's; direct maps are listed first, then partial maps, then flags with no equivalent.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="controller-flags"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -4475,7 +4477,7 @@ spec:
                             <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> + <span class="badge badge-transportserver">TransportServer CRD</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> No flag equivalent — each entry becomes a GlobalConfiguration TCP listener + TransportServer (see <a href="#tcp-services">TCP Services</a>).</div>
+                            <div class="info-box note"><strong>Note:</strong> No flag equivalent — each entry becomes a GlobalConfiguration TCP listener + TransportServer (see <a href="#tcp-services">TCP services</a>).</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--default-ssl-certificate</code></td>

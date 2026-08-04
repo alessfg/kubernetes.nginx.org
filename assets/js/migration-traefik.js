@@ -2313,7 +2313,7 @@
                 noFindings: { title: 'No Traefik configuration found.', message: 'Make sure your YAML contains Traefik CRDs (IngressRoute, Middleware, TraefikService, …) or Ingress annotations with the traefik.ingress.kubernetes.io/ prefix.' },
                 emptyStateLead: 'Paste your Traefik YAML above and click Analyze',
                 emptyStateHint: 'Drag & drop a .yaml file, or try "Load Sample" for an example',
-                pageNames: { 'getting-started': 'Getting Started', analyzer: 'Config Analyzer', reference: 'Reference Guide' }
+                pageNames: { 'getting-started': 'Getting started', analyzer: 'Config analyzer', reference: 'Reference guide' }
             },
             versionBindings: [
                 { attr: 'data-traefik-version', text: TRAEFIK_VERSION },

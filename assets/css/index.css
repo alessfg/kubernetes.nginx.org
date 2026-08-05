@@ -70,8 +70,8 @@
 
 /* ── Feature Grid ── */
 .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 20px 0 32px; }
-.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 20px; transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s; }
-.feature-card:hover { border-color: var(--text-secondary); transform: translateY(-2px); box-shadow: var(--shadow); }
+.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 20px; box-shadow: var(--shadow); transition: border-color 0.25s, box-shadow 0.25s; }
+.feature-card:hover { border-color: var(--text-secondary); box-shadow: var(--shadow-strong); }
 .feature-card .feature-title { font-family: var(--font-display); font-size: 0.92rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
 .feature-card h3 svg { flex-shrink: 0; opacity: 0.7; }
 .feature-card p { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5; }
@@ -189,9 +189,9 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
 
 /* ── Project Cards (Home) ── */
 .project-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 20px 0 32px; }
-.project-card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 24px; transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s; text-align: left; text-decoration: none; color: inherit; }
+.project-card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 24px; box-shadow: var(--shadow); transition: border-color 0.25s, box-shadow 0.25s; text-align: left; text-decoration: none; color: inherit; }
 .project-card:link, .project-card:visited { color: inherit; }
-.project-card:hover { border-color: var(--text-secondary); transform: translateY(-2px); box-shadow: var(--shadow); }
+.project-card:hover { border-color: var(--text-secondary); box-shadow: var(--shadow-strong); }
 .project-card:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 5px; }
 /* Category eyebrow: f5.com labels categories typographically (Neusa Wide, no
    container) — a filled capsule is off-idiom, and f5.com ships 9999px only on

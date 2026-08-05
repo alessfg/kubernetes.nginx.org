@@ -104,7 +104,11 @@
     --text-secondary: #666666; /* Black 2 */
     --border: #E6E6E6;       /* White 3 */
     --radius: 5px;           /* f5.com dominant radius */
-    --shadow: 0 2px 10px rgba(0,0,0,0.10); /* f5.com card shadow */
+    --shadow: 0 2px 10px rgba(0,0,0,0.10); /* f5.com card shadow (shadow-z1) */
+    /* Hover elevation. f5.com never translates on hover — interactive surfaces
+       rest on one elevation step and strengthen to the next. This is its
+       shadow-z2 verbatim (#485665 blue-grey at 24% / 16%). */
+    --shadow-strong: 0 1px 4px rgba(72,86,101,0.24), 0 4px 8px rgba(72,86,101,0.16);
     /* The metric-corrected Arial sits ahead of the system fonts on purpose: f5.com
        sets body copy in an Arial-based fallback, not the platform UI font, so this
        keeps the two properties consistent. The system stack stays behind it for
@@ -130,6 +134,8 @@
     --text-secondary: #999999; /* Black 1 */
     --border: #343434;       /* Black 3 */
     --shadow: 0 2px 10px rgba(0,0,0,0.5);
+    /* Blue-grey shadows vanish on black, so dark mode deepens instead of tinting */
+    --shadow-strong: 0 1px 4px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.45);
     --green: #53D36B;        /* Jade 3 */
     --green-text: #53D36B;
     --blue: #6B9FFF;         /* River 3 — K8s-blue hue family */
@@ -276,7 +282,7 @@ body.has-banner { --banner-h: 35px; }
     :is(html, body).dark-mode {
         color-scheme: light;
         --bg: #fff; --surface: #fff; --text: #222222; --text-secondary: #666666; --border: #E6E6E6;
-        --shadow: none; --green: #009639; --green-text: #007D30; --blue: #326CE5;
+        --shadow: none; --shadow-strong: none; --green: #009639; --green-text: #007D30; --blue: #326CE5;
         --purple: #933DCC; --teal: #009C93; --red: #E4002B; --orange: #F29A36;
     }
 }

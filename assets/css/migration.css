@@ -140,8 +140,8 @@ pre code { background: none; color: inherit; padding: 0; }
 .btn-secondary:hover { background: var(--border); }
 .feature-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 25px; margin: 20px 0; }
 .feature-card { flex: 0 0 calc(33.333% - 17px); }
-.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 25px; transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s; }
-.feature-card:hover { border-color: var(--text-secondary); transform: translateY(-2px); box-shadow: var(--shadow); }
+.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 25px; box-shadow: var(--shadow); transition: border-color 0.25s, box-shadow 0.25s; }
+.feature-card:hover { border-color: var(--text-secondary); box-shadow: var(--shadow-strong); }
 .feature-card h3 { font-family: var(--font-display); color: var(--text); margin: 0 0 15px; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
 .feature-card .description { font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.5; }
 .feature-card ul { margin: 0; padding-left: 20px; }
@@ -184,12 +184,12 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus { opac
 .yaml-editor:focus-within .yaml-highlight-layer { border-color: var(--green-text); box-shadow: 0 0 0 3px rgba(0,150,57,0.15); }
 .analyzer-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .analyzer-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-.analyzer-pill { padding: 8px 16px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; transition: transform 0.15s, box-shadow 0.15s; }
+.analyzer-pill { padding: 8px 16px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; transition: box-shadow 0.15s; }
 /* Scrollable pills are rendered as <button>s for keyboard operability */
 button.analyzer-pill { border: none; font-family: var(--font); }
 .analyzer-pill[data-scroll] { cursor: pointer; }
 .analyzer-pill[data-scroll]:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.analyzer-pill[data-scroll]:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.analyzer-pill[data-scroll]:hover { box-shadow: var(--shadow); }
 .analyzer-pill.found { background: rgba(0,150,57,0.12); color: #025F26; }
 .analyzer-pill.paths { background: rgba(50,108,229,0.10); color: #1A4CB5; }
 .analyzer-pill.crds { background: rgba(242,154,54,0.18); color: #733800; }

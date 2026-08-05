@@ -10,6 +10,51 @@
    which shares the same ~220° hue. F5 Bay is reserved for the VirtualServer
    badge so no hue does double duty within one context. */
 
+/* ── Display-face fallback ──
+   The brand display face (Neusa Next Pro Wide) is license-gated on brand.f5.com,
+   so this site cannot self-host it and only F5ers with it installed locally will
+   ever see the real thing. Everyone else lands on Arial — and Arial set at the
+   same font-size renders noticeably smaller and on a different baseline than
+   Neusa Wide, which is what makes untreated headings read as the wrong font.
+
+   f5.com solves this with a metric-compatible fallback rather than plain Arial.
+   The four values below are lifted verbatim from f5.com's own production
+   stylesheet (its "neusaNextProWide Fallback" @font-face), so our fallback
+   headings occupy the same optical size and vertical rhythm as f5.com's real
+   Neusa Wide. size-adjust does the heavy lifting: Arial has to be scaled up
+   11.49% to match Neusa Wide's apparent size.
+
+   Two faces instead of f5.com's one: theirs omits the font-weight descriptor,
+   so a 700 heading gets *synthetically* emboldened Arial. Declaring a real 700
+   face pointed at Arial Bold avoids that smearing. The bold face deliberately
+   has no local('Arial') last resort — if Arial Bold can't be found we want the
+   400 face to be used and synthesised, not regular-weight glyphs sitting in the
+   700 slot. Where Arial is absent entirely (most Linux), neither face resolves
+   and the stack falls through to the generic families in --font-display.
+
+   Progressive enhancement: browsers without the metric-override descriptors
+   (Safari < 16.4) ignore them and render exactly what they do today. */
+@font-face {
+    font-family: 'Neusa Next Pro Wide Fallback';
+    src: local('Arial');
+    font-weight: 400;
+    font-style: normal;
+    ascent-override: 88.08%;
+    descent-override: 21.80%;
+    line-gap-override: 0.00%;
+    size-adjust: 111.49%;
+}
+@font-face {
+    font-family: 'Neusa Next Pro Wide Fallback';
+    src: local('Arial Bold'), local('Arial-BoldMT');
+    font-weight: 700;
+    font-style: normal;
+    ascent-override: 88.08%;
+    descent-override: 21.80%;
+    line-gap-override: 0.00%;
+    size-adjust: 111.49%;
+}
+
 /* ── Variables ── */
 :root {
     color-scheme: light;
@@ -34,7 +79,10 @@
     --radius: 5px;           /* f5.com dominant radius */
     --shadow: 0 2px 10px rgba(0,0,0,0.10); /* f5.com card shadow */
     --font: 'Proxima Nova', 'proxima-nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-display: 'Neusa Next Pro Wide', 'Neusa Next Pro', Arial, sans-serif; /* license-gated → Arial fallback, same as f5.com */
+    /* Real face first for F5ers who have it installed, then the metric-corrected
+       Arial defined above, then plain Arial/Helvetica where Arial Bold is missing
+       or the overrides are unsupported. See the @font-face block for why. */
+    --font-display: 'Neusa Next Pro Wide', 'Neusa Next Pro', 'Neusa Next Pro Wide Fallback', Arial, Helvetica, sans-serif;
     --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
     --sidebar-w: 260px;
     /* Layout offsets — overridden when the announcement banner is visible (body.has-banner)

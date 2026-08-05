@@ -214,8 +214,8 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
 .video-poster:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .video-poster-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: filter 0.2s; }
 .video-poster:hover .video-poster-img { filter: brightness(0.85); }
-.video-poster-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; opacity: 0.92; transition: opacity 0.2s, transform 0.2s; }
-.video-poster:hover .video-poster-play { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+.video-poster-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; opacity: 0.92; transition: opacity 0.2s; }
+.video-poster:hover .video-poster-play { opacity: 1; }
 
 /* ── Entrance Animation ── */
 .animate-in { opacity: 0; transform: translateY(12px); }

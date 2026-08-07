@@ -17,11 +17,11 @@ Project characteristics:
 
 ## Directory layout
 
-CSS and JS are split into external files under `assets/` (shared chrome + per-page), so the two HTML pages no longer duplicate styles/scripts. Images live under `assets/img/`.
+CSS and JS are split into external files under `assets/` (shared chrome + per-page), so the two HTML pages no longer duplicate styles/scripts. Images live under `assets/img/`, the webfont under `assets/fonts/`.
 
 ```
 assets/
-  css/  shared.css        # chrome: design tokens, reset, topbar, sidebar, event banner, dark mode, layout, accessibility
+  css/  shared.css        # chrome: @font-face, design tokens, type scale, reset, topbar, sidebar, event banner, dark mode, layout, accessibility
         index.css         # landing-page-only styles (hero, feature/project grids, compat tables, CTAs, code blocks)
         migration.css     # migration-tool styles shared by all migration pages (analyzer UI, mapping/reference tables, badges, checklist, print)
   js/   shared.js         # chrome behavior: dark-mode toggle, sidebar drawer, copy-to-clipboard, copyright year (globals)
@@ -29,9 +29,21 @@ assets/
         migration-core.js           # source-agnostic migration-tool engine: analyzer orchestration/rendering, table filtering, page nav, checklist; defines window.MigrationTool (NIC target versions + shared utils)
         migration-ingress-nginx.js  # ingress-nginx SOURCE module: INGRESS_NGINX_VERSION, ANNOTATION_MAPPINGS, parsers, CRD generators, sample presets; defines window.MIGRATION_SOURCE
   img/  icon.svg, icon-512.png, apple-touch-icon.{svg,png}, og-image.{svg,png}
+  fonts/ InterVariable-subset.woff2, OFL.txt, README.md   # the site's only webfont — see README.md for provenance and how to regenerate
 ```
 
-Loading rules (all pages): `shared.css` is linked before the page CSS; `shared.js` is loaded before the page JS (the page scripts are IIFEs that call shared.js globals like `closeSidebar` / `copyToClipboard`). Migration pages load **three** scripts in this exact order: `shared.js` → `migration-<source>.js` → `migration-core.js`. The source module must load before the core (the core reads `window.MIGRATION_SOURCE` at top level); source modules never touch the DOM and may dereference `MigrationTool.*` only inside function bodies (call time), never at top level. Asset paths are **relative** (`assets/css/…`, `assets/js/…`, no leading `/`) so they resolve identically locally, in PR previews, and in production. The inline `<head>` dark-mode flash-prevention `<script>` and the page-specific JSON-LD stay inline; classic (non-module) scripts keep functions global.
+Loading rules (all pages): `shared.css` is linked before the page CSS; `shared.js` is loaded before the page JS (the page scripts are IIFEs that call shared.js globals like `closeSidebar` / `copyToClipboard`). Migration pages load **three** scripts in this exact order: `shared.js` → `migration-<source>.js` → `migration-core.js`. The source module must load before the core (the core reads `window.MIGRATION_SOURCE` at top level); source modules never touch the DOM and may dereference `MigrationTool.*` only inside function bodies (call time), never at top level. Asset paths are **relative** (`assets/css/…`, `assets/js/…`, no leading `/`) so they resolve identically locally, in PR previews, and in production. Every page also carries a `<link rel="preload" as="font" … crossorigin>` for the woff2 **before** the stylesheet links — the `@font-face` lives inside `shared.css`, so without the preload the font is not discoverable until that CSS has parsed. The inline `<head>` dark-mode flash-prevention `<script>` and the page-specific JSON-LD stay inline; classic (non-module) scripts keep functions global.
+
+## Typography
+
+The site sets type in **Inter**, per the **F5 Design System (F5DS)** — the design system for F5 Distributed Cloud product UI (`~/.claude/skills/f5-product-ui-core`). This is deliberately a *different* standard from the F5 marketing brand (`f5-brand-core`: Neusa Next Pro Wide / Proxima Nova), which the site used until 2026-08-07; those faces are license-gated on brand.f5.com and could never be self-hosted, so most visitors only ever saw a metric-corrected Arial standing in for them. **Do not blend the two standards** — a value correct in one is a defect in the other. Note the site's *colors* still follow the marketing/NGINX palette (Jade green lead, K8s blue tooling accent); only the type system comes from F5DS, so an F5DS scanner run flags every color and that is expected.
+
+- **All sizes go through the scale tokens in `shared.css`** (`--fs-*` / `--lh-*`): `h1` 36/54, `h2` 24/36, `h3` 18/26, `body-lg` 16/24, `body` 14/20, `caption` 12/18, `badge` 10/16, `code` 14/24. Never write a raw `rem`/`px` font-size — including in inline `style=` attributes and in JS-generated `cssText`, both of which exist in the migration tool and are easy to miss.
+- F5DS pairs a **fixed leading with each size** rather than one global ratio, so `line-height` is a length, not a multiplier: any rule that sets `font-size` must restate the paired `--lh-*`.
+- **Weights are 400 / 500 / 700 only.** No 300, no 600.
+- **`letter-spacing` is 0 on every style** — the scale specifies no tracking anywhere, so there should be no `letter-spacing` declaration in the CSS at all.
+- **Documented deviations** (keep them, don't "fix" them): `--mono` stays SF Mono rather than F5DS's Courier, which is unreadable at code-block sizes — docs.nginx.com deviates identically with JetBrains Mono. The glyph-only sizes (`.checklist li::before` ☐, `.sample-dropdown-btn::after` ▼), the em-based inline `code` size, and the print stylesheet's `11pt` are icons/relative/print, not type.
+- The font is **self-hosted, never a CDN**. See `assets/fonts/README.md` before upgrading or re-subsetting it — in particular, `→` is used 29 times in the mapping tables and is outside both stock Google `latin` and `latin-ext` ranges.
 
 ## Key Files
 

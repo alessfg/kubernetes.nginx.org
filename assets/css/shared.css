@@ -1,33 +1,138 @@
 /* shared.css — chrome shared by index.html and ingress-nginx-migration.html.
    Single source of truth for the top bar, sidebar, event banner, dark-mode
    design tokens, layout offsets, and accessibility helpers. Edit here, not
-   per-page. Page-specific styles live in index.css / migration.css. */
+   per-page. Page-specific styles live in index.css / migration.css.
+
+   Design tokens follow the F5 design system (Brand Center palette ramps +
+   f5.com web idiom) with NGINX green (Jade #009639) as the lead accent.
+   Exception: the tooling accent is Kubernetes brand blue #326CE5 (the two
+   tools are Kubernetes-API tools); its tints/shades borrow F5's River ramp,
+   which shares the same ~220° hue. F5 Bay is reserved for the VirtualServer
+   badge so no hue does double duty within one context. */
+
+/* ── Typeface ──
+   The site sets type in Inter, per the F5 Design System (F5DS) — the design
+   system for F5 Distributed Cloud product UI, which specifies Inter for all 14
+   of its non-code styles. That is a different standard from the F5 marketing
+   brand (Neusa Next Pro Wide / Proxima Nova), which this file used previously;
+   those faces are license-gated on brand.f5.com and could never be self-hosted,
+   so most visitors only ever saw a metric-corrected Arial standing in for them.
+   Inter is SIL OFL 1.1, so it can simply be shipped and actually rendered.
+
+   One variable file carries the whole 100–900 weight range, which is why a
+   single 112 KB request covers every weight the site uses. It is subset to the
+   glyphs this site renders and self-hosted rather than pulled from a CDN, which
+   keeps the no-third-party-runtime-dependency rule intact. Provenance, the
+   subset ranges, and how to regenerate: assets/fonts/README.md. */
+@font-face {
+    font-family: 'InterVariable';
+    src: url('../fonts/InterVariable-subset.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Metric-matched stand-in for the swap window. font-display:swap renders text in
+   the fallback until the woff2 lands; without matched metrics that hand-off
+   reflows the page. Arial at the same font-size is ~4.7% narrower than Inter and
+   sits on a different baseline, so these overrides scale and re-seat it to
+   occupy Inter's exact box — the swap then changes letterforms only.
+
+   Values are derived from these specific files, not copied from anywhere: Inter's
+   own hhea metrics, and the average advance width of Inter instanced at each
+   weight against the matching Arial face. Recompute them if the font is ever
+   regenerated — the script is in assets/fonts/README.md.
+
+   Two faces rather than one because a single face with no font-weight descriptor
+   leaves the browser to *synthesise* bold, which smears the stand-in. The 700
+   face deliberately has no local('Arial') last resort: if Arial Bold is missing
+   we want synthesis from the 400 face, not regular-weight glyphs sitting in the
+   700 slot. Where Arial is absent entirely (most Linux), neither face resolves
+   and the stack falls through to the families listed after it. 400 and 700 cover
+   the 500 weight too — CSS font matching resolves 500 down to 400 within a
+   family, so it gets a real face rather than a synthesised one.
+
+   Progressive enhancement: browsers without the metric-override descriptors
+   (Safari < 16.4) ignore them and simply get plain Arial during the swap. */
+@font-face {
+    font-family: 'Inter Fallback';
+    src: local('Arial');
+    font-weight: 400;
+    font-style: normal;
+    ascent-override: 92.54%;
+    descent-override: 23.04%;
+    line-gap-override: 0.00%;
+    size-adjust: 104.68%;
+}
+@font-face {
+    font-family: 'Inter Fallback';
+    src: local('Arial Bold'), local('Arial-BoldMT');
+    font-weight: 700;
+    font-style: normal;
+    ascent-override: 92.97%;
+    descent-override: 23.15%;
+    line-gap-override: 0.00%;
+    size-adjust: 104.20%;
+}
 
 /* ── Variables ── */
 :root {
     color-scheme: light;
-    --green: #009639;
-    --green-dark: #006b2b;
-    --green-text: #006b2b;
-    --blue: #0072B0;
-    --blue-dark: #005e91;
-    --purple: #62228B;
-    --purple-dark: #4e1a6f;
-    --teal: #00838f;
-    --teal-dark: #006064;
-    --red: #c62828;
-    --red-dark: #a01c1c;
-    --orange: #F29A36;
-    --orange-dark: #d88a2e;
-    --bg: #f4f5f6;
-    --surface: #ffffff;
-    --text: #1a1a2e;
-    --text-secondary: #555;
-    --border: #e2e4e8;
-    --radius: 12px;
-    --shadow: 0 2px 12px rgba(0,0,0,0.06);
-    --font: 'Proxima Nova', 'proxima-nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --green: #009639;        /* Jade — NGINX green (official F5 palette) */
+    --green-dark: #007D30;   /* Jade 5 — AA on white for buttons/links */
+    --green-text: #007D30;   /* Jade 5 */
+    --blue: #326CE5;         /* Kubernetes brand blue — tools accent */
+    --blue-dark: #1A4CB5;    /* derived K8s-blue shade — hover/badge text */
+    --purple: #933DCC;       /* Eggplant */
+    --purple-dark: #6E23A1;  /* Eggplant 5 */
+    --teal: #009C93;         /* Surf */
+    --teal-dark: #007A76;    /* Surf 5 — AA on white */
+    --red: #E4002B;          /* F5 Red */
+    --red-dark: #B30013;     /* F5 Red 5 */
+    --orange: #F29A36;       /* Tangerine */
+    --orange-dark: #C96718;  /* Tangerine 5 */
+    --bg: #FAF9F7;           /* White 1 "snow" — f5.com body background */
+    --surface: #FFFFFF;
+    --text: #222222;         /* Black 4 "carbon" */
+    --text-secondary: #666666; /* Black 2 */
+    --border: #E6E6E6;       /* White 3 */
+    --radius: 5px;           /* f5.com dominant radius */
+    --shadow: 0 2px 10px rgba(0,0,0,0.10); /* f5.com card shadow (shadow-z1) */
+    /* Hover elevation. f5.com never translates on hover — interactive surfaces
+       rest on one elevation step and strengthen to the next. This is its
+       shadow-z2 verbatim (#485665 blue-grey at 24% / 16%). */
+    --shadow-strong: 0 1px 4px rgba(72,86,101,0.24), 0 4px 8px rgba(72,86,101,0.16);
+    /* Self-hosted variable Inter first; then a locally installed static Inter for
+       the case where the woff2 request fails; then the metric-corrected Arial
+       defined above, which only matters during the swap window; then the platform
+       stack for machines without Arial. See the @font-face block above. */
+    --font: 'InterVariable', 'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    /* F5DS sets headings in Inter too — display and body differ by weight and size
+       only, not by face. Kept as a separate token so the distinction survives in
+       the markup and headings can diverge again without a sitewide edit. */
+    --font-display: var(--font);
+    /* Deliberate deviation: F5DS specifies Courier for its one code style, which is
+       hard to read at the sizes the YAML analyzer and install commands use. NGINX's
+       own docs property deviates the same way (docs.nginx.com sets JetBrains Mono). */
     --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+
+    /* ── F5DS type scale ──
+       The F5 Design System publishes 15 styles; these are the seven distinct
+       size/line-height pairs behind them. Specified there in px, expressed here in
+       rem so the browser's font-size preference still scales the site — at the
+       default 16px root each value resolves to exactly the px figure named below.
+       Line heights are unitless-free on purpose: F5DS pairs a fixed leading with
+       each size rather than one global ratio. */
+    --fs-h1: 2.25rem;      --lh-h1: 3.375rem;   /* 36 / 54 */
+    --fs-h2: 1.5rem;       --lh-h2: 2.25rem;    /* 24 / 36 */
+    --fs-h3: 1.125rem;     --lh-h3: 1.625rem;   /* 18 / 26 */
+    --fs-body-lg: 1rem;    --lh-body-lg: 1.5rem;/* 16 / 24 — nav block headers, card titles */
+    --fs-body: 0.875rem;   --lh-body: 1.25rem;  /* 14 / 20 — main body and UI size */
+    --fs-caption: 0.75rem; --lh-caption: 1.125rem; /* 12 / 18 */
+    --fs-badge: 0.625rem;  --lh-badge: 1rem;    /* 10 / 16 — badges only */
+    /* F5DS gives code its own style — same 14px as body but looser leading. Only
+       the face deviates (see --mono); the metrics follow the system. */
+    --fs-code: 0.875rem;   --lh-code: 1.5rem;   /* 14 / 24 */
     --sidebar-w: 260px;
     /* Layout offsets — overridden when the announcement banner is visible (body.has-banner)
        and on narrow viewports. Components compose against these instead of repeating numbers. */
@@ -37,54 +142,64 @@
 }
 :is(html, body).dark-mode {
     color-scheme: dark;
-    --bg: #0f1117;
-    --surface: #1a1c25;
-    --text: #e4e6eb;
-    --text-secondary: #9ca3af;
-    --border: #2a2d38;
-    --shadow: 0 2px 12px rgba(0,0,0,0.3);
-    --green: #34d058;
-    --green-text: #34d058;
-    --blue: #58a6ff;
-    --purple: #b07ee8;
-    --teal: #4dd0e1;
-    --red: #f48fb1;
-    --orange: #ffb74d;
+    --bg: #000000;           /* Black */
+    --surface: #222222;      /* Black 4 */
+    --text: #FAF9F7;         /* White 1 */
+    --text-secondary: #999999; /* Black 1 */
+    --border: #343434;       /* Black 3 */
+    --shadow: 0 2px 10px rgba(0,0,0,0.5);
+    /* Blue-grey shadows vanish on black, so dark mode deepens instead of tinting */
+    --shadow-strong: 0 1px 4px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.45);
+    --green: #53D36B;        /* Jade 3 */
+    --green-text: #53D36B;
+    --blue: #6B9FFF;         /* River 3 — K8s-blue hue family */
+    --purple: #C177F3;       /* Eggplant 4 */
+    --teal: #5FDED3;         /* Surf 3 */
+    --red: #FF918C;          /* F5 Red 3 */
+    --orange: #FFAC5C;       /* Tangerine 4 */
 }
 
 /* ── Reset & Base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; transition: background 0.3s, color 0.3s; }
+/* F5DS pairs a fixed leading with each size rather than applying one global ratio,
+   so line-height here is a length, not a multiplier — every rule that changes
+   font-size restates the paired line-height rather than inheriting this one. */
+body { font-family: var(--font); font-size: var(--fs-body); line-height: var(--lh-body); background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
 
 /* ── Accessibility ── */
-.skip-link { position: absolute; top: -100%; left: 16px; background: var(--green-dark); color: #fff; padding: 8px 16px; border-radius: 0 0 8px 8px; font-size: 0.85rem; font-weight: 600; z-index: 9999; text-decoration: none; transition: top 0.2s; }
+.skip-link { position: absolute; top: -100%; left: 16px; background: var(--green-dark); color: #fff; padding: 8px 16px; border-radius: 0 0 5px 5px; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; z-index: 9999; text-decoration: none; transition: top 0.2s; }
 .skip-link:focus-visible { top: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 /* ── No-JS warning ── */
 /* Sits just below the fixed topbar: neither hidden behind it nor covering the
    topbar links, which work without JavaScript. */
-.noscript-warning { position: fixed; top: var(--chrome-h); left: 0; right: 0; z-index: 150; background: #fff3e0; color: #bf4000; text-align: center; padding: 12px 16px; font-size: 0.9rem; border-bottom: 1px solid #ffcc80; }
+.noscript-warning { position: fixed; top: var(--chrome-h); left: 0; right: 0; z-index: 150; background: #FFE4C4; color: #733800; text-align: center; padding: 12px 16px; font-size: var(--fs-body); line-height: var(--lh-body); border-bottom: 1px solid #FFC180; }
 
 /* ── Top Bar ── */
 .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: var(--topbar-h); display: flex; align-items: center; justify-content: space-between; position: fixed; top: var(--banner-h); left: 0; right: 0; z-index: 200; transition: background 0.3s, border-color 0.3s, top 0.2s; }
 .topbar-left { display: flex; align-items: center; gap: 16px; }
-.menu-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: var(--text); font-size: 1.1rem; transition: background 0.2s, border-color 0.2s; min-width: 44px; min-height: 44px; }
+.menu-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; cursor: pointer; color: var(--text); font-size: var(--fs-h3); line-height: var(--lh-h3); transition: background 0.2s, border-color 0.2s; min-width: 44px; min-height: 44px; }
 .menu-toggle:hover { background: var(--bg); }
 .menu-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.mobile-breadcrumb { display: none; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); }
+.mobile-breadcrumb { display: none; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-secondary); }
 .topbar-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
 .topbar-brand:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; border-radius: 4px; }
 .topbar-brand svg { flex-shrink: 0; }
-.topbar-brand span { font-weight: 700; font-size: 1rem; }
-.topbar-brand .sub { font-weight: 400; color: var(--text-secondary); }
+/* nginx.org "NGINX, sponsored by F5" lockup — light/dark pair swapped by mode */
+.topbar-brand .brand-logo { height: 30px; width: auto; display: block; flex-shrink: 0; }
+.topbar-brand .brand-logo-dark { display: none; }
+:is(html, body).dark-mode .topbar-brand .brand-logo-light { display: none; }
+:is(html, body).dark-mode .topbar-brand .brand-logo-dark { display: block; }
+.topbar-brand span { font-family: var(--font-display); font-weight: 700; font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); }
+.topbar-brand .sub { font-family: var(--font); font-weight: 400; color: var(--text-secondary); }
 .topbar-right { display: flex; align-items: center; gap: 6px; }
-.topbar-link { color: var(--text-secondary); text-decoration: none; font-size: 0.83rem; padding: 5px 10px; border-radius: 6px; transition: background 0.2s, color 0.2s; display: inline-flex; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; justify-content: center; }
+.topbar-link { color: var(--text-secondary); text-decoration: none; font-size: var(--fs-body); line-height: var(--lh-body); padding: 5px 10px; border-radius: 5px; transition: background 0.2s, color 0.2s; display: inline-flex; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; justify-content: center; }
 .topbar-link:hover { background: var(--bg); color: var(--text); }
 .topbar-link:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .topbar-link svg { width: 18px; height: 18px; flex-shrink: 0; }
 .topbar-link svg.nginx-glyph { width: 16px; height: 18px; }
-.dark-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 9px; cursor: pointer; color: var(--text); font-size: 0.95rem; font-family: var(--font); transition: background 0.2s, border-color 0.2s; display: inline-flex; align-items: center; gap: 5px; min-width: 44px; min-height: 44px; justify-content: center; }
+.dark-toggle { background: none; border: 1px solid var(--border); border-radius: 5px; padding: 5px 9px; cursor: pointer; color: var(--text); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); transition: background 0.2s, border-color 0.2s; display: inline-flex; align-items: center; gap: 5px; min-width: 44px; min-height: 44px; justify-content: center; }
 .dark-toggle:hover { background: var(--bg); }
 .dark-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .dark-toggle svg { width: 16px; height: 16px; }
@@ -94,7 +209,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 :is(html, body).dark-mode .dark-icon-sun { display: block; }
 
 /* ── Event Banner ── */
-.event-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 300; background: #006b2b; color: #fff; text-align: center; padding: 8px 16px; font-size: 0.82rem; font-weight: 500; line-height: 1.4; }
+.event-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 300; background: #007D30; color: #fff; text-align: center; padding: 8px 16px; font-size: var(--fs-caption); font-weight: 500; line-height: var(--lh-caption); }
 .event-banner strong { font-weight: 700; }
 .event-banner .banner-highlight { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .event-banner a { color: #fff; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
@@ -102,7 +217,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 /* When the banner is shown, override --banner-h so all chrome offsets recompute. */
 body.has-banner { --banner-h: 35px; }
 @media (max-width: 600px) {
-    .event-banner { font-size: 0.72rem; padding: 6px 12px; }
+    .event-banner { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: 6px 12px; }
     body.has-banner { --banner-h: 50px; }
 }
 
@@ -115,29 +230,34 @@ body.has-banner { --banner-h: 35px; }
 
 /* ── Sidebar ── */
 .sidebar { width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); position: fixed; top: var(--chrome-h); bottom: 0; left: 0; overflow-y: auto; padding: 20px 0; transition: background 0.3s, border-color 0.3s, transform 0.3s ease, top 0.2s; z-index: 100; display: flex; flex-direction: column; }
-.sidebar-section { padding: 0 16px; margin-bottom: 8px; }
-.sidebar-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary); padding: 8px 12px; }
+.sidebar-section { padding: 0 16px; margin-bottom: 14px; }
+.sidebar-label { font-family: var(--font-display); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 700; color: var(--text-secondary); padding: 8px 12px 6px; }
 .sidebar-nav { list-style: none; }
 .sidebar-nav li { margin: 2px 0; }
-.sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; text-decoration: none; color: var(--text-secondary); font-size: 0.88rem; font-weight: 500; transition: background 0.2s, color 0.2s; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: var(--font); }
+.sidebar-link { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 5px; text-decoration: none; color: var(--text-secondary); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: background 0.2s, color 0.2s; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: var(--font); }
 .sidebar-link:hover { background: var(--bg); color: var(--text); }
-.sidebar-link:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: 8px; }
-.sidebar-link.active { background: var(--bg); color: var(--text); font-weight: 600; }
-.sidebar-link .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--text-secondary); }
-.sidebar-link.active .dot { box-shadow: 0 0 0 3px var(--bg); }
+.sidebar-link:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: 5px; }
+.sidebar-link.active { background: var(--bg); color: var(--text); font-weight: 500; border-radius: 0 5px 5px 0; }
+/* f5.com nav idiom: typographic links with a flat left accent rail on the
+   active item — no bullet glyphs. The .dot spans stay in the markup purely
+   as per-product color metadata (read via :has() in the page CSS). */
+.sidebar-link .dot { display: none; }
+.sidebar-link::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background 0.2s; }
+.sidebar-link.active::before { background: var(--green); }
 .sidebar-link-text { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
-.sidebar-link-name { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-.sidebar-link-desc { font-size: 0.68rem; color: var(--text-secondary); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-link-name { font-size: var(--fs-body); line-height: var(--lh-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.sidebar-link-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-divider { height: 1px; background: var(--border); margin: 12px 16px; }
 .sidebar-ext-links { padding: 0 16px; }
-.sidebar-ext { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: var(--text); font-size: 0.82rem; transition: background 0.2s, color 0.2s; }
+.sidebar-ext { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 5px; text-decoration: none; font-size: var(--fs-caption); line-height: var(--lh-caption); transition: background 0.2s, color 0.2s; }
 .sidebar-ext:link, .sidebar-ext:visited { color: var(--text); }
-.sidebar-ext:hover { background: var(--bg); color: var(--text); }
-.sidebar-ext:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: 8px; }
+.sidebar-ext:hover { background: var(--bg); }
+.sidebar-ext:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: 5px; }
 .sidebar-ext svg { flex-shrink: 0; opacity: 0.6; }
 
 /* ── Sidebar Copyright ── */
-.sidebar-copyright { padding: 16px 16px 8px; margin-top: auto; font-size: 0.68rem; color: var(--text-secondary); }
+.sidebar-copyright { padding: 16px 16px 8px; margin-top: auto; font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
+.sidebar-trademark { margin-top: 6px; }
 .sidebar-tagline { margin-top: 6px; font-style: italic; opacity: 0.7; }
 
 /* ── Main Content ── */
@@ -178,8 +298,8 @@ body.has-banner { --banner-h: 35px; }
        on white paper are near-invisible once backgrounds are stripped. */
     :is(html, body).dark-mode {
         color-scheme: light;
-        --bg: #fff; --surface: #fff; --text: #1a1a2e; --text-secondary: #555; --border: #e2e4e8;
-        --shadow: none; --green: #009639; --green-text: #006b2b; --blue: #0072B0;
-        --purple: #62228B; --teal: #00838f; --red: #c62828; --orange: #F29A36;
+        --bg: #fff; --surface: #fff; --text: #222222; --text-secondary: #666666; --border: #E6E6E6;
+        --shadow: none; --shadow-strong: none; --green: #009639; --green-text: #007D30; --blue: #326CE5;
+        --purple: #933DCC; --teal: #009C93; --red: #E4002B; --orange: #F29A36;
     }
 }

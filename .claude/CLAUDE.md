@@ -36,7 +36,14 @@ Loading rules (all pages): `shared.css` is linked before the page CSS; `shared.j
 
 ## Typography
 
-The site sets type in **Inter**, per the **F5 Design System (F5DS)** — the design system for F5 Distributed Cloud product UI (`~/.claude/skills/f5-product-ui-core`). This is deliberately a *different* standard from the F5 marketing brand (`f5-brand-core`: Neusa Next Pro Wide / Proxima Nova), which the site used until 2026-08-07; those faces are license-gated on brand.f5.com and could never be self-hosted, so most visitors only ever saw a metric-corrected Arial standing in for them. **Do not blend the two standards** — a value correct in one is a defect in the other. Note the site's *colors* still follow the marketing/NGINX palette (Jade green lead, K8s blue tooling accent); only the type system comes from F5DS, so an F5DS scanner run flags every color and that is expected.
+The site sets type in **Inter**, per the **F5 Design System (F5DS)** — the design system for F5 Distributed Cloud product UI (`~/.claude/skills/f5-product-ui-core`). This is deliberately a *different* standard from the F5 marketing brand (`f5-brand-core`: Neusa Next Pro Wide / Proxima Nova), which the site used until 2026-08-07; those faces are license-gated on brand.f5.com and could never be self-hosted, so most visitors only ever saw a metric-corrected Arial standing in for them. **Do not blend the two standards** — a value correct in one is a defect in the other. The split, as of 2026-08-11, is:
+
+| Dimension | Standard |
+|---|---|
+| Type, spacing, radius, elevation, motion, grid, component geometry, UI-label case | **F5DS** |
+| Colour, and long-form prose voice | **F5 marketing / Brand Center ramps**, NGINX green lead |
+
+So an F5DS scanner run flags every colour, and that is expected rather than a regression. See "Spacing, radius, elevation, motion" below for the structural half.
 
 - **All sizes go through the scale tokens in `shared.css`** (`--fs-*` / `--lh-*`): `h1` 36/54, `h2` 24/36, `h3` 18/26, `body-lg` 16/24, `body` 14/20, `caption` 12/18, `badge` 10/16, `code` 14/24. Never write a raw `rem`/`px` font-size — including in inline `style=` attributes and in JS-generated `cssText`, both of which exist in the migration tool and are easy to miss.
 - F5DS pairs a **fixed leading with each size** rather than one global ratio, so `line-height` is a length, not a multiplier: any rule that sets `font-size` must restate the paired `--lh-*`.
@@ -44,6 +51,40 @@ The site sets type in **Inter**, per the **F5 Design System (F5DS)** — the des
 - **`letter-spacing` is 0 on every style** — the scale specifies no tracking anywhere, so there should be no `letter-spacing` declaration in the CSS at all.
 - **Documented deviations** (keep them, don't "fix" them): `--mono` stays SF Mono rather than F5DS's Courier, which is unreadable at code-block sizes — docs.nginx.com deviates identically with JetBrains Mono. The glyph-only sizes (`.checklist li::before` ☐, `.sample-dropdown-btn::after` ▼), the em-based inline `code` size, and the print stylesheet's `11pt` are icons/relative/print, not type.
 - The font is **self-hosted, never a CDN**. See `assets/fonts/README.md` before upgrading or re-subsetting it — in particular, `→` is used 29 times in the mapping tables and is outside both stock Google `latin` and `latin-ext` ranges.
+
+## Spacing, radius, elevation, motion
+
+Structural tokens live in `shared.css:root` alongside the type scale, and follow **F5DS**. Same rule as typography: **never write a raw value at a call site** — including inline `style=` attributes and JS-generated `cssText`/`style.*`, which is where they hide.
+
+- **Spacing** (`--space-*`): base 8px, every value a multiple of 4. Named for F5DS's own steps so each token is auditable: `xsmall` 2, `small` 4, `base` 8, `2x` 16, `2hx` 20, `3x` 24, `3hx` 28, `4x` 32, `4hx` 36, `5x` 40, plus `6x` 48 and `8x` 64 as local extensions past F5DS's published 40px ceiling (its own `Nx = 8N` formula). Two hard rules: **`12px` is not in the system** — resolve a 12px gap to 8 or 16 by context, never to itself, which is why there is deliberately no step between `base` and `2x` — and **2px is only used between a label and its form control.**
+- **Choosing between 8 and 16**, rather than rounding: icon↔text **8**; between buttons in a group **20**; sibling controls in a row **16**; grid gutter **16**; same-thought margin (heading→body, para→para) **8**; peer blocks and body→trailing-link **16**; container insets **16**, so labels align with the container's own margin; section→section **40**. When genuinely ambiguous, round **down** to 8 — vertical padding compounds down a 4,900-line page.
+- **Radius** (`--radius` 4px, `--radius-small` 2px, `--radius-pill` 999px): 4px for everything, `--radius-small` only when an element is too small for 4px, and **`--radius-pill` for Tags and Badges only** — a pill-shaped button, card or input is off-system. `.analyzer-pill` is split on exactly this line: the `<span>` keeps the pill, the `<button>` takes 4px.
+- **Elevation** (`--elev-0/1/2`): N700 `#0B1640` at 8% / 12%, never black. **L0 on buttons and typographic elements** — they carry their own affordance. L1/L2 only on surfaces genuinely above the page. Interactive surfaces rest on L1 and strengthen to L2 on hover; **they do not translate** (see deviations).
+- **Motion** (`--dur-*`, `--ease-*`): D2 200ms for colour/opacity with an explicit `linear`, D3 300ms, D4 400ms, D5 600ms, and 400ms linear for a shadow's own fade (the Elevation page, not the Motion page). `--ease-enter` (EaseOutQuint) on entrances, `--ease-exit` (EaseInCubic) on exits. F5DS assigns durations **by distance travelled**, adding 100ms per 10% of screen crossed — use that to place a new value rather than guessing.
+- **Grid**: 12 columns, 16px gutter adopted (`--space-2x` on every multi-column grid). F5DS's 20px side margin is **not** adopted; the site keeps 48px content gutters. `--sidebar-w` is 264px, F5DS's fixed Primary Navigation width.
+- **Buttons**: one system in `shared.css` — `.btn` plus `.btn-primary`/`.btn-secondary`, sizes `.btn-xs` 24 / default 32 / `.btn-md` 40, 20px horizontal padding, `.btn-row` for the 20px group gap, `.btn-loading` for the F5DS Loading state. **Exactly one Primary per group.** Match a button's size to any input beside it. Compose bespoke buttons onto `.btn` (add `btn` + variant + size to the `className`) and keep only the colours that differ — do not redefine geometry. Tabs and the segmented control are separate F5DS components and deliberately stay off `.btn`.
+- **UI-label case**: Title Case on buttons, links, tab labels and navigation titles, and on the `<h2>`/`<h3>` headings that mirror a nav item so the two agree. Sentence case on notification titles and bodies, tooltips, form-control labels, error text, checklist items, table-cell blurbs and `sidebar-link-desc`. No terminal punctuation on labels. Preserve technical tokens verbatim (`CRD`, `NGINX`, `ConfigMap`, `mTLS`, `responseHeaders`, `ingress2gateway`, and the community repo name `ingress-nginx` — never `Ingress-Nginx`).
+
+### Documented deviations (keep these; don't let a scanner "fix" them)
+
+| Deviation | Why |
+|---|---|
+| **No hover lift** — L1→L2 shadow only, no `translateY(-4px)` | Decided in `1dab729` against f5.com's production CSS. F5DS's `Elevate Up` is a Motion-page catalogue entry, not a mandate, and 40 cards lifting on one landing page is a lot of motion for a docs site. |
+| **Marketing colour palette** | The deliberate half of the two-standard split. |
+| **Dark theme** | F5DS publishes none (Early Availability only). Dark shadows deepen with black — N700 at 8% is invisible on black. |
+| **900px / 600px breakpoints, and all max-widths** | F5DS publishes no breakpoints and never states its fixed grid's maximum width. Local conventions, not spec values. |
+| **48px content gutters** (not F5DS's 20px) | 20px assumes a dense product screen in a chrome-heavy shell; on a 1300px docs page it puts prose against the viewport edge. |
+| **`--mono` = SF Mono** (not Courier) | Unreadable at code-block sizes; docs.nginx.com deviates identically. |
+| **`min-height: 44px` on mobile tabs/controls** | WCAG target size beats F5DS's fixed 32px. |
+| **`prefers-reduced-motion` kill switch** | F5DS is silent; an addition, not a deviation. |
+| **`.info-box` class names** | Mandated below, and `migration-core.js` matches on `classList.contains('info-box')` to hide notes with their tables. |
+| **`border-radius: 50%` ×5, and the step-number knockout ring** | A spinner and a 6px state dot cannot take a 4px corner; the ring is not an elevation. |
+| **`Why Migrate?` keeps its `?`** | A genuine question serving as a section title. |
+| **`scale()` on the checklist marker and scroll-to-top hover** | Kept by owner request in `1dab729`. |
+| **Inline `code` 2px vertical padding** | F5DS publishes nothing for inline code; 4px inflates the line box in prose. |
+| **`.approach-tab` `margin-bottom: -2px`** | Not spacing — it must equal the tab strip's 2px border so the active tab covers it. |
+
+**Inferred, not published** — say so when touching these: table cell padding (F5DS has **no** table component), `.info-box` internal padding (screenshot-only in the spec), which elevation level a dropdown gets (only Toast=L1 is stated), heading case, and any spacing above 40px.
 
 ## Key Files
 
@@ -65,6 +106,43 @@ The site sets type in **Inter**, per the **F5 Design System (F5DS)** — the des
 
 The analyzer is pure data — the source module's `parseInput` → `buildPlan` returns a plain `MigrationPlan` object with no DOM. Test generator/mapping edits in Node by loading `assets/js/migration-ingress-nginx.js` + `assets/js/migration-core.js` under a hand-rolled `window`/`document` stub (its `createElement`/`getElementById`/etc. return a chainable no-op element) and calling `MIGRATION_SOURCE.analyzer.parseInput`/`buildPlan` on the sample presets. **Load-bearing gotcha:** `buildPlan` runs each generator in a `try/catch` that only `console.warn`s on failure, so a broken generator **silently drops its resource** from the output instead of throwing — capturing `console.warn` (count > 0, not a thrown exception) is the only way to detect it. `node --check` catches syntax only. Also sanity-check generated `k8s.nginx.org/v1` field names against the `json:` tags in `nginx/kubernetes-ingress/pkg/apis/configuration/v1/types.go` to catch invalid CRD fields.
 
+Two more silent-failure paths worth knowing, both outside `buildPlan`: `renderPlan` `console.warn`s and skips any `block.type` it does not recognise (the type strings come from the source module, so they can drift on one side only), and the static comparison-block copy buttons attach through a bare `if (!h5 || !pre) return;` with no warning at all — changing `.comparison-block`, its `<h4>`, or the `<pre>` nesting silently removes all 344 of them.
+
+#### Design-token invariant guards
+
+The F5DS scanner (`~/.claude/skills/f5-product-ui-core/scripts/scan_ui_tokens.py`) is **not** a sufficient gate: it cannot resolve `var()`, so a correct `var(--space-2x)` is invisible to it while a literal `16px` counts as on-token. Its spacing and typography dimensions therefore read low *because* the site uses tokens. Use these greps instead — they inspect every value and are not fooled by indirection. Note the `(?<![\w-])` lookbehind: without it, `margin` matches inside `scroll-margin-top`.
+
+```bash
+# no 12px in any spacing property (F5DS excludes 12px from the system)
+grep -rnE '(^|[^\w-])(padding|margin|gap|row-gap|column-gap|inset)[a-z-]*:[^;{}"]*\b12px' assets index.html ingress-nginx-migration.html
+# no literal radius, and the pill token is 999 not 9999
+grep -rn 'border-radius:[^;}"]*[0-9]px' assets index.html ingress-nginx-migration.html | grep -v '50%'
+grep -rn '9999px' assets index.html ingress-nginx-migration.html      # only the off-screen clipboard trick
+# elevation must come from --elev-*; no raw black shadow tints
+grep -rnE 'box-shadow:[^;}"]*rgba\(0, *0, *0' assets index.html ingress-nginx-migration.html
+# one focus idiom: outline, never a box-shadow ring
+grep -rnE ':focus[^{]*\{[^}]*box-shadow' assets/css
+# no literal font-size (4 sanctioned deviations only — see Typography)
+grep -rnE "font-size: *[0-9]|fontSize *= *['\"][0-9]" assets index.html ingress-nginx-migration.html
+grep -rn 'letter-spacing' assets index.html ingress-nginx-migration.html    # must stay 0 hits
+# every spacing px a multiple of 4 (1px hairlines and the documented 2px excepted),
+# and anything above 40px a multiple of 8
+python3 -c "
+import re, glob
+P = r'(?<![\w-])(?:padding|margin|gap|row-gap|column-gap)[a-z-]*'
+for f in glob.glob('assets/css/*.css'):
+    for i, l in enumerate(open(f), 1):
+        if l.lstrip().startswith(('/*', '*')): continue
+        for m in re.finditer(P + r': *([^;}]+)', l):
+            for px in re.findall(r'-?\d+px', m.group(1)):
+                n = abs(int(px[:-2]))
+                if n % 4 and n not in (1, 2): print(f'{f}:{i} off-grid {px}')
+                if n > 40 and n % 8: print(f'{f}:{i} >40 not /8 {px}')
+"
+# class drift: every class written by HTML/JS must exist in the CSS
+# (baseline: only the 'badge-' prefix hook is legitimately unresolved)
+```
+
 #### Migration tool ordering and structure rules
 
 - **Annotation mapping rows** within each category table must be sorted alphabetically by the community annotation name (left column).
@@ -77,7 +155,7 @@ The analyzer is pure data — the source module's `parseInput` → `buildPlan` r
 
 The shared "chrome" lives in `assets/css/shared.css` and `assets/js/shared.js` as the single source of truth — **edit it once there**, not in two places. This covers:
 
-- **Event banner** (Announcements) — the green fixed banner, its CSS (`.event-banner`, `body.has-banner` offsets), and JS init
+- **Event banner** (Announcements) — the green fixed banner and its CSS (`.event-banner`, `body.has-banner` offsets). **Dormant, not dead:** it was live in markup from 2026-03-19 to 2026-04-07 carrying a conference announcement and was removed when that expired, so there is currently no banner element in either page and **no JS init** — it is pure CSS awaiting its next announcement. Re-enable it by adding the markup and `has-banner` to `<body>`; do not delete the CSS as unreferenced. (`.coming-soon-label` + `.btn-disabled` and `.version-pill.i2g` are dormant in the same way.)
 - **Top bar** — the NGINX logo, GitHub link, and dark-mode toggle (CSS + dark-toggle wiring in `shared.js`)
 - **Sidebar** — structure, external links, copyright, and the drawer open/close behavior (`shared.js`)
 - **Dark mode** — design-token overrides and chrome (topbar/sidebar) colors in `shared.css`; the dark-mode toggle logic in `shared.js`

@@ -342,6 +342,49 @@ body.has-banner { --banner-h: 36px; }
 .sidebar-trademark { margin-top: var(--space-base); }
 .sidebar-tagline { margin-top: var(--space-base); font-style: italic; opacity: 0.7; }
 
+/* ── Buttons ──
+   One geometry for every button on the site. Before this the site ran three
+   unrelated button systems (.cta on the landing page, .btn in the migration
+   tool, and eight bespoke one-offs in the analyzer), each with its own padding,
+   height and radius.
+
+   Per F5DS: three sizes named for their heights — XS-24, S-32 (the default) and
+   M-40, the last two "used sparingly" — 20px horizontal padding, the 4px default
+   radius, and L0, because F5DS puts no shadow on a button, which already carries
+   its own affordance. Labels must never truncate, hence white-space: nowrap with
+   no max-width. Match a button's size to any input beside it.
+
+   F5DS publishes no colours for any button variant — every interactive state on
+   its Button page is a screenshot — so the variant colours here come from the
+   site's own palette, which is the marketing/NGINX ramp by design. Exactly one
+   Primary per group. */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-base); height: 32px; padding: 0 var(--space-2hx); border: 1px solid transparent; border-radius: var(--radius); box-shadow: var(--elev-0); font-family: var(--font); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear, color var(--dur-colour) linear; }
+.btn:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.btn-xs { height: 24px; padding: 0 var(--space-base); gap: var(--space-small); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.btn-xs svg { width: 12px; height: 12px; }
+.btn-md { height: 40px; }
+.btn-primary { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+.btn-primary:hover { background: #025F26; border-color: #025F26; }
+.btn-secondary { background: transparent; color: var(--text); border-color: var(--text); }
+.btn-secondary:hover { background: var(--text); color: var(--surface); }
+:is(html, body).dark-mode .btn-primary { background: var(--green); color: #003105; border-color: var(--green); }
+:is(html, body).dark-mode .btn-primary:hover { background: #42BA5B; border-color: #42BA5B; }
+/* F5DS requires a disabled button to stay focusable and to explain itself, so
+   markup using this must carry aria-disabled="true" plus a tooltip rather than
+   the disabled attribute. Dormant: last used for a "coming soon" CTA. */
+.btn-disabled { opacity: 0.6; cursor: default; border-color: transparent; }
+/* Buttons in a group sit 20px apart (F5DS's most explicit spacing rule; 16px
+   only when space is tight). */
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--space-2hx); }
+/* F5DS Loading state: a spinner in the button that triggered the action, with the
+   label rewritten as the verb in continuous form plus an ellipsis, and
+   interaction blocked while it runs. */
+.btn-loading { pointer-events: none; }
+.btn-loading::before { content: ''; width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: btn-spin 0.7s linear infinite; flex-shrink: 0; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .btn-loading::before { animation: none; } }
+
 /* ── Main Content ── */
 .main { flex: 1; margin-left: var(--sidebar-w); padding: 0; min-width: 0; }
 

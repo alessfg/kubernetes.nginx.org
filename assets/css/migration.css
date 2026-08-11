@@ -77,7 +77,7 @@ pre code { background: none; color: inherit; padding: 0; }
 .comparison-block h4 { padding: var(--space-base) var(--space-2x); margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); display: flex; justify-content: space-between; align-items: center; }
 .comparison-block.old h4 { background: rgba(228,0,43,0.08); color: #B30013; }
 .comparison-block.new h4 { background: rgba(0,150,57,0.10); color: #025F26; }
-.comparison-copy-btn { background: rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.12); color: inherit; padding: var(--space-small) var(--space-base); border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; opacity: 0.7; transition: opacity var(--dur-colour) linear; font-family: var(--font); }
+.comparison-copy-btn { background: rgba(0,0,0,0.08); border-color: rgba(0,0,0,0.12); color: inherit; opacity: 0.7; transition: opacity var(--dur-colour) linear; }
 .comparison-copy-btn:hover { opacity: 1; }
 .comparison-copy-btn.copied { background: #007D30; color: white; border-color: #007D30; opacity: 1; }
 .comparison-block pre { margin: 0; border-radius: 0 0 var(--radius) var(--radius); }
@@ -104,9 +104,8 @@ pre code { background: none; color: inherit; padding: 0; }
 .info-box.warning a { color: #733800; }
 .info-box.warning code { background: rgba(242,154,54,0.18); color: #733800; }
 /* Collapsible end-of-maintenance warning (repeats on all three tool pages) */
-.eol-toggle { background: none; border: 1px solid currentColor; border-radius: var(--radius); color: inherit; font-family: var(--font); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; padding: var(--space-small) var(--space-base); cursor: pointer; margin-left: var(--space-base); opacity: 0.85; transition: opacity var(--dur-colour) linear; vertical-align: middle; }
+.eol-toggle { background: none; border-color: currentColor; color: inherit; margin-left: var(--space-base); opacity: 0.85; transition: opacity var(--dur-colour) linear; vertical-align: middle; }
 .eol-toggle:hover { opacity: 1; }
-.eol-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .eol-compact { margin: 0 0 var(--space-base); padding: var(--space-base) var(--space-2hx); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 
 .controls { display: flex; gap: var(--space-2x); margin-bottom: var(--space-2hx); flex-wrap: wrap; align-items: center; }
@@ -117,8 +116,8 @@ pre code { background: none; color: inherit; padding: 0; }
     /* Headings below the sticky bar need extra scroll clearance (chrome + bar) */
     #mappings h3[id], #plus-mappings h3[id], #configmap-mappings h3[id] { scroll-margin-top: calc(var(--chrome-h) + 80px); }
 }
-.controls input[type="search"] { padding: var(--space-base) var(--space-2x); border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); transition: border-color var(--dur-colour) linear; min-width: 240px; flex: 1; max-width: 400px; }
-.controls select { padding: var(--space-base) var(--space-2x); border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color var(--dur-colour) linear; }
+.controls input[type="search"] { height: 32px; padding: 0 var(--space-2x); border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); transition: border-color var(--dur-colour) linear; min-width: 240px; flex: 1; max-width: 400px; }
+.controls select { height: 32px; padding: 0 var(--space-2x); border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color var(--dur-colour) linear; }
 /* One focus idiom sitewide: a 2px outline offset by 2px. These two controls used
    to suppress the outline and draw a tinted box-shadow ring instead, which was
    the site's second idiom and the only place two different green alphas
@@ -129,11 +128,11 @@ pre code { background: none; color: inherit; padding: 0; }
 .controls input[type="search"]::placeholder { color: #666666; }
 .search-count { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); white-space: nowrap; }
 .search-count.no-results { color: #B30013; }
-.btn { padding: var(--space-base) var(--space-2hx); border: none; border-radius: var(--radius); cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: background var(--dur-colour) linear, color var(--dur-colour) linear; }
-.btn-primary { background: var(--green-dark); color: white; }
-.btn-primary:hover { background: #025F26; }
-.btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
-.btn-secondary:hover { background: var(--border); }
+/* .btn geometry and the primary/secondary variants live in shared.css. The
+   migration tool's secondary is filled rather than outlined, because it sits on
+   a white panel next to a filled primary and an outline reads as an input. */
+.btn-secondary { background: var(--bg); color: var(--text); border-color: var(--border); }
+.btn-secondary:hover { background: var(--border); color: var(--text); }
 .feature-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2x); margin: var(--space-2hx) 0; }
 /* Basis is derived from the gap: three columns share two 16px gutters, so each
    card gives up 2/3 of 16px. Recompute this if .feature-grid's gap changes. */
@@ -150,9 +149,8 @@ pre code { background: none; color: inherit; padding: 0; }
 .checklist-meta { display: flex; align-items: center; gap: var(--space-2x); flex-wrap: wrap; margin-bottom: var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); }
 .checklist-progress { font-weight: 500; color: var(--text); }
 .checklist-note { font-size: var(--fs-caption); line-height: var(--lh-caption); }
-.checklist-reset { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-secondary); font-family: var(--font); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; padding: var(--space-small) var(--space-base); cursor: pointer; transition: background var(--dur-colour) linear, color var(--dur-colour) linear, border-color var(--dur-colour) linear; }
+.checklist-reset { background: none; border-color: var(--border); color: var(--text-secondary); }
 .checklist-reset:hover { background: var(--bg); color: var(--text); border-color: var(--text-secondary); }
-.checklist-reset:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .checklist { list-style: none; padding: 0; }
 .checklist li { display: flex; align-items: baseline; gap: var(--space-base); padding: var(--space-base) 0; border-bottom: 1px solid var(--border); cursor: pointer; transition: opacity var(--dur-colour) linear; }
 .checklist li::before { content: '☐'; flex-shrink: 0; font-size: 1.2rem; line-height: 1; color: var(--green-text); transition: transform var(--dur-colour); }
@@ -229,7 +227,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-step-title { font-family: var(--font-display); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 700; color: var(--text); margin: 0; }
 .analyzer-step-desc { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); margin-bottom: var(--space-2x); }
 .analyzer-yaml-output { position: relative; background: #222222; color: #D5D6D6; padding: var(--space-2hx); border-radius: var(--radius); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); overflow-x: auto; white-space: pre; margin: var(--space-base) 0; border: 1px solid #343434; color-scheme: dark; }
-.analyzer-copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #CCCCCC; padding: var(--space-small) var(--space-base); border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; transition: background var(--dur-colour) linear, color var(--dur-colour) linear; z-index: 1; }
+.analyzer-copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); color: #CCCCCC; z-index: 1; }
 .analyzer-copy-btn:hover { background: rgba(255,255,255,0.25); color: white; }
 .analyzer-copy-btn.copied { background: #007D30; color: white; border-color: #007D30; }
 .analyzer-step-separator { border: none; border-top: 1px dashed var(--border); margin: var(--space-2x) 0 0; }
@@ -253,10 +251,8 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-comparison-block.old .analyzer-comparison-badge { background: rgba(228,0,43,0.12); color: #B30013; }
 .analyzer-comparison-block.new .analyzer-comparison-badge { background: rgba(0,150,57,0.15); color: #025F26; }
 .analyzer-comparison-block .analyzer-yaml-output { margin: 0; border-radius: 0 0 var(--radius) var(--radius); min-height: 60px; }
-.analyzer-copy-all { display: flex; align-items: center; gap: var(--space-base); margin-top: var(--space-2hx); padding: var(--space-base) var(--space-2hx); background: var(--green-dark); color: white; border: none; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background var(--dur-colour) linear; }
-.analyzer-copy-all:hover { background: #025F26; }
-.analyzer-copy-all.copied { background: #007D30; }
-.analyzer-copy-all svg { flex-shrink: 0; }
+.analyzer-copy-all { margin-top: var(--space-2hx); }
+.analyzer-copy-all.copied { background: #007D30; border-color: #007D30; }
 .analyzer-step-count { font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; padding: var(--space-small) var(--space-base); border-radius: var(--radius-pill); background: rgba(0,150,57,0.12); color: #025F26; margin-left: var(--space-base); }
 .analyzer-step-count.configmap { background: rgba(171,39,130,0.10); color: #9C1174; }
 .analyzer-step-count.crd { background: rgba(147,61,204,0.10); color: #6E23A1; }
@@ -358,9 +354,9 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-complexity-dots span.filled { opacity: 1; }
 .analyzer-yaml-output.collapsed { max-height: 200px; overflow: hidden; }
 .analyzer-yaml-output.collapsed::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: linear-gradient(transparent, #222222); pointer-events: none; }
-.analyzer-yaml-expand { background: none; border: 1px solid var(--border); color: var(--green-text); padding: var(--space-small) var(--space-2x); border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; margin-top: var(--space-small); font-weight: 500; transition: background var(--dur-colour) linear, color var(--dur-colour) linear, border-color var(--dur-colour) linear; }
+.analyzer-yaml-expand { background: none; border-color: var(--border); color: var(--green-text); margin-top: var(--space-small); }
 .analyzer-yaml-expand:hover { background: var(--green-dark); color: white; border-color: var(--green-dark); }
-.analyzer-edit-btn { display: inline-flex; align-items: center; gap: var(--space-base); padding: var(--space-base) var(--space-2x); background: var(--surface); border: 1px solid var(--green-dark); color: var(--green-text); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background var(--dur-colour) linear, color var(--dur-colour) linear; margin-top: var(--space-2x); }
+.analyzer-edit-btn { background: var(--surface); border-color: var(--green-dark); color: var(--green-text); margin-top: var(--space-2x); }
 .analyzer-edit-btn:hover { background: var(--green-dark); color: white; }
 @keyframes analyzerFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .analyzer-fade-in { animation: analyzerFadeIn var(--dur-move) var(--ease-enter) forwards; opacity: 0; }
@@ -375,10 +371,9 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-drop-zone.dragging #yamlInput { opacity: 0.5; }
 .analyzer-drop-label { background: var(--surface); padding: var(--space-2x) var(--space-3x); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--green-text); box-shadow: var(--elev-1); }
 .analyzer-export-actions { display: flex; gap: var(--space-2hx); flex-wrap: wrap; margin-top: var(--space-2hx); align-items: center; }
-.analyzer-download-btn { display: inline-flex; align-items: center; gap: var(--space-base); padding: var(--space-base) var(--space-2hx); background: var(--blue); color: white; border: none; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background var(--dur-colour) linear; }
-.analyzer-download-btn:hover { background: var(--blue-dark); }
-.analyzer-download-btn.downloaded { background: #007D30; }
-.analyzer-download-btn svg { flex-shrink: 0; }
+.analyzer-download-btn { background: var(--blue); border-color: var(--blue); color: white; }
+.analyzer-download-btn:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
+.analyzer-download-btn.downloaded { background: #007D30; border-color: #007D30; }
 
 /* ── Dark Mode Overrides ── */
 :is(html, body).dark-mode tr.expandable:hover { background-color: rgba(83,211,107,0.10); border-left-color: rgba(83,211,107,0.4); }
@@ -401,8 +396,8 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 :is(html, body).dark-mode .comparison-block.old h4 { background: rgba(255,99,107,0.12); color: #FF918C; }
 :is(html, body).dark-mode .comparison-block.new h4 { background: rgba(83,211,107,0.12); color: #7FE590; }
 :is(html, body).dark-mode .comparison-copy-btn { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); }
-:is(html, body).dark-mode .btn-secondary { background: var(--border); color: var(--text); }
-:is(html, body).dark-mode .btn-secondary:hover { background: #343434; }
+:is(html, body).dark-mode .btn-secondary { background: var(--border); color: var(--text); border-color: var(--border); }
+:is(html, body).dark-mode .btn-secondary:hover { background: #343434; border-color: #343434; }
 :is(html, body).dark-mode .analyzer-success-banner { background: linear-gradient(135deg, rgba(83,211,107,0.12), rgba(83,211,107,0.06)); border-color: rgba(83,211,107,0.3); }
 :is(html, body).dark-mode .analyzer-success-banner svg { color: #7FE590; }
 :is(html, body).dark-mode .analyzer-success-banner .banner-text { color: #7FE590; }
@@ -452,7 +447,8 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 :is(html, body).dark-mode .analyzer-download-btn:hover { background: #4A7DE1; }
 :is(html, body).dark-mode .analyzer-download-btn.downloaded { background: #42BA5B; color: #003105; }
 .sample-dropdown { position: relative; display: inline-block; }
-.sample-dropdown-btn { display: inline-flex; align-items: center; gap: var(--space-base); }
+/* Layout comes from .btn; only the disclosure caret is local. F5DS calls this the
+   Trailing Icon modifier, used where a button "reveals more options". */
 .sample-dropdown-btn::after { content: '\25BC'; font-size: 0.6rem; opacity: 0.7; }
 /* L1 here is an inference, not a spec value: F5DS states an elevation level for
    Toast only and explicitly says not to assume one for other overlays. */
@@ -472,7 +468,11 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .strategy-toggle { display: flex; align-items: center; gap: var(--space-2x); margin: var(--space-2x) 0; padding: var(--space-2x) var(--space-2x); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); }
 .strategy-toggle-label { font-weight: 500; color: var(--text); white-space: nowrap; }
 .strategy-toggle-options { display: flex; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.strategy-option { padding: var(--space-base) var(--space-2x); cursor: pointer; font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; border: none; background: none; color: var(--text-secondary); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; font-family: var(--font); }
+/* Deliberately not composed onto .btn: this is a Segmented Control, which F5DS
+   names but never documents. It keeps the shared 32px height so it matches the
+   buttons and inputs beside it, but it must stay a seamless flush-joined pair
+   rather than gaining a button's own border and radius. */
+.strategy-option { height: 32px; padding: 0 var(--space-2x); cursor: pointer; font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; border: none; background: none; color: var(--text-secondary); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; font-family: var(--font); }
 .strategy-option.active { background: var(--green-dark); color: #fff; }
 .strategy-option:not(.active):hover { background: var(--bg); }
 .strategy-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); margin-left: var(--space-small); }

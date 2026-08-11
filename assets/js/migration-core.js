@@ -373,7 +373,7 @@
                 let pre = block.querySelector('pre');
                 if (!h5 || !pre) return;
                 let btn = document.createElement('button');
-                btn.className = 'comparison-copy-btn';
+                btn.className = 'btn btn-xs comparison-copy-btn';
                 btn.textContent = 'Copy';
                 btn.setAttribute('aria-label', 'Copy code snippet');
                 btn.addEventListener('click', function(e) {
@@ -708,6 +708,25 @@
             if (liveStatus) liveStatus.textContent = 'Analyzing your YAML…';
         }
 
+        // F5DS routes the feedback for a triggered action to the button that triggered
+        // it: a spinner inside the button, the label restated as the verb in continuous
+        // form, and interaction blocked (.btn-loading sets pointer-events: none).
+        function setButtonLoading(btn, loadingLabel) {
+            if (!btn) return;
+            btn.setAttribute('data-label-before', btn.textContent);
+            btn.textContent = loadingLabel;
+            btn.classList.add('btn-loading');
+            btn.setAttribute('aria-busy', 'true');
+        }
+        function clearButtonLoading(btn) {
+            if (!btn) return;
+            let before = btn.getAttribute('data-label-before');
+            if (before) btn.textContent = before;
+            btn.removeAttribute('data-label-before');
+            btn.classList.remove('btn-loading');
+            btn.removeAttribute('aria-busy');
+        }
+
         function analyzeYaml() {
             let yamlText = document.getElementById('yamlInput').value.trim();
             let resultsDiv = document.getElementById('analyzerResults');
@@ -715,10 +734,19 @@
                 showAnalyzerMessage(resultsDiv, 'error', SOURCE.strings.analyzeEmpty.title, SOURCE.strings.analyzeEmpty.message);
                 return;
             }
+            let analyzeBtn = document.querySelector('[data-action="analyzeYaml"]');
+            if (analyzeBtn && analyzeBtn.classList.contains('btn-loading')) return;
             // Paint a spinner immediately, then defer the heavy work to the next animation
             // frame so the user sees feedback even on multi-hundred-line inputs.
             showAnalyzerLoading(resultsDiv);
-            requestAnimationFrame(function() { setTimeout(runAnalyzeYaml, 0); });
+            setButtonLoading(analyzeBtn, 'Analyzing…');
+            // finally, not a trailing call: runAnalyzeYaml has several early returns and
+            // the button must be restored on every one of them.
+            requestAnimationFrame(function() {
+                setTimeout(function() {
+                    try { runAnalyzeYaml(); } finally { clearButtonLoading(analyzeBtn); }
+                }, 0);
+            });
         }
 
         function runAnalyzeYaml() {
@@ -884,7 +912,7 @@
             let pre = document.createElement('div');
             pre.className = 'analyzer-yaml-output';
             let copyBtn = document.createElement('button');
-            copyBtn.className = 'analyzer-copy-btn';
+            copyBtn.className = 'btn btn-xs analyzer-copy-btn';
             copyBtn.textContent = 'Copy';
             copyBtn.addEventListener('click', function() { copyAnalyzerBlock(copyBtn); });
             pre.appendChild(copyBtn);
@@ -896,7 +924,7 @@
                 let wrapper = document.createDocumentFragment();
                 wrapper.appendChild(pre);
                 let expandBtn = document.createElement('button');
-                expandBtn.className = 'analyzer-yaml-expand';
+                expandBtn.className = 'btn btn-xs analyzer-yaml-expand';
                 expandBtn.textContent = 'Show full YAML (' + lineCount + ' lines)';
                 expandBtn.addEventListener('click', function() {
                     if (pre.classList.contains('collapsed')) {
@@ -1275,7 +1303,7 @@
                 let exportRow = document.createElement('div');
                 exportRow.className = 'analyzer-export-actions';
                 let copyAllBtn = document.createElement('button');
-                copyAllBtn.className = 'analyzer-copy-all';
+                copyAllBtn.className = 'btn btn-primary btn-md analyzer-copy-all';
                 copyAllBtn.style.marginTop = '0';
                 let clipSvg = document.createElementNS(svgNS, 'svg');
                 clipSvg.setAttribute('width', '18');
@@ -1328,7 +1356,7 @@
 
                 // Download YAML button
                 let dlBtn = document.createElement('button');
-                dlBtn.className = 'analyzer-download-btn';
+                dlBtn.className = 'btn btn-md analyzer-download-btn';
                 let dlSvg = document.createElementNS(svgNS, 'svg');
                 dlSvg.setAttribute('width', '18'); dlSvg.setAttribute('height', '18');
                 dlSvg.setAttribute('viewBox', '0 0 24 24'); dlSvg.setAttribute('fill', 'none');
@@ -1397,7 +1425,7 @@
 
                 // Edit YAML button
                 let editBtn = document.createElement('button');
-                editBtn.className = 'analyzer-edit-btn';
+                editBtn.className = 'btn analyzer-edit-btn';
                 let editSvgNS = 'http://www.w3.org/2000/svg';
                 let editSvg = document.createElementNS(editSvgNS, 'svg');
                 editSvg.setAttribute('width', '16'); editSvg.setAttribute('height', '16');
@@ -2010,7 +2038,7 @@
             banners.forEach(function(banner) {
                 let hideBtn = document.createElement('button');
                 hideBtn.type = 'button';
-                hideBtn.className = 'eol-toggle';
+                hideBtn.className = 'btn btn-xs eol-toggle';
                 hideBtn.textContent = 'Hide';
                 hideBtn.setAttribute('aria-label', 'Collapse the end-of-maintenance warning');
                 banner.appendChild(document.createTextNode(' '));
@@ -2025,7 +2053,7 @@
                 compact.appendChild(document.createTextNode(SOURCE.eolCompact.restText));
                 let showBtn = document.createElement('button');
                 showBtn.type = 'button';
-                showBtn.className = 'eol-toggle';
+                showBtn.className = 'btn btn-xs eol-toggle';
                 showBtn.textContent = 'Details';
                 showBtn.setAttribute('aria-label', 'Expand the end-of-maintenance warning');
                 compact.appendChild(showBtn);

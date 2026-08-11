@@ -62,8 +62,8 @@
 .page-body { padding: 0 var(--space-6x) var(--space-8x); max-width: 1140px; }
 /* Light-mode content links — Jade 5, scoped to the content area (mirrors the
    existing dark-mode rule below; card-anchors excluded so they keep inherit) */
-.page-body a:link:not(.cta):not(.feature-card):not(.project-card) { color: var(--green-text); }
-.page-body a:visited:not(.cta):not(.feature-card):not(.project-card) { color: var(--text); }
+.page-body a:link:not(.btn):not(.feature-card):not(.project-card) { color: var(--green-text); }
+.page-body a:visited:not(.btn):not(.feature-card):not(.project-card) { color: var(--text); }
 
 /* ── Section Headings ── */
 .section-heading { font-family: var(--font-display); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 700; margin-bottom: var(--space-2x); margin-top: var(--space-4hx); padding-bottom: var(--space-base); border-bottom: 1px solid var(--border); }
@@ -102,36 +102,32 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
 .code-accent { background: rgba(50,108,229,0.10); color: var(--blue); }
 
 /* ── Copy Button ── */
-.copy-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #999999; padding: var(--space-small) var(--space-base); border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); font-family: var(--font); cursor: pointer; transition: background var(--dur-colour) linear, color var(--dur-colour) linear, border-color var(--dur-colour) linear; z-index: 2; min-height: 28px; }
+.copy-btn { position: absolute; top: var(--space-base); right: var(--space-base); background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); color: #999999; z-index: 2; }
 .copy-btn:hover { background: rgba(255,255,255,0.18); color: #D5D6D6; }
-.copy-btn:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .copy-btn.copied { background: rgba(83,211,107,0.25); color: #7FE590; border-color: rgba(83,211,107,0.45); }
 
-/* ── CTA Row ── */
-.cta-row { display: flex; gap: var(--space-2hx); flex-wrap: wrap; margin-top: var(--space-4x); }
-.cta { display: inline-flex; align-items: center; gap: var(--space-base); padding: var(--space-base) var(--space-2hx); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; text-decoration: none; transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear, color var(--dur-colour) linear; }
-.cta:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.cta-primary { color: #fff; }
-.cta-primary.nic, .cta-primary.ngf { background: var(--green-dark); }
-.cta-primary.nic:hover, .cta-primary.ngf:hover { background: #025F26; }
-.cta-primary.migration, .cta-primary.i2g { background: var(--blue); }
-.cta-primary.migration:hover, .cta-primary.i2g:hover { background: var(--blue-dark); }
-:is(html, body).dark-mode .cta-primary.nic, :is(html, body).dark-mode .cta-primary.ngf { background: var(--green); color: #003105; }
-:is(html, body).dark-mode .cta-primary.nic:hover, :is(html, body).dark-mode .cta-primary.ngf:hover { background: #42BA5B; }
-:is(html, body).dark-mode .cta-primary.migration, :is(html, body).dark-mode .cta-primary.i2g { background: var(--blue); color: #041538; }
-:is(html, body).dark-mode .cta-primary.migration:hover, :is(html, body).dark-mode .cta-primary.i2g:hover { background: #4A7DE1; }
-.cta-primary.blogs { background: var(--teal-dark); }
-.cta-primary.blogs:hover { background: #005250; }
-.cta-primary.videos { background: var(--red); }
-.cta-primary.videos:hover { background: var(--red-dark); }
-:is(html, body).dark-mode .cta-primary.blogs { background: var(--teal); color: #003635; }
-:is(html, body).dark-mode .cta-primary.blogs:hover { background: #26C7BD; }
-:is(html, body).dark-mode .cta-primary.videos { background: var(--red); color: #530001; }
-:is(html, body).dark-mode .cta-primary.videos:hover { background: #FF636B; }
-.cta-secondary { background: transparent; color: var(--text); border: 1px solid var(--text); }
-.cta-secondary:hover { background: var(--text); color: var(--surface); }
-.cta-disabled { opacity: 0.6; cursor: default; border: none; }
-.cta svg { width: 16px; height: 16px; flex-shrink: 0; }
+/* ── CTA buttons ──
+   Geometry, focus and the primary/secondary variants live in shared.css (.btn).
+   What remains here is the per-product colour set: each product section leads
+   with its own hue, so .btn-primary's green is overridden per section. The hero
+   CTAs take M-40 as their most-prominent action; F5DS says use it sparingly. */
+.cta-row { margin-top: var(--space-4x); }
+.btn-primary.nic, .btn-primary.ngf { background: var(--green-dark); border-color: var(--green-dark); }
+.btn-primary.nic:hover, .btn-primary.ngf:hover { background: #025F26; border-color: #025F26; }
+.btn-primary.migration, .btn-primary.i2g { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn-primary.migration:hover, .btn-primary.i2g:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
+:is(html, body).dark-mode .btn-primary.nic, :is(html, body).dark-mode .btn-primary.ngf { background: var(--green); color: #003105; border-color: var(--green); }
+:is(html, body).dark-mode .btn-primary.nic:hover, :is(html, body).dark-mode .btn-primary.ngf:hover { background: #42BA5B; border-color: #42BA5B; }
+:is(html, body).dark-mode .btn-primary.migration, :is(html, body).dark-mode .btn-primary.i2g { background: var(--blue); color: #041538; border-color: var(--blue); }
+:is(html, body).dark-mode .btn-primary.migration:hover, :is(html, body).dark-mode .btn-primary.i2g:hover { background: #4A7DE1; border-color: #4A7DE1; }
+.btn-primary.blogs { background: var(--teal-dark); border-color: var(--teal-dark); color: #fff; }
+.btn-primary.blogs:hover { background: #005250; border-color: #005250; }
+.btn-primary.videos { background: var(--red); border-color: var(--red); color: #fff; }
+.btn-primary.videos:hover { background: var(--red-dark); border-color: var(--red-dark); }
+:is(html, body).dark-mode .btn-primary.blogs { background: var(--teal); color: #003635; border-color: var(--teal); }
+:is(html, body).dark-mode .btn-primary.blogs:hover { background: #26C7BD; border-color: #26C7BD; }
+:is(html, body).dark-mode .btn-primary.videos { background: var(--red); color: #530001; border-color: var(--red); }
+:is(html, body).dark-mode .btn-primary.videos:hover { background: #FF636B; border-color: #FF636B; }
 
 /* ── Info Box ── */
 .info-box { padding: var(--space-2x) var(--space-2hx); border-radius: var(--radius); margin: var(--space-2hx) 0; font-size: var(--fs-body); line-height: var(--lh-body); }
@@ -158,8 +154,8 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
 .version-pill.i2g { background: rgba(50,108,229,0.12); color: #1A4CB5; }
 :is(html, body).dark-mode .version-pill.nic, :is(html, body).dark-mode .version-pill.ngf { color: var(--green-text); }
 :is(html, body).dark-mode .version-pill.i2g { color: var(--blue); }
-:is(html, body).dark-mode .page-body a:link:not(.cta):not(.feature-card):not(.project-card) { color: var(--blue); }
-:is(html, body).dark-mode .page-body a:visited:not(.cta):not(.feature-card):not(.project-card) { color: var(--text); }
+:is(html, body).dark-mode .page-body a:link:not(.btn):not(.feature-card):not(.project-card) { color: var(--blue); }
+:is(html, body).dark-mode .page-body a:visited:not(.btn):not(.feature-card):not(.project-card) { color: var(--text); }
 
 /* ── Compatibility Table ── */
 .compat-table { width: 100%; border-collapse: collapse; margin: var(--space-2x) 0; }
@@ -241,7 +237,7 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
     .page-hero p { font-size: var(--fs-body); line-height: var(--lh-body); }
     .page-body { padding: var(--space-2hx) var(--space-2x) var(--space-4x); }
     .cta-row { flex-direction: column; }
-    .cta { justify-content: center; width: 100%; }
+    .cta-row .btn { width: 100%; }
     .preview-stats { gap: var(--space-2hx); }
 }
 

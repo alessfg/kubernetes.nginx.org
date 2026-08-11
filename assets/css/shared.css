@@ -146,6 +146,16 @@
     --space-6x: 48px;
     --space-8x: 64px;
 
+    /* ── F5DS grid ──
+       12 columns, 16px gutter, 20px side margins. The 16px gutter is adopted:
+       every grid and flex row on the site now uses --space-2x between columns.
+       The 20px side margin is deliberately NOT adopted — the site keeps 48px
+       content gutters (--space-6x). F5DS's 20px assumes a dense product screen
+       inside a chrome-heavy shell; on a 1300px documentation page it puts prose
+       hard against the viewport edge. F5DS also publishes no breakpoints and
+       never states the fixed grid's maximum width, so the site's 900px/600px
+       breakpoints and its max-widths are local conventions, not spec values. */
+
     /* ── F5DS motion ──
        Four durations (there is no D1) and two easings. Colour and opacity move
        linearly at D2; elevation fades at 400ms linear, which is what the
@@ -195,7 +205,9 @@
     /* F5DS gives code its own style — same 14px as body but looser leading. Only
        the face deviates (see --mono); the metrics follow the system. */
     --fs-code: 0.875rem;   --lh-code: 1.5rem;   /* 14 / 24 */
-    --sidebar-w: 260px;
+    /* F5DS fixes Primary Navigation at 264px. Nothing in JS reads this width, so
+       the token is the only place it is defined. */
+    --sidebar-w: 264px;
     /* Layout offsets — overridden when the announcement banner is visible (body.has-banner)
        and on narrow viewports. Components compose against these instead of repeating numbers. */
     --topbar-h: 52px;

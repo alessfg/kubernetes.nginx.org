@@ -149,10 +149,16 @@
        Elevation page specifies — the Motion page's D3/EaseOutQuint applies to an
        accompanying position change, which this site does not use on hover.
        EaseOutQuint enters, EaseInCubic exits. */
-    --dur-colour: 200ms;
-    --dur-elev: 400ms;
-    --dur-move: 400ms;
-    --dur-travel: 600ms;
+       F5DS assigns a duration by how far a thing travels, and adds 100ms per
+       10% of screen crossed. That derivation is what places each token below:
+       a colour swap or a 6px chevron rotation crosses ~0% and takes the base
+       D2; a disclosure panel or a 264px drawer crosses ~20–30% and takes D3/D4;
+       D5 is reserved for a full-height Side Modal, which this site has none of. */
+    --dur-colour: 200ms;   /* D2 */
+    --dur-reveal: 300ms;   /* D3 */
+    --dur-move: 400ms;     /* D4 */
+    --dur-travel: 600ms;   /* D5 */
+    --dur-elev: 400ms;     /* Elevation page: the shadow's own fade, linear */
     --ease-enter: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-exit: cubic-bezier(0.550, 0.055, 0.675, 0.190);
     /* Self-hosted variable Inter first; then a locally installed static Inter for
@@ -220,10 +226,10 @@
 /* F5DS pairs a fixed leading with each size rather than applying one global ratio,
    so line-height here is a length, not a multiplier — every rule that changes
    font-size restates the paired line-height rather than inheriting this one. */
-body { font-family: var(--font); font-size: var(--fs-body); line-height: var(--lh-body); background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+body { font-family: var(--font); font-size: var(--fs-body); line-height: var(--lh-body); background: var(--bg); color: var(--text); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; }
 
 /* ── Accessibility ── */
-.skip-link { position: absolute; top: -100%; left: 16px; background: var(--green-dark); color: #fff; padding: 8px 16px; border-radius: 0 0 var(--radius) var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; z-index: 9999; text-decoration: none; transition: top 0.2s; }
+.skip-link { position: absolute; top: -100%; left: 16px; background: var(--green-dark); color: #fff; padding: 8px 16px; border-radius: 0 0 var(--radius) var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; z-index: 9999; text-decoration: none; transition: top var(--dur-move); }
 .skip-link:focus-visible { top: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
@@ -233,9 +239,9 @@ body { font-family: var(--font); font-size: var(--fs-body); line-height: var(--l
 .noscript-warning { position: fixed; top: var(--chrome-h); left: 0; right: 0; z-index: 150; background: #FFE4C4; color: #733800; text-align: center; padding: 12px 16px; font-size: var(--fs-body); line-height: var(--lh-body); border-bottom: 1px solid #FFC180; }
 
 /* ── Top Bar ── */
-.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: var(--topbar-h); display: flex; align-items: center; justify-content: space-between; position: fixed; top: var(--banner-h); left: 0; right: 0; z-index: 200; transition: background 0.3s, border-color 0.3s, top 0.2s; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: var(--topbar-h); display: flex; align-items: center; justify-content: space-between; position: fixed; top: var(--banner-h); left: 0; right: 0; z-index: 200; transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear, top var(--dur-move); }
 .topbar-left { display: flex; align-items: center; gap: 16px; }
-.menu-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; color: var(--text); font-size: var(--fs-h3); line-height: var(--lh-h3); transition: background 0.2s, border-color 0.2s; min-width: 44px; min-height: 44px; }
+.menu-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; color: var(--text); font-size: var(--fs-h3); line-height: var(--lh-h3); transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear; min-width: 44px; min-height: 44px; }
 .menu-toggle:hover { background: var(--bg); }
 .menu-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .mobile-breadcrumb { display: none; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-secondary); }
@@ -250,12 +256,12 @@ body { font-family: var(--font); font-size: var(--fs-body); line-height: var(--l
 .topbar-brand span { font-family: var(--font-display); font-weight: 700; font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); }
 .topbar-brand .sub { font-family: var(--font); font-weight: 400; color: var(--text-secondary); }
 .topbar-right { display: flex; align-items: center; gap: 6px; }
-.topbar-link { color: var(--text-secondary); text-decoration: none; font-size: var(--fs-body); line-height: var(--lh-body); padding: 5px 10px; border-radius: var(--radius); transition: background 0.2s, color 0.2s; display: inline-flex; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; justify-content: center; }
+.topbar-link { color: var(--text-secondary); text-decoration: none; font-size: var(--fs-body); line-height: var(--lh-body); padding: 5px 10px; border-radius: var(--radius); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; display: inline-flex; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; justify-content: center; }
 .topbar-link:hover { background: var(--bg); color: var(--text); }
 .topbar-link:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .topbar-link svg { width: 18px; height: 18px; flex-shrink: 0; }
 .topbar-link svg.nginx-glyph { width: 16px; height: 18px; }
-.dark-toggle { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 9px; cursor: pointer; color: var(--text); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); transition: background 0.2s, border-color 0.2s; display: inline-flex; align-items: center; gap: 5px; min-width: 44px; min-height: 44px; justify-content: center; }
+.dark-toggle { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 9px; cursor: pointer; color: var(--text); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear; display: inline-flex; align-items: center; gap: 5px; min-width: 44px; min-height: 44px; justify-content: center; }
 .dark-toggle:hover { background: var(--bg); }
 .dark-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .dark-toggle svg { width: 16px; height: 16px; }
@@ -281,16 +287,16 @@ body.has-banner { --banner-h: 35px; }
 .layout { display: flex; margin-top: var(--chrome-h); min-height: calc(100vh - var(--chrome-h)); }
 
 /* ── Sidebar Backdrop ── */
-.sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99; opacity: 0; transition: opacity 0.3s; }
+.sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99; opacity: 0; transition: opacity var(--dur-colour) linear; }
 .sidebar-backdrop.visible { display: block; opacity: 1; }
 
 /* ── Sidebar ── */
-.sidebar { width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); position: fixed; top: var(--chrome-h); bottom: 0; left: 0; overflow-y: auto; padding: 20px 0; transition: background 0.3s, border-color 0.3s, transform 0.3s ease, top 0.2s; z-index: 100; display: flex; flex-direction: column; }
+.sidebar { width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); position: fixed; top: var(--chrome-h); bottom: 0; left: 0; overflow-y: auto; padding: 20px 0; transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear, transform var(--dur-move) var(--ease-enter), top var(--dur-move); z-index: 100; display: flex; flex-direction: column; }
 .sidebar-section { padding: 0 16px; margin-bottom: 14px; }
 .sidebar-label { font-family: var(--font-display); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 700; color: var(--text-secondary); padding: 8px 12px 6px; }
 .sidebar-nav { list-style: none; }
 .sidebar-nav li { margin: 2px 0; }
-.sidebar-link { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius); text-decoration: none; color: var(--text-secondary); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: background 0.2s, color 0.2s; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: var(--font); }
+.sidebar-link { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius); text-decoration: none; color: var(--text-secondary); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: background var(--dur-colour) linear, color var(--dur-colour) linear; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: var(--font); }
 .sidebar-link:hover { background: var(--bg); color: var(--text); }
 .sidebar-link:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: var(--radius); }
 .sidebar-link.active { background: var(--bg); color: var(--text); font-weight: 500; border-radius: 0 var(--radius) var(--radius) 0; }
@@ -298,14 +304,14 @@ body.has-banner { --banner-h: 35px; }
    active item — no bullet glyphs. The .dot spans stay in the markup purely
    as per-product color metadata (read via :has() in the page CSS). */
 .sidebar-link .dot { display: none; }
-.sidebar-link::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background 0.2s; }
+.sidebar-link::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background var(--dur-colour) linear; }
 .sidebar-link.active::before { background: var(--green); }
 .sidebar-link-text { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
 .sidebar-link-name { font-size: var(--fs-body); line-height: var(--lh-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .sidebar-link-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-divider { height: 1px; background: var(--border); margin: 12px 16px; }
 .sidebar-ext-links { padding: 0 16px; }
-.sidebar-ext { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--radius); text-decoration: none; font-size: var(--fs-caption); line-height: var(--lh-caption); transition: background 0.2s, color 0.2s; }
+.sidebar-ext { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--radius); text-decoration: none; font-size: var(--fs-caption); line-height: var(--lh-caption); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; }
 .sidebar-ext:link, .sidebar-ext:visited { color: var(--text); }
 .sidebar-ext:hover { background: var(--bg); }
 .sidebar-ext:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: var(--radius); }
@@ -323,7 +329,7 @@ body.has-banner { --banner-h: 35px; }
 @media (max-width: 900px) {
     /* visibility keeps the closed off-canvas drawer out of the tab order and
        accessibility tree (translateX alone leaves ~19 invisible tab stops). */
-    .sidebar { transform: translateX(-100%); box-shadow: var(--elev-0); visibility: hidden; transition: background 0.3s, border-color 0.3s, transform 0.3s ease, visibility 0.3s, top 0.2s; }
+    .sidebar { transform: translateX(-100%); box-shadow: var(--elev-0); visibility: hidden; transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear, transform var(--dur-move) var(--ease-exit), visibility var(--dur-move), top var(--dur-move); }
     /* The open drawer is a genuine overlay, so it earns an elevation — but F5DS's
        L1/L2 cast straight down, and a left-anchored drawer needs its shadow to
        fall to the right of its edge. The offset stays directional; the tint and

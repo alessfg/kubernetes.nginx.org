@@ -51,7 +51,7 @@
 .page-hero-badge.videos { color: var(--red-dark); }
 :is(html, body).dark-mode .page-hero-badge.blogs { color: var(--teal); }
 :is(html, body).dark-mode .page-hero-badge.videos { color: var(--red); }
-.hero-version { display: inline-block; padding: 2px 7px; border-radius: var(--radius); font-size: var(--fs-badge); line-height: var(--lh-badge); font-weight: 700; font-family: var(--mono); margin-left: 4px; color: inherit; text-decoration: none; background: rgba(0,0,0,0.12); transition: background 0.15s; }
+.hero-version { display: inline-block; padding: 2px 7px; border-radius: var(--radius); font-size: var(--fs-badge); line-height: var(--lh-badge); font-weight: 700; font-family: var(--mono); margin-left: 4px; color: inherit; text-decoration: none; background: rgba(0,0,0,0.12); transition: background var(--dur-colour) linear; }
 .hero-version:hover { text-decoration: underline; }
 :is(html, body).dark-mode .hero-version { background: rgba(255,255,255,0.1); }
 .page-hero h1 { font-family: var(--font-display); font-size: var(--fs-h1); font-weight: 700; line-height: var(--lh-h1); margin-bottom: 12px; }
@@ -72,7 +72,7 @@
 
 /* ── Feature Grid ── */
 .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 20px 0 32px; }
-.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--elev-1); transition: border-color 0.25s, box-shadow 0.25s; }
+.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--elev-1); transition: border-color var(--dur-colour) linear, box-shadow var(--dur-elev) linear; }
 .feature-card:hover { border-color: var(--text-secondary); box-shadow: var(--elev-2); }
 .feature-card .feature-title { font-family: var(--font-display); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
 .feature-card h3 svg { flex-shrink: 0; opacity: 0.7; }
@@ -102,14 +102,14 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
 .code-accent { background: rgba(50,108,229,0.10); color: var(--blue); }
 
 /* ── Copy Button ── */
-.copy-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #999999; padding: 6px 12px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); font-family: var(--font); cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s; z-index: 2; min-height: 28px; }
+.copy-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #999999; padding: 6px 12px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); font-family: var(--font); cursor: pointer; transition: background var(--dur-colour) linear, color var(--dur-colour) linear, border-color var(--dur-colour) linear; z-index: 2; min-height: 28px; }
 .copy-btn:hover { background: rgba(255,255,255,0.18); color: #D5D6D6; }
 .copy-btn:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .copy-btn.copied { background: rgba(83,211,107,0.25); color: #7FE590; border-color: rgba(83,211,107,0.45); }
 
 /* ── CTA Row ── */
 .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
-.cta { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; text-decoration: none; transition: background 0.2s, border-color 0.2s, color 0.2s; }
+.cta { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; text-decoration: none; transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear, color var(--dur-colour) linear; }
 .cta:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .cta-primary { color: #fff; }
 .cta-primary.nic, .cta-primary.ngf { background: var(--green-dark); }
@@ -147,7 +147,7 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
 .detail-item { display: flex; flex-direction: column; gap: 6px; }
 .detail-label { font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 700; color: var(--text-secondary); }
 .detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.detail-tag { display: inline-block; padding: 3px 10px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; background: var(--bg); border: 1px solid var(--border); transition: border-color 0.15s; }
+.detail-tag { display: inline-block; padding: 3px 10px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; background: var(--bg); border: 1px solid var(--border); transition: border-color var(--dur-colour) linear; }
 .detail-tag a { color: inherit; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 2px; }
 .detail-tag a:hover { text-decoration-color: currentColor; }
 .detail-tag a:focus-visible, .version-pill a:focus-visible, .hero-version:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: var(--radius); }
@@ -182,7 +182,7 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
 
 /* ── Project Cards (Home) ── */
 .project-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 20px 0 32px; }
-.project-card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--elev-1); transition: border-color 0.25s, box-shadow 0.25s; text-align: left; text-decoration: none; color: inherit; }
+.project-card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--elev-1); transition: border-color var(--dur-colour) linear, box-shadow var(--dur-elev) linear; text-align: left; text-decoration: none; color: inherit; }
 .project-card:link, .project-card:visited { color: inherit; }
 .project-card:hover { border-color: var(--text-secondary); box-shadow: var(--elev-2); }
 .project-card:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: var(--radius); }
@@ -206,14 +206,14 @@ a.feature-card:link, a.feature-card:visited { color: inherit; }
 /* Click-to-load poster for YouTube embeds — avoids loading the full iframe payload until requested. */
 .video-poster { cursor: pointer; }
 .video-poster:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.video-poster-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: filter 0.2s; }
+.video-poster-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: filter var(--dur-colour) linear; }
 .video-poster:hover .video-poster-img { filter: brightness(0.85); }
-.video-poster-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; opacity: 0.92; transition: opacity 0.2s; }
+.video-poster-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; opacity: 0.92; transition: opacity var(--dur-colour) linear; }
 .video-poster:hover .video-poster-play { opacity: 1; }
 
 /* ── Entrance Animation ── */
-.animate-in { opacity: 0; transform: translateY(12px); }
-.animate-in.visible { opacity: 1; transform: translateY(0); transition: opacity 0.4s ease, transform 0.4s ease; }
+.animate-in { opacity: 0; transform: translateY(8px); }
+.animate-in.visible { opacity: 1; transform: translateY(0); transition: opacity var(--dur-move) var(--ease-enter), transform var(--dur-move) var(--ease-enter); }
 /* Inactive (display:none) pages must always render their entrance items as fully visible
    so they snap in immediately when activated, regardless of any leftover animate-in state. */
 .product-page:not(.active) .animate-in { opacity: 1; transform: none; transition: none; }

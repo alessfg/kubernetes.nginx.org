@@ -11,14 +11,14 @@
    keyed off aria-expanded — same caret language as the mapping-table rows:
    right-pointing when collapsed, rotating down when open. */
 .sidebar-link[aria-expanded] { padding-right: 30px; }
-.sidebar-link[aria-expanded]::after { content: ''; position: absolute; right: 14px; top: 50%; width: 6px; height: 6px; border-right: 2px solid var(--green); border-bottom: 2px solid var(--green); transform: translateY(-50%) rotate(-45deg); transition: transform 0.25s ease, opacity 0.2s; opacity: 0.55; }
+.sidebar-link[aria-expanded]::after { content: ''; position: absolute; right: 14px; top: 50%; width: 6px; height: 6px; border-right: 2px solid var(--green); border-bottom: 2px solid var(--green); transform: translateY(-50%) rotate(-45deg); transition: transform var(--dur-colour) var(--ease-enter), opacity var(--dur-colour) linear; opacity: 0.55; }
 .sidebar-link[aria-expanded]:hover::after { opacity: 0.85; }
 .sidebar-link[aria-expanded="true"]::after { transform: translateY(-50%) rotate(45deg); opacity: 1; }
 
 /* Sub-items step down in size and sit close to the tree line (F5 hierarchy:
    descending size + contrast, color restraint — active is carbon + weight,
    not a colored link). */
-.sidebar-subnav { list-style: none; padding-left: 6px; overflow: hidden; max-height: 0; transition: max-height 0.3s ease; border-left: 1px solid var(--border); margin-left: 22px; margin-top: 2px; margin-bottom: 4px; }
+.sidebar-subnav { list-style: none; padding-left: 6px; overflow: hidden; max-height: 0; transition: max-height var(--dur-reveal) ease; border-left: 1px solid var(--border); margin-left: 22px; margin-top: 2px; margin-bottom: 4px; }
 .sidebar-subnav.open { max-height: 500px; }
 .sidebar-subnav .sidebar-link { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: 5px 10px; color: var(--text-secondary); }
 .sidebar-subnav .sidebar-link::before { display: none; }
@@ -31,7 +31,7 @@
 /* ── Main Content ── */
 .main-inner { max-width: 1300px; padding: 40px 48px 60px; }
 main { padding: 0; }
-.main-inner section { background: var(--surface); border-radius: var(--radius); padding: 30px; margin-bottom: 30px; box-shadow: var(--elev-1); transition: background 0.3s; }
+.main-inner section { background: var(--surface); border-radius: var(--radius); padding: 30px; margin-bottom: 30px; box-shadow: var(--elev-1); transition: background var(--dur-colour) linear; }
 /* Light-mode content links — Jade 5, scoped to the content area (dark-mode
    counterpart lives in the dark overrides below). Component link colors that
    must differ (.install-box a, .info-box.warning a) are declared later at the
@@ -53,14 +53,14 @@ table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); line-
 .mapping-table pre code { white-space: pre; }
 th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border); }
 th { font-weight: 700; color: var(--text-secondary); font-size: var(--fs-caption); line-height: var(--lh-caption); background: var(--bg); }
-tr.expandable { cursor: pointer; transition: background-color 0.2s; border-left: 3px solid transparent; }
+tr.expandable { cursor: pointer; transition: background-color var(--dur-colour) linear; border-left: 3px solid transparent; }
 tr.expandable:hover { background-color: rgba(0,150,57,0.08); border-left-color: rgba(0,150,57,0.4); }
 tr.expandable.expanded { border-left-color: var(--green-text); }
 tr.expandable:focus { outline: 2px solid var(--green); outline-offset: -2px; background-color: rgba(0,150,57,0.08); }
 tr.expandable:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 tr.expandable td:first-child { position: relative; padding-left: 28px; }
 tr.expandable td:last-child { line-height: 1.8; }
-tr.expandable td:first-child::after { content: ''; position: absolute; left: 8px; top: 50%; width: 6px; height: 6px; border-right: 2px solid var(--green); border-bottom: 2px solid var(--green); transform: translate(-50%, -50%) rotate(-45deg); transition: transform 0.25s ease; opacity: 0.5; }
+tr.expandable td:first-child::after { content: ''; position: absolute; left: 8px; top: 50%; width: 6px; height: 6px; border-right: 2px solid var(--green); border-bottom: 2px solid var(--green); transform: translate(-50%, -50%) rotate(-45deg); transition: transform var(--dur-colour) var(--ease-enter); opacity: 0.5; }
 tr.expandable:hover td:first-child::after { opacity: 0.8; }
 tr.expandable.expanded td:first-child::after { transform: translate(-50%, -50%) rotate(45deg); opacity: 1; }
 tr.example-row { display: none; }
@@ -77,7 +77,7 @@ pre code { background: none; color: inherit; padding: 0; }
 .comparison-block h4 { padding: 10px 15px; margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); display: flex; justify-content: space-between; align-items: center; }
 .comparison-block.old h4 { background: rgba(228,0,43,0.08); color: #B30013; }
 .comparison-block.new h4 { background: rgba(0,150,57,0.10); color: #025F26; }
-.comparison-copy-btn { background: rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.12); color: inherit; padding: 2px 10px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; opacity: 0.7; transition: opacity 0.2s; font-family: var(--font); }
+.comparison-copy-btn { background: rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.12); color: inherit; padding: 2px 10px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; opacity: 0.7; transition: opacity var(--dur-colour) linear; font-family: var(--font); }
 .comparison-copy-btn:hover { opacity: 1; }
 .comparison-copy-btn.copied { background: #007D30; color: white; border-color: #007D30; opacity: 1; }
 .comparison-block pre { margin: 0; border-radius: 0 0 var(--radius) var(--radius); }
@@ -104,7 +104,7 @@ pre code { background: none; color: inherit; padding: 0; }
 .info-box.warning a { color: #733800; }
 .info-box.warning code { background: rgba(242,154,54,0.18); color: #733800; }
 /* Collapsible end-of-maintenance warning (repeats on all three tool pages) */
-.eol-toggle { background: none; border: 1px solid currentColor; border-radius: var(--radius); color: inherit; font-family: var(--font); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; padding: 2px 10px; cursor: pointer; margin-left: 8px; opacity: 0.85; transition: opacity 0.2s; vertical-align: middle; }
+.eol-toggle { background: none; border: 1px solid currentColor; border-radius: var(--radius); color: inherit; font-family: var(--font); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; padding: 2px 10px; cursor: pointer; margin-left: 8px; opacity: 0.85; transition: opacity var(--dur-colour) linear; vertical-align: middle; }
 .eol-toggle:hover { opacity: 1; }
 .eol-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .eol-compact { margin: 0 0 12px; padding: 8px 20px; font-size: var(--fs-caption); line-height: var(--lh-caption); }
@@ -117,8 +117,8 @@ pre code { background: none; color: inherit; padding: 0; }
     /* Headings below the sticky bar need extra scroll clearance (chrome + bar) */
     #mappings h3[id], #plus-mappings h3[id], #configmap-mappings h3[id] { scroll-margin-top: calc(var(--chrome-h) + 78px); }
 }
-.controls input[type="search"] { padding: 10px 16px; border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); transition: border-color 0.2s; min-width: 240px; flex: 1; max-width: 400px; }
-.controls select { padding: 10px 12px; border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color 0.2s; }
+.controls input[type="search"] { padding: 10px 16px; border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); transition: border-color var(--dur-colour) linear; min-width: 240px; flex: 1; max-width: 400px; }
+.controls select { padding: 10px 12px; border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color var(--dur-colour) linear; }
 /* One focus idiom sitewide: a 2px outline offset by 2px. These two controls used
    to suppress the outline and draw a tinted box-shadow ring instead, which was
    the site's second idiom and the only place two different green alphas
@@ -129,14 +129,14 @@ pre code { background: none; color: inherit; padding: 0; }
 .controls input[type="search"]::placeholder { color: #666666; }
 .search-count { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); white-space: nowrap; }
 .search-count.no-results { color: #B30013; }
-.btn { padding: 10px 20px; border: none; border-radius: var(--radius); cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: background 0.3s, color 0.3s; }
+.btn { padding: 10px 20px; border: none; border-radius: var(--radius); cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: background var(--dur-colour) linear, color var(--dur-colour) linear; }
 .btn-primary { background: var(--green-dark); color: white; }
 .btn-primary:hover { background: #025F26; }
 .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--border); }
 .feature-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 25px; margin: 20px 0; }
 .feature-card { flex: 0 0 calc(33.333% - 17px); }
-.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 25px; box-shadow: var(--elev-1); transition: border-color 0.25s, box-shadow 0.25s; }
+.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 25px; box-shadow: var(--elev-1); transition: border-color var(--dur-colour) linear, box-shadow var(--dur-elev) linear; }
 .feature-card:hover { border-color: var(--text-secondary); box-shadow: var(--elev-2); }
 .feature-card h3 { font-family: var(--font-display); color: var(--text); margin: 0 0 15px; font-size: var(--fs-h3); line-height: var(--lh-h3); display: flex; align-items: center; gap: 10px; }
 .feature-card .description { font-size: var(--fs-body); color: var(--text-secondary); margin-bottom: 15px; line-height: var(--lh-body); }
@@ -148,25 +148,25 @@ pre code { background: none; color: inherit; padding: 0; }
 .checklist-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); }
 .checklist-progress { font-weight: 500; color: var(--text); }
 .checklist-note { font-size: var(--fs-caption); line-height: var(--lh-caption); }
-.checklist-reset { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-secondary); font-family: var(--font); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; padding: 3px 12px; cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+.checklist-reset { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-secondary); font-family: var(--font); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; padding: 3px 12px; cursor: pointer; transition: background var(--dur-colour) linear, color var(--dur-colour) linear, border-color var(--dur-colour) linear; }
 .checklist-reset:hover { background: var(--bg); color: var(--text); border-color: var(--text-secondary); }
 .checklist-reset:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .checklist { list-style: none; padding: 0; }
-.checklist li { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; transition: opacity 0.2s; }
-.checklist li::before { content: '☐'; flex-shrink: 0; font-size: 1.2rem; line-height: 1; color: var(--green-text); transition: transform 0.15s; }
+.checklist li { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; transition: opacity var(--dur-colour) linear; }
+.checklist li::before { content: '☐'; flex-shrink: 0; font-size: 1.2rem; line-height: 1; color: var(--green-text); transition: transform var(--dur-colour); }
 .checklist li:hover::before { transform: scale(1.15); }
 .checklist li.checked { opacity: 0.7; }
 .checklist li.checked::before { content: '☑'; }
 .checklist li.checked span { text-decoration: line-through; }
 .approach-tabs { display: flex; gap: 0; margin-bottom: 15px; border-bottom: 2px solid var(--border); }
-.approach-tab { padding: 8px 20px; border: none; background: none; cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s; }
+.approach-tab { padding: 8px 20px; border: none; background: none; cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color var(--dur-colour) linear, border-color var(--dur-colour) linear; }
 .approach-tab:hover { color: var(--green-text); }
 .approach-tab.active { color: var(--green-text); border-bottom-color: var(--green-text); }
 .approach-content { display: none; }
 .approach-content.active { display: block; }
 h2[id], h3[id] { display: flex; align-items: center; }
 h2[id], h3[id], section[id] { scroll-margin-top: 100px; }
-.heading-anchor { display: inline-flex; align-items: center; margin-left: 8px; opacity: 0; transition: opacity 0.2s; text-decoration: none; color: inherit; }
+.heading-anchor { display: inline-flex; align-items: center; margin-left: 8px; opacity: 0; transition: opacity var(--dur-colour) linear; text-decoration: none; color: inherit; }
 h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus { opacity: 0.5; }
 .heading-anchor:hover { opacity: 1 !important; }
 .yaml-editor { position: relative; }
@@ -183,7 +183,7 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus { opac
 .yaml-editor:focus-within .yaml-highlight-layer { border-color: var(--green-text); }
 .analyzer-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .analyzer-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-.analyzer-pill { padding: 8px 16px; border-radius: var(--radius-pill); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: box-shadow 0.15s; }
+.analyzer-pill { padding: 8px 16px; border-radius: var(--radius-pill); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: box-shadow var(--dur-elev) linear; }
 /* Scrollable pills are rendered as <button>s for keyboard operability */
 /* Scrollable pills are real <button>s (migration-core.js picks the tag from
    p.scrollTo), and F5DS reserves the pill radius for Tags and Badges — "a
@@ -224,7 +224,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-step-title { font-family: var(--font-display); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 700; color: var(--text); margin: 0; }
 .analyzer-step-desc { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); margin-bottom: 12px; }
 .analyzer-yaml-output { position: relative; background: #222222; color: #D5D6D6; padding: 20px; border-radius: var(--radius); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); overflow-x: auto; white-space: pre; margin: 10px 0; border: 1px solid #343434; color-scheme: dark; }
-.analyzer-copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #CCCCCC; padding: 5px 12px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; transition: background 0.2s, color 0.2s; z-index: 1; }
+.analyzer-copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #CCCCCC; padding: 5px 12px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; transition: background var(--dur-colour) linear, color var(--dur-colour) linear; z-index: 1; }
 .analyzer-copy-btn:hover { background: rgba(255,255,255,0.25); color: white; }
 .analyzer-copy-btn.copied { background: #007D30; color: white; border-color: #007D30; }
 .analyzer-step-separator { border: none; border-top: 1px dashed var(--border); margin: 15px 0 0; }
@@ -248,7 +248,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-comparison-block.old .analyzer-comparison-badge { background: rgba(228,0,43,0.12); color: #B30013; }
 .analyzer-comparison-block.new .analyzer-comparison-badge { background: rgba(0,150,57,0.15); color: #025F26; }
 .analyzer-comparison-block .analyzer-yaml-output { margin: 0; border-radius: 0 0 var(--radius) var(--radius); min-height: 60px; }
-.analyzer-copy-all { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding: 12px 20px; background: var(--green-dark); color: white; border: none; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background 0.2s; }
+.analyzer-copy-all { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding: 12px 20px; background: var(--green-dark); color: white; border: none; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background var(--dur-colour) linear; }
 .analyzer-copy-all:hover { background: #025F26; }
 .analyzer-copy-all.copied { background: #007D30; }
 .analyzer-copy-all svg { flex-shrink: 0; }
@@ -328,6 +328,8 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-empty-state p { font-size: var(--fs-body); line-height: var(--lh-body); margin: 4px 0; }
 .analyzer-empty-state .hint { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
 .analyzer-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 28px 20px; color: var(--text-secondary); font-size: var(--fs-body); line-height: var(--lh-body); }
+/* 0.7s is kept deliberately: F5DS assigns durations by distance travelled and
+   publishes nothing for a continuous rotation, so there is no token to snap to. */
 .analyzer-loading-spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: analyzer-spin 0.7s linear infinite; }
 @keyframes analyzer-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .analyzer-loading-spinner { animation: none; } }
@@ -351,12 +353,12 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-complexity-dots span.filled { opacity: 1; }
 .analyzer-yaml-output.collapsed { max-height: 200px; overflow: hidden; }
 .analyzer-yaml-output.collapsed::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: linear-gradient(transparent, #222222); pointer-events: none; }
-.analyzer-yaml-expand { background: none; border: 1px solid var(--border); color: var(--green-text); padding: 4px 14px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; margin-top: 4px; font-weight: 500; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+.analyzer-yaml-expand { background: none; border: 1px solid var(--border); color: var(--green-text); padding: 4px 14px; border-radius: var(--radius); font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; margin-top: 4px; font-weight: 500; transition: background var(--dur-colour) linear, color var(--dur-colour) linear, border-color var(--dur-colour) linear; }
 .analyzer-yaml-expand:hover { background: var(--green-dark); color: white; border-color: var(--green-dark); }
-.analyzer-edit-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--surface); border: 1px solid var(--green-dark); color: var(--green-text); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background 0.2s, color 0.2s; margin-top: 16px; }
+.analyzer-edit-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--surface); border: 1px solid var(--green-dark); color: var(--green-text); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background var(--dur-colour) linear, color var(--dur-colour) linear; margin-top: 16px; }
 .analyzer-edit-btn:hover { background: var(--green-dark); color: white; }
-@keyframes analyzerFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-.analyzer-fade-in { animation: analyzerFadeIn 0.4s ease forwards; opacity: 0; }
+@keyframes analyzerFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.analyzer-fade-in { animation: analyzerFadeIn var(--dur-move) var(--ease-enter) forwards; opacity: 0; }
 .analyzer-input-status { display: flex; gap: 16px; margin-top: 6px; font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
 .analyzer-input-status .status-item { display: flex; align-items: center; gap: 4px; }
 .analyzer-input-status .status-dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -368,7 +370,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-drop-zone.dragging #yamlInput { opacity: 0.5; }
 .analyzer-drop-label { background: var(--surface); padding: 12px 24px; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--green-text); box-shadow: var(--elev-1); }
 .analyzer-export-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; align-items: center; }
-.analyzer-download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: var(--blue); color: white; border: none; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background 0.2s; }
+.analyzer-download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: var(--blue); color: white; border: none; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background var(--dur-colour) linear; }
 .analyzer-download-btn:hover { background: var(--blue-dark); }
 .analyzer-download-btn.downloaded { background: #007D30; }
 .analyzer-download-btn svg { flex-shrink: 0; }
@@ -450,8 +452,8 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 /* L1 here is an inference, not a spec value: F5DS states an elevation level for
    Toast only and explicitly says not to assume one for other overlays. */
 .sample-dropdown-menu { display: none; position: absolute; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--elev-1); min-width: 280px; max-width: calc(100vw - 40px); z-index: 50; overflow: hidden; }
-.sample-dropdown-menu.visible { display: block; animation: analyzerFadeIn 0.15s ease; }
-.sample-dropdown-item { padding: 12px 16px; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid var(--border); }
+.sample-dropdown-menu.visible { display: block; animation: analyzerFadeIn var(--dur-colour) var(--ease-enter); }
+.sample-dropdown-item { padding: 12px 16px; cursor: pointer; transition: background var(--dur-colour) linear; border-bottom: 1px solid var(--border); }
 .sample-dropdown-item:last-child { border-bottom: none; }
 .sample-dropdown-item:hover { background: rgba(0,150,57,0.08); }
 .sample-dropdown-item .sample-title { font-weight: 500; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text); display: flex; align-items: center; gap: 6px; }
@@ -465,7 +467,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .strategy-toggle { display: flex; align-items: center; gap: 12px; margin: 16px 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); }
 .strategy-toggle-label { font-weight: 500; color: var(--text); white-space: nowrap; }
 .strategy-toggle-options { display: flex; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.strategy-option { padding: 6px 14px; cursor: pointer; font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; border: none; background: none; color: var(--text-secondary); transition: background 0.2s, color 0.2s; font-family: var(--font); }
+.strategy-option { padding: 6px 14px; cursor: pointer; font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; border: none; background: none; color: var(--text-secondary); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; font-family: var(--font); }
 .strategy-option.active { background: var(--green-dark); color: #fff; }
 .strategy-option:not(.active):hover { background: var(--bg); }
 .strategy-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); margin-left: 4px; }
@@ -473,7 +475,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 :is(html, body).dark-mode .sample-dropdown-item:hover { background: rgba(83,211,107,0.10); }
 /* Keeps an elevation despite the L0-on-buttons rule: F5DS's own Do list allows
    elevation on a fixed action bar, and this floats over scrolling content. */
-.scroll-to-top { position: fixed; bottom: 30px; right: 30px; width: 44px; height: 44px; border-radius: 50%; background: var(--green-dark); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: var(--elev-1); z-index: 200; transition: opacity 0.2s, transform 0.2s; }
+.scroll-to-top { position: fixed; bottom: 30px; right: 30px; width: 44px; height: 44px; border-radius: 50%; background: var(--green-dark); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: var(--elev-1); z-index: 200; transition: opacity var(--dur-colour) linear, transform var(--dur-colour); }
 .scroll-to-top:hover { transform: scale(1.1); background: #025F26; }
 .scroll-to-top.visible { display: flex; }
 :is(html, body).dark-mode .scroll-to-top { background: var(--green); color: var(--bg); }

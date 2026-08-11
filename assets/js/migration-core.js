@@ -1235,7 +1235,8 @@
                 h4.textContent = plan.unrecognized.title;
                 unrecSection.appendChild(h4);
                 let desc = document.createElement('p');
-                desc.style.fontSize = '0.9rem';
+                desc.style.fontSize = 'var(--fs-body)';
+                desc.style.lineHeight = 'var(--lh-body)';
                 desc.style.color = 'var(--text-secondary)';
                 desc.style.marginBottom = '10px';
                 desc.textContent = plan.unrecognized.desc;
@@ -1253,7 +1254,8 @@
                     unrecSection.appendChild(uCard);
                 });
                 let contributeP = document.createElement('p');
-                contributeP.style.fontSize = '0.85rem';
+                contributeP.style.fontSize = 'var(--fs-caption)';
+                contributeP.style.lineHeight = 'var(--lh-caption)';
                 contributeP.style.marginTop = '10px';
                 let contributeLink = document.createElement('a');
                 contributeLink.href = 'https://github.com/nginx/kubernetes.nginx.org';

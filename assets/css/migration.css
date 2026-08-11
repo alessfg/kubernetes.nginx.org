@@ -5,8 +5,6 @@
    Eggplant/Tangerine/Raspberry) plus the Kubernetes brand blue (#326CE5/
    #1A4CB5) as the tooling accent; Bay belongs to the VirtualServer badge. */
 
-.container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
-
 /* ── Sidebar (tool nav) ── */
 /* Top-level tool pages use the shared Jade active rail (shared.css). */
 /* Disclosure chevron on expandable section parents (docs.nginx.com idiom),
@@ -70,12 +68,6 @@ tr.example-row.visible { display: table-row; }
 tr.example-row td { padding: 0; background: var(--bg); white-space: normal; }
 .example-content { padding: 20px; border-left: 4px solid var(--green); margin: 10px; background: var(--surface); border-radius: 0 5px 5px 0; }
 tr:not(.expandable):not(.example-row):hover { background-color: #F5F5F5; }
-.annotation-preview { line-height: 2; }
-.annotation-preview code { white-space: nowrap; }
-.annotation-preview-more { display: none; }
-.annotation-preview-more.show { display: inline; }
-.annotation-preview-toggle { color: var(--green-text); cursor: pointer; font-size: 0.85em; font-weight: 500; text-decoration: none; border-bottom: 1px dashed var(--green); margin-left: 4px; white-space: nowrap; }
-.annotation-preview-toggle:hover { border-bottom-style: solid; }
 code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-family: var(--mono); font-size: 0.9em; color: #9C1174; }
 pre { background: #222222; color: #D5D6D6; padding: 20px; border-radius: 5px; overflow-x: auto; font-size: var(--fs-code); line-height: var(--lh-code); margin: 15px 0; border: 1px solid #343434; color-scheme: dark; }
 pre code { background: none; color: inherit; padding: 0; }
@@ -96,7 +88,6 @@ pre code { background: none; color: inherit; padding: 0; }
 .badge-transportserver { background: rgba(242,154,54,0.18); color: #733800; }
 .badge-globalconfiguration { background: rgba(52,52,52,0.08); color: #343434; }
 .badge-plus { background: rgba(228,0,43,0.08); color: #B30013; }
-.badge-annotation { background: rgba(0,156,147,0.12); color: #005250; }
 .badge-configmap { background: rgba(171,39,130,0.10); color: #9C1174; }
 .badge-new { background: rgba(0,150,57,0.10); color: var(--green-text); border: 1px solid rgba(0,150,57,0.25); }
 .install-box { background: linear-gradient(135deg, #00216B, #0E41AA); color: white; padding: 15px 20px; border-radius: 5px; margin: 20px 0 15px; }
@@ -162,9 +153,6 @@ pre code { background: none; color: inherit; padding: 0; }
 .checklist li.checked { opacity: 0.7; }
 .checklist li.checked::before { content: '☑'; }
 .checklist li.checked span { text-decoration: line-through; }
-.copy-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 4px 10px; border-radius: 4px; font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; position: sticky; right: 8px; float: right; z-index: 2; }
-.copy-btn:hover { background: rgba(255,255,255,0.3); }
-.copy-btn.copied { background: #007D30; }
 .approach-tabs { display: flex; gap: 0; margin-bottom: 15px; border-bottom: 2px solid var(--border); }
 .approach-tab { padding: 8px 20px; border: none; background: none; cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s; }
 .approach-tab:hover { color: var(--green-text); }
@@ -215,8 +203,6 @@ button.analyzer-pill { border: none; font-family: var(--font); }
 .analyzer-copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #CCCCCC; padding: 5px 12px; border-radius: 4px; font-size: var(--fs-caption); line-height: var(--lh-caption); cursor: pointer; transition: background 0.2s, color 0.2s; z-index: 1; }
 .analyzer-copy-btn:hover { background: rgba(255,255,255,0.25); color: white; }
 .analyzer-copy-btn.copied { background: #007D30; color: white; border-color: #007D30; }
-.analyzer-install-cmd { background: linear-gradient(135deg, #00216B, #0E41AA); color: white; padding: 12px 16px; border-radius: 5px; margin: 10px 0; font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); overflow-x: auto; position: relative; }
-.analyzer-install-cmd .analyzer-copy-btn { top: 6px; right: 6px; }
 .analyzer-step-separator { border: none; border-top: 1px dashed var(--border); margin: 15px 0 0; }
 .analyzer-crd-group { margin-top: 15px; padding: 15px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border); }
 .analyzer-crd-group-title { font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--blue-dark); margin-bottom: 8px; }
@@ -277,9 +263,6 @@ button.analyzer-pill { border: none; font-family: var(--font); }
     .info-box { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: 12px 14px; }
     /* .feature-grid is flex on this page (unlike index.css's grid) — stack via the cards */
     .feature-card { flex: 1 1 100%; }
-    .key-details { padding: 16px; }
-    .details-grid { grid-template-columns: 1fr; }
-    .preview-stats { gap: 16px; }
 }
 @media (max-width: 600px) {
     .main-inner { padding: 16px 12px 32px; }
@@ -314,8 +297,6 @@ button.analyzer-pill { border: none; font-family: var(--font); }
     pre { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: 14px; }
     #yamlInput { min-height: 200px; }
     .doc-list { padding-left: 22px; }
-    .cta-row { flex-direction: column; }
-    .cta { justify-content: center; width: 100%; }
 }
 
 .analyzer-empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
@@ -377,7 +358,6 @@ button.analyzer-pill { border: none; font-family: var(--font); }
 :is(html, body).dark-mode tr.example-row td { background: var(--bg); }
 :is(html, body).dark-mode .example-content { background: var(--surface); border-left-color: var(--green-text); }
 :is(html, body).dark-mode code { background: rgba(52,52,52,0.5); color: #FFA3E1; }
-:is(html, body).dark-mode .annotation-preview-toggle { color: var(--green-text); border-bottom-color: var(--green-text); }
 :is(html, body).dark-mode .info-box.note { background: rgba(107,159,255,0.10); color: var(--blue); }
 :is(html, body).dark-mode .info-box.tip { background: rgba(83,211,107,0.10); color: var(--green-text); }
 :is(html, body).dark-mode .info-box.warning { background: rgba(242,154,54,0.12); color: var(--orange); }
@@ -412,7 +392,6 @@ button.analyzer-pill { border: none; font-family: var(--font); }
 :is(html, body).dark-mode .badge-transportserver { background: rgba(255,172,92,0.15); color: #FFAC5C; }
 :is(html, body).dark-mode .badge-globalconfiguration { background: rgba(204,204,204,0.12); color: #CCCCCC; }
 :is(html, body).dark-mode .badge-plus { background: rgba(255,145,140,0.15); color: #FF918C; }
-:is(html, body).dark-mode .badge-annotation { background: rgba(95,222,211,0.15); color: #5FDED3; }
 :is(html, body).dark-mode .badge-configmap { background: rgba(255,163,225,0.15); color: #FFA3E1; }
 :is(html, body).dark-mode .badge-new { background: rgba(83,211,107,0.15); color: #7FE590; border-color: rgba(127,229,144,0.35); }
 :is(html, body).dark-mode .analyzer-pill.found { background: rgba(83,211,107,0.15); color: #7FE590; }
@@ -442,10 +421,6 @@ button.analyzer-pill { border: none; font-family: var(--font); }
 :is(html, body).dark-mode .analyzer-download-btn { color: #041538; }
 :is(html, body).dark-mode .analyzer-download-btn:hover { background: #4A7DE1; }
 :is(html, body).dark-mode .analyzer-download-btn.downloaded { background: #42BA5B; color: #003105; }
-.annotation-tooltip { position: relative; cursor: help; }
-.annotation-tooltip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #343434; color: #fff; padding: 6px 10px; border-radius: 5px; font-size: var(--fs-caption); white-space: nowrap; max-width: 320px; white-space: normal; line-height: var(--lh-caption); pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-family: var(--font); }
-.annotation-tooltip::before { content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #343434; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 20; }
-.annotation-tooltip:hover::after, .annotation-tooltip:hover::before, .annotation-tooltip:focus::after, .annotation-tooltip:focus::before { opacity: 1; }
 .sample-dropdown { position: relative; display: inline-block; }
 .sample-dropdown-btn { display: inline-flex; align-items: center; gap: 6px; }
 .sample-dropdown-btn::after { content: '\25BC'; font-size: 0.6rem; opacity: 0.7; }
@@ -499,8 +474,6 @@ button.analyzer-pill { border: none; font-family: var(--font); }
     .yaml-keyword, .yaml-bool { color: #004278 !important; }
     .yaml-number { color: #007D30 !important; }
     .yaml-separator { color: #666666 !important; }
-    .analyzer-install-cmd { background: #F5F5F5 !important; color: #343434 !important; border: 1px solid #CCCCCC; }
-    .analyzer-install-cmd code { color: #343434; }
     .analyzer-success-banner { border: 1px solid #999999; }
     body { background: white; font-size: 11pt; }
 }

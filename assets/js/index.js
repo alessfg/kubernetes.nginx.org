@@ -220,7 +220,7 @@
                 });
             }
             _animatingPage = pageEl;
-            let items = pageEl.querySelectorAll('.feature-card, .code-section, .info-box, .cta-row, .key-details, .preview-card, .compat-table, .annotation-grid, .section-heading, .project-card');
+            let items = pageEl.querySelectorAll('.feature-card, .code-section, .info-box, .cta-row, .key-details, .preview-card, .compat-table, .section-heading, .project-card');
             if (prefersReducedMotion) {
                 items.forEach(function(el) { el.classList.remove('animate-in'); });
                 return;

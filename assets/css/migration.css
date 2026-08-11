@@ -56,7 +56,9 @@ th { font-weight: 700; color: var(--text-secondary); font-size: var(--fs-caption
 tr.expandable { cursor: pointer; transition: background-color var(--dur-colour) linear; border-left: 3px solid transparent; }
 tr.expandable:hover { background-color: rgba(0,150,57,0.08); border-left-color: rgba(0,150,57,0.4); }
 tr.expandable.expanded { border-left-color: var(--green-text); }
-tr.expandable:focus { outline: 2px solid var(--green); outline-offset: -2px; background-color: rgba(0,150,57,0.08); }
+/* :focus-visible only. The :focus rule that used to sit here drew a ring on every
+   mouse click as well, which is the behaviour :focus-visible exists to avoid; the
+   hover background already gives pointer users their feedback. */
 tr.expandable:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 tr.expandable td:first-child { position: relative; padding-left: var(--space-3hx); }
 tr.expandable td:last-child { line-height: 1.8; }

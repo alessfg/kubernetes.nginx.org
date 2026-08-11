@@ -342,7 +342,11 @@ body.has-banner { --banner-h: 36px; }
 .sidebar-link::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background var(--dur-colour) linear; }
 .sidebar-link.active::before { background: var(--green); }
 .sidebar-link-text { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
-.sidebar-link-name { font-size: var(--fs-body); line-height: var(--lh-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+/* No ellipsis on the name. F5DS is explicit that nothing in Primary Navigation
+   truncates, and every name fits at 264px, so the fix is the content rather than
+   the CSS. The description keeps its ellipsis as a safety net for future strings;
+   the three that actually clipped were shortened instead. */
+.sidebar-link-name { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text); }
 .sidebar-link-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-divider { height: 1px; background: var(--border); margin: var(--space-2x) var(--space-2x); }
 .sidebar-ext-links { padding: 0 var(--space-2x); }
@@ -360,7 +364,11 @@ body.has-banner { --banner-h: 36px; }
 /* ── Sidebar Copyright ── */
 .sidebar-copyright { padding: var(--space-2x) var(--space-2x) var(--space-base); margin-top: auto; font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
 .sidebar-trademark { margin-top: var(--space-base); }
-.sidebar-tagline { margin-top: var(--space-base); font-style: italic; opacity: 0.7; }
+/* No opacity: --text-secondary composited at 0.7 lands on #949494 over the light
+   sidebar (3.03:1) and #757575 over the dark one (3.45:1), both below WCAG AA's
+   4.5:1. The token on its own measures 5.74:1 and 5.58:1. F5DS publishes no
+   contrast guidance at all, so WCAG 2.1 AA governs here. */
+.sidebar-tagline { margin-top: var(--space-base); font-style: italic; }
 
 /* ── Buttons ──
    One geometry for every button on the site. Before this the site ran three

@@ -124,10 +124,6 @@
     --elev-0: none;
     --elev-1: 0px 6px 24px rgba(11,22,64,0.08);
     --elev-2: 0px 10px 20px rgba(11,22,64,0.12);
-    /* Retained as aliases so the two names already threaded through index.css and
-       migration.css keep resolving; they now carry the F5DS values. */
-    --shadow: var(--elev-1);
-    --shadow-strong: var(--elev-2);
 
     /* ── F5DS spacing scale ──
        Base 8px; every value a multiple of 4. Named after F5DS's own steps
@@ -327,8 +323,12 @@ body.has-banner { --banner-h: 35px; }
 @media (max-width: 900px) {
     /* visibility keeps the closed off-canvas drawer out of the tab order and
        accessibility tree (translateX alone leaves ~19 invisible tab stops). */
-    .sidebar { transform: translateX(-100%); box-shadow: none; visibility: hidden; transition: background 0.3s, border-color 0.3s, transform 0.3s ease, visibility 0.3s, top 0.2s; }
-    .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.15); visibility: visible; }
+    .sidebar { transform: translateX(-100%); box-shadow: var(--elev-0); visibility: hidden; transition: background 0.3s, border-color 0.3s, transform 0.3s ease, visibility 0.3s, top 0.2s; }
+    /* The open drawer is a genuine overlay, so it earns an elevation — but F5DS's
+       L1/L2 cast straight down, and a left-anchored drawer needs its shadow to
+       fall to the right of its edge. The offset stays directional; the tint and
+       alpha follow L2 (N700 #0B1640 at 12%) so it reads as the same system. */
+    .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(11,22,64,0.12); visibility: visible; }
     .main { margin-left: 0; }
     .menu-toggle { display: block; }
     .mobile-breadcrumb { display: block; }

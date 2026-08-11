@@ -31,7 +31,7 @@
 /* ── Main Content ── */
 .main-inner { max-width: 1300px; padding: 40px 48px 60px; }
 main { padding: 0; }
-.main-inner section { background: var(--surface); border-radius: var(--radius); padding: 30px; margin-bottom: 30px; box-shadow: var(--shadow); transition: background 0.3s; }
+.main-inner section { background: var(--surface); border-radius: var(--radius); padding: 30px; margin-bottom: 30px; box-shadow: var(--elev-1); transition: background 0.3s; }
 /* Light-mode content links — Jade 5, scoped to the content area (dark-mode
    counterpart lives in the dark overrides below). Component link colors that
    must differ (.install-box a, .info-box.warning a) are declared later at the
@@ -117,10 +117,15 @@ pre code { background: none; color: inherit; padding: 0; }
     /* Headings below the sticky bar need extra scroll clearance (chrome + bar) */
     #mappings h3[id], #plus-mappings h3[id], #configmap-mappings h3[id] { scroll-margin-top: calc(var(--chrome-h) + 78px); }
 }
-.controls input[type="search"] { padding: 10px 16px; border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); outline: none; transition: border-color 0.2s, box-shadow 0.2s; min-width: 240px; flex: 1; max-width: 400px; }
-.controls select { padding: 10px 12px; border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); background: var(--surface); color: var(--text); outline: none; cursor: pointer; transition: border-color 0.2s; }
-.controls select:focus { border-color: var(--green-text); }
-.controls input[type="search"]:focus { border-color: var(--green-text); box-shadow: 0 0 0 3px rgba(0,150,57,0.12); }
+.controls input[type="search"] { padding: 10px 16px; border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); transition: border-color 0.2s; min-width: 240px; flex: 1; max-width: 400px; }
+.controls select { padding: 10px 12px; border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color 0.2s; }
+/* One focus idiom sitewide: a 2px outline offset by 2px. These two controls used
+   to suppress the outline and draw a tinted box-shadow ring instead, which was
+   the site's second idiom and the only place two different green alphas
+   appeared. The select previously had no ring at all. F5DS publishes no focus
+   specification anywhere, so this follows WCAG 2.1 AA rather than the system. */
+.controls input[type="search"]:focus-visible, .controls select:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.controls input[type="search"]:focus, .controls select:focus { border-color: var(--green-text); }
 .controls input[type="search"]::placeholder { color: #666666; }
 .search-count { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); white-space: nowrap; }
 .search-count.no-results { color: #B30013; }
@@ -131,8 +136,8 @@ pre code { background: none; color: inherit; padding: 0; }
 .btn-secondary:hover { background: var(--border); }
 .feature-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 25px; margin: 20px 0; }
 .feature-card { flex: 0 0 calc(33.333% - 17px); }
-.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 25px; box-shadow: var(--shadow); transition: border-color 0.25s, box-shadow 0.25s; }
-.feature-card:hover { border-color: var(--text-secondary); box-shadow: var(--shadow-strong); }
+.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 25px; box-shadow: var(--elev-1); transition: border-color 0.25s, box-shadow 0.25s; }
+.feature-card:hover { border-color: var(--text-secondary); box-shadow: var(--elev-2); }
 .feature-card h3 { font-family: var(--font-display); color: var(--text); margin: 0 0 15px; font-size: var(--fs-h3); line-height: var(--lh-h3); display: flex; align-items: center; gap: 10px; }
 .feature-card .description { font-size: var(--fs-body); color: var(--text-secondary); margin-bottom: 15px; line-height: var(--lh-body); }
 .feature-card ul { margin: 0; padding-left: 20px; }
@@ -169,7 +174,13 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus { opac
 #yamlInput { width: 100%; min-height: 300px; background: transparent; color: transparent; caret-color: #D5D6D6; border: 1px solid transparent; border-radius: var(--radius); padding: 20px; font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); resize: vertical; tab-size: 2; position: relative; z-index: 1; }
 #yamlInput::placeholder { color: #999999; }
 #yamlInput:focus { outline: none; }
-.yaml-editor:focus-within .yaml-highlight-layer { border-color: var(--green-text); box-shadow: 0 0 0 3px rgba(0,150,57,0.15); }
+/* The textarea is transparent and stacks above an aria-hidden highlight layer,
+   so the visible box belongs to the layer. The ring goes on the wrapper rather
+   than the layer: the wrapper is in flow and tracks the textarea's resized
+   height, whereas outlining an absolutely-positioned inner layer is fragile.
+   #yamlInput keeps outline: none so the ring is not drawn twice. */
+.yaml-editor:focus-within { outline: 2px solid var(--green); outline-offset: 2px; border-radius: var(--radius); }
+.yaml-editor:focus-within .yaml-highlight-layer { border-color: var(--green-text); }
 .analyzer-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .analyzer-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
 .analyzer-pill { padding: 8px 16px; border-radius: var(--radius-pill); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: box-shadow 0.15s; }
@@ -181,12 +192,13 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus { opac
 button.analyzer-pill { border: none; font-family: var(--font); border-radius: var(--radius); }
 .analyzer-pill[data-scroll] { cursor: pointer; }
 .analyzer-pill[data-scroll]:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.analyzer-pill[data-scroll]:hover { box-shadow: var(--shadow); }
+/* No hover elevation: F5DS puts L0 on buttons, which carry their own
+   affordance, and these scroll pills render as real <button>s. */
 .analyzer-pill.found { background: rgba(0,150,57,0.12); color: #025F26; }
 .analyzer-pill.paths { background: rgba(50,108,229,0.10); color: #1A4CB5; }
 .analyzer-pill.crds { background: rgba(242,154,54,0.18); color: #733800; }
 .analyzer-pill.unrecognized { background: rgba(228,0,43,0.08); color: #B30013; }
-.analyzer-card { background: var(--surface); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px; box-shadow: 0 0 1px rgba(136,136,136,0.9), 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid var(--green); }
+.analyzer-card { background: var(--surface); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px; box-shadow: var(--elev-1); border-left: 4px solid var(--green); }
 .analyzer-card.unrecognized { border-left-color: #B30013; }
 
 .analyzer-error { padding: 12px 16px; border-radius: var(--radius); margin-top: 15px; font-size: var(--fs-body); line-height: var(--lh-body); background: rgba(228,0,43,0.08); border-left: 4px solid var(--red-dark); color: #B30013; }
@@ -205,7 +217,9 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
    which has no circular value: a numbered stepper bead, a spin indicator and a
    4px-wide state dot cannot take a 4px corner, and F5DS publishes no
    floating-action-button component to conform the scroll-to-top to. Do not
-   "snap" these to var(--radius). */
+   "snap" these to var(--radius). The step number's box-shadow is likewise not an
+   elevation but a knockout ring, punching a surface-coloured gap through the
+   timeline rule behind it — leave it off the --elev-* scale. */
 .analyzer-step-number { width: 32px; height: 32px; border-radius: 50%; background: var(--green-dark); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: var(--fs-body); line-height: var(--lh-body); flex-shrink: 0; position: relative; left: -37px; margin-right: -25px; z-index: 1; box-shadow: 0 0 0 4px var(--surface); }
 .analyzer-step-title { font-family: var(--font-display); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 700; color: var(--text); margin: 0; }
 .analyzer-step-desc { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); margin-bottom: 12px; }
@@ -352,7 +366,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-drop-overlay { display: none; position: absolute; inset: 0; background: rgba(0,150,57,0.08); border: 3px dashed var(--green); border-radius: var(--radius); z-index: 10; align-items: center; justify-content: center; pointer-events: none; }
 .analyzer-drop-zone.dragging .analyzer-drop-overlay { display: flex; }
 .analyzer-drop-zone.dragging #yamlInput { opacity: 0.5; }
-.analyzer-drop-label { background: var(--surface); padding: 12px 24px; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--green-text); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+.analyzer-drop-label { background: var(--surface); padding: 12px 24px; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--green-text); box-shadow: var(--elev-1); }
 .analyzer-export-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; align-items: center; }
 .analyzer-download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: var(--blue); color: white; border: none; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; cursor: pointer; transition: background 0.2s; }
 .analyzer-download-btn:hover { background: var(--blue-dark); }
@@ -376,7 +390,6 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 :is(html, body).dark-mode .main-inner a:visited { color: var(--text); }
 :is(html, body).dark-mode .main-inner a:link { color: var(--blue); }
 :is(html, body).dark-mode .controls input[type="search"]::placeholder { color: #999999; }
-:is(html, body).dark-mode .controls input[type="search"]:focus { border-color: var(--green-text); box-shadow: 0 0 0 3px rgba(83,211,107,0.15); }
 
 :is(html, body).dark-mode .comparison-block.old h4 { background: rgba(255,99,107,0.12); color: #FF918C; }
 :is(html, body).dark-mode .comparison-block.new h4 { background: rgba(83,211,107,0.12); color: #7FE590; }
@@ -434,7 +447,9 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .sample-dropdown { position: relative; display: inline-block; }
 .sample-dropdown-btn { display: inline-flex; align-items: center; gap: 6px; }
 .sample-dropdown-btn::after { content: '\25BC'; font-size: 0.6rem; opacity: 0.7; }
-.sample-dropdown-menu { display: none; position: absolute; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 2px 10px rgba(0,0,0,0.15); min-width: 280px; max-width: calc(100vw - 40px); z-index: 50; overflow: hidden; }
+/* L1 here is an inference, not a spec value: F5DS states an elevation level for
+   Toast only and explicitly says not to assume one for other overlays. */
+.sample-dropdown-menu { display: none; position: absolute; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--elev-1); min-width: 280px; max-width: calc(100vw - 40px); z-index: 50; overflow: hidden; }
 .sample-dropdown-menu.visible { display: block; animation: analyzerFadeIn 0.15s ease; }
 .sample-dropdown-item { padding: 12px 16px; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid var(--border); }
 .sample-dropdown-item:last-child { border-bottom: none; }
@@ -455,9 +470,10 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .strategy-option:not(.active):hover { background: var(--bg); }
 .strategy-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); margin-left: 4px; }
 :is(html, body).dark-mode .strategy-option.active { background: var(--green); color: #003105; }
-:is(html, body).dark-mode .sample-dropdown-menu { box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 :is(html, body).dark-mode .sample-dropdown-item:hover { background: rgba(83,211,107,0.10); }
-.scroll-to-top { position: fixed; bottom: 30px; right: 30px; width: 44px; height: 44px; border-radius: 50%; background: var(--green-dark); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 3px 12px rgba(0,0,0,0.2); z-index: 200; transition: opacity 0.2s, transform 0.2s; }
+/* Keeps an elevation despite the L0-on-buttons rule: F5DS's own Do list allows
+   elevation on a fixed action bar, and this floats over scrolling content. */
+.scroll-to-top { position: fixed; bottom: 30px; right: 30px; width: 44px; height: 44px; border-radius: 50%; background: var(--green-dark); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: var(--elev-1); z-index: 200; transition: opacity 0.2s, transform 0.2s; }
 .scroll-to-top:hover { transform: scale(1.1); background: #025F26; }
 .scroll-to-top.visible { display: flex; }
 :is(html, body).dark-mode .scroll-to-top { background: var(--green); color: var(--bg); }

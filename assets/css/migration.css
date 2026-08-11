@@ -69,7 +69,7 @@ tr.example-row td { padding: 0; background: var(--bg); white-space: normal; }
 .example-content { padding: var(--space-2hx); border-left: 4px solid var(--green); margin: var(--space-base); background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; }
 tr:not(.expandable):not(.example-row):hover { background-color: #F5F5F5; }
 code { background: var(--bg); padding: 2px var(--space-small); border-radius: var(--radius); font-family: var(--mono); font-size: 0.9em; color: #9C1174; }
-pre { background: #222222; color: #D5D6D6; padding: var(--space-2hx); border-radius: var(--radius); overflow-x: auto; font-size: var(--fs-code); line-height: var(--lh-code); margin: var(--space-2x) 0; border: 1px solid #343434; color-scheme: dark; }
+pre { padding: var(--space-2hx); font-size: var(--fs-code); line-height: var(--lh-code); margin: var(--space-2x) 0; }
 pre code { background: none; color: inherit; padding: 0; }
 .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2x); }
 @media (max-width: 900px) { .comparison { grid-template-columns: 1fr; } }
@@ -97,7 +97,8 @@ pre code { background: none; color: inherit; padding: 0; }
 .install-box code { color: #8FBAFF; background: none; }
 .install-box a:link, .install-box a:visited { color: #B8D5FF; text-decoration: underline; text-underline-offset: 2px; }
 .install-box a:hover { color: white; }
-.info-box { padding: var(--space-2x) var(--space-2hx); border-radius: var(--radius); margin: var(--space-2x) 0; font-size: var(--fs-body); line-height: var(--lh-body); }
+/* Base geometry and the sentiment icons live in shared.css; the three variants
+   this page uses are declared here. */
 .info-box.note { background: rgba(50,108,229,0.08); border-left: 4px solid var(--blue); color: #1A4CB5; }
 .info-box.tip { background: rgba(0,150,57,0.08); border-left: 4px solid var(--green); color: #025F26; }
 .info-box.warning { background: rgba(242,154,54,0.15); border-left: 4px solid var(--orange); color: #733800; }
@@ -137,8 +138,8 @@ pre code { background: none; color: inherit; padding: 0; }
 /* Basis is derived from the gap: three columns share two 16px gutters, so each
    card gives up 2/3 of 16px. Recompute this if .feature-grid's gap changes. */
 .feature-card { flex: 0 0 calc(33.333% - 11px); }
-.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3x); box-shadow: var(--elev-1); transition: border-color var(--dur-colour) linear, box-shadow var(--dur-elev) linear; }
-.feature-card:hover { border-color: var(--text-secondary); box-shadow: var(--elev-2); }
+/* Surface and hover come from shared.css; only the padding differs per page. */
+.feature-card { padding: var(--space-3x); }
 .feature-card h3 { font-family: var(--font-display); color: var(--text); margin: 0 0 var(--space-2x); font-size: var(--fs-h3); line-height: var(--lh-h3); display: flex; align-items: center; gap: var(--space-base); }
 .feature-card .description { font-size: var(--fs-body); color: var(--text-secondary); margin-bottom: var(--space-2x); line-height: var(--lh-body); }
 .feature-card ul { margin: 0; padding-left: var(--space-2hx); }
@@ -159,7 +160,7 @@ pre code { background: none; color: inherit; padding: 0; }
 .checklist li.checked::before { content: '☑'; }
 .checklist li.checked span { text-decoration: line-through; }
 .approach-tabs { display: flex; gap: 0; margin-bottom: var(--space-2hx); border-bottom: 2px solid var(--border); }
-.approach-tab { padding: var(--space-base) var(--space-2hx); border: none; background: none; cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color var(--dur-colour) linear, border-color var(--dur-colour) linear; }
+.approach-tab { height: 32px; padding: 0 var(--space-2x); display: inline-flex; align-items: center; border: none; background: none; cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color var(--dur-colour) linear, border-color var(--dur-colour) linear; }
 /* The -2px above is not spacing and must stay off the scale: it pulls each tab
    down by exactly the width of .approach-tabs' 2px bottom border so the active
    tab's own border covers it. Change it only if that border width changes. */
@@ -173,7 +174,7 @@ h2[id], h3[id], section[id] { scroll-margin-top: 96px; }
 h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus { opacity: 0.5; }
 .heading-anchor:hover { opacity: 1 !important; }
 .yaml-editor { position: relative; }
-.yaml-highlight-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #222222; color: #D5D6D6; border: 1px solid #343434; border-radius: var(--radius); padding: var(--space-2hx); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); margin: 0; overflow: auto; white-space: pre-wrap; word-wrap: break-word; pointer-events: none; z-index: 0; tab-size: 2; color-scheme: dark; }
+.yaml-highlight-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: var(--space-2hx); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); margin: 0; overflow: auto; white-space: pre-wrap; word-wrap: break-word; pointer-events: none; z-index: 0; tab-size: 2; color-scheme: dark; }
 #yamlInput { width: 100%; min-height: 300px; background: transparent; color: transparent; caret-color: #D5D6D6; border: 1px solid transparent; border-radius: var(--radius); padding: var(--space-2hx); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); resize: vertical; tab-size: 2; position: relative; z-index: 1; }
 #yamlInput::placeholder { color: #999999; }
 #yamlInput:focus { outline: none; }
@@ -226,7 +227,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-step-number { width: 32px; height: 32px; border-radius: 50%; background: var(--green-dark); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: var(--fs-body); line-height: var(--lh-body); flex-shrink: 0; position: relative; left: -36px; margin-right: -24px; z-index: 1; box-shadow: 0 0 0 4px var(--surface); }
 .analyzer-step-title { font-family: var(--font-display); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 700; color: var(--text); margin: 0; }
 .analyzer-step-desc { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); margin-bottom: var(--space-2x); }
-.analyzer-yaml-output { position: relative; background: #222222; color: #D5D6D6; padding: var(--space-2hx); border-radius: var(--radius); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); overflow-x: auto; white-space: pre; margin: var(--space-base) 0; border: 1px solid #343434; color-scheme: dark; }
+.analyzer-yaml-output { position: relative; padding: var(--space-2hx); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); white-space: pre; margin: var(--space-base) 0; }
 .analyzer-copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); color: #CCCCCC; z-index: 1; }
 .analyzer-copy-btn:hover { background: rgba(255,255,255,0.25); color: white; }
 .analyzer-copy-btn.copied { background: #007D30; color: white; border-color: #007D30; }
@@ -343,8 +344,11 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-next-steps ul { list-style: none; padding: 0; margin: 0; }
 .analyzer-next-steps li { padding: var(--space-base) 0; font-size: var(--fs-body); line-height: var(--lh-body); }
 .analyzer-next-steps li::before { content: '\2192'; color: var(--green-text); margin-right: var(--space-base); font-weight: 500; }
-.analyzer-next-steps a { color: var(--green-text); text-decoration: none; font-weight: 500; }
-.analyzer-next-steps a:hover { text-decoration: underline; }
+/* Underlined, and Regular weight: F5DS says a link is never set in Bold or
+   Medium. Applied here because these are real prose-adjacent links; the card CTA
+   labels on the landing page stay at 500, being card affordance labels rather
+   than inline links. */
+.analyzer-next-steps a { color: var(--green-text); text-decoration: underline; text-underline-offset: 2px; font-weight: 400; }
 .analyzer-complexity { display: inline-flex; align-items: center; gap: var(--space-base); margin-left: var(--space-base); padding: var(--space-small) var(--space-base); border-radius: var(--radius-pill); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; }
 .analyzer-complexity.simple { background: rgba(0,150,57,0.12); color: #025F26; }
 .analyzer-complexity.moderate { background: rgba(242,154,54,0.20); color: #733800; }
@@ -353,7 +357,7 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
 .analyzer-complexity-dots span { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.25; }
 .analyzer-complexity-dots span.filled { opacity: 1; }
 .analyzer-yaml-output.collapsed { max-height: 200px; overflow: hidden; }
-.analyzer-yaml-output.collapsed::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: linear-gradient(transparent, #222222); pointer-events: none; }
+.analyzer-yaml-output.collapsed::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: linear-gradient(transparent, var(--code-bg)); pointer-events: none; }
 .analyzer-yaml-expand { background: none; border-color: var(--border); color: var(--green-text); margin-top: var(--space-small); }
 .analyzer-yaml-expand:hover { background: var(--green-dark); color: white; border-color: var(--green-dark); }
 .analyzer-edit-btn { background: var(--surface); border-color: var(--green-dark); color: var(--green-text); margin-top: var(--space-2x); }
@@ -492,7 +496,11 @@ button.analyzer-pill { border: none; font-family: var(--font); border-radius: va
     .main-inner section { box-shadow: none; break-inside: avoid; }
     /* Static code examples keep their on-screen dark palette otherwise —
        browsers strip backgrounds by default, leaving light-gray-on-white text. */
-    pre { background: #F5F5F5 !important; color: #343434 !important; border: 1px solid #CCCCCC; color-scheme: light; }
+    /* Selector must be .main-inner pre, not pre: the shared code surface in
+       shared.css is itself .main-inner pre, so a bare `pre` here would lose the
+       border and color-scheme to it on specificity and print a dark border
+       around a light block. */
+    .main-inner pre { background: #F5F5F5 !important; color: #343434 !important; border: 1px solid #CCCCCC; color-scheme: light; }
     .analyzer-yaml-output { background: #F5F5F5 !important; color: #343434 !important; border: 1px solid #CCCCCC; }
     .analyzer-yaml-output.collapsed { max-height: none !important; overflow: visible !important; }
     .analyzer-yaml-output.collapsed::after { display: none !important; }

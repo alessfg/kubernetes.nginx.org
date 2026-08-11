@@ -103,6 +103,21 @@
     --text: #222222;         /* Black 4 "carbon" */
     --text-secondary: #666666; /* Black 2 */
     --border: #E6E6E6;       /* White 3 */
+    /* Code surfaces stay dark in both themes — see .code-surface. */
+    --code-bg: #222222;      /* Black 4 */
+    --code-fg: #D5D6D6;
+    --code-border: #343434;  /* Black 3 */
+
+    /* ── Notification icons ──
+       F5DS assigns each notification sentiment one fixed, non-swappable icon:
+       info, success, warning, alert. These are inlined as masks so a single
+       declaration tints them with each variant's own text colour, and so the
+       site keeps its no-third-party-runtime-dependency rule (no icon font, no
+       sprite request). Geometry traced from F5DS's own 16px icon grid. */
+    --icon-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zM7.25 6.75h1.5v4.5h-1.5v-4.5zM8 4.2a.95.95 0 110 1.9.95.95 0 010-1.9z'/%3E%3C/svg%3E");
+    --icon-success: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm3.03 3.4l-3.9 3.9-1.9-1.9-1.06 1.06 2.96 2.96 4.96-4.96L11.03 5.9z'/%3E%3C/svg%3E");
+    --icon-warning: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 .9L.6 14.2h14.8L8 .9zm0 3.1l5 9H3l5-9zm-.75 3.2h1.5v3.2h-1.5V7.2zm.75 4.1a.9.9 0 110 1.8.9.9 0 010-1.8z'/%3E%3C/svg%3E");
+    --icon-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm-.75 2.6h1.5v4.2h-1.5V5.1zm.75 5.1a.9.9 0 110 1.8.9.9 0 010-1.8z'/%3E%3C/svg%3E");
     /* ── F5DS border radius ──
        F5DS publishes four values and one rule: "use 4px for all components and
        UI elements except Tags and badges, and when an element is too small for
@@ -331,7 +346,12 @@ body.has-banner { --banner-h: 36px; }
 .sidebar-link-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-divider { height: 1px; background: var(--border); margin: var(--space-2x) var(--space-2x); }
 .sidebar-ext-links { padding: 0 var(--space-2x); }
-.sidebar-ext { display: flex; align-items: center; gap: var(--space-base); padding: var(--space-base) var(--space-2x); border-radius: var(--radius); text-decoration: none; font-size: var(--fs-caption); line-height: var(--lh-caption); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; }
+/* Underlined per F5DS, which lists "links without an underline" as a red flag and
+   publishes all three of its link type styles as underline variants. Applied to
+   standalone affordance links only; prose links inside notes and table cells stay
+   coloured-but-not-underlined, since F5DS's Link component never contemplated a
+   4,900-line documentation page carrying 109 prose notes. */
+.sidebar-ext { display: flex; align-items: center; gap: var(--space-base); padding: var(--space-base) var(--space-2x); border-radius: var(--radius); text-decoration: underline; text-underline-offset: 2px; font-size: var(--fs-caption); line-height: var(--lh-caption); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; }
 .sidebar-ext:link, .sidebar-ext:visited { color: var(--text); }
 .sidebar-ext:hover { background: var(--bg); }
 .sidebar-ext:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: var(--radius); }
@@ -384,6 +404,52 @@ body.has-banner { --banner-h: 36px; }
 .btn-loading::before { content: ''; width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: btn-spin 0.7s linear infinite; flex-shrink: 0; }
 @keyframes btn-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .btn-loading::before { animation: none; } }
+
+/* ── Cards ──
+   Only the surface is shared. Layout deliberately stays per-page: the landing
+   page lays these out on a 2-column grid, the migration tool centres them in a
+   3-up flex row, and reconciling those would change the migration Overview's
+   composition rather than its style. F5DS publishes no Card component at all —
+   it appears only as an example on the Border Radius page and as a named user
+   of elevation — so this is the 4px radius and L1/L2 applied to a container,
+   not a documented spec. */
+.card-surface, .feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--elev-1); transition: border-color var(--dur-colour) linear, box-shadow var(--dur-elev) linear; }
+.card-surface:hover, .feature-card:hover { border-color: var(--text-secondary); box-shadow: var(--elev-2); }
+
+/* ── Code surface ──
+   The dark code treatment was re-declared five times across the two page
+   stylesheets. --code-* names it once. It is deliberately dark in both themes:
+   these are terminal transcripts and YAML, and colour-scheme: dark keeps
+   scrollbars and form controls inside them legible. */
+   Named consumers rather than a class in the markup, because the migration page
+   alone holds several hundred <pre> elements and none of them would gain a class
+   for free. Each consumer still owns its own padding and metrics. */
+.code-surface,
+.code-block,                 /* landing page: install/command transcripts */
+.main-inner pre,             /* migration tool: every YAML and command block */
+.yaml-highlight-layer,       /* analyzer: the syntax layer under the textarea */
+.analyzer-yaml-output        /* analyzer: generated CRD output */
+{ background: var(--code-bg); color: var(--code-fg); border: 1px solid var(--code-border); border-radius: var(--radius); overflow-x: auto; color-scheme: dark; }
+
+/* ── Notifications (.info-box) ──
+   Shared geometry for both pages; the sentiment colours stay per-page because
+   each page carries a different subset. The class names are fixed by
+   CLAUDE.md and, more importantly, migration-core.js's table filter matches on
+   classList.contains('info-box') to hide notes alongside their tables — renaming
+   this would silently orphan 97 notes above hidden tables.
+
+   F5DS gives each notification sentiment one fixed, non-swappable icon. The
+   icons below are applied from CSS via ::before so none of the 109 existing
+   boxes needed editing, and are mapped to the site's existing hues rather than
+   F5DS's palette, since colour is out of scope on this branch: the green tip
+   takes Positive/success, the amber warning takes Attention/warning, and the
+   blue note takes Informative/info. Icons are masked so they inherit each
+   variant's text colour. */
+.info-box { padding: var(--space-2x) var(--space-2hx); border-radius: var(--radius); margin: var(--space-2x) 0; font-size: var(--fs-body); line-height: var(--lh-body); }
+.info-box::before { content: ''; float: left; width: 16px; height: 16px; margin: 2px var(--space-base) 0 0; background-color: currentColor; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-size: contain; mask-size: contain; }
+.info-box.note::before, .info-box.info::before { -webkit-mask-image: var(--icon-info); mask-image: var(--icon-info); }
+.info-box.tip::before { -webkit-mask-image: var(--icon-success); mask-image: var(--icon-success); }
+.info-box.warning::before { -webkit-mask-image: var(--icon-warning); mask-image: var(--icon-warning); }
 
 /* ── Main Content ── */
 .main { flex: 1; margin-left: var(--sidebar-w); padding: 0; min-width: 0; }

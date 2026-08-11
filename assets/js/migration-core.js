@@ -943,7 +943,7 @@
         function renderCrdInstallNote() {
             let installNote = document.createElement('div');
             installNote.className = 'info-box note';
-            installNote.style.cssText = 'margin:0 0 16px;';
+            installNote.style.cssText = 'margin:0 0 var(--space-2x);';
             let noteStrong = document.createElement('strong');
             noteStrong.textContent = 'Note:';
             installNote.appendChild(noteStrong);
@@ -971,7 +971,7 @@
             let badgeClass = kindBadgeMap[block.kind] || 'virtualserver';
             let kindBadge = document.createElement('span');
             kindBadge.className = 'badge badge-' + badgeClass;
-            kindBadge.style.marginRight = '8px';
+            kindBadge.style.marginRight = 'var(--space-base)';
             kindBadge.textContent = block.kind + ' CRD';
             groupTitle.appendChild(kindBadge);
             groupTitle.appendChild(document.createTextNode(block.countText));
@@ -984,7 +984,7 @@
                     groupDiv.appendChild(spacer);
                 }
                 let catLabel = document.createElement('div');
-                catLabel.style.cssText = 'font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--text-secondary);margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;';
+                catLabel.style.cssText = 'font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--text-secondary);margin-bottom:var(--space-small);display:flex;align-items:center;gap:var(--space-base);flex-wrap:wrap;';
                 catLabel.appendChild(document.createTextNode(item.category));
                 if (item.plusRequired) {
                     let plusBadge = document.createElement('span');
@@ -1149,12 +1149,12 @@
                 plan.infoNotes.forEach(function(note) {
                     let card = document.createElement('div');
                     card.className = 'info-box note';
-                    card.style.cssText = 'margin: 10px 0;';
+                    card.style.cssText = 'margin: var(--space-base) 0;';
                     let annCode = document.createElement('code');
                     annCode.textContent = note.code;
                     card.appendChild(annCode);
                     let msg = document.createElement('div');
-                    msg.style.cssText = 'margin-top: 6px; font-size: var(--fs-body); line-height: var(--lh-body);';
+                    msg.style.cssText = 'margin-top: var(--space-base); font-size: var(--fs-body); line-height: var(--lh-body);';
                     msg.textContent = note.message;
                     card.appendChild(msg);
                     stepInfo.appendChild(card);
@@ -1191,7 +1191,7 @@
                 plan.unsupported.cards.forEach(function(cardData) {
                     let card = document.createElement('div');
                     card.className = 'info-box warning';
-                    card.style.cssText = 'margin: 10px 0;';
+                    card.style.cssText = 'margin: var(--space-base) 0;';
                     let title = document.createElement('strong');
                     title.textContent = cardData.title;
                     card.appendChild(title);
@@ -1200,13 +1200,13 @@
                     annCode.textContent = cardData.code;
                     card.appendChild(annCode);
                     let desc = document.createElement('div');
-                    desc.style.cssText = 'margin-top: 6px; font-size: var(--fs-body); line-height: var(--lh-body);';
+                    desc.style.cssText = 'margin-top: var(--space-base); font-size: var(--fs-body); line-height: var(--lh-body);';
                     desc.textContent = cardData.desc;
                     card.appendChild(desc);
                     if (cardData.anchor) {
                         let link = document.createElement('a');
                         link.href = '#' + cardData.anchor;
-                        link.style.cssText = 'font-size: var(--fs-caption); line-height: var(--lh-caption); margin-top: 4px; display: inline-block;';
+                        link.style.cssText = 'font-size: var(--fs-caption); line-height: var(--lh-caption); margin-top: var(--space-small); display: inline-block;';
                         link.textContent = 'See reference guide →';
                         link.addEventListener('click', function(e) {
                             e.preventDefault();
@@ -1238,7 +1238,7 @@
                 desc.style.fontSize = 'var(--fs-body)';
                 desc.style.lineHeight = 'var(--lh-body)';
                 desc.style.color = 'var(--text-secondary)';
-                desc.style.marginBottom = '10px';
+                desc.style.marginBottom = 'var(--space-base)';
                 desc.textContent = plan.unrecognized.desc;
                 unrecSection.appendChild(desc);
                 plan.unrecognized.items.forEach(function(u) {
@@ -1256,7 +1256,7 @@
                 let contributeP = document.createElement('p');
                 contributeP.style.fontSize = 'var(--fs-caption)';
                 contributeP.style.lineHeight = 'var(--lh-caption)';
-                contributeP.style.marginTop = '10px';
+                contributeP.style.marginTop = 'var(--space-base)';
                 let contributeLink = document.createElement('a');
                 contributeLink.href = 'https://github.com/nginx/kubernetes.nginx.org';
                 contributeLink.target = '_blank';

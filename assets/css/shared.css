@@ -3,12 +3,19 @@
    design tokens, layout offsets, and accessibility helpers. Edit here, not
    per-page. Page-specific styles live in index.css / migration.css.
 
-   Design tokens follow the F5 design system (Brand Center palette ramps +
-   f5.com web idiom) with NGINX green (Jade #009639) as the lead accent.
-   Exception: the tooling accent is Kubernetes brand blue #326CE5 (the two
-   tools are Kubernetes-API tools); its tints/shades borrow F5's River ramp,
-   which shares the same ~220° hue. F5 Bay is reserved for the VirtualServer
-   badge so no hue does double duty within one context. */
+   The site runs two F5 standards at once, on purpose:
+
+   - COLOUR follows the F5 Brand Center ramps with NGINX green (Jade #009639)
+     as the lead accent. Exception: the tooling accent is Kubernetes brand blue
+     #326CE5 (the two tools are Kubernetes-API tools); its tints/shades borrow
+     F5's River ramp, which shares the same ~220° hue. F5 Bay is reserved for
+     the VirtualServer badge so no hue does double duty within one context.
+   - TYPE, SPACING, RADIUS, ELEVATION and MOTION follow the F5 Design System
+     (F5DS), the F5XC product-UI standard.
+
+   Mixing them is deliberate, so an F5DS scan flagging every colour is expected
+   rather than a regression. Do not resolve a value from the wrong standard: a
+   figure that is correct in one is a defect in the other. */
 
 /* ── Typeface ──
    The site sets type in Inter, per the F5 Design System (F5DS) — the design
@@ -96,12 +103,62 @@
     --text: #222222;         /* Black 4 "carbon" */
     --text-secondary: #666666; /* Black 2 */
     --border: #E6E6E6;       /* White 3 */
-    --radius: 5px;           /* f5.com dominant radius */
-    --shadow: 0 2px 10px rgba(0,0,0,0.10); /* f5.com card shadow (shadow-z1) */
-    /* Hover elevation. f5.com never translates on hover — interactive surfaces
-       rest on one elevation step and strengthen to the next. This is its
-       shadow-z2 verbatim (#485665 blue-grey at 24% / 16%). */
-    --shadow-strong: 0 1px 4px rgba(72,86,101,0.24), 0 4px 8px rgba(72,86,101,0.16);
+    /* ── F5DS border radius ──
+       F5DS publishes four values and one rule: "use 4px for all components and
+       UI elements except Tags and badges, and when an element is too small for
+       4px". So --radius is the default for every surface, --radius-small is the
+       too-small escape hatch (F5DS's own example is the selected-item highlight
+       in Primary Navigation), and --radius-pill is reserved for Tags and Badges
+       alone — a pill-shaped button, card or input is off-system. The site
+       previously ran on f5.com's 5px. */
+    --radius: 4px;
+    --radius-small: 2px;
+    --radius-pill: 999px;
+
+    /* ── F5DS elevation ──
+       Three levels, all tinted with N700 #0B1640 rather than black: L0 for
+       elements with their own affordance (buttons, links, text), L1 for a
+       surface genuinely above the page, L2 for the step above that. F5DS treats
+       elevation as the hover affordance, so interactive surfaces rest on L1 and
+       strengthen to L2. Replaces f5.com's shadow-z1/z2 pair. */
+    --elev-0: none;
+    --elev-1: 0px 6px 24px rgba(11,22,64,0.08);
+    --elev-2: 0px 10px 20px rgba(11,22,64,0.12);
+    /* Retained as aliases so the two names already threaded through index.css and
+       migration.css keep resolving; they now carry the F5DS values. */
+    --shadow: var(--elev-1);
+    --shadow-strong: var(--elev-2);
+
+    /* ── F5DS spacing scale ──
+       Base 8px; every value a multiple of 4. Named after F5DS's own steps
+       (xsmall/small/base/2x-large…5x-large) so each token is auditable against
+       the spec. Two published exceptions carry real weight: 2px is used ONLY
+       between a label and its form control, and 12px is explicitly not part of
+       the system — a 12px gap resolves to 8 or 16 by context, never to itself.
+       There is deliberately no step between 8 and 16, because that step would
+       be the banned 12. --space-6x extends the ladder past F5DS's published
+       ceiling of 40px, following its own Nx = 8N formula. */
+    --space-xsmall: 2px;
+    --space-small: 4px;
+    --space-base: 8px;
+    --space-2x: 16px;   --space-2hx: 20px;
+    --space-3x: 24px;   --space-3hx: 28px;
+    --space-4x: 32px;   --space-4hx: 36px;
+    --space-5x: 40px;
+    --space-6x: 48px;
+
+    /* ── F5DS motion ──
+       Four durations (there is no D1) and two easings. Colour and opacity move
+       linearly at D2; elevation fades at 400ms linear, which is what the
+       Elevation page specifies — the Motion page's D3/EaseOutQuint applies to an
+       accompanying position change, which this site does not use on hover.
+       EaseOutQuint enters, EaseInCubic exits. */
+    --dur-colour: 200ms;
+    --dur-elev: 400ms;
+    --dur-move: 400ms;
+    --dur-travel: 600ms;
+    --ease-enter: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-exit: cubic-bezier(0.550, 0.055, 0.675, 0.190);
     /* Self-hosted variable Inter first; then a locally installed static Inter for
        the case where the woff2 request fails; then the metric-corrected Arial
        defined above, which only matters during the swap window; then the platform
@@ -147,9 +204,12 @@
     --text: #FAF9F7;         /* White 1 */
     --text-secondary: #999999; /* Black 1 */
     --border: #343434;       /* Black 3 */
-    --shadow: 0 2px 10px rgba(0,0,0,0.5);
-    /* Blue-grey shadows vanish on black, so dark mode deepens instead of tinting */
-    --shadow-strong: 0 1px 4px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.45);
+    /* F5DS publishes no dark theme (it is Early Availability only), and its N700
+       tint at 8% is invisible on black, so dark mode keeps deepening with black
+       rather than tinting. Overriding --elev-* rather than the aliases keeps both
+       names in agreement. */
+    --elev-1: 0 2px 10px rgba(0,0,0,0.5);
+    --elev-2: 0 1px 4px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.45);
     --green: #53D36B;        /* Jade 3 */
     --green-text: #53D36B;
     --blue: #6B9FFF;         /* River 3 — K8s-blue hue family */
@@ -299,7 +359,7 @@ body.has-banner { --banner-h: 35px; }
     :is(html, body).dark-mode {
         color-scheme: light;
         --bg: #fff; --surface: #fff; --text: #222222; --text-secondary: #666666; --border: #E6E6E6;
-        --shadow: none; --shadow-strong: none; --green: #009639; --green-text: #007D30; --blue: #326CE5;
+        --elev-1: none; --elev-2: none; --green: #009639; --green-text: #007D30; --blue: #326CE5;
         --purple: #933DCC; --teal: #009C93; --red: #E4002B; --orange: #F29A36;
     }
 }

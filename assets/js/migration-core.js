@@ -925,14 +925,14 @@
                 wrapper.appendChild(pre);
                 let expandBtn = document.createElement('button');
                 expandBtn.className = 'btn btn-xs analyzer-yaml-expand';
-                expandBtn.textContent = 'Show full YAML (' + lineCount + ' lines)';
+                expandBtn.textContent = 'Show Full YAML (' + lineCount + ' lines)';
                 expandBtn.addEventListener('click', function() {
                     if (pre.classList.contains('collapsed')) {
                         pre.classList.remove('collapsed');
                         expandBtn.textContent = 'Collapse';
                     } else {
                         pre.classList.add('collapsed');
-                        expandBtn.textContent = 'Show full YAML (' + lineCount + ' lines)';
+                        expandBtn.textContent = 'Show Full YAML (' + lineCount + ' lines)';
                     }
                 });
                 wrapper.appendChild(expandBtn);
@@ -1321,18 +1321,18 @@
                 clipSvg.appendChild(rect1);
                 clipSvg.appendChild(path1);
                 copyAllBtn.appendChild(clipSvg);
-                copyAllBtn.appendChild(document.createTextNode('Copy all migration YAML'));
+                copyAllBtn.appendChild(document.createTextNode('Copy All Migration YAML'));
                 copyAllBtn.addEventListener('click', function() {
                     function restoreLabel() {
                         copyAllBtn.textContent = '';
                         copyAllBtn.appendChild(clipSvg);
-                        copyAllBtn.appendChild(document.createTextNode('Copy all migration YAML'));
+                        copyAllBtn.appendChild(document.createTextNode('Copy All Migration YAML'));
                         copyAllBtn.classList.remove('copied');
                     }
                     function onCopied() {
                         copyAllBtn.textContent = '';
                         copyAllBtn.appendChild(clipSvg);
-                        copyAllBtn.appendChild(document.createTextNode('Copied!'));
+                        copyAllBtn.appendChild(document.createTextNode('Copied'));
                         copyAllBtn.classList.add('copied');
                         announce('Migration YAML copied to clipboard');
                         setTimeout(restoreLabel, 2000);
@@ -1384,7 +1384,7 @@
                     URL.revokeObjectURL(url);
                     dlBtn.classList.add('downloaded');
                     let origText = dlBtn.lastChild;
-                    origText.textContent = 'Downloaded!';
+                    origText.textContent = 'Downloaded';
                     setTimeout(function() {
                         origText.textContent = 'Download YAML';
                         dlBtn.classList.remove('downloaded');
@@ -1437,7 +1437,7 @@
                 editPath2.setAttribute('d', 'M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z');
                 editSvg.appendChild(editPath); editSvg.appendChild(editPath2);
                 editBtn.appendChild(editSvg);
-                editBtn.appendChild(document.createTextNode('Edit YAML & re-analyze'));
+                editBtn.appendChild(document.createTextNode('Edit YAML & Re-analyze'));
                 editBtn.addEventListener('click', function() {
                     // Switch to analyzer page
                     let analyzerPageLink = document.querySelector('.sidebar-link[data-page="analyzer"]');

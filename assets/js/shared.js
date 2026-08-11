@@ -116,7 +116,7 @@ function fallbackCopy(text, btn) {
 function showCopied(btn) {
     if (!btn) return;
     if (btn._copyTimeout) clearTimeout(btn._copyTimeout);
-    btn.textContent = 'Copied!';
+    btn.textContent = 'Copied';
     btn.classList.add('copied');
     announce('Code copied to clipboard');
     btn._copyTimeout = setTimeout(function() {

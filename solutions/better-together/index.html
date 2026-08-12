@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Better Together — F5 for Kubernetes</title>
+<meta name="description" content="How F5's Kubernetes products combine, with each integration marked as F5-documented or as architectural guidance.">
+<link rel="canonical" href="https://kubernetes.nginx.org/solutions/better-together/">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="color-scheme" content="light dark">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="F5 for Kubernetes">
+<meta property="og:title" content="Better Together — F5 for Kubernetes">
+<meta property="og:description" content="How F5's Kubernetes products combine, with each integration marked as F5-documented or as architectural guidance.">
+<meta property="og:url" content="https://kubernetes.nginx.org/solutions/better-together/">
+<meta property="og:image" content="https://kubernetes.nginx.org/assets/img/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="/assets/img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+
+<link rel="preload" as="font" type="font/woff2" href="/assets/fonts/InterVariable-subset.woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/core.css">
+<link rel="stylesheet" href="/assets/css/product.css">
+
+<script>
+/* Set the theme before first paint so it never flashes. */
+(function () {
+    try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+    } catch (e) { /* private browsing */ }
+}());
+</script>
+<script defer src="/assets/js/chrome.js"></script>
+<script defer src="/assets/js/versions.js"></script>
+</head>
+<body>
+
+<!-- sync:sprite -->
+<svg class="sr-only" aria-hidden="true" focusable="false">
+  <symbol id="logo-nginx" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></symbol>
+  <symbol id="icon-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></symbol>
+  <symbol id="icon-external" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h4"/></g></symbol>
+  <symbol id="icon-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5a10.5 10.5 0 00-3.32 20.47c.53.1.72-.23.72-.5v-1.8c-2.92.63-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.96-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.47 1.14 3.07.87.1-.68.37-1.14.67-1.4-2.33-.27-4.78-1.17-4.78-5.2 0-1.15.41-2.09 1.09-2.83-.11-.27-.47-1.34.1-2.8 0 0 .88-.28 2.89 1.08a10 10 0 015.26 0c2-1.36 2.89-1.08 2.89-1.08.57 1.46.21 2.53.1 2.8.68.74 1.09 1.68 1.09 2.83 0 4.04-2.46 4.93-4.8 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0012 1.5z"/></symbol>
+  <symbol id="icon-chevron" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2.5 8.5l3.5 3.5 7.5-7.5"/></symbol>
+  <symbol id="icon-grid" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></g></symbol>
+  <symbol id="icon-box" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></g></symbol>
+  <symbol id="icon-layers" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></g></symbol>
+  <symbol id="icon-tool" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a4 4 0 105.4 5.4l-1.6-1.6-2.2-2.2-1.6-1.6zM13 10L4 19a2 2 0 102.8 2.8L16 13"/></symbol>
+  <symbol id="icon-shield" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="icon-route" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h5a4 4 0 000-8H10a4 4 0 010-8h5"/></g></symbol>
+  <symbol id="icon-cpu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M10 2v4M14 2v4M10 18v4M14 18v4M2 10h4M2 14h4M18 10h4M18 14h4"/></g></symbol>
+  <symbol id="icon-swap" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></g></symbol>
+  <symbol id="icon-cloud" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M17.5 19a4.5 4.5 0 00.5-8.97A6 6 0 106 12.5 3.5 3.5 0 007 19z"/></symbol>
+  <symbol id="icon-info" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zM7.25 6.75h1.5v4.5h-1.5v-4.5zM8 4.2a.95.95 0 110 1.9.95.95 0 010-1.9z"/></symbol>
+  <symbol id="icon-success" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm3.03 3.4l-3.9 3.9-1.9-1.9-1.06 1.06 2.96 2.96 4.96-4.96L11.03 5.9z"/></symbol>
+  <symbol id="icon-warning" viewBox="0 0 16 16"><path fill="currentColor" d="M8 .9L.6 14.2h14.8L8 .9zm0 3.1l5 9H3l5-9zm-.75 3.2h1.5v3.2h-1.5V7.2zm.75 4.1a.9.9 0 110 1.8.9.9 0 010-1.8z"/></symbol>
+  <symbol id="icon-error" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm-.75 2.6h1.5v4.2h-1.5V5.1zm.75 5.1a.9.9 0 110 1.8.9.9 0 010-1.8z"/></symbol>
+</svg>
+<!-- /sync:sprite -->
+
+<noscript><p class="noscript-warning">This site works without JavaScript. Version numbers show their last published values, and the navigation drawer is unavailable on small screens.</p></noscript>
+
+<a class="skip-link" href="#main">Skip to Content</a>
+<div class="sr-only" aria-live="polite" id="announce"></div>
+
+<!-- sync:masthead -->
+<button class="icon-btn menu-toggle" id="menuToggle" type="button"
+        aria-label="Open navigation" aria-expanded="false" aria-controls="nav">
+  <svg aria-hidden="true"><use href="#icon-menu"></use></svg>
+</button>
+<a class="brand" href="/">
+  <svg class="brand-mark" aria-hidden="true"><use href="#logo-nginx"></use></svg>
+  <span class="brand-name">F5 for Kubernetes</span>
+</a>
+<!-- /sync:masthead -->
+
+<header class="topbar">
+  <div class="topbar-heading">
+    <nav aria-label="Breadcrumb">
+      <ol class="breadcrumb">
+        <li><a href="/">Home</a></li>
+        <li><a href="/catalog/">Solutions</a></li>
+        <li aria-current="page">Better Together</li>
+      </ol>
+    </nav>
+    <div class="topbar-title">Better Together</div>
+  </div>
+  <!-- sync:actions -->
+  <div class="topbar-actions">
+    <a class="btn btn-tertiary hide-compact" href="https://docs.nginx.com/" target="_blank" rel="noopener">
+      Documentation
+      <svg aria-hidden="true"><use href="#icon-external"></use></svg>
+    </a>
+    <a class="icon-btn hide-compact" href="https://github.com/nginx/kubernetes.nginx.org"
+       target="_blank" rel="noopener" aria-label="This site on GitHub">
+      <svg aria-hidden="true"><use href="#icon-github"></use></svg>
+    </a>
+    <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark theme" aria-pressed="false">
+      <svg class="theme-icon-light" aria-hidden="true"><use href="#icon-moon"></use></svg>
+      <svg class="theme-icon-dark" aria-hidden="true" hidden><use href="#icon-sun"></use></svg>
+    </button>
+  </div>
+  <!-- /sync:actions -->
+</header>
+
+<!-- sync:nav -->
+<div class="nav-backdrop" id="navBackdrop"></div>
+<nav class="nav" id="nav" aria-label="Main">
+  <div class="nav-group">
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/">Home</a></li>
+      <li><a class="nav-link" href="/catalog/">Catalog</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-box"></use></svg>Products</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/products/big-ip-next-for-kubernetes/">BIG-IP Next for Kubernetes
+        <span class="nav-link-meta">L4&ndash;L7 ingress and egress</span></a></li>
+      <li><a class="nav-link" href="/products/container-ingress-services/">Container Ingress Services
+        <span class="nav-link-meta">BIG-IP from Kubernetes</span></a></li>
+      <li><a class="nav-link" href="/products/nginx-ingress-controller/">NGINX Ingress Controller
+        <span class="nav-link-meta">Ingress API</span></a></li>
+      <li><a class="nav-link" href="/products/nginx-gateway-fabric/">NGINX Gateway Fabric
+        <span class="nav-link-meta">Gateway API</span></a></li>
+      <li><a class="nav-link" href="/products/f5-waf-for-nginx/">F5 WAF for NGINX
+        <span class="nav-link-meta">App and API security</span></a></li>
+      <li><a class="nav-link" href="/products/f5-ai-gateway/">F5 AI Gateway
+        <span class="nav-link-meta">AI traffic governance</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-layers"></use></svg>Solutions</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/solutions/better-together/">Better Together
+        <span class="nav-link-meta">How the products combine</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-tool"></use></svg>Tools</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/tools/ingress-nginx-migration/">ingress-nginx Migration
+        <span class="nav-link-meta">Move to NGINX Ingress Controller</span></a></li>
+      <li><a class="nav-link" href="/tools/ingress2gateway/">ingress2gateway
+        <span class="nav-link-meta">Convert Ingress to Gateway API</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-divider"></div>
+  <div class="nav-footer">
+    <p>&copy; <span id="year">2026</span> F5, Inc.</p>
+    <p>NGINX is a registered trademark of F5, Inc.</p>
+    <p>Created with AI. Maintained by humans.</p>
+  </div>
+</nav>
+<!-- /sync:nav -->
+
+<main class="main" id="main">
+<div class="main-inner">
+  <div class="product-header">
+    <h1>Better Together</h1>
+    <p class="product-summary">F5&rsquo;s Kubernetes products are usually described
+      one at a time, which makes it hard to tell which ones are meant to be
+      combined and which are alternatives. This page is the answer to that, and it
+      is explicit about provenance: each combination is marked either as something
+      <strong>F5 documents</strong>, with the guide and version matrix to prove it,
+      or as <strong>guidance</strong> &mdash; architecturally sound, but without an
+      F5 document behind it.</p>
+    <div class="product-tags">
+      <span class="tag tag-positive">Documented &mdash; F5 publishes a guide</span>
+      <span class="tag tag-info">Guidance &mdash; sound, but no F5 document</span>
+    </div>
+  </div>
+
+    <div class="notification notification-info">
+      <svg aria-hidden="true"><use href="#icon-info"></use></svg>
+      <div><p class="notification-title">Why the distinction matters</p>
+      <p>A combination marked Guidance is not a warning. It means the building blocks are documented but the specific pairing is not, so you will not find a step-by-step guide or a tested version matrix for it. Treat those as designs to validate in your own environment rather than recipes to follow.</p></div>
+    </div>
+
+  <section class="section">
+    <h2 class="section-title">Documented integrations</h2>
+    <p class="page-lede">F5 publishes a guide for each of these, and in most cases
+      a version matrix too.</p>
+
+  <section class="combo" id="ingresslink">
+    <div class="combo-head">
+      <div>
+        <h3 class="combo-title">BIG-IP + Container Ingress Services + NGINX Ingress Controller</h3>
+        <p class="combo-layers">L4 and TLS at the edge &middot; L7 inside the cluster</p>
+      </div>
+      <span class="tag tag-positive combo-tag">Documented</span>
+    </div>
+    <p>This is F5&rsquo;s documented two-tier design, and the one to reach
+      for if you want an appliance tier in front of an in-cluster tier. A BIG-IP at
+      the cluster edge load-balances across the NGINX Ingress Controller pods; CIS
+      watches those pods and reprograms the BIG-IP pool as they change. NGINX then
+      owns per-application L7 routing inside the cluster.</p>
+    <p>The link between the tiers is an <code>IngressLink</code> custom resource,
+      which carries the virtual server address (or an IPAM label) and a selector
+      matching the NGINX Ingress Controller service labels. CIS must run in CRD
+      mode, and the BIG-IP virtual server needs a Proxy Protocol iRule so the
+      original client address survives the first hop.</p>
+    <p>Two details worth knowing before you commit: this path requires
+      <strong>NGINX Plus</strong> Ingress Controller, not the OSS build, and F5
+      documents that CIS does not update the ingress address in the Ingress
+      status.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <caption class="sr-only">IngressLink compatibility</caption>
+        <thead><tr><th scope="col">Component</th><th scope="col">Version</th></tr></thead>
+        <tbody>
+          <tr><td>Container Ingress Services</td><td>v2.4 and above</td></tr>
+          <tr><td>BIG-IP</td><td>v13.1 and above</td></tr>
+          <tr><td>NGINX Plus Ingress Controller</td><td>v1.10 and above</td></tr>
+          <tr><td>AS3</td><td>3.18 and above</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <a class="link-arrow" href="https://clouddocs.f5.com/containers/latest/userguide/ingresslink/" target="_blank" rel="noopener">Read the IngressLink Guide <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+  </section>
+
+  <section class="combo" id="waf-nic">
+    <div class="combo-head">
+      <div>
+        <h3 class="combo-title">F5 WAF for NGINX + NGINX Ingress Controller</h3>
+        <p class="combo-layers">WAF enforced in process, in the ingress data plane</p>
+      </div>
+      <span class="tag tag-positive combo-tag">Documented</span>
+    </div>
+    <p>The WAF compiles into NGINX Ingress Controller as a module, using a
+      purpose-built NGINX Plus image. You define an <code>APPolicy</code> resource
+      and attach it either through NIC&rsquo;s own <code>Policy</code> CRD for a
+      VirtualServer, or through <code>app-protect</code> annotations on a plain
+      Ingress.</p>
+    <p>Because it runs in process there is no additional hop and nothing extra to
+      scale &mdash; but it does mean the WAF version is whichever one is pinned
+      into your controller release, not the latest standalone release.</p>
+    <a class="link-arrow" href="https://docs.nginx.com/nginx-ingress-controller/integrations/app-protect-waf/configuration/" target="_blank" rel="noopener">Configuration Guide <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+  </section>
+
+  <section class="combo" id="waf-ngf">
+    <div class="combo-head">
+      <div>
+        <h3 class="combo-title">F5 WAF for NGINX + NGINX Gateway Fabric</h3>
+        <p class="combo-layers">WAF enforced out of process, alongside each data plane pod</p>
+      </div>
+      <span class="tag tag-positive combo-tag">Documented</span>
+    </div>
+    <p>On Gateway Fabric the same product works quite differently. Enabling
+      it injects two sidecars into each NGINX pod &mdash; <code>waf-enforcer</code>
+      and <code>waf-config-mgr</code> &mdash; and policy attaches through a
+      <code>WAFPolicy</code> using Gateway API inherited policy attachment.</p>
+    <p>Policies are compiled outside the cluster and fetched as bundles from NGINX
+      Instance Manager, the NGINX One Console, or a URL. A route-scoped policy
+      overrides a Gateway-scoped one rather than merging with it, and a second
+      policy targeting the same resource at the same level is rejected as
+      conflicted.</p>
+    <a class="link-arrow" href="https://docs.nginx.com/nginx-gateway-fabric/waf-integration/overview/" target="_blank" rel="noopener">WAF Integration Overview <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+  </section>
+
+  <section class="combo" id="inference">
+    <div class="combo-head">
+      <div>
+        <h3 class="combo-title">NGINX Gateway Fabric + Gateway API Inference Extension</h3>
+        <p class="combo-layers">Model-aware routing to self-hosted models</p>
+      </div>
+      <span class="tag tag-positive combo-tag">Documented</span>
+    </div>
+    <p>Round-robin is the wrong load-balancing algorithm for inference:
+      requests are long-lived, expensive, and their cost varies enormously. The
+      Gateway API Inference Extension replaces it with an Endpoint Picker that NGINX
+      Gateway Fabric consults per request, giving routing by queue depth, adapter
+      and serving priority.</p>
+    <p>An <code>InferencePool</code> becomes an HTTPRoute backend reference. One
+      caveat F5 documents and worth repeating: the Endpoint Picker is third-party
+      software, and traffic between NGF and it uses TLS with certificate
+      verification disabled by default.</p>
+    <a class="link-arrow" href="https://docs.nginx.com/nginx-gateway-fabric/how-to/gateway-api-inference-extension/" target="_blank" rel="noopener">Inference Extension Guide <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+  </section>
+
+  <section class="combo" id="cis-multicluster">
+    <div class="combo-head">
+      <div>
+        <h3 class="combo-title">Container Ingress Services across several clusters</h3>
+        <p class="combo-layers">One BIG-IP virtual server, many clusters</p>
+      </div>
+      <span class="tag tag-positive combo-tag">Documented</span>
+    </div>
+    <p>CIS can expose applications spread across several Kubernetes or
+      OpenShift clusters behind a single BIG-IP virtual server, in either a
+      standalone or an HA topology. Pool members are node ports and the cluster
+      mode uses static routes rather than tunnels.</p>
+    <p>It needs an extended ConfigMap, the <code>--multi-cluster-mode</code> flag,
+      a local cluster name, and read-only kubeconfig access to each cluster. Note
+      that Service type LoadBalancer is unsupported in the active-active and ratio
+      HA modes.</p>
+    <a class="link-arrow" href="https://clouddocs.f5.com/containers/latest/userguide/multicluster/" target="_blank" rel="noopener">Multi-cluster Guide <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+  </section>
+
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Guidance</h2>
+    <p class="page-lede">These designs are sound and their building blocks are
+      documented, but F5 publishes no guide for the specific combination. We say so
+      rather than implying otherwise.</p>
+
+  <section class="combo" id="biq-lb-nic">
+    <div class="combo-head">
+      <div>
+        <h3 class="combo-title">BIG-IP fronting NGINX Ingress Controller without IngressLink</h3>
+        <p class="combo-layers">L4 at the edge &middot; L7 inside the cluster</p>
+      </div>
+      <span class="tag tag-info combo-tag">Guidance</span>
+    </div>
+    <p>If <code>IngressLink</code> is more coupling than you want, CIS also
+      supports Service type LoadBalancer with a load balancer class, which will
+      allocate a BIG-IP virtual server for any Service &mdash; including the NGINX
+      Ingress Controller Service. The result is the same two tiers with a looser
+      join between them.</p>
+    <p>Both halves are documented separately. What is not documented is this
+      specific pairing: there is no F5 walkthrough for "front NGINX Ingress
+      Controller with a BIG-IP using Service type LoadBalancer", so you are
+      assembling it from two guides rather than following one. In exchange you are
+      not restricted to NGINX Plus, as IngressLink is.</p>
+    <a class="link-arrow" href="https://clouddocs.f5.com/containers/latest/userguide/loadbalancer/" target="_blank" rel="noopener">Service Type LoadBalancer in CIS <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+  </section>
+
+  <section class="combo" id="nic-ngf">
+    <div class="combo-head">
+      <div>
+        <h3 class="combo-title">NGINX Ingress Controller and NGINX Gateway Fabric in one cluster</h3>
+        <p class="combo-layers">Ingress API and Gateway API, side by side</p>
+      </div>
+      <span class="tag tag-info combo-tag">Guidance</span>
+    </div>
+    <p>The two controllers watch disjoint resource types &mdash; NIC takes
+      Ingress and its own CRDs, NGF takes Gateway API &mdash; and NGF maps each
+      Gateway to a dedicated data plane deployment. That makes per-application
+      cutover practical: run both, scope NIC by IngressClass, and move one workload
+      at a time instead of scheduling a cluster-wide migration.</p>
+    <p>F5 documents running multiple controllers with IngressClass scoping, and
+      documents the Ingress-to-Gateway conversion. It does not publish coexistence
+      as a topic in its own right, so treat the combination as a pattern rather
+      than a supported configuration with a tested matrix.</p>
+    <a class="link-arrow" href="https://docs.nginx.com/nginx-ingress-controller/install/multiple-controllers/" target="_blank" rel="noopener">Running Multiple Controllers <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+  </section>
+
+  <section class="combo" id="bnk-nginx">
+    <div class="combo-head">
+      <div>
+        <h3 class="combo-title">BIG-IP Next for Kubernetes with NGINX Ingress Controller or Gateway Fabric</h3>
+        <p class="combo-layers">Cluster gateway &middot; per-application L7</p>
+      </div>
+      <span class="tag tag-info combo-tag">Guidance</span>
+    </div>
+    <p>It is tempting to describe this as "BNK for L4, NGINX for L7", and
+      that framing is wrong twice over. BIG-IP Next for Kubernetes is documented as
+      an <strong>L4&ndash;L7</strong> product, not an L4 one, and F5 publishes no
+      reference architecture pairing it with either NGINX data plane. If you have
+      seen that pairing asserted, it was not from an F5 document.</p>
+    <p>What is defensible: BNK consolidates ingress, egress, firewall and DDoS at
+      the cluster boundary and is where NetOps teams extend existing control into
+      Kubernetes; the NGINX data planes are where platform and application teams own
+      per-application L7 routing through Ingress or Gateway API. Those are different
+      operating models, and F5&rsquo;s own solutions page frames them as
+      complementary options chosen by who operates the cluster &mdash; not as tiers
+      of one stack.</p>
+    <p>Layering them is a reasonable design. It is your design to validate, not one
+      you can point at a guide for. The documented two-tier path is
+      <a href="#ingresslink">IngressLink</a>, which uses classic BIG-IP and CIS.</p>
+    <a class="link-arrow" href="https://www.f5.com/solutions/networking-for-kubernetes" target="_blank" rel="noopener">F5 on Networking for Kubernetes <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+  </section>
+
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Choosing between them</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <p class="feature-title"><svg aria-hidden="true"><use href="#icon-box"></use></svg>Platform teams own the cluster</p>
+        <p>Start with NGINX Ingress Controller or NGINX Gateway Fabric. Both are
+          open source, configured entirely through Kubernetes resources, and need no
+          appliance. Add F5 WAF for NGINX when you need enforcement in the data
+          plane.</p>
+      </div>
+      <div class="feature">
+        <p class="feature-title"><svg aria-hidden="true"><use href="#icon-route"></use></svg>NetOps already runs BIG-IP</p>
+        <p>Container Ingress Services turns the BIG-IP you operate into the
+          cluster&rsquo;s ingress tier without changing who owns it. Add IngressLink
+          if you also want an NGINX tier inside the cluster.</p>
+      </div>
+      <div class="feature">
+        <p class="feature-title"><svg aria-hidden="true"><use href="#icon-cpu"></use></svg>Egress, telco or AI infrastructure</p>
+        <p>BIG-IP Next for Kubernetes is the only option here that controls egress
+          as well as ingress, carries telco signalling protocols, and offloads onto
+          BlueField-3 DPUs.</p>
+      </div>
+      <div class="feature">
+        <p class="feature-title"><svg aria-hidden="true"><use href="#icon-swap"></use></svg>Leaving the community controller</p>
+        <p>The <a href="/tools/ingress-nginx-migration/">migration tool</a> if you
+          are staying on Ingress, <code>ingress2gateway</code> if you are moving to
+          Gateway API. You can do both, one application at a time.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+</main>
+
+</body>
+</html>

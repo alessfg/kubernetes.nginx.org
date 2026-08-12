@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F5 AI Gateway — F5 for Kubernetes</title>
+<meta name="description" content="A control plane for the traffic between your applications, agents, and AI model providers.">
+<link rel="canonical" href="https://kubernetes.nginx.org/products/f5-ai-gateway/">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="color-scheme" content="light dark">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="F5 for Kubernetes">
+<meta property="og:title" content="F5 AI Gateway — F5 for Kubernetes">
+<meta property="og:description" content="A control plane for the traffic between your applications, agents, and AI model providers.">
+<meta property="og:url" content="https://kubernetes.nginx.org/products/f5-ai-gateway/">
+<meta property="og:image" content="https://kubernetes.nginx.org/assets/img/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="/assets/img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+
+<link rel="preload" as="font" type="font/woff2" href="/assets/fonts/InterVariable-subset.woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/core.css">
+<link rel="stylesheet" href="/assets/css/product.css">
+
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"F5 AI Gateway",
+"applicationCategory":"DeveloperApplication","operatingSystem":"Kubernetes",
+"publisher":{"@type":"Organization","name":"F5, Inc."}}
+</script>
+<script>
+/* Set the theme before first paint so it never flashes. */
+(function () {
+    try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+    } catch (e) { /* private browsing */ }
+}());
+</script>
+<script defer src="/assets/js/chrome.js"></script>
+<script defer src="/assets/js/versions.js"></script>
+</head>
+<body>
+
+<!-- sync:sprite -->
+<svg class="sr-only" aria-hidden="true" focusable="false">
+  <symbol id="logo-nginx" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></symbol>
+  <symbol id="icon-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></symbol>
+  <symbol id="icon-external" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h4"/></g></symbol>
+  <symbol id="icon-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5a10.5 10.5 0 00-3.32 20.47c.53.1.72-.23.72-.5v-1.8c-2.92.63-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.96-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.47 1.14 3.07.87.1-.68.37-1.14.67-1.4-2.33-.27-4.78-1.17-4.78-5.2 0-1.15.41-2.09 1.09-2.83-.11-.27-.47-1.34.1-2.8 0 0 .88-.28 2.89 1.08a10 10 0 015.26 0c2-1.36 2.89-1.08 2.89-1.08.57 1.46.21 2.53.1 2.8.68.74 1.09 1.68 1.09 2.83 0 4.04-2.46 4.93-4.8 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0012 1.5z"/></symbol>
+  <symbol id="icon-chevron" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2.5 8.5l3.5 3.5 7.5-7.5"/></symbol>
+  <symbol id="icon-grid" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></g></symbol>
+  <symbol id="icon-box" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></g></symbol>
+  <symbol id="icon-layers" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></g></symbol>
+  <symbol id="icon-tool" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a4 4 0 105.4 5.4l-1.6-1.6-2.2-2.2-1.6-1.6zM13 10L4 19a2 2 0 102.8 2.8L16 13"/></symbol>
+  <symbol id="icon-shield" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="icon-route" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h5a4 4 0 000-8H10a4 4 0 010-8h5"/></g></symbol>
+  <symbol id="icon-cpu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M10 2v4M14 2v4M10 18v4M14 18v4M2 10h4M2 14h4M18 10h4M18 14h4"/></g></symbol>
+  <symbol id="icon-swap" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></g></symbol>
+  <symbol id="icon-cloud" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M17.5 19a4.5 4.5 0 00.5-8.97A6 6 0 106 12.5 3.5 3.5 0 007 19z"/></symbol>
+  <symbol id="icon-info" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zM7.25 6.75h1.5v4.5h-1.5v-4.5zM8 4.2a.95.95 0 110 1.9.95.95 0 010-1.9z"/></symbol>
+  <symbol id="icon-success" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm3.03 3.4l-3.9 3.9-1.9-1.9-1.06 1.06 2.96 2.96 4.96-4.96L11.03 5.9z"/></symbol>
+  <symbol id="icon-warning" viewBox="0 0 16 16"><path fill="currentColor" d="M8 .9L.6 14.2h14.8L8 .9zm0 3.1l5 9H3l5-9zm-.75 3.2h1.5v3.2h-1.5V7.2zm.75 4.1a.9.9 0 110 1.8.9.9 0 010-1.8z"/></symbol>
+  <symbol id="icon-error" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm-.75 2.6h1.5v4.2h-1.5V5.1zm.75 5.1a.9.9 0 110 1.8.9.9 0 010-1.8z"/></symbol>
+</svg>
+<!-- /sync:sprite -->
+
+<noscript><p class="noscript-warning">This site works without JavaScript. Version numbers show their last published values, and the navigation drawer is unavailable on small screens.</p></noscript>
+
+<a class="skip-link" href="#main">Skip to Content</a>
+<div class="sr-only" aria-live="polite" id="announce"></div>
+
+<!-- sync:masthead -->
+<button class="icon-btn menu-toggle" id="menuToggle" type="button"
+        aria-label="Open navigation" aria-expanded="false" aria-controls="nav">
+  <svg aria-hidden="true"><use href="#icon-menu"></use></svg>
+</button>
+<a class="brand" href="/">
+  <svg class="brand-mark" aria-hidden="true"><use href="#logo-nginx"></use></svg>
+  <span class="brand-name">F5 for Kubernetes</span>
+</a>
+<!-- /sync:masthead -->
+
+<header class="topbar">
+  <div class="topbar-heading">
+    <nav aria-label="Breadcrumb">
+      <ol class="breadcrumb">
+        <li><a href="/">Home</a></li>
+        <li><a href="/catalog/">Products</a></li>
+        <li aria-current="page">F5 AI Gateway</li>
+      </ol>
+    </nav>
+    <div class="topbar-title">F5 AI Gateway</div>
+  </div>
+  <!-- sync:actions -->
+  <div class="topbar-actions">
+    <a class="btn btn-tertiary hide-compact" href="https://docs.nginx.com/" target="_blank" rel="noopener">
+      Documentation
+      <svg aria-hidden="true"><use href="#icon-external"></use></svg>
+    </a>
+    <a class="icon-btn hide-compact" href="https://github.com/nginx/kubernetes.nginx.org"
+       target="_blank" rel="noopener" aria-label="This site on GitHub">
+      <svg aria-hidden="true"><use href="#icon-github"></use></svg>
+    </a>
+    <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark theme" aria-pressed="false">
+      <svg class="theme-icon-light" aria-hidden="true"><use href="#icon-moon"></use></svg>
+      <svg class="theme-icon-dark" aria-hidden="true" hidden><use href="#icon-sun"></use></svg>
+    </button>
+  </div>
+  <!-- /sync:actions -->
+</header>
+
+<!-- sync:nav -->
+<div class="nav-backdrop" id="navBackdrop"></div>
+<nav class="nav" id="nav" aria-label="Main">
+  <div class="nav-group">
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/">Home</a></li>
+      <li><a class="nav-link" href="/catalog/">Catalog</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-box"></use></svg>Products</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/products/big-ip-next-for-kubernetes/">BIG-IP Next for Kubernetes
+        <span class="nav-link-meta">L4&ndash;L7 ingress and egress</span></a></li>
+      <li><a class="nav-link" href="/products/container-ingress-services/">Container Ingress Services
+        <span class="nav-link-meta">BIG-IP from Kubernetes</span></a></li>
+      <li><a class="nav-link" href="/products/nginx-ingress-controller/">NGINX Ingress Controller
+        <span class="nav-link-meta">Ingress API</span></a></li>
+      <li><a class="nav-link" href="/products/nginx-gateway-fabric/">NGINX Gateway Fabric
+        <span class="nav-link-meta">Gateway API</span></a></li>
+      <li><a class="nav-link" href="/products/f5-waf-for-nginx/">F5 WAF for NGINX
+        <span class="nav-link-meta">App and API security</span></a></li>
+      <li><a class="nav-link" href="/products/f5-ai-gateway/">F5 AI Gateway
+        <span class="nav-link-meta">AI traffic governance</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-layers"></use></svg>Solutions</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/solutions/better-together/">Better Together
+        <span class="nav-link-meta">How the products combine</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-tool"></use></svg>Tools</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/tools/ingress-nginx-migration/">ingress-nginx Migration
+        <span class="nav-link-meta">Move to NGINX Ingress Controller</span></a></li>
+      <li><a class="nav-link" href="/tools/ingress2gateway/">ingress2gateway
+        <span class="nav-link-meta">Convert Ingress to Gateway API</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-divider"></div>
+  <div class="nav-footer">
+    <p>&copy; <span id="year">2026</span> F5, Inc.</p>
+    <p>NGINX is a registered trademark of F5, Inc.</p>
+    <p>Created with AI. Maintained by humans.</p>
+  </div>
+</nav>
+<!-- /sync:nav -->
+
+<main class="main" id="main">
+<div class="main-inner">
+  <div class="product-header">
+    <h1>F5 AI Gateway</h1>
+    <p class="product-summary">A control plane for the traffic between your
+      applications, agents and AI model providers. F5 describes it as unifying a
+      Model Gateway, an MCP Gateway and AI Guardrails under one policy model, and
+      it deploys on Kubernetes.</p>
+    <div class="product-tags">
+      <span class="tag">Commercial</span>
+      <span class="status"><span class="status-dot status-dot-attention"></span>No public technical documentation</span>
+    </div>
+    <div class="btn-row product-cta">
+      <a class="btn btn-primary btn-md" href="https://www.f5.com/products/ai-gateway" target="_blank" rel="noopener">
+        Product Page <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+      <a class="btn btn-secondary btn-md" href="https://www.f5.com/products/ai-guardrails" target="_blank" rel="noopener">
+        AI Guardrails <svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+    </div>
+  </div>
+
+    <div class="notification notification-attention">
+      <svg aria-hidden="true"><use href="#icon-warning"></use></svg>
+      <div><p class="notification-title">This page is deliberately short</p>
+      <p>F5 AI Gateway has no public technical documentation at the time of writing &mdash; its former documentation site now redirects to marketing, and no version, changelog, chart reference or install guide is published. Rather than fill the gap with detail we cannot verify, this page states only what F5 currently publishes and links to it. If you need specifics, the product page is the route in.</p></div>
+    </div>
+
+  <section class="section">
+    <h2 class="section-title">What F5 publishes about it</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <p class="feature-title"><svg aria-hidden="true"><use href="#icon-cloud"></use></svg>One control plane for AI traffic</p>
+        <p>Positioned as a single place to secure, control and optimise every AI interaction, sitting between your users, agents and AI services.</p>
+      </div>
+      <div class="feature">
+        <p class="feature-title"><svg aria-hidden="true"><use href="#icon-layers"></use></svg>Three parts under one policy model</p>
+        <p>A Model Gateway, an MCP Gateway, and AI Guardrails &mdash; unified under a single control plane and policy model rather than operated separately.</p>
+      </div>
+      <div class="feature">
+        <p class="feature-title"><svg aria-hidden="true"><use href="#icon-shield"></use></svg>AI Guardrails</p>
+        <p>Data security, threat management and governance for AI models, apps and agents. It also has its own product page, and its own deployment options outside Kubernetes.</p>
+      </div>
+      <div class="feature">
+        <p class="feature-title"><svg aria-hidden="true"><use href="#icon-box"></use></svg>Runs on Kubernetes</p>
+        <p>Installed with Helm from F5&rsquo;s private registry rather than a public one, which means an image pull secret and an entitlement to obtain it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">What we have not stated, and why</h2>
+    <p class="page-lede">This site holds itself to only publishing what can be checked against a current F5 source. These are the gaps that rule left open.</p>
+    <ul class="prereqs">
+      <li><svg aria-hidden="true"><use href="#icon-info"></use></svg><strong>No version number.</strong> No current version is published on any F5 page we can reach, and the changelog is gone.</li>
+      <li><svg aria-hidden="true"><use href="#icon-info"></use></svg><strong>No install command.</strong> The chart reference and namespace that circulate in search results come from a documentation site that now redirects away, so they are stale index data rather than a source.</li>
+      <li><svg aria-hidden="true"><use href="#icon-info"></use></svg><strong>No policy count.</strong> The product page gives two different figures for the number of guardrail policies in two different sections, so neither is quotable.</li>
+      <li><svg aria-hidden="true"><use href="#icon-info"></use></svg><strong>No NGINX integration.</strong> F5 publishes no documented integration between AI Gateway and NGINX Ingress Controller or NGINX Gateway Fabric. For Kubernetes-native inference routing, that is <a href="/products/nginx-gateway-fabric/">NGINX Gateway Fabric</a> and the Gateway API Inference Extension &mdash; a different mechanism, not this product.</li>
+    </ul>
+  </section>
+
+</div>
+</main>
+
+</body>
+</html>

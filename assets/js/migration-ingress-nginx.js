@@ -1340,7 +1340,7 @@
             },
             export: {
                 filename: 'nginx-ingress-migration.yaml',
-                header: '# NGINX Ingress Migration Tool — Generated Output\n# https://kubernetes.nginx.org/ingress-nginx-migration.html'
+                header: '# NGINX Ingress Migration Tool — Generated Output\n# https://kubernetes.nginx.org/tools/ingress-nginx-migration/'
             }
         };
     })();

@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
 
+# Development harness, not part of the site. It carries noindex too; this is
+# belt and braces until it is deleted before the rebuild is merged.
+Disallow: /gallery.html
+
 Sitemap: https://kubernetes.nginx.org/sitemap.xml

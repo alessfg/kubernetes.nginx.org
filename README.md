@@ -8,24 +8,58 @@
 
 # kubernetes.nginx.org
 
-The community site for NGINX's Kubernetes ecosystem, served via GitHub Pages at [kubernetes.nginx.org](https://kubernetes.nginx.org/).
+F5's Kubernetes portfolio in one place, commercial and open source, served via GitHub Pages at [kubernetes.nginx.org](https://kubernetes.nginx.org/).
 
 ## What's Here
 
-- **[Landing Page](https://kubernetes.nginx.org/)** (`index.html`) — Hub page covering the NGINX Kubernetes projects and related tools:
-  - [NGINX Ingress Controller](https://github.com/nginx/kubernetes-ingress) — F5 NGINX's Kubernetes Ingress Controller
-  - [NGINX Gateway Fabric](https://github.com/nginx/nginx-gateway-fabric) — F5 NGINX's Gateway API implementation
-  - [ingress2gateway](https://github.com/kubernetes-sigs/ingress2gateway) — Kubernetes SIG CLI tool to convert Ingress resources to Gateway API
+**[Home](https://kubernetes.nginx.org/)** is a grid of every product. **[Catalog](https://kubernetes.nginx.org/catalog/)** groups them by use case, and **[Better Together](https://kubernetes.nginx.org/solutions/better-together/)** covers how they combine — with each integration marked either as one F5 documents or as architectural guidance.
 
-- **[NGINX Ingress Migration Tool](https://kubernetes.nginx.org/ingress-nginx-migration.html)** (`ingress-nginx-migration.html`) — Interactive tool for migrating from the community Ingress-NGINX controller (`kubernetes/ingress-nginx`) to the NGINX Ingress Controller. Features include:
-  - Interactive YAML analyzer
-  - 130+ annotation mappings
-  - CRD migration examples
-  - ConfigMap migration guidance
+### Products
+
+| | |
+|---|---|
+| [BIG-IP Next for Kubernetes](https://kubernetes.nginx.org/products/big-ip-next-for-kubernetes/) | L4–L7 ingress **and egress** at the North/South gateway. Commercial. |
+| [BIG-IP Container Ingress Services](https://kubernetes.nginx.org/products/container-ingress-services/) | Programs an external BIG-IP from inside Kubernetes. Apache 2.0. |
+| [NGINX Ingress Controller](https://kubernetes.nginx.org/products/nginx-ingress-controller/) | Ingress plus CRDs, with NGINX in the same pod. Apache 2.0. |
+| [NGINX Gateway Fabric](https://kubernetes.nginx.org/products/nginx-gateway-fabric/) | Gateway API, with a separated control and data plane. Apache 2.0. |
+| [F5 WAF for NGINX](https://kubernetes.nginx.org/products/f5-waf-for-nginx/) | App and API security inside either NGINX data plane. Commercial. |
+| [F5 AI Gateway](https://kubernetes.nginx.org/products/f5-ai-gateway/) | Governs traffic to AI model providers. Commercial. |
+
+### Tools
+
+- **[ingress-nginx Migration](https://kubernetes.nginx.org/tools/ingress-nginx-migration/)** — move from the retired community controller to the F5 NGINX Ingress Controller. 130+ annotation mappings, the ConfigMap keys that differ, CRD examples, and an analyzer that reads your own YAML and returns a migration plan. Nothing leaves the browser.
+- **[ingress2gateway](https://kubernetes.nginx.org/tools/ingress2gateway/)** — convert Ingress resources to Gateway API. An upstream Kubernetes SIG project, not an F5 one.
 
 ## Project Structure
 
-This is a documentation-only project with no build system, tests, or package manager. All pages are static HTML with first-party CSS/JS under `assets/` and no third-party runtime dependencies.
+A documentation-only project with **no build system, no package manager and no test framework**. Static HTML with first-party CSS and JS under `assets/`, and no third-party runtime dependency of any kind — including the webfont, which is self-hosted.
+
+The site follows the **F5 Design System**, the design system behind the F5 Distributed Cloud console. `assets/css/tokens.css` is the whole design surface: every colour, size, space, radius, shadow and duration used anywhere resolves to a token declared there.
+
+### Running it locally
+
+Internal paths are absolute, so `file://` will not resolve them:
+
+```console
+python3 -m http.server
+```
+
+Then open <http://localhost:8000>.
+
+### Checks
+
+There is no CI for these yet; run them before opening a pull request.
+
+```console
+python3 scripts/check-tokens.py        # design-token invariants, retired colours, undefined var()
+python3 scripts/check-contrast.py      # every colour pairing against WCAG 2.1 AA
+python3 scripts/check-chrome-sync.py   # the shared chrome is byte-identical across all pages
+node    scripts/test-analyzer.js       # the migration analyzer, under a DOM stub
+```
+
+The analyzer test matters more than it looks: `buildPlan` runs each CRD generator inside a `try/catch` that only warns, so a broken generator drops its resource and the tool still appears to work. A thrown exception is not the failure signal — the script counts `console.warn` instead.
+
+`.claude/CLAUDE.md` holds the full working spec: the design-system rules and their documented deviations, the migration tool's data-versus-presentation boundary, the version-accuracy rules, and the release checklist.
 
 ## Contributing
 

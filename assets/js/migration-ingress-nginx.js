@@ -2,7 +2,7 @@
        migration tool. Defines window.MIGRATION_SOURCE: the community-controller
        version, the annotation mapping data, the analyzer's parseInput/buildPlan
        hooks, and the page strings/config the shared engine (migration-core.js)
-       reads. Load order matters: shared.js → this file → migration-core.js.
+       reads. Load order matters: migration-util.js → this file → migration-core.js.
        This file must not touch the DOM — the core owns all rendering — and its
        functions may dereference MigrationTool.* at call time only (the core
        defines it after this file has run).

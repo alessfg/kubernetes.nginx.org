@@ -58,7 +58,7 @@ cp inter/LICENSE.txt assets/fonts/OFL.txt
 ```
 
 `--layout-features='*'` is load-bearing: the default feature set drops `calt`, `tnum`, and the
-`ss0*` stylistic sets that `shared.css` enables.
+`ss0*` stylistic sets that `core.css` enables.
 
 To find every non-ASCII character the site renders (the input to the `--unicodes` list):
 
@@ -78,7 +78,7 @@ rendered, and deliberately outside the subset.
 
 ## Metric fallback
 
-`shared.css` pairs the webfont with an `'Inter Fallback'` face built on local Arial with metric
+`core.css` pairs the webfont with an `'Inter Fallback'` face built on local Arial with metric
 overrides, so text laid out before the woff2 arrives occupies the same space and does not shift
 on swap. Those override values are derived from these exact files; if you regenerate the subset,
 recompute them:

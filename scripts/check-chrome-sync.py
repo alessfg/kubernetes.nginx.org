@@ -25,8 +25,12 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# gallery.html is a development harness, not a page of the site.
-IGNORE = {'gallery.html', 'ingress-nginx-migration.html'}
+# gallery.html is a development harness. ingress-nginx-migration.html is a
+# redirect stub. 404.html is deliberately self-contained — GitHub Pages serves
+# it for a missing URL at any depth, so it cannot reference the shared chrome
+# by any path that would reliably resolve. None of the three carries sync
+# regions, and none should.
+IGNORE = {'gallery.html', 'ingress-nginx-migration.html', '404.html'}
 
 # Pre-rebuild pages that still carry the old chrome and have no sync markers
 # yet. They are skipped rather than reported as drift, because "this page has
@@ -37,6 +41,20 @@ PENDING = set()
 
 REGION = re.compile(
     r'<!--\s*sync:([\w-]+)\s*-->(.*?)<!--\s*/sync:\1\s*-->', re.S)
+
+# Navigation and asset paths are depth-relative, so the same chrome legitimately
+# reads href="products/…" at the root and href="../../products/…" two levels
+# down. Normalising the prefix away keeps the comparison meaningful — a renamed
+# label, a new nav item or a changed URL still shows up — while tolerating the
+# one difference that is supposed to vary.
+DEPTH = re.compile(r'\b(href|src)="(?:\.\./)+')
+# The site root itself is written "./" at the top level and "../../" further
+# down; stripping the prefix leaves an empty href, so both are folded to "./".
+EMPTY = re.compile(r'\b(href|src)=""')
+
+
+def normalise(body):
+    return EMPTY.sub(r'\1="./"', DEPTH.sub(r'\1="', body))
 
 
 def pages():
@@ -71,7 +89,7 @@ def main():
         with open(path, encoding='utf-8') as fh:
             text = fh.read()
         for name, body in REGION.findall(text):
-            found.setdefault(name, {})[path] = body
+            found.setdefault(name, {})[path] = normalise(body)
 
     if not found:
         print('No sync regions found. Has the chrome lost its markers?')

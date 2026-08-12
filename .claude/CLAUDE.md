@@ -58,7 +58,22 @@ assets/fonts/  InterVariable-subset.woff2, OFL.txt, README.md
 scripts/       check-tokens.py, check-contrast.py, check-chrome-sync.py, test-analyzer.js
 ```
 
-**Loading rules.** Every page links `tokens.css` → `core.css` → its page CSS, in that order. Asset and internal paths are **absolute** (`/assets/…`, `/products/…`) because the site is multi-page and a relative path would resolve differently at each depth — this is a deliberate reversal of the pre-rebuild convention. Consequence: `file://` does not work; serve with `python3 -m http.server` to preview.
+**Loading rules.** Every page links `tokens.css` → `core.css` → its page CSS, in that order.
+
+**Asset and internal paths are depth-relative** — `assets/css/core.css` at the root, `../../assets/css/core.css` two levels down — and the site root is `./` or `../../`. Never write a root-absolute `/assets/…` or `/products/…`. The reason is deployment: GitHub Pages serves a project site at `/<repo>/`, so the fork preview lives at `alessfg.github.io/kubernetes.nginx.org/` and a root-absolute path resolves outside the site. Relative paths work at the domain root (production), under a subpath (fork preview) **and** over `file://`.
+
+`<base href>` would have been tidier — one tag per page, chrome identical everywhere — and was rejected: it re-resolves `#fragment` links against the base, which would break every anchor in the migration tool's reference guide.
+
+Two consequences to know:
+
+- **`check-chrome-sync.py` normalises the `../` prefix** before comparing, since the same chrome legitimately reads `href="products/…"` at the root and `href="../../products/…"` deeper. A renamed label, a new nav item or a changed URL still fails the check; only the depth prefix is tolerated.
+- **`initActiveNav()` in `chrome.js` reads `link.pathname`, not the `href` attribute.** The property is the browser's resolved absolute path, which is the only thing comparable against `location` when the attribute itself is relative.
+
+**Three pages sit outside this scheme, deliberately**, and all three are in `check-chrome-sync.py`'s `IGNORE` set:
+
+- **`404.html` is entirely self-contained** — no external CSS, no external JS, no sprite, and its tokens are *copied* from `tokens.css` rather than imported. GitHub Pages serves it for a missing URL at any depth, so it has no stable location: a relative href would resolve against whatever the visitor mistyped, and a root-absolute one would break on the subpath. Its links are root-absolute in the markup (correct in production) and rewritten at runtime for the `*.github.io` project-site case. **If the palette moves, update the copy in that file too.**
+- **`ingress-nginx-migration.html`** is the redirect stub.
+- **`gallery.html`** is a development harness.
 
 Every page carries `<link rel="preload" as="font" … crossorigin>` **before** the stylesheets — the `@font-face` lives in `core.css`, so without the preload the font is not discoverable until that CSS has parsed. `crossorigin` is required even though the file is same-origin: fonts are always fetched in CORS mode, and omitting it fetches the file twice.
 
@@ -307,4 +322,5 @@ Prefer GitHub MCP tools over WebFetch for source; prefer the `zeroheight` MCP ov
 
 - **Repository**: https://github.com/nginx/kubernetes.nginx.org
 - **GitHub Pages** serves `main` at https://kubernetes.nginx.org/
-- Preview locally with `python3 -m http.server` from the repo root. `file://` will not work — internal paths are absolute.
+- **Fork previews** go to `alessfg/kubernetes.nginx.org` on a `preview/*` branch, served at `https://alessfg.github.io/kubernetes.nginx.org/` — a **project-site subpath**, not a domain root. The `CNAME` file is inherited from `main` and is ignored there, because the fork cannot claim a domain the upstream org owns. This subpath is the whole reason paths are depth-relative.
+- Preview locally with `python3 -m http.server` from the repo root, or just open `index.html` — relative paths mean `file://` works too.

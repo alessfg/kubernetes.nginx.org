@@ -140,19 +140,28 @@ function initNav() {
    chrome block byte-identical across all pages, which scripts/check-chrome-
    sync.py depends on. */
 
+function normalisePath(path) {
+    var out = path.replace(/index\.html$/, '');
+    if (out.charAt(out.length - 1) !== '/') { out += '/'; }
+    return out;
+}
+
 function initActiveNav() {
-    var here = window.location.pathname.replace(/index\.html$/, '');
-    if (here.length > 1 && here.charAt(here.length - 1) !== '/') { here += '/'; }
+    var here = normalisePath(window.location.pathname);
 
     var links = document.querySelectorAll('.nav-link');
     var best = null;
     var bestLen = -1;
 
     for (var i = 0; i < links.length; i++) {
-        var path = links[i].getAttribute('href');
-        if (!path || path.charAt(0) !== '/') { continue; }
+        /* Read .pathname rather than the href attribute. Navigation hrefs are
+           depth-relative ("../../products/…") so the site works at a domain
+           root, under a GitHub Pages project subpath, and over file://. The
+           property gives the browser's resolved absolute path, which is what
+           we can actually compare against location. */
+        var path = normalisePath(links[i].pathname);
         /* Longest matching prefix wins, so /products/nginx-ingress-controller/
-           beats a bare / that also technically matches. */
+           beats the site root, which also technically matches. */
         if (here.indexOf(path) === 0 && path.length > bestLen) {
             best = links[i];
             bestLen = path.length;

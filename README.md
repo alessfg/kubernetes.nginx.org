@@ -38,13 +38,15 @@ The site follows the **F5 Design System**, the design system behind the F5 Distr
 
 ### Running it locally
 
-Internal paths are absolute, so `file://` will not resolve them:
+Paths are depth-relative, so opening `index.html` straight from the filesystem
+works. For a closer match to production:
 
 ```console
 python3 -m http.server
 ```
 
-Then open <http://localhost:8000>.
+Then open <http://localhost:8000>. The same relative paths are why the site also
+works from a GitHub Pages project subpath, which is how fork previews are served.
 
 ### Checks
 

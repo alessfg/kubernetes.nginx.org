@@ -1298,7 +1298,7 @@
                 noFindings: { title: 'No community NGINX annotations found.', message: 'Make sure your YAML contains annotations with the nginx.ingress.kubernetes.io/ prefix.' },
                 emptyStateLead: 'Paste your Ingress YAML above and click Analyze',
                 emptyStateHint: 'Drag & drop a .yaml file, or try "Load sample" for an example',
-                pageNames: { 'getting-started': 'Getting started', analyzer: 'Config analyzer', reference: 'Reference guide' }
+                pageNames: { 'getting-started': 'Getting Started', analyzer: 'Config Analyzer', reference: 'Reference Guide' }
             },
             versionBindings: [
                 { attr: 'data-ingress-nginx-version', text: INGRESS_NGINX_VERSION },

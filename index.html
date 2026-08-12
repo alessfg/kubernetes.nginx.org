@@ -1,708 +1,319 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#009639" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#222222" media="(prefers-color-scheme: dark)">
-    <meta name="color-scheme" content="light dark">
-    <meta name="description" content="NGINX on Kubernetes — the NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources.">
-    <meta name="author" content="F5, Inc.">
-    <link rel="canonical" href="https://kubernetes.nginx.org/">
-    <link rel="preconnect" href="https://api.github.com" crossorigin>
-    <!-- No crossorigin here: the poster <img> and iframe requests are no-cors, and
-         connection reuse is keyed on credential mode — a CORS-mode preconnect
-         would warm sockets those requests can never use. -->
-    <link rel="preconnect" href="https://www.youtube-nocookie.com">
-    <link rel="preconnect" href="https://i.ytimg.com">
-    <meta property="og:title" content="NGINX - Networking for Kubernetes">
-    <meta property="og:description" content="NGINX on Kubernetes — the NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources.">
-    <meta property="og:url" content="https://kubernetes.nginx.org/">
-    <meta property="og:type" content="website">
-    <meta property="og:image" content="https://kubernetes.nginx.org/assets/img/og-image.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="NGINX — Networking for Kubernetes">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="https://kubernetes.nginx.org/assets/img/og-image.png">
-    <meta name="twitter:image:alt" content="NGINX — Networking for Kubernetes">
-    <title>NGINX - Networking for Kubernetes</title>
-    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
-    <link rel="manifest" href="site.webmanifest">
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "NGINX - Networking for Kubernetes",
-        "url": "https://kubernetes.nginx.org/",
-        "description": "NGINX on Kubernetes — the NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources.",
-        "publisher": {
-            "@type": "Organization",
-            "name": "F5, Inc.",
-            "url": "https://www.f5.com/"
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F5 for Kubernetes</title>
+<meta name="description" content="F5's Kubernetes portfolio, commercial and open source: BIG-IP Next for Kubernetes, Container Ingress Services, NGINX Ingress Controller, NGINX Gateway Fabric, F5 WAF for NGINX, and migration tooling.">
+<link rel="canonical" href="https://kubernetes.nginx.org/">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="color-scheme" content="light dark">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="F5 for Kubernetes">
+<meta property="og:title" content="F5 for Kubernetes">
+<meta property="og:description" content="F5's Kubernetes portfolio, commercial and open source — from the network edge to the pod.">
+<meta property="og:url" content="https://kubernetes.nginx.org/">
+<meta property="og:image" content="https://kubernetes.nginx.org/assets/img/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="/assets/img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+
+<link rel="preload" as="font" type="font/woff2" href="/assets/fonts/InterVariable-subset.woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/core.css">
+<link rel="stylesheet" href="/assets/css/catalog.css">
+
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"F5 for Kubernetes",
+"url":"https://kubernetes.nginx.org/","publisher":{"@type":"Organization","name":"F5, Inc."}}
+</script>
+
+<script>
+/* Set the theme before first paint so it never flashes. */
+(function () {
+    try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
         }
-    }
-    </script>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='53' height='60' viewBox='0 0 53 60'%3E%3Cg transform='translate(-7.198 -0.359)'%3E%3Cpath fill='%23009639' d='M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544'/%3E%3Cpath fill='%23fff' d='M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z'/%3E%3C/g%3E%3C/svg%3E">
-    <!-- The site's only webfont. Preloaded because the @font-face that requests it lives
-         inside shared.css, so the browser cannot discover it until that stylesheet has
-         downloaded and parsed. crossorigin is required even though the file is same-origin:
-         fonts are always fetched in CORS mode, and omitting it fetches the file twice. -->
-    <link rel="preload" href="assets/fonts/InterVariable-subset.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="assets/css/shared.css">
-    <link rel="stylesheet" href="assets/css/index.css">
-    <!-- Without JS the inactive product pages stay hidden="until-found" — stack
-         them so the static content is readable (display for the boolean-hidden
-         fallback, content-visibility for Chromium's until-found). -->
-    <noscript><style>.product-page[hidden] { display: block; content-visibility: visible; }</style></noscript>
-    <script>try{let s=localStorage.getItem('darkMode');if(s==='1'||(s===null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark-mode')}catch(e){}</script>
-    <!-- defer: fetch starts with the first HTML chunk instead of after the whole
-         document; execution order (shared before page) and after-parse timing keep
-         the classic-script/globals convention working. -->
-    <script defer src="assets/js/shared.js"></script>
-    <script defer src="assets/js/index.js"></script>
+    } catch (e) { /* private browsing */ }
+}());
+</script>
+<script defer src="/assets/js/chrome.js"></script>
+<script defer src="/assets/js/versions.js"></script>
 </head>
 <body>
-    <svg xmlns="http://www.w3.org/2000/svg" class="svg-sprite" aria-hidden="true">
-        <symbol id="icon-github" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></symbol>
-        <symbol id="icon-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></symbol>
-        <symbol id="icon-community" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></symbol>
-        <symbol id="icon-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
-    </svg>
-    <noscript><div class="noscript-warning">This site requires JavaScript for navigation, dark mode, and version fetching.</div></noscript>
-    <a class="skip-link" href="#main-content">Skip to main content</a>
-    <div class="sr-only" aria-live="polite" id="page-announce"></div>
 
-    <!-- ── Top Bar ── -->
-    <nav class="topbar" aria-label="Top navigation">
-        <div class="topbar-left">
-            <button class="menu-toggle" id="menuToggle" aria-label="Toggle sidebar navigation" aria-expanded="false" aria-controls="sidebar">
-                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-            </button>
-            <a class="topbar-brand" href="#">
-                <img class="brand-logo brand-logo-light" src="assets/img/nginx-logo.svg" alt="NGINX, sponsored by F5" width="106" height="30">
-                <img class="brand-logo brand-logo-dark" src="assets/img/nginx-logo-dark.svg" alt="NGINX, sponsored by F5" width="106" height="30">
-                <span class="sub">Networking for Kubernetes</span>
-            </a>
-            <span class="mobile-breadcrumb" id="mobileBreadcrumb">Home</span>
-        </div>
-        <div class="topbar-right">
-            <a class="topbar-link hide-mobile" href="https://nginx.org" target="_blank" rel="noopener" aria-label="Visit nginx.org">
-                <svg aria-hidden="true" class="nginx-glyph" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></svg>
-                nginx.org
-            </a>
-            <a class="topbar-link" href="https://github.com/nginx/kubernetes.nginx.org" target="_blank" rel="noopener" aria-label="Contribute on GitHub">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><use href="#icon-github"/></svg>
-                Contribute
-            </a>
-            <button class="dark-toggle" id="darkToggle" aria-label="Dark mode" aria-pressed="false">
-                <svg aria-hidden="true" class="dark-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-                <svg aria-hidden="true" class="dark-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-            </button>
-        </div>
+<!-- sync:sprite -->
+<svg class="sr-only" aria-hidden="true" focusable="false">
+  <symbol id="logo-nginx" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></symbol>
+  <symbol id="icon-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></symbol>
+  <symbol id="icon-external" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h4"/></g></symbol>
+  <symbol id="icon-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5a10.5 10.5 0 00-3.32 20.47c.53.1.72-.23.72-.5v-1.8c-2.92.63-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.96-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.47 1.14 3.07.87.1-.68.37-1.14.67-1.4-2.33-.27-4.78-1.17-4.78-5.2 0-1.15.41-2.09 1.09-2.83-.11-.27-.47-1.34.1-2.8 0 0 .88-.28 2.89 1.08a10 10 0 015.26 0c2-1.36 2.89-1.08 2.89-1.08.57 1.46.21 2.53.1 2.8.68.74 1.09 1.68 1.09 2.83 0 4.04-2.46 4.93-4.8 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0012 1.5z"/></symbol>
+  <symbol id="icon-chevron" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2.5 8.5l3.5 3.5 7.5-7.5"/></symbol>
+  <symbol id="icon-grid" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></g></symbol>
+  <symbol id="icon-box" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></g></symbol>
+  <symbol id="icon-layers" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></g></symbol>
+  <symbol id="icon-tool" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a4 4 0 105.4 5.4l-1.6-1.6-2.2-2.2-1.6-1.6zM13 10L4 19a2 2 0 102.8 2.8L16 13"/></symbol>
+  <symbol id="icon-shield" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="icon-route" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h5a4 4 0 000-8H10a4 4 0 010-8h5"/></g></symbol>
+  <symbol id="icon-cpu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M10 2v4M14 2v4M10 18v4M14 18v4M2 10h4M2 14h4M18 10h4M18 14h4"/></g></symbol>
+  <symbol id="icon-swap" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></g></symbol>
+  <symbol id="icon-cloud" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M17.5 19a4.5 4.5 0 00.5-8.97A6 6 0 106 12.5 3.5 3.5 0 007 19z"/></symbol>
+  <symbol id="icon-info" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zM7.25 6.75h1.5v4.5h-1.5v-4.5zM8 4.2a.95.95 0 110 1.9.95.95 0 010-1.9z"/></symbol>
+  <symbol id="icon-success" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm3.03 3.4l-3.9 3.9-1.9-1.9-1.06 1.06 2.96 2.96 4.96-4.96L11.03 5.9z"/></symbol>
+  <symbol id="icon-warning" viewBox="0 0 16 16"><path fill="currentColor" d="M8 .9L.6 14.2h14.8L8 .9zm0 3.1l5 9H3l5-9zm-.75 3.2h1.5v3.2h-1.5V7.2zm.75 4.1a.9.9 0 110 1.8.9.9 0 010-1.8z"/></symbol>
+  <symbol id="icon-error" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm-.75 2.6h1.5v4.2h-1.5V5.1zm.75 5.1a.9.9 0 110 1.8.9.9 0 010-1.8z"/></symbol>
+</svg>
+<!-- /sync:sprite -->
+
+<noscript><p class="noscript-warning">This site works without JavaScript. Version numbers show their last published values, and the navigation drawer is unavailable on small screens.</p></noscript>
+
+<a class="skip-link" href="#main">Skip to Content</a>
+<div class="sr-only" aria-live="polite" id="announce"></div>
+
+<!-- sync:masthead -->
+<button class="icon-btn menu-toggle" id="menuToggle" type="button"
+        aria-label="Open navigation" aria-expanded="false" aria-controls="nav">
+  <svg aria-hidden="true"><use href="#icon-menu"></use></svg>
+</button>
+<a class="brand" href="/">
+  <svg class="brand-mark" aria-hidden="true"><use href="#logo-nginx"></use></svg>
+  <span class="brand-name">F5 for Kubernetes</span>
+</a>
+<!-- /sync:masthead -->
+
+<header class="topbar">
+  <div class="topbar-heading">
+    <nav aria-label="Breadcrumb">
+      <ol class="breadcrumb"><li aria-current="page">Home</li></ol>
     </nav>
+    <div class="topbar-title">Home</div>
+  </div>
+  <!-- sync:actions -->
+  <div class="topbar-actions">
+    <a class="btn btn-tertiary hide-compact" href="https://docs.nginx.com/" target="_blank" rel="noopener">
+      Documentation
+      <svg aria-hidden="true"><use href="#icon-external"></use></svg>
+    </a>
+    <a class="icon-btn hide-compact" href="https://github.com/nginx/kubernetes.nginx.org"
+       target="_blank" rel="noopener" aria-label="This site on GitHub">
+      <svg aria-hidden="true"><use href="#icon-github"></use></svg>
+    </a>
+    <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark theme" aria-pressed="false">
+      <svg class="theme-icon-light" aria-hidden="true"><use href="#icon-moon"></use></svg>
+      <svg class="theme-icon-dark" aria-hidden="true" hidden><use href="#icon-sun"></use></svg>
+    </button>
+  </div>
+  <!-- /sync:actions -->
+</header>
 
-    <div class="layout">
-        <!-- ── Sidebar Backdrop ── -->
-        <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+<!-- sync:nav -->
+<div class="nav-backdrop" id="navBackdrop"></div>
+<nav class="nav" id="nav" aria-label="Main">
+  <div class="nav-group">
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/">Home</a></li>
+      <li><a class="nav-link" href="/catalog/">Catalog</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-box"></use></svg>Products</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/products/big-ip-next-for-kubernetes/">BIG-IP Next for Kubernetes
+        <span class="nav-link-meta">L4&ndash;L7 ingress and egress</span></a></li>
+      <li><a class="nav-link" href="/products/container-ingress-services/">Container Ingress Services
+        <span class="nav-link-meta">BIG-IP from Kubernetes</span></a></li>
+      <li><a class="nav-link" href="/products/nginx-ingress-controller/">NGINX Ingress Controller
+        <span class="nav-link-meta">Ingress API</span></a></li>
+      <li><a class="nav-link" href="/products/nginx-gateway-fabric/">NGINX Gateway Fabric
+        <span class="nav-link-meta">Gateway API</span></a></li>
+      <li><a class="nav-link" href="/products/f5-waf-for-nginx/">F5 WAF for NGINX
+        <span class="nav-link-meta">App and API security</span></a></li>
+      <li><a class="nav-link" href="/products/f5-ai-gateway/">F5 AI Gateway
+        <span class="nav-link-meta">AI traffic governance</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-layers"></use></svg>Solutions</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/solutions/better-together/">Better Together
+        <span class="nav-link-meta">How the products combine</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-tool"></use></svg>Tools</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/tools/ingress-nginx-migration/">ingress-nginx Migration
+        <span class="nav-link-meta">Move to NGINX Ingress Controller</span></a></li>
+      <li><a class="nav-link" href="/tools/ingress2gateway/">ingress2gateway
+        <span class="nav-link-meta">Convert Ingress to Gateway API</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-divider"></div>
+  <div class="nav-footer">
+    <p>&copy; <span id="year">2026</span> F5, Inc.</p>
+    <p>NGINX is a registered trademark of F5, Inc.</p>
+    <p>Created with AI. Maintained by humans.</p>
+  </div>
+</nav>
+<!-- /sync:nav -->
 
-        <!-- ── Sidebar ── -->
-        <aside class="sidebar" id="sidebar" aria-label="Product navigation">
-            <section class="sidebar-section">
-                <ul class="sidebar-nav">
-                    <li><a class="sidebar-link active" href="#home" data-product="home" aria-current="page">
-                        <span class="dot" data-color="green"></span>
-                        <span class="sidebar-link-text">
-                            <span class="sidebar-link-name">Home</span>
-                            <span class="sidebar-link-desc">Overview &amp; ecosystem</span>
-                        </span>
-                    </a></li>
-                </ul>
-            </section>
-            <section class="sidebar-section" aria-labelledby="sidebar-products-label">
-                <div class="sidebar-label" id="sidebar-products-label">Projects</div>
-                <ul class="sidebar-nav">
-                    <li><a class="sidebar-link" href="#nginx-ingress-controller" data-product="nginx-ingress-controller">
-                        <span class="dot" data-color="green"></span>
-                        <span class="sidebar-link-text">
-                            <span class="sidebar-link-name">NGINX Ingress Controller</span>
-                            <span class="sidebar-link-desc"><span data-version="nic.release">v5.5.1</span> &middot; Ingress API</span>
-                        </span>
-                    </a></li>
-                    <li><a class="sidebar-link" href="#nginx-gateway-fabric" data-product="nginx-gateway-fabric">
-                        <span class="dot" data-color="green"></span>
-                        <span class="sidebar-link-text">
-                            <span class="sidebar-link-name">NGINX Gateway Fabric</span>
-                            <span class="sidebar-link-desc"><span data-version="ngf.release">v2.6.6</span> &middot; Gateway API</span>
-                        </span>
-                    </a></li>
-                </ul>
-            </section>
-            <section class="sidebar-section" aria-labelledby="sidebar-tools-label">
-                <div class="sidebar-label" id="sidebar-tools-label">Tools</div>
-                <ul class="sidebar-nav">
-                    <li><a class="sidebar-link" href="#migration-tool" data-product="migration-tool">
-                        <span class="dot" data-color="blue"></span>
-                        <span class="sidebar-link-text">
-                            <span class="sidebar-link-name">Ingress-NGINX Migration</span>
-                            <span class="sidebar-link-desc">Ingress-NGINX &rarr; NGINX Ingress</span>
-                        </span>
-                    </a></li>
-                    <li><a class="sidebar-link" href="#ingress2gateway" data-product="ingress2gateway">
-                        <span class="dot" data-color="blue"></span>
-                        <span class="sidebar-link-text">
-                            <span class="sidebar-link-name">ingress2gateway</span>
-                            <span class="sidebar-link-desc"><span data-version="i2g.release">v1.1.0</span> &middot; Ingress API &rarr; Gateway API</span>
-                        </span>
-                    </a></li>
-                </ul>
-            </section>
-            <div class="sidebar-divider"></div>
-            <div class="sidebar-ext-links">
-                <a class="sidebar-ext" href="https://github.com/nginx" target="_blank" rel="noopener">
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><use href="#icon-github"/></svg>
-                    GitHub
-                </a>
-                <a class="sidebar-ext" href="https://docs.nginx.com" target="_blank" rel="noopener">
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-book"/></svg>
-                    Documentation
-                </a>
-                <a class="sidebar-ext" href="https://blog.nginx.org" target="_blank" rel="noopener">
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                    Blog
-                </a>
-                <a class="sidebar-ext" href="https://www.youtube.com/@nginx_official" target="_blank" rel="noopener">
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                    YouTube
-                </a>
-                <a class="sidebar-ext" href="https://community.nginx.org" target="_blank" rel="noopener">
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-community"/></svg>
-                    Community forum
-                </a>
-            </div>
-            <div class="sidebar-copyright">
-                &copy; <span id="copyright-year">2026</span> F5, Inc. All rights reserved.
-                <div class="sidebar-trademark">NGINX is a registered trademark of F5, Inc.</div>
-                <div class="sidebar-tagline">Created with AI. Maintained by humans.</div>
-            </div>
-        </aside>
+<main class="main" id="main">
+<div class="main-inner">
 
-        <!-- ── Main Content ── -->
-        <main class="main" id="main-content">
+  <div class="welcome">
+    <h1>F5 for Kubernetes</h1>
+    <p class="page-lede">Deliver, secure, and scale applications, APIs, and AI
+      workloads on Kubernetes. F5 covers the whole path a request takes &mdash;
+      from the network edge to the pod &mdash; with commercial and open source
+      options that fit how your teams already work.</p>
+  </div>
 
-            <!-- ════════════════════════════════════════════ -->
-            <!-- Home Page                                     -->
-            <!-- ════════════════════════════════════════════ -->
-            <div class="product-page active" id="page-home">
-                <div class="page-hero home">
-                    <div class="page-hero-content">
-                        <span class="page-hero-badge home">NGINX on Kubernetes</span>
-                        <h1>Networking for Kubernetes</h1>
-                        <p>Your hub for NGINX's Kubernetes ecosystem — Ingress controllers, Gateway API implementations, migration tools, and conversion utilities.</p>
-                        <div class="btn-row cta-row hero-cta-row">
-                            <a class="btn btn-primary btn-md nic" href="ingress-nginx-migration.html">
-                                Migrating from ingress-nginx? Start Here
-                                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><polyline points="12 5 19 12 12 19"/></svg>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="page-body">
-                    <h2 class="section-heading">Explore the Ecosystem</h2>
-                    <div class="project-grid">
-                        <a class="project-card" href="#nginx-ingress-controller" data-navigate="nginx-ingress-controller">
-                            <span class="project-card-badge green">Project</span>
-                            <h3>NGINX Ingress Controller</h3>
-                            <p>Production-grade Ingress controller with advanced traffic management, VirtualServer CRDs, and full observability.</p>
-                            <p class="card-fit">Best if you run Ingress resources today or are migrating from ingress-nginx.</p>
-                            <span class="card-link" aria-hidden="true">Learn more &rsaquo;</span>
-                        </a>
-                        <a class="project-card" href="#nginx-gateway-fabric" data-navigate="nginx-gateway-fabric">
-                            <span class="project-card-badge green">Project</span>
-                            <h3>NGINX Gateway Fabric</h3>
-                            <p>Gateway API implementation powered by NGINX with control and data plane separation for future-ready traffic management.</p>
-                            <p class="card-fit">Best if you're adopting the Kubernetes Gateway API.</p>
-                            <span class="card-link" aria-hidden="true">Learn more &rsaquo;</span>
-                        </a>
-                        <a class="project-card" href="#migration-tool" data-navigate="migration-tool">
-                            <span class="project-card-badge blue">Tool</span>
-                            <h3>Ingress-NGINX to NGINX Ingress Controller Migration Tool</h3>
-                            <p>Interactive guide for migrating from the community Ingress-NGINX controller with 130+ annotation mappings and CRD examples.</p>
-                            <span class="card-link blue" aria-hidden="true">Learn more &rsaquo;</span>
-                        </a>
-                        <a class="project-card" href="#ingress2gateway" data-navigate="ingress2gateway">
-                            <span class="project-card-badge blue">Tool</span>
-                            <h3>ingress2gateway</h3>
-                            <p>CLI tool to convert Ingress resources to Gateway API resources using the NGINX provider.</p>
-                            <span class="card-link blue" aria-hidden="true">Learn more &rsaquo;</span>
-                        </a>
-                    </div>
-
-                    <h2 class="section-heading">Featured Content</h2>
-                    <div class="feature-grid">
-                        <div class="feature-card feature-card-flush" data-yt-id="hA3bb_5jGJw" data-yt-title="CNCF On-Demand: Ingress-NGINX Is Retiring, NGINX Is Not">
-                            <div class="video-embed video-poster" role="button" tabindex="0" aria-label="Play video: CNCF On-Demand: Ingress-NGINX Is Retiring, NGINX Is Not">
-                                <img class="video-poster-img" src="https://i.ytimg.com/vi/hA3bb_5jGJw/maxresdefault.jpg" alt="" loading="lazy" decoding="async">
-                                <span class="video-poster-play" aria-hidden="true">
-                                    <svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74a8.21 8.21 0 0 0-5.79-5.81C55.59.5 34 .5 34 .5s-21.59 0-26.73 1.43A8.21 8.21 0 0 0 1.48 7.74 85.86 85.86 0 0 0 0 24a85.86 85.86 0 0 0 1.48 16.26 8.21 8.21 0 0 0 5.79 5.81C12.41 47.5 34 47.5 34 47.5s21.59 0 26.73-1.43a8.21 8.21 0 0 0 5.79-5.81A85.86 85.86 0 0 0 68 24a85.86 85.86 0 0 0-1.48-16.26z" fill="#f00"/><path d="M45.01 24L27 14v20z" fill="#fff"/></svg>
-                                </span>
-                            </div>
-                            <div class="feature-card-body">
-                                <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Featured video</h3>
-                                <p class="feature-card-eyebrow">Ingress-NGINX Is Retiring, NGINX Is Not</p>
-                                <p>CNCF On-Demand webinar</p>
-                            </div>
-                        </div>
-                        <div class="feature-card feature-card-flush" data-yt-id="gJrB3-w2_tM" data-yt-title="Cutting Through the Kubernetes Confusion: NGINX Ingress, Gateway Fabric, and What's Next">
-                            <div class="video-embed video-poster" role="button" tabindex="0" aria-label="Play video: Cutting Through the Kubernetes Confusion: NGINX Ingress, Gateway Fabric, and What's Next">
-                                <img class="video-poster-img" src="https://i.ytimg.com/vi/gJrB3-w2_tM/maxresdefault.jpg" alt="" loading="lazy" decoding="async">
-                                <span class="video-poster-play" aria-hidden="true">
-                                    <svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74a8.21 8.21 0 0 0-5.79-5.81C55.59.5 34 .5 34 .5s-21.59 0-26.73 1.43A8.21 8.21 0 0 0 1.48 7.74 85.86 85.86 0 0 0 0 24a85.86 85.86 0 0 0 1.48 16.26 8.21 8.21 0 0 0 5.79 5.81C12.41 47.5 34 47.5 34 47.5s21.59 0 26.73-1.43a8.21 8.21 0 0 0 5.79-5.81A85.86 85.86 0 0 0 68 24a85.86 85.86 0 0 0-1.48-16.26z" fill="#f00"/><path d="M45.01 24L27 14v20z" fill="#fff"/></svg>
-                                </span>
-                            </div>
-                            <div class="feature-card-body">
-                                <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Featured video</h3>
-                                <p class="feature-card-eyebrow">Cutting Through the Kubernetes Confusion</p>
-                                <p>NGINX Ingress, Gateway Fabric, and What's Next</p>
-                            </div>
-                        </div>
-                        <a class="feature-card feature-card-flush" href="https://blog.nginx.org/blog/the-nginx-kubernetes-open-source-roadmap-first-half-of-2026" target="_blank" rel="noopener">
-                            <img class="feature-card-thumb" src="assets/img/blog-roadmap-h1-2026.jpg" alt="NGINX Kubernetes Open Source Roadmap" loading="lazy" decoding="async">
-                            <div class="feature-card-body">
-                                <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Featured blog</h3>
-                                <p class="feature-card-eyebrow">The NGINX Kubernetes Open Source Roadmap: First Half of 2026</p>
-                                <p>What's coming next for NGINX Ingress Controller, NGINX Gateway Fabric, and the broader Kubernetes ecosystem.</p>
-                                <span class="feature-card-cta">Read on blog.nginx.org &rsaquo;</span>
-                            </div>
-                        </a>
-                        <a class="feature-card feature-card-flush" href="https://blog.nginx.org/blog/nginx-ingress-controller-v5-4-0-making-migration-easier-than-ever" target="_blank" rel="noopener">
-                            <img class="feature-card-thumb" src="assets/img/blog-nic-v540.jpg" alt="NGINX Ingress Controller v5.4.0" loading="lazy" decoding="async">
-                            <div class="feature-card-body">
-                                <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Featured blog</h3>
-                                <p class="feature-card-eyebrow">NGINX Ingress Controller v5.4.0: Making Migration Easier Than Ever</p>
-                                <p>New features designed to simplify migration from Ingress-NGINX, including CORS support, configuration validation, and expanded annotation compatibility.</p>
-                                <span class="feature-card-cta">Read on blog.nginx.org &rsaquo;</span>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ════════════════════════════════════════════ -->
-            <!-- NIC Page                                     -->
-            <!-- ════════════════════════════════════════════ -->
-            <div class="product-page" id="page-nginx-ingress-controller" hidden="until-found">
-                <div class="page-hero nic">
-                    <div class="page-hero-content">
-                        <span class="page-hero-badge nic">
-                            <svg aria-hidden="true" width="16" height="16" viewBox="34 5 36 48" fill="none"><path fill="#009639" d="M35.31,40.15c.21.37.52.66.86.86l17.65,10.19c.34.2.75.32,1.17.32s.83-.12,1.17-.32l17.65-10.19c.35-.2.65-.48.86-.86.21-.37.31-.78.31-1.18v-20.38c0-.4-.1-.81-.31-1.18-.21-.37-.52-.66-.86-.86l-17.65-10.19c-.34-.2-.74-.32-1.17-.32s-.83.12-1.17.32l-17.65,10.19c-.35.2-.65.49-.86.86-.21.37-.31.78-.31,1.18v20.38c0,.4.1.8.31,1.18"/><path fill="#fff" d="M56.79,36.68h-13.66c-.37,0-.67-.3-.67-.67v-13.66c0-.37.3-.67.67-.67h13.66c.37,0,.67.3.67.67v13.66c0,.37-.3.67-.67.67Z"/><path fill="#fff" d="M67,22.69h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><path fill="#fff" d="M67,31.68h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><path fill="#fff" d="M67.08,39.88h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><polygon fill="#fff" points="64.95 29.68 48.15 29.66 64.7 19.76 65.21 20.62 51.76 28.67 64.96 28.68 64.95 29.68"/><rect fill="#fff" x="57" y="24.68" width="1" height="17.18" transform="translate(.78 67.86) rotate(-61.43)"/></svg>
-                            Ingress Controller
-                            <a class="hero-version" data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">v5.5.1</a>
-                        </span>
-                        <h1>NGINX Ingress Controller</h1>
-                        <p>Production-grade Ingress controller built on NGINX. Advanced traffic management, TLS termination, VirtualServer CRDs, and full observability for Kubernetes.</p>
-                    </div>
-                </div>
-                <div class="page-body">
-                    <div class="btn-row cta-row">
-                        <a class="btn btn-primary btn-md nic" href="https://docs.nginx.com/nginx-ingress-controller/installation/" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-bolt"/></svg>
-                            Get started
-                        </a>
-                        <a class="btn btn-secondary btn-md" href="https://docs.nginx.com/nginx-ingress-controller/" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-book"/></svg>
-                            Documentation
-                        </a>
-                        <a class="btn btn-secondary btn-md" href="https://github.com/nginx/kubernetes-ingress" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><use href="#icon-github"/></svg>
-                            GitHub
-                        </a>
-                        <a class="btn btn-secondary btn-md" href="https://community.nginx.org/c/projects/nginx-ingress-controller/24" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-community"/></svg>
-                            Community forum
-                        </a>
-                    </div>
-
-                    <div class="info-box tip">
-                        <strong>NGINX Ingress Controller</strong> is the NGINX Ingress API implementation built by F5 NGINX &mdash; delivering enterprise-grade traffic management, security, and observability for Kubernetes with both standard Ingress resources and powerful custom resources.
-                    </div>
-
-                    <div class="feature-grid">
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Advanced traffic management</h3>
-                            <p>Load balancing, rate limiting, circuit breaking, and blue-green deployments with fine-grained control via annotations or VirtualServer CRDs.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> SSL/TLS management</h3>
-                            <p>TLS termination, SSL passthrough, forced redirects, and certificate management via Kubernetes Secrets.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> TCP/UDP load balancing</h3>
-                            <p>Layer 4 load balancing for non-HTTP workloads using TransportServer and GlobalConfiguration custom resources.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> VirtualServer CRDs</h3>
-                            <p>VirtualServer, VirtualServerRoute, Policy, TransportServer, and GlobalConfiguration custom resources for advanced routing beyond Ingress.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> Snippets &amp; customization</h3>
-                            <p>Server, location, and HTTP snippets for injecting custom NGINX configuration. Full control without forking the controller.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg> Prometheus &amp; OpenTelemetry</h3>
-                            <p>Built-in Prometheus metrics endpoint and OpenTelemetry tracing for full observability of your ingress traffic.</p>
-                        </div>
-                    </div>
-
-                    <div class="key-details">
-                        <h2 class="section-heading section-heading-plain">Key Details</h2>
-                        <div class="details-grid">
-                            <div class="detail-item">
-                                <span class="detail-label">Latest version</span>
-                                <span class="version-pill nic"><a data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/latest" target="_blank" rel="noopener">v5.5.1</a></span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Latest Helm chart</span>
-                                <span class="version-pill nic"><a data-version="nic.helm" href="https://github.com/nginx/kubernetes-ingress/tree/v5.5.1/charts/nginx-ingress" target="_blank" rel="noopener">v2.6.1</a></span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Custom resources</span>
-                                <div class="detail-tags">
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/virtualserver-and-virtualserverroute-resources/" target="_blank" rel="noopener">VirtualServer</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/virtualserver-and-virtualserverroute-resources/" target="_blank" rel="noopener">VirtualServerRoute</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/policy-resource/" target="_blank" rel="noopener">Policy</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/transportserver-resource/" target="_blank" rel="noopener">TransportServer</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-ingress-controller/configuration/global-configuration/globalconfiguration-resource/" target="_blank" rel="noopener">GlobalConfiguration</a></span>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Image registries</span>
-                                <div class="detail-tags">
-                                    <span class="detail-tag"><a href="https://github.com/nginx/kubernetes-ingress/pkgs/container/kubernetes-ingress" target="_blank" rel="noopener">GHCR</a></span>
-                                    <span class="detail-tag"><a href="https://hub.docker.com/r/nginx/nginx-ingress" target="_blank" rel="noopener">Docker Hub</a></span>
-                                    <span class="detail-tag"><a href="https://gallery.ecr.aws/nginx/nginx-ingress" target="_blank" rel="noopener">ECR</a></span>
-                                    <span class="detail-tag"><a href="https://quay.io/repository/nginx/nginx-ingress" target="_blank" rel="noopener">Quay</a></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <h2 class="section-heading">Compatibility</h2>
-                    <table class="compat-table">
-                        <caption class="sr-only">NGINX Ingress Controller compatibility</caption>
-                        <thead><tr><th scope="col">Component</th><th scope="col">Version</th></tr></thead>
-                        <tbody>
-                            <tr><td>Kubernetes</td><td>1.34, 1.35, 1.36</td></tr>
-                            <tr><td>NGINX</td><td>1.31.2</td></tr>
-                        </tbody>
-                    </table>
-
-                    <div class="code-section">
-                        <h2 class="section-heading section-heading-plain">Quick Start</h2>
-                        <div class="code-block"><button class="btn btn-xs copy-btn" aria-label="Copy NIC install command">Copy</button><code><span class="comment"># Install via Helm (OCI registry)</span>
-<span class="cmd">helm</span> install nginx-ingress \
-  oci://ghcr.io/nginx/charts/nginx-ingress \
-  <span class="flag">--version</span> <span class="str" data-version="nic.helm" data-version-format="bare">2.6.1</span> \
-  <span class="flag">--namespace</span> nginx-ingress <span class="flag">--create-namespace</span></code></div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- ════════════════════════════════════════════ -->
-            <!-- NGF Page                                     -->
-            <!-- ════════════════════════════════════════════ -->
-            <div class="product-page" id="page-nginx-gateway-fabric" hidden="until-found">
-                <div class="page-hero ngf">
-                    <div class="page-hero-content">
-                        <span class="page-hero-badge ngf">
-                            <svg aria-hidden="true" width="16" height="16" viewBox="34 5 36 48" fill="none"><path fill="#009639" d="M35.31,39.58c.21.37.52.66.86.86l17.65,10.19c.34.2.75.32,1.17.32s.83-.12,1.17-.32l17.65-10.19c.35-.2.65-.48.86-.86.21-.37.31-.78.31-1.18v-20.38c0-.4-.1-.81-.31-1.18-.21-.37-.52-.66-.86-.86l-17.65-10.19c-.34-.2-.74-.32-1.17-.32s-.83.12-1.17.32l-17.65,10.19c-.35.2-.65.49-.86.86-.21.37-.31.78-.31,1.18v20.38c0,.4.1.8.31,1.18"/><polygon fill="#fff" points="54.87 41.41 43.25 34.46 54.88 27.97 55.37 28.84 45.25 34.49 55.38 40.55 54.87 41.41"/><path fill="#fff" d="M66.51,35.33l-11.38-6.35-.51.3v-12.98l-10.38,6.06-.5-.86,11.89-6.94v12.96l10.88-6.47v14.27ZM56.13,28.39l9.38,5.23v-10.81l-9.38,5.58Z"/><circle fill="#fff" cx="43.99" cy="21.94" r="3"/><circle fill="#fff" cx="66.01" cy="21.94" r="3"/><circle fill="#fff" cx="55.13" cy="15.44" r="3"/><circle fill="#fff" cx="55.13" cy="28.41" r="3"/><circle fill="#fff" cx="44.25" cy="34.48" r="3"/><circle fill="#fff" cx="55.13" cy="40.98" r="3"/><circle fill="#fff" cx="66.01" cy="34.48" r="3"/></svg>
-                            Gateway Fabric
-                            <a class="hero-version" data-version="ngf.release" href="https://github.com/nginx/nginx-gateway-fabric/releases/tag/v2.6.6" target="_blank" rel="noopener">v2.6.6</a>
-                        </span>
-                        <h1>NGINX Gateway Fabric</h1>
-                        <p>Gateway API implementation powered by NGINX. A future-ready, standards-based approach to Kubernetes traffic management with control and data plane separation.</p>
-                    </div>
-                </div>
-                <div class="page-body">
-                    <div class="btn-row cta-row">
-                        <a class="btn btn-primary btn-md ngf" href="https://docs.nginx.com/nginx-gateway-fabric/installation/" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-bolt"/></svg>
-                            Get started
-                        </a>
-                        <a class="btn btn-secondary btn-md" href="https://docs.nginx.com/nginx-gateway-fabric/" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-book"/></svg>
-                            Documentation
-                        </a>
-                        <a class="btn btn-secondary btn-md" href="https://github.com/nginx/nginx-gateway-fabric" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><use href="#icon-github"/></svg>
-                            GitHub
-                        </a>
-                        <a class="btn btn-secondary btn-md" href="https://community.nginx.org/c/projects/nginx-gateway-fabric/25" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-community"/></svg>
-                            Community forum
-                        </a>
-                    </div>
-
-                    <div class="info-box tip">
-                        <strong>Gateway API</strong> is the next generation of Kubernetes Ingress &mdash; providing more expressive, extensible, and role-oriented routing for services. NGINX Gateway Fabric is a fully conformant implementation.
-                    </div>
-
-                    <div class="feature-grid">
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg> Gateway API native</h3>
-                            <p>First-class Kubernetes Gateway API v1.5.1 implementation with full conformance testing across HTTP, GRPC, TLS, TCP, and UDP.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg> Control &amp; data plane separation</h3>
-                            <p>Clean architectural split with NGINX Agent dynamically managing the NGINX data plane for reliability and scale.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> Multi-cloud ready</h3>
-                            <p>Deploy consistently across hybrid and multi-cloud Kubernetes environments with portable Gateway API resources.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> TLS &amp; mTLS</h3>
-                            <p>Flexible TLS termination and passthrough with automatic certificate management and mutual TLS support.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><path d="M6 9v12"/></svg> Traffic splitting</h3>
-                            <p>Weighted backend routing for canary deployments and A/B testing using native HTTPRoute resources.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> Extensibility</h3>
-                            <p>SnippetsFilter, ClientSettingsPolicy, and ObservabilityPolicy custom resources for use cases beyond core Gateway API.</p>
-                        </div>
-                    </div>
-
-                    <div class="key-details">
-                        <h2 class="section-heading section-heading-plain">Key Details</h2>
-                        <div class="details-grid">
-                            <div class="detail-item">
-                                <span class="detail-label">Latest version</span>
-                                <span class="version-pill ngf"><a data-version="ngf.release" href="https://github.com/nginx/nginx-gateway-fabric/releases/latest" target="_blank" rel="noopener">v2.6.6</a></span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Latest Helm chart</span>
-                                <span class="version-pill ngf"><a data-version="ngf.helm" href="https://github.com/nginx/nginx-gateway-fabric/tree/v2.6.6/charts/nginx-gateway-fabric" target="_blank" rel="noopener">v2.6.6</a></span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Supported resources</span>
-                                <div class="detail-tags">
-                                    <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#gateway" target="_blank" rel="noopener">Gateway</a></span>
-                                    <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#gatewayclass" target="_blank" rel="noopener">GatewayClass</a></span>
-                                    <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#httproute" target="_blank" rel="noopener">HTTPRoute</a></span>
-                                    <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#grpcroute" target="_blank" rel="noopener">GRPCRoute</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/traffic-management/tcp-routing/" target="_blank" rel="noopener">TCPRoute</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/traffic-management/tls-passthrough/" target="_blank" rel="noopener">TLSRoute</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/traffic-management/udp-routing/" target="_blank" rel="noopener">UDPRoute</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.AuthenticationFilter" target="_blank" rel="noopener">AuthenticationFilter</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.ClientSettingsPolicy" target="_blank" rel="noopener">ClientSettingsPolicy</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.NginxGateway" target="_blank" rel="noopener">NginxGateway</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha2.NginxProxy" target="_blank" rel="noopener">NginxProxy</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha2.ObservabilityPolicy" target="_blank" rel="noopener">ObservabilityPolicy</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.ProxySettingsPolicy" target="_blank" rel="noopener">ProxySettingsPolicy</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.RateLimitPolicy" target="_blank" rel="noopener">RateLimitPolicy</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.SnippetsFilter" target="_blank" rel="noopener">SnippetsFilter</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.SnippetsPolicy" target="_blank" rel="noopener">SnippetsPolicy</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.UpstreamSettingsPolicy" target="_blank" rel="noopener">UpstreamSettingsPolicy</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.WAFPolicy" target="_blank" rel="noopener">WAFPolicy</a></span>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Image registries</span>
-                                <div class="detail-tags">
-                                    <span class="detail-tag"><a href="https://github.com/nginx/nginx-gateway-fabric/pkgs/container/nginx-gateway-fabric" target="_blank" rel="noopener">GHCR</a></span>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Fully conformant Gateway API</span>
-                                <span class="version-pill ngf"><a href="https://gateway-api.sigs.k8s.io/implementations/#gateway-controller-implementation-status" target="_blank" rel="noopener">v1.5.1</a></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <h2 class="section-heading">Compatibility</h2>
-                    <table class="compat-table">
-                        <caption class="sr-only">NGINX Gateway Fabric compatibility</caption>
-                        <thead><tr><th scope="col">Component</th><th scope="col">Version</th></tr></thead>
-                        <tbody>
-                            <tr><td>Kubernetes</td><td>1.34, 1.35, 1.36</td></tr>
-                            <tr><td>NGINX</td><td>1.31.2</td></tr>
-                        </tbody>
-                    </table>
-
-                    <div class="code-section">
-                        <h2 class="section-heading section-heading-plain">Quick Start</h2>
-                        <div class="code-block"><button class="btn btn-xs copy-btn" aria-label="Copy NGF install command">Copy</button><code><span class="comment"># Install via Helm (OCI registry)</span>
-<span class="cmd">helm</span> install nginx-gateway-fabric \
-  oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
-  <span class="flag">--version</span> <span class="str" data-version="ngf.helm" data-version-format="bare">2.6.6</span> \
-  <span class="flag">--namespace</span> nginx-gateway-fabric <span class="flag">--create-namespace</span></code></div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- ════════════════════════════════════════════ -->
-            <!-- Migration Tool Page                          -->
-            <!-- ════════════════════════════════════════════ -->
-            <div class="product-page" id="page-migration-tool" hidden="until-found">
-                <div class="page-hero migration">
-                    <div class="page-hero-content">
-                        <span class="page-hero-badge migration">
-                            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                            Migration tool
-                        </span>
-                        <h1>Ingress-NGINX to NGINX Ingress Controller Migration Tool</h1>
-                        <p>Migrate from the community Ingress-NGINX controller to the NGINX Ingress Controller. Interactive YAML analysis, 130+ annotation mappings, and CRD migration examples.</p>
-                    </div>
-                </div>
-                <div class="page-body">
-                    <div class="btn-row cta-row">
-                        <a class="btn btn-primary btn-md migration" href="ingress-nginx-migration.html">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><polyline points="12 5 19 12 12 19"/></svg>
-                            Open the migration tool
-                        </a>
-                    </div>
-
-                    <div class="feature-grid">
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8m8 4H8m2-8H8"/></svg> Interactive YAML analyzer</h3>
-                            <p>Paste your existing Ingress YAML and get an instant migration plan with converted annotations, ConfigMap mappings, and CRD suggestions.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> 130+ annotation mappings</h3>
-                            <p>Complete mapping table with community annotations, their NGINX Ingress Controller equivalents, side-by-side YAML examples, and searchable filters.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> CRD migration examples</h3>
-                            <p>Side-by-side examples for VirtualServer, VirtualServerRoute, Policy, TransportServer, and GlobalConfiguration CRDs.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> ConfigMap migration</h3>
-                            <p>Detailed guide for migrating ConfigMap-based global configuration between the community controller and the NGINX Ingress Controller.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Complexity assessment</h3>
-                            <p>The analyzer evaluates your Ingress resources and provides a migration complexity score with actionable recommendations.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> Copy-ready output</h3>
-                            <p>Every code block and generated YAML snippet includes a one-click copy button for immediate use in your workflow.</p>
-                        </div>
-                    </div>
-
-                    <div class="preview-card">
-                        <p>The migration tool is a static HTML application with first-party CSS/JS and no third-party runtime dependencies. It covers every annotation and ConfigMap key from the community controller.</p>
-                        <div class="preview-stats">
-                            <div class="preview-stat">
-                                <span class="num migration">130+</span>
-                                <span class="label">Annotations</span>
-                            </div>
-                            <div class="preview-stat">
-                                <span class="num migration">55+</span>
-                                <span class="label">Mapping groups</span>
-                            </div>
-                            <div class="preview-stat">
-                                <span class="num migration">5</span>
-                                <span class="label">CRD types</span>
-                            </div>
-                            <div class="preview-stat">
-                                <span class="num migration">40+</span>
-                                <span class="label">ConfigMap keys</span>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- ════════════════════════════════════════════ -->
-            <!-- ingress2gateway Page                         -->
-            <!-- ════════════════════════════════════════════ -->
-            <div class="product-page" id="page-ingress2gateway" hidden="until-found">
-                <div class="page-hero i2g">
-                    <div class="page-hero-content">
-                        <span class="page-hero-badge i2g">
-                            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-                            Conversion tool
-                            <a class="hero-version" data-version="i2g.release" href="https://github.com/kubernetes-sigs/ingress2gateway/releases/tag/v1.1.0" target="_blank" rel="noopener">v1.1.0</a>
-                        </span>
-                        <h1>ingress2gateway</h1>
-                        <p>Convert Ingress resources to Gateway API resources using the NGINX provider. Automate your migration from Ingress to the Kubernetes Gateway API.</p>
-                    </div>
-                </div>
-                <div class="page-body">
-                    <div class="btn-row cta-row">
-                        <a class="btn btn-primary btn-md i2g" href="https://github.com/kubernetes-sigs/ingress2gateway" target="_blank" rel="noopener">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><use href="#icon-github"/></svg>
-                            GitHub repository
-                        </a>
-                        <a class="btn btn-secondary btn-md" href="https://github.com/kubernetes-sigs/ingress2gateway/blob/main/pkg/i2gw/providers/nginx/README.md" target="_blank" rel="noopener">ingress2gateway NGINX Provider</a>
-                    </div>
-
-                    <div class="feature-grid">
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg> Automated conversion</h3>
-                            <p>Reads Ingress resources from your cluster or YAML files and outputs equivalent Gateway API manifests automatically.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> NGINX provider</h3>
-                            <p>Dedicated NGINX provider that understands 14 NGINX-specific annotations and converts them to their Gateway API equivalents.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> Gateway &amp; HTTPRoute output</h3>
-                            <p>Produces Gateway and HTTPRoute resources ready for direct application to your cluster.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> CLI tool</h3>
-                            <p>Simple command-line interface that fits into CI/CD pipelines. Read from files or directly from a live cluster.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> 9 providers</h3>
-                            <p>Support for NGINX, Istio, Kong, Apisix, GCE, OpenAPI3, Traefik, and more &mdash; each with provider-specific annotation handling.</p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> File or cluster input</h3>
-                            <p>Read Ingress resources from local YAML files with <code class="code-accent">--input-file</code> or directly from a connected Kubernetes cluster.</p>
-                        </div>
-                    </div>
-
-                    <div class="info-box warning">
-                        <strong>Limitations:</strong> ingress2gateway converts core Ingress resources only &mdash; it does not convert CRDs (VirtualServer, etc.) and only translates a subset of NGINX-specific annotations. Review generated output before applying to production.
-                    </div>
-
-                    <h2 class="section-heading">Installation</h2>
-                    <div class="code-section code-section-flush">
-                        <div class="code-block"><button class="btn btn-xs copy-btn" aria-label="Copy Go install command">Copy</button><code><span class="comment"># Install with Go</span>
-<span class="cmd">go</span> install github.com/kubernetes-sigs/ingress2gateway<span data-version="i2g.release" data-version-format="atv">@v1.1.0</span></code></div>
-                        <div class="code-block"><button class="btn btn-xs copy-btn" aria-label="Copy Homebrew install command">Copy</button><code><span class="comment"># Or install with Homebrew (macOS / Linux)</span>
-<span class="cmd">brew</span> install ingress2gateway</code></div>
-                    </div>
-
-                    <h2 class="section-heading">Usage</h2>
-                    <div class="code-section code-section-flush">
-                        <div class="code-block"><button class="btn btn-xs copy-btn" aria-label="Copy convert-from-file command">Copy</button><code><span class="comment"># Convert from a YAML file</span>
-<span class="cmd">ingress2gateway</span> print \
-  <span class="flag">--providers</span>=nginx \
-  <span class="flag">--input-file</span>=<span class="str">my-ingress.yaml</span></code></div>
-                        <div class="code-block"><button class="btn btn-xs copy-btn" aria-label="Copy convert-from-cluster command">Copy</button><code><span class="comment"># Convert from a live cluster (current context)</span>
-<span class="cmd">ingress2gateway</span> print \
-  <span class="flag">--providers</span>=nginx</code></div>
-                        <div class="code-block"><button class="btn btn-xs copy-btn" aria-label="Copy convert-and-save command">Copy</button><code><span class="comment"># Convert and save to a file</span>
-<span class="cmd">ingress2gateway</span> print \
-  <span class="flag">--providers</span>=nginx \
-  <span class="flag">--input-file</span>=<span class="str">my-ingress.yaml</span> &gt; gateway-resources.yaml</code></div>
-                    </div>
-
-                </div>
-            </div>
-
-
-        </main>
+  <section class="section">
+    <div class="section-head">
+      <h2 class="section-title">Products</h2>
+      <a class="link-arrow" href="/catalog/">
+        <svg width="16" height="16" aria-hidden="true"><use href="#icon-grid"></use></svg>
+        View the Catalog
+      </a>
     </div>
 
+    <div class="tile-grid">
+
+      <a class="tile" href="/products/big-ip-next-for-kubernetes/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-cpu"></use></svg>
+          <span class="tag">Commercial</span>
+        </div>
+        <p class="tile-title">BIG-IP Next for Kubernetes
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">L4&ndash;L7 traffic management, security, and policy
+          control at the North/South gateway, covering both ingress and egress.</p>
+        <p class="tile-meta"><span class="status"><span class="status-dot status-dot-info"></span>2.3.2</span></p>
+      </a>
+
+      <a class="tile" href="/products/container-ingress-services/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-route"></use></svg>
+        </div>
+        <p class="tile-title">Container Ingress Services
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">Configure an external BIG-IP from inside Kubernetes,
+          using Ingress, OpenShift Routes, or its own custom resources.</p>
+        <p class="tile-meta"><span class="status"><span class="status-dot status-dot-positive"></span><span data-version="cis.release">v2.20.4</span> &middot; Apache 2.0</span></p>
+      </a>
+
+      <a class="tile" href="/products/nginx-ingress-controller/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-box"></use></svg>
+        </div>
+        <p class="tile-title">NGINX Ingress Controller
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">Ingress and CRD-based traffic management, with NGINX
+          running as the data plane in the same pod as the controller.</p>
+        <p class="tile-meta"><span class="status"><span class="status-dot status-dot-positive"></span><span data-version="nic.release">v5.5.4</span> &middot; Apache 2.0</span></p>
+      </a>
+
+      <a class="tile" href="/products/nginx-gateway-fabric/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-layers"></use></svg>
+        </div>
+        <p class="tile-title">NGINX Gateway Fabric
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">A conformant Gateway API implementation that separates
+          the control plane from the NGINX data plane it manages.</p>
+        <p class="tile-meta"><span class="status"><span class="status-dot status-dot-positive"></span><span data-version="ngf.release">v2.6.7</span> &middot; Apache 2.0</span></p>
+      </a>
+
+      <a class="tile" href="/products/f5-waf-for-nginx/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-shield"></use></svg>
+          <span class="tag">Commercial</span>
+        </div>
+        <p class="tile-title">F5 WAF for NGINX
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">Application and API security, enforced inside NGINX
+          Ingress Controller or attached to NGINX Gateway Fabric routes.</p>
+        <p class="tile-meta"><span class="status"><span class="status-dot status-dot-attention"></span>Requires NGINX Plus</span></p>
+      </a>
+
+      <a class="tile" href="/products/f5-ai-gateway/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-cloud"></use></svg>
+          <span class="tag">Commercial</span>
+        </div>
+        <p class="tile-title">F5 AI Gateway
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">Govern the traffic between your apps, agents, and model
+          providers, with AI Guardrails enforcing policy on every interaction.</p>
+        <p class="tile-meta"><span class="status"><span class="status-dot status-dot-info"></span>Commercial</span></p>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Tools</h2>
+    <div class="tile-grid tile-tools">
+
+      <a class="tile" href="/tools/ingress-nginx-migration/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-swap"></use></svg>
+        </div>
+        <p class="tile-title">ingress-nginx Migration
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">Move from the community controller to NGINX Ingress
+          Controller. Paste your own YAML and get a migration plan back.</p>
+        <p class="tile-meta"><span class="status"><span class="status-dot status-dot-positive"></span>130+ annotations mapped</span></p>
+      </a>
+
+      <a class="tile" href="/tools/ingress2gateway/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-tool"></use></svg>
+        </div>
+        <p class="tile-title">ingress2gateway
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">Convert existing Ingress resources into Gateway API
+          resources. An upstream Kubernetes SIG project, not an F5 one.</p>
+        <p class="tile-meta"><span class="status"><span class="status-dot status-dot-neutral"></span><span data-version="i2g.release">v1.2.0</span> &middot; Upstream</span></p>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Not sure where to start?</h2>
+    <div class="tile-grid">
+      <a class="tile" href="/catalog/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-grid"></use></svg>
+        </div>
+        <p class="tile-title">Browse by Use Case
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">The catalog groups every product by the problem it
+          solves &mdash; ingress and routing, security, AI delivery, migration.</p>
+      </a>
+      <a class="tile" href="/solutions/better-together/">
+        <div class="tile-top">
+          <svg class="tile-pictogram" aria-hidden="true"><use href="#icon-layers"></use></svg>
+        </div>
+        <p class="tile-title">See How They Combine
+          <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#icon-chevron"></use></svg></p>
+        <p class="tile-desc">Eight ways these products work together, each marked
+          as an F5-documented integration or as architectural guidance.</p>
+      </a>
+    </div>
+  </section>
+
+</div>
+</main>
 
 </body>
 </html>

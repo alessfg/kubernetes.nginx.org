@@ -1,0 +1,258 @@
+/* catalog.css — the Home tile grid and the Catalog use-case cards.
+   =========================================================================
+   Loaded after tokens.css and core.css on / and /catalog/ only.
+
+   Both layouts come from the console. Home is a grid of workspace tiles:
+   pictogram, optional state tags, a title carrying a forward chevron, and a
+   short description. Catalog is a vertical stack of workspace cards, each
+   with a header, an expandable detail region and a table of the services
+   inside it.
+
+   The mapping onto a product site: a Catalog card is a USE CASE and its
+   table rows are PRODUCTS. The console explicitly allows one service to
+   appear in several workspaces, so a product may recur across cards — which
+   is what lets each card explain how its products work together rather than
+   just listing them.
+   ========================================================================= */
+
+/* ── Home: welcome ────────────────────────────────────────────────────────
+   The console leads with an H1 welcome and a one-line description, then goes
+   straight into tiles. No hero image, no gradient — the products are the
+   content. */
+.welcome { margin-bottom: var(--space-5x); }
+.welcome h1 { margin-bottom: var(--space-base); }
+
+/* ── Home: tile grid ──────────────────────────────────────────────────────
+   Four across on a wide viewport, matching the console's "Common workspaces"
+   grid. --space-2x between tiles is F5DS's published grid gutter. */
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: var(--space-2x);
+}
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-base);
+    padding: var(--space-2hx);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--dur-colour) linear,
+                box-shadow var(--dur-elev) linear;
+}
+.tile:visited { color: inherit; }
+.tile:hover { border-color: var(--border-control); box-shadow: var(--elev-1); }
+
+.tile-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-base);
+    min-height: 32px;
+}
+.tile-pictogram { width: 32px; height: 32px; color: var(--green-text); }
+/* Tools take the platform accent rather than the brand one, so the two
+   groups stay distinguishable at a glance without relying on the label. */
+.tile-tools .tile-pictogram { color: var(--blue-text); }
+
+.tile-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-base);
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    font-weight: 500;
+    color: var(--text);
+}
+.tile-title .chevron { color: var(--icon); flex-shrink: 0; }
+.tile:hover .tile-title .chevron { color: var(--text); }
+
+.tile-desc {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text-secondary);
+    flex: 1;
+}
+.tile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-base);
+    align-items: center;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+}
+
+/* ── Layer diagram ────────────────────────────────────────────────────────
+   One canonical diagram rather than decorative art per card. F5DS's
+   illustration system is Figma-only and imitating its hand-drawn style badly
+   would read worse than not using it, so the space goes to something a
+   documentation site can actually use: where each product sits in the path a
+   request takes. Authored entirely from tokens so it themes correctly. */
+.layer-diagram {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-base);
+    margin: 0;
+}
+.layer {
+    display: grid;
+    grid-template-columns: 168px 1fr;
+    gap: var(--space-2x);
+    align-items: center;
+    padding: var(--space-2x);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.layer-name {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    font-weight: 700;
+}
+.layer-name span {
+    display: block;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+.layer-items { display: flex; flex-wrap: wrap; gap: var(--space-base); }
+.layer-item {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-small) var(--space-base);
+    border-radius: var(--radius);
+    background: var(--green-tint);
+    border: 1px solid transparent;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text);
+    text-decoration: none;
+}
+.layer-item:hover { border-color: var(--green-text); }
+.layer-item-platform { background: var(--blue-tint); }
+.layer-item-platform:hover { border-color: var(--blue-text); }
+.layer-item-none { background: var(--surface-sunken); color: var(--text-secondary); }
+
+/* The connector between layers: a short vertical rule with an arrowhead,
+   drawn in CSS so it needs no image and inherits the border colour. */
+.layer-link {
+    width: 1px;
+    height: var(--space-2x);
+    margin-left: var(--space-6x);
+    background: var(--border-control);
+    position: relative;
+}
+.layer-link::after {
+    content: '';
+    position: absolute;
+    left: 50%; bottom: 0;
+    width: 6px; height: 6px;
+    border-right: 1px solid var(--border-control);
+    border-bottom: 1px solid var(--border-control);
+    transform: translate(-50%, 50%) rotate(45deg);
+}
+
+/* ── Catalog: use-case card ───────────────────────────────────────────────
+   The console's workspace card. 20px side padding throughout, which is
+   F5DS's "between page content or panels" step and what the annotated card
+   in the styleguide measures. */
+.catalog-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.catalog-card + .catalog-card { margin-top: var(--space-2x); }
+
+.catalog-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2x);
+    padding: var(--space-2x) var(--space-2hx);
+}
+.catalog-pictogram { width: 24px; height: 24px; color: var(--green-text); flex-shrink: 0; }
+.catalog-card-title {
+    flex: 1;
+    font-size: var(--fs-h3);
+    line-height: var(--lh-h3);
+    font-weight: 700;
+    margin: 0;
+}
+/* The console puts an expand/collapse control at the card's top right,
+   labelled "Details". */
+.catalog-toggle { flex-shrink: 0; }
+.catalog-toggle .chevron {
+    transition: transform var(--dur-colour) linear;
+}
+.catalog-toggle[aria-expanded='false'] .chevron { transform: rotate(-90deg); }
+
+.catalog-card-detail {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: var(--space-8x);
+    padding: 0 var(--space-2hx) var(--space-2hx);
+}
+.catalog-card-detail[hidden] { display: none; }
+.catalog-card-detail h3 {
+    font-size: var(--fs-h3);
+    line-height: var(--lh-h3);
+    font-weight: 700;
+    margin-bottom: var(--space-base);
+}
+.catalog-card-detail p { color: var(--text-secondary); }
+.catalog-card-detail .link-arrow { margin-top: var(--space-2x); }
+
+.at-a-glance {
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
+    padding: var(--space-2x);
+}
+.at-a-glance h4 {
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-base);
+}
+.at-a-glance ul { list-style: none; padding: 0; margin: 0; }
+.at-a-glance li {
+    display: flex;
+    gap: var(--space-base);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+}
+.at-a-glance li + li { margin-top: var(--space-base); }
+.at-a-glance li svg { width: 1rem; height: 1rem; margin-top: calc((var(--lh-body) - 1rem) / 2); color: var(--green-text); }
+
+/* The services table sits flush to the card edges, with the 20px gap above
+   and below that the styleguide annotates. */
+.catalog-services { border-top: 1px solid var(--border); }
+.catalog-services .table th:first-child,
+.catalog-services .table td:first-child { padding-left: var(--space-2hx); }
+.catalog-services .table th:last-child,
+.catalog-services .table td:last-child { padding-right: var(--space-2hx); text-align: right; }
+.catalog-services .table td:first-child { font-weight: 500; white-space: nowrap; }
+.col-docs { width: 1%; text-align: center; }
+.col-licence { width: 1%; white-space: nowrap; }
+.col-action { width: 1%; }
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+    .catalog-card-detail { grid-template-columns: 1fr; gap: var(--space-3x); }
+    .layer { grid-template-columns: 1fr; gap: var(--space-base); }
+    .layer-link { margin-left: var(--space-3x); }
+    /* The services table has five columns and a fixed layout will not fit;
+       the wrapper in core.css scrolls it horizontally. */
+}
+
+@media (max-width: 600px) {
+    .tile-grid { grid-template-columns: 1fr; }
+}

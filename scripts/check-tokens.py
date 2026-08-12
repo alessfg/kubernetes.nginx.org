@@ -45,12 +45,9 @@ SPACING_PROPS = r'(?<![\w-])(?:padding|margin|gap|row-gap|column-gap)[a-z-]*'
 # phase was skipped or a file was kept that should not have been.
 LEGACY = {
     'assets/css/shared.css',
-    'assets/css/index.css',
     'assets/css/migration.css',
     'assets/js/shared.js',
-    'assets/js/index.js',
     'assets/js/migration-core.js',
-    'index.html',
     'ingress-nginx-migration.html',
 }
 

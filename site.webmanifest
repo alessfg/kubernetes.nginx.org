@@ -1,12 +1,12 @@
 {
-  "name": "NGINX on Kubernetes",
-  "short_name": "NGINX K8s",
-  "description": "NGINX on Kubernetes — the NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources.",
+  "name": "F5 for Kubernetes",
+  "short_name": "F5 K8s",
+  "description": "F5's Kubernetes portfolio, commercial and open source — from the network edge to the pod.",
   "start_url": "/",
   "scope": "/",
   "display": "browser",
-  "theme_color": "#009639",
-  "background_color": "#ffffff",
+  "theme_color": "#FFFFFF",
+  "background_color": "#F7F8FA",
   "icons": [
     { "src": "/assets/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]

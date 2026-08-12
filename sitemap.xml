@@ -1,15 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- The pre-rebuild URL /ingress-nginx-migration.html is deliberately absent:
+     it is still served, as a redirect stub, but it should not be indexed. Its
+     replacement is /tools/ingress-nginx-migration/. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://kubernetes.nginx.org/</loc>
-    <lastmod>2026-07-02</lastmod>
+    <lastmod>2026-08-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://kubernetes.nginx.org/ingress-nginx-migration.html</loc>
-    <lastmod>2026-07-02</lastmod>
+    <loc>https://kubernetes.nginx.org/catalog/</loc>
+    <lastmod>2026-08-12</lastmod>
     <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/tools/ingress-nginx-migration/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/solutions/better-together/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/products/big-ip-next-for-kubernetes/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/products/container-ingress-services/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/products/nginx-ingress-controller/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/products/nginx-gateway-fabric/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/products/f5-waf-for-nginx/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/products/f5-ai-gateway/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kubernetes.nginx.org/tools/ingress2gateway/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>

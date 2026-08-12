@@ -26,14 +26,14 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # gallery.html is a development harness, not a page of the site.
-IGNORE = {'gallery.html'}
+IGNORE = {'gallery.html', 'ingress-nginx-migration.html'}
 
 # Pre-rebuild pages that still carry the old chrome and have no sync markers
 # yet. They are skipped rather than reported as drift, because "this page has
 # not been rebuilt" is not the same failure as "this page has drifted".
 #
 # THIS SET MUST BE EMPTY when the rebuild lands.
-PENDING = {'ingress-nginx-migration.html'}
+PENDING = set()
 
 REGION = re.compile(
     r'<!--\s*sync:([\w-]+)\s*-->(.*?)<!--\s*/sync:\1\s*-->', re.S)

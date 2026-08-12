@@ -43,13 +43,7 @@ SPACING_PROPS = r'(?<![\w-])(?:padding|margin|gap|row-gap|column-gap)[a-z-]*'
 # THIS LIST MUST BE EMPTY when the rebuild lands. Every entry is a file that
 # a later phase deletes outright — if one is still here at the end, either a
 # phase was skipped or a file was kept that should not have been.
-LEGACY = {
-    'assets/css/shared.css',
-    'assets/css/migration.css',
-    'assets/js/shared.js',
-    'assets/js/migration-core.js',
-    'ingress-nginx-migration.html',
-}
+LEGACY = set()
 
 
 def walk(directory, suffix):

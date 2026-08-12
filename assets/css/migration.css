@@ -1,522 +1,714 @@
-/* migration.css — styles specific to the migration tool (ingress-nginx-migration.html).
-   Shared chrome (topbar, sidebar, banner, dark-mode tokens, layout) lives in
-   shared.css, which must be linked before this file.
-   Color values are F5 Brand Center ramp values (Jade/Bay/Surf/F5 Red/River/
-   Eggplant/Tangerine/Raspberry) plus the Kubernetes brand blue (#326CE5/
-   #1A4CB5) as the tooling accent; Bay belongs to the VirtualServer badge. */
+/* migration.css — the ingress-nginx migration tool.
+   =========================================================================
+   Loaded after tokens.css and core.css on /tools/ingress-nginx-migration/.
 
-/* ── Sidebar (tool nav) ── */
-/* Top-level tool pages use the shared Jade active rail (shared.css). */
-/* Disclosure chevron on expandable section parents (docs.nginx.com idiom),
-   keyed off aria-expanded — same caret language as the mapping-table rows:
-   right-pointing when collapsed, rotating down when open. */
-.sidebar-link[aria-expanded] { padding-right: var(--space-4x); }
-.sidebar-link[aria-expanded]::after { content: ''; position: absolute; right: 14px; top: 50%; width: 6px; height: 6px; border-right: 2px solid var(--green); border-bottom: 2px solid var(--green); transform: translateY(-50%) rotate(-45deg); transition: transform var(--dur-colour) var(--ease-enter), opacity var(--dur-colour) linear; opacity: 0.55; }
-.sidebar-link[aria-expanded]:hover::after { opacity: 0.85; }
-.sidebar-link[aria-expanded="true"]::after { transform: translateY(-50%) rotate(45deg); opacity: 1; }
+   Two kinds of class name live here, and the distinction matters when
+   editing:
 
-/* Sub-items step down in size and sit close to the tree line (F5 hierarchy:
-   descending size + contrast, color restraint — active is carbon + weight,
-   not a colored link). */
-.sidebar-subnav { list-style: none; padding-left: var(--space-base); overflow: hidden; max-height: 0; transition: max-height var(--dur-reveal) ease; border-left: 1px solid var(--border); margin-left: var(--space-3x); margin-top: var(--space-small); margin-bottom: var(--space-small); }
-.sidebar-subnav.open { max-height: 500px; }
-.sidebar-subnav .sidebar-link { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-small) var(--space-base); color: var(--text-secondary); }
-.sidebar-subnav .sidebar-link::before { display: none; }
-.sidebar-subnav .sidebar-link.active { border-radius: var(--radius); }
-.sidebar-subnav .sidebar-link-name { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
-.sidebar-subnav .sidebar-link.active .sidebar-link-name { color: var(--text); }
-/* Inactive tool pages are hidden via the hidden="until-found" attribute
-   (markup + migration-core.js), not display:none, so find-in-page can search them. */
+   1. Names the CARRIED DATA depends on. The tool's ~340 reference rows, their
+      comparison YAML and their notes were written by hand over many months
+      and are carried verbatim through the rebuild. They reference
+      .mapping-table, .expandable, .example-row, .comparison-block,
+      .approach-tabs, .badge-* and .info-box. Renaming any of those means
+      rewriting the data, which is exactly what this rebuild set out not to
+      do. They are restyled, not renamed.
 
-/* ── Main Content ── */
-.main-inner { max-width: 1300px; padding: var(--space-5x) var(--space-6x) var(--space-8x); }
-main { padding: 0; }
-.main-inner section { background: var(--surface); border-radius: var(--radius); padding: var(--space-4x); margin-bottom: var(--space-4x); box-shadow: var(--elev-1); transition: background var(--dur-colour) linear; }
-/* Light-mode content links — Jade 5, scoped to the content area (dark-mode
-   counterpart lives in the dark overrides below). Component link colors that
-   must differ (.install-box a, .info-box.warning a) are declared later at the
-   same specificity, so source order lets them win. */
-.main-inner a:link { color: var(--green-text); }
-.main-inner a:visited { color: var(--text); }
-h2 { font-family: var(--font-display); color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: var(--space-base); margin-bottom: var(--space-3x); font-size: var(--fs-h2); line-height: var(--lh-h2); font-weight: 700; }
-h3 { font-family: var(--font-display); color: var(--text); margin: var(--space-4x) 0 var(--space-2x); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 700; }
-.table-wrapper { overflow-x: auto; margin: var(--space-2hx) 0; }
-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); line-height: var(--lh-body); }
-.mapping-table { table-layout: fixed; }
-.mapping-table th, .mapping-table td { width: 50%; }
-/* Annotation slugs wrap at every width. With table-layout: fixed 50/50 columns,
-   a `nowrap` slug wider than its half-column used to overflow and visually collide
-   with the other column at narrower desktop sizes. `overflow-wrap: anywhere` keeps
-   short codes on one line and only breaks the ones that would otherwise overflow. */
-.mapping-table td code { white-space: normal; overflow-wrap: anywhere; }
-.mapping-table td .or-text { display: block; font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); margin: var(--space-base) 0; }
-.mapping-table pre code { white-space: pre; }
-th, td { padding: var(--space-base) var(--space-2x); text-align: left; border-bottom: 1px solid var(--border); }
-th { font-weight: 700; color: var(--text-secondary); font-size: var(--fs-caption); line-height: var(--lh-caption); background: var(--bg); }
-tr.expandable { cursor: pointer; transition: background-color var(--dur-colour) linear; border-left: 3px solid transparent; }
-tr.expandable:hover { background-color: rgba(0,150,57,0.08); border-left-color: rgba(0,150,57,0.4); }
-tr.expandable.expanded { border-left-color: var(--green-text); }
-/* :focus-visible only. The :focus rule that used to sit here drew a ring on every
-   mouse click as well, which is the behaviour :focus-visible exists to avoid; the
-   hover background already gives pointer users their feedback. */
-tr.expandable:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
-tr.expandable td:first-child { position: relative; padding-left: var(--space-3hx); }
-tr.expandable td:last-child { line-height: 1.8; }
-tr.expandable td:first-child::after { content: ''; position: absolute; left: 8px; top: 50%; width: 6px; height: 6px; border-right: 2px solid var(--green); border-bottom: 2px solid var(--green); transform: translate(-50%, -50%) rotate(-45deg); transition: transform var(--dur-colour) var(--ease-enter); opacity: 0.5; }
-tr.expandable:hover td:first-child::after { opacity: 0.8; }
-tr.expandable.expanded td:first-child::after { transform: translate(-50%, -50%) rotate(45deg); opacity: 1; }
-tr.example-row { display: none; }
-tr.example-row.visible { display: table-row; }
-tr.example-row td { padding: 0; background: var(--bg); white-space: normal; }
-.example-content { padding: var(--space-2hx); border-left: 4px solid var(--green); margin: var(--space-base); background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; }
-tr:not(.expandable):not(.example-row):hover { background-color: #F5F5F5; }
-code { background: var(--bg); padding: 2px var(--space-small); border-radius: var(--radius); font-family: var(--mono); font-size: 0.9em; color: #9C1174; }
-pre { padding: var(--space-2hx); font-size: var(--fs-code); line-height: var(--lh-code); margin: var(--space-2x) 0; }
-pre code { background: none; color: inherit; padding: 0; }
-.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2x); }
-@media (max-width: 900px) { .comparison { grid-template-columns: 1fr; } }
-.comparison-block { border-radius: var(--radius); overflow: hidden; position: relative; }
-.comparison-block h4 { padding: var(--space-base) var(--space-2x); margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); display: flex; justify-content: space-between; align-items: center; }
-.comparison-block.old h4 { background: rgba(228,0,43,0.08); color: #B30013; }
-.comparison-block.new h4 { background: rgba(0,150,57,0.10); color: #025F26; }
-.comparison-copy-btn { background: rgba(0,0,0,0.08); border-color: rgba(0,0,0,0.12); color: inherit; opacity: 0.7; transition: opacity var(--dur-colour) linear; }
-.comparison-copy-btn:hover { opacity: 1; }
-.comparison-copy-btn.copied { background: #007D30; color: white; border-color: #007D30; opacity: 1; }
-.comparison-block pre { margin: 0; border-radius: 0 0 var(--radius) var(--radius); }
-.badge { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-small) var(--space-base); border-radius: var(--radius-pill); font-weight: 500; margin-left: var(--space-small); white-space: nowrap; }
-.badge-virtualserver { background: rgba(0,114,176,0.10); color: #045B91; }
-.badge-virtualserverroute { background: rgba(14,65,170,0.10); color: #00216B; }
-.badge-policy { background: rgba(147,61,204,0.10); color: #6E23A1; }
-.badge-transportserver { background: rgba(242,154,54,0.18); color: #733800; }
-.badge-globalconfiguration { background: rgba(52,52,52,0.08); color: #343434; }
-.badge-plus { background: rgba(228,0,43,0.08); color: #B30013; }
-.badge-configmap { background: rgba(171,39,130,0.10); color: #9C1174; }
-.badge-new { background: rgba(0,150,57,0.10); color: var(--green-text); border: 1px solid rgba(0,150,57,0.25); }
-.install-box { background: linear-gradient(135deg, #00216B, #0E41AA); color: white; padding: var(--space-2x) var(--space-2hx); border-radius: var(--radius); margin: var(--space-2hx) 0 var(--space-2x); }
-.install-box h3 { font-family: var(--font-display); color: #fff; margin: 0 0 var(--space-base); font-size: var(--fs-body); line-height: var(--lh-body); display: flex; align-items: center; gap: var(--space-base); }
-.install-box h3::before { content: '⚙️'; }
-.install-box pre { background: rgba(0,0,0,0.3); margin: 0; padding: var(--space-2x) var(--space-2x); font-size: var(--fs-code); line-height: var(--lh-code); border-radius: var(--radius); }
-.install-box code { color: #8FBAFF; background: none; }
-.install-box a:link, .install-box a:visited { color: #B8D5FF; text-decoration: underline; text-underline-offset: 2px; }
-.install-box a:hover { color: white; }
-/* Base geometry and the sentiment icons live in shared.css; the three variants
-   this page uses are declared here. */
-.info-box.note { background: rgba(50,108,229,0.08); border-left: 4px solid var(--blue); color: #1A4CB5; }
-.info-box.tip { background: rgba(0,150,57,0.08); border-left: 4px solid var(--green); color: #025F26; }
-.info-box.warning { background: rgba(242,154,54,0.15); border-left: 4px solid var(--orange); color: #733800; }
-.info-box.warning a { color: #733800; }
-.info-box.warning code { background: rgba(242,154,54,0.18); color: #733800; }
-/* Collapsible end-of-maintenance warning (repeats on all three tool pages) */
-.eol-toggle { background: none; border-color: currentColor; color: inherit; margin-left: var(--space-base); opacity: 0.85; transition: opacity var(--dur-colour) linear; vertical-align: middle; }
-.eol-toggle:hover { opacity: 1; }
-.eol-compact { margin: 0 0 var(--space-base); padding: var(--space-base) var(--space-2hx); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+   2. Names the analyzer UI uses. Those are ours, since migration-core.js was
+      rewritten, and they follow the new component vocabulary.
 
-.controls { display: flex; gap: var(--space-2x); margin-bottom: var(--space-2hx); flex-wrap: wrap; align-items: center; }
-/* Keep search/filter reachable while scrolling the ~3000-line mapping sections.
-   Desktop only — on mobile the wrapped controls row would eat too much height. */
-@media (min-width: 901px) {
-    .controls { position: sticky; top: calc(var(--chrome-h) + 4px); z-index: 5; background: var(--surface); padding: var(--space-base) 0; margin: -8px 0 var(--space-2hx); }
-    /* Headings below the sticky bar need extra scroll clearance (chrome + bar) */
-    #mappings h3[id], #plus-mappings h3[id], #configmap-mappings h3[id] { scroll-margin-top: calc(var(--chrome-h) + 80px); }
+   .info-box is the notable case: it mirrors core.css's .notification, on the
+   same tokens and the same sentiment binding, but keeps its own
+   implementation because 100 instances carry hand-written content and
+   restructuring each into the flex-plus-icon shape would risk the data for no
+   visual gain.
+   ========================================================================= */
+
+/* ── Sentiment icons ──────────────────────────────────────────────────────
+   Inlined as masks so one declaration tints each with its variant's own
+   colour, and so the site keeps its no-third-party-request rule — no icon
+   font, no sprite fetch. Geometry traced from F5DS's 16px icon grid. */
+:root {
+    --icon-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zM7.25 6.75h1.5v4.5h-1.5v-4.5zM8 4.2a.95.95 0 110 1.9.95.95 0 010-1.9z'/%3E%3C/svg%3E");
+    --icon-success: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm3.03 3.4l-3.9 3.9-1.9-1.9-1.06 1.06 2.96 2.96 4.96-4.96L11.03 5.9z'/%3E%3C/svg%3E");
+    --icon-warning: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 .9L.6 14.2h14.8L8 .9zm0 3.1l5 9H3l5-9zm-.75 3.2h1.5v3.2h-1.5V7.2zm.75 4.1a.9.9 0 110 1.8.9.9 0 010-1.8z'/%3E%3C/svg%3E");
+    --icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M3 8.5l3.5 3.5 7-7.5'/%3E%3C/svg%3E");
 }
-.controls input[type="search"] { height: 32px; padding: 0 var(--space-2x); border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); transition: border-color var(--dur-colour) linear; min-width: 240px; flex: 1; max-width: 400px; }
-.controls select { height: 32px; padding: 0 var(--space-2x); border: 1px solid #CCCCCC; border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-family: var(--font); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color var(--dur-colour) linear; }
-/* One focus idiom sitewide: a 2px outline offset by 2px. These two controls used
-   to suppress the outline and draw a tinted box-shadow ring instead, which was
-   the site's second idiom and the only place two different green alphas
-   appeared. The select previously had no ring at all. F5DS publishes no focus
-   specification anywhere, so this follows WCAG 2.1 AA rather than the system. */
-.controls input[type="search"]:focus-visible, .controls select:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.controls input[type="search"]:focus, .controls select:focus { border-color: var(--green-text); }
-.controls input[type="search"]::placeholder { color: #666666; }
-.search-count { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); white-space: nowrap; }
-.search-count.no-results { color: #B30013; }
-/* .btn geometry and the primary/secondary variants live in shared.css. The
-   migration tool's secondary is filled rather than outlined, because it sits on
-   a white panel next to a filled primary and an outline reads as an input. */
-.btn-secondary { background: var(--bg); color: var(--text); border-color: var(--border); }
-.btn-secondary:hover { background: var(--border); color: var(--text); }
-.feature-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2x); margin: var(--space-2hx) 0; }
-/* Basis is derived from the gap: three columns share two 16px gutters, so each
-   card gives up 2/3 of 16px. Recompute this if .feature-grid's gap changes. */
-.feature-card { flex: 0 0 calc(33.333% - 11px); }
-/* Surface and hover come from shared.css; only the padding differs per page. */
-.feature-card { padding: var(--space-3x); }
-.feature-card h3 { font-family: var(--font-display); color: var(--text); margin: 0 0 var(--space-2x); font-size: var(--fs-h3); line-height: var(--lh-h3); display: flex; align-items: center; gap: var(--space-base); }
-.feature-card .description { font-size: var(--fs-body); color: var(--text-secondary); margin-bottom: var(--space-2x); line-height: var(--lh-body); }
-.feature-card ul { margin: 0; padding-left: var(--space-2hx); }
-.feature-card li { margin: var(--space-base) 0; font-size: var(--fs-body); line-height: var(--lh-body); }
-.main li::marker { color: var(--green-text); font-weight: 500; }
-.doc-list { padding-left: var(--space-5x); }
-.feature-card li strong { color: var(--blue-dark); }
-.checklist-meta { display: flex; align-items: center; gap: var(--space-2x); flex-wrap: wrap; margin-bottom: var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); }
-.checklist-progress { font-weight: 500; color: var(--text); }
-.checklist-note { font-size: var(--fs-caption); line-height: var(--lh-caption); }
-.checklist-reset { background: none; border-color: var(--border); color: var(--text-secondary); }
-.checklist-reset:hover { background: var(--bg); color: var(--text); border-color: var(--text-secondary); }
-.checklist { list-style: none; padding: 0; }
-.checklist li { display: flex; align-items: baseline; gap: var(--space-base); padding: var(--space-base) 0; border-bottom: 1px solid var(--border); cursor: pointer; transition: opacity var(--dur-colour) linear; }
-.checklist li::before { content: '☐'; flex-shrink: 0; font-size: 1.2rem; line-height: 1; color: var(--green-text); transition: transform var(--dur-colour); }
-.checklist li:hover::before { transform: scale(1.15); }
-.checklist li.checked { opacity: 0.7; }
-.checklist li.checked::before { content: '☑'; }
-.checklist li.checked span { text-decoration: line-through; }
-.approach-tabs { display: flex; gap: 0; margin-bottom: var(--space-2hx); border-bottom: 2px solid var(--border); }
-.approach-tab { height: 32px; padding: 0 var(--space-2x); display: inline-flex; align-items: center; border: none; background: none; cursor: pointer; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color var(--dur-colour) linear, border-color var(--dur-colour) linear; }
-/* The -2px above is not spacing and must stay off the scale: it pulls each tab
-   down by exactly the width of .approach-tabs' 2px bottom border so the active
-   tab's own border covers it. Change it only if that border width changes. */
-.approach-tab:hover { color: var(--green-text); }
-.approach-tab.active { color: var(--green-text); border-bottom-color: var(--green-text); }
+
+/* ── Tool shell ───────────────────────────────────────────────────────────
+   The tool's three views are same-hierarchy content, which is what F5DS Tabs
+   are for. Inactive views keep hidden="until-found" rather than display:none,
+   so browser find-in-page can still search them. */
+.tool-lede { margin-bottom: var(--space-3x); }
+
+/* In-page jump row for the reference view's four sections. */
+.jump-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-base);
+    margin-bottom: var(--space-3x);
+}
+
+/* ── Search and filter controls ───────────────────────────────────────────
+   Sticky on desktop so the filter stays reachable through a 4,000-row table.
+   scrollOffsetFor() in migration-core.js compensates for this height when
+   scrolling to an anchor. */
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2x);
+    align-items: center;
+    padding: var(--space-2x) 0;
+    margin-bottom: var(--space-2x);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+}
+@media (min-width: 901px) {
+    .controls { position: sticky; top: var(--topbar-h); z-index: 20; }
+}
+.controls input[type='search'],
+.controls select {
+    height: 32px;
+    padding: 0 var(--space-base);
+    font-family: inherit;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius);
+}
+.controls input[type='search'] { flex: 1; min-width: 220px; }
+.controls input[type='search']::placeholder { color: var(--text-secondary); }
+.search-count {
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+}
+.search-count.no-results { color: var(--pomegranate); font-weight: 500; }
+
+/* ── Mapping tables ───────────────────────────────────────────────────────
+   Fixed layout with an even split: the two columns are a before-and-after
+   pair, so an uneven split would imply one side matters more. */
+.table-wrapper { overflow-x: auto; margin-bottom: var(--space-3x); }
+.mapping-table, .diff-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.mapping-table th, .diff-table th,
+.mapping-table td, .diff-table td {
+    padding: var(--space-base) var(--space-2x);
+    text-align: left;
+    vertical-align: top;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    border-bottom: 1px solid var(--border);
+}
+.mapping-table thead th, .diff-table thead th {
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    font-weight: 700;
+    color: var(--text-secondary);
+    background: var(--surface-sunken);
+}
+.mapping-table td code, .diff-table td code { overflow-wrap: anywhere; }
+.or-text {
+    display: block;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+    padding: var(--space-small) 0;
+}
+
+/* Disclosure row. The whole row is the control; the chevron marks it. */
+.expandable { cursor: pointer; transition: background var(--dur-colour) linear; }
+.expandable:hover { background: var(--surface-sunken); }
+.expandable td:first-child { position: relative; padding-left: var(--space-4x); }
+.expandable td:first-child::before {
+    content: '';
+    position: absolute;
+    left: var(--space-2x);
+    top: calc(var(--space-base) + var(--lh-body) / 2);
+    width: 6px; height: 6px;
+    margin-top: -4px;
+    border-right: 1.5px solid var(--icon);
+    border-bottom: 1.5px solid var(--icon);
+    transform: rotate(-45deg);
+    transition: transform var(--dur-colour) linear;
+}
+.expandable.expanded td:first-child::before { transform: rotate(45deg); }
+.expandable:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+.example-row { display: none; }
+.example-row.visible { display: table-row; }
+.example-row > td { padding: 0; background: var(--surface-sunken); }
+.example-content {
+    padding: var(--space-2x);
+    border-left: 3px solid var(--green);
+}
+
+/* ── Comparison blocks ────────────────────────────────────────────────────
+   Before and after. The old side takes Pomegranate, the new side green — the
+   one place in the tool where the two sides are colour-coded, because the
+   direction of the migration is the whole point. The heading text carries the
+   meaning either way. */
+.comparison {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2x);
+}
+.comparison-block {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.comparison-block h4 {
+    padding: var(--space-base) var(--space-2x);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+}
+.comparison-block.old h4 { background: var(--pomegranate-tint); color: var(--text); }
+.comparison-block.new h4 { background: var(--green-tint); color: var(--text); }
+.comparison-block pre {
+    margin: 0;
+    padding: var(--space-2x);
+    overflow-x: auto;
+    background: var(--code-bg);
+    color-scheme: dark;
+}
+.comparison-block pre code {
+    font-family: var(--mono);
+    font-size: var(--fs-code);
+    line-height: var(--lh-code);
+    color: var(--code-fg);
+    white-space: pre;
+    background: none;
+    border: 0;
+    padding: 0;
+}
+.comparison-copy-btn {
+    position: absolute;
+    top: var(--space-4hx);
+    right: var(--space-small);
+    z-index: 2;
+    background: var(--on-code);
+    border-color: var(--on-code-strong);
+    color: var(--n300);
+}
+.comparison-copy-btn:hover { background: var(--on-code-strong); color: var(--n0); }
+.comparison-copy-btn.is-copied {
+    background: var(--emerald-tint);
+    border-color: transparent;
+    color: var(--n700);
+}
+
+/* ── Approach tabs ────────────────────────────────────────────────────────
+   A second, smaller tab set inside an expanded row, switching between the CRD
+   and annotation ways of expressing the same migration. */
+.approach-tabs {
+    display: flex;
+    gap: var(--space-3x);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-2x);
+}
+.approach-tab {
+    position: relative;
+    height: 32px;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.approach-tab:hover { color: var(--text); }
+.approach-tab.active { color: var(--text); font-weight: 500; }
+.approach-tab.active::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: -1px;
+    width: 100%; height: 2px;
+    background: var(--green);
+}
 .approach-content { display: none; }
 .approach-content.active { display: block; }
-h2[id], h3[id] { display: flex; align-items: center; }
-h2[id], h3[id], section[id] { scroll-margin-top: 96px; }
-.heading-anchor { display: inline-flex; align-items: center; margin-left: var(--space-base); opacity: 0; transition: opacity var(--dur-colour) linear; text-decoration: none; color: inherit; }
-h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus { opacity: 0.5; }
-.heading-anchor:hover { opacity: 1 !important; }
-.yaml-editor { position: relative; }
-.yaml-highlight-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: var(--space-2hx); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); margin: 0; overflow: auto; white-space: pre-wrap; word-wrap: break-word; pointer-events: none; z-index: 0; tab-size: 2; color-scheme: dark; }
-#yamlInput { width: 100%; min-height: 300px; background: transparent; color: transparent; caret-color: #D5D6D6; border: 1px solid transparent; border-radius: var(--radius); padding: var(--space-2hx); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); resize: vertical; tab-size: 2; position: relative; z-index: 1; }
-#yamlInput::placeholder { color: #999999; }
-#yamlInput:focus { outline: none; }
-/* The textarea is transparent and stacks above an aria-hidden highlight layer,
-   so the visible box belongs to the layer. The ring goes on the wrapper rather
-   than the layer: the wrapper is in flow and tracks the textarea's resized
-   height, whereas outlining an absolutely-positioned inner layer is fragile.
-   #yamlInput keeps outline: none so the ring is not drawn twice. */
-.yaml-editor:focus-within { outline: 2px solid var(--green); outline-offset: 2px; border-radius: var(--radius); }
-.yaml-editor:focus-within .yaml-highlight-layer { border-color: var(--green-text); }
-.analyzer-actions { display: flex; gap: var(--space-2hx); margin-top: var(--space-2x); flex-wrap: wrap; }
-.analyzer-summary { display: flex; flex-wrap: wrap; gap: var(--space-base); margin-bottom: var(--space-2hx); }
-.analyzer-pill { padding: var(--space-base) var(--space-2x); border-radius: var(--radius-pill); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; transition: box-shadow var(--dur-elev) linear; }
-/* Scrollable pills are rendered as <button>s for keyboard operability */
-/* Scrollable pills are real <button>s (migration-core.js picks the tag from
-   p.scrollTo), and F5DS reserves the pill radius for Tags and Badges — "a
-   pill-shaped button is off-system". So the span variant above stays a pill and
-   the button variant takes the 4px default. */
-button.analyzer-pill { border: none; font-family: var(--font); border-radius: var(--radius); }
-.analyzer-pill[data-scroll] { cursor: pointer; }
-.analyzer-pill[data-scroll]:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-/* No hover elevation: F5DS puts L0 on buttons, which carry their own
-   affordance, and these scroll pills render as real <button>s. */
-.analyzer-pill.found { background: rgba(0,150,57,0.12); color: #025F26; }
-.analyzer-pill.paths { background: rgba(50,108,229,0.10); color: #1A4CB5; }
-.analyzer-pill.crds { background: rgba(242,154,54,0.18); color: #733800; }
-.analyzer-pill.unrecognized { background: rgba(228,0,43,0.08); color: #B30013; }
-.analyzer-card { background: var(--surface); border-radius: var(--radius); padding: var(--space-2x) var(--space-2hx); margin-bottom: var(--space-2x); box-shadow: var(--elev-1); border-left: 4px solid var(--green); }
-.analyzer-card.unrecognized { border-left-color: #B30013; }
 
-.analyzer-error { padding: var(--space-2x) var(--space-2x); border-radius: var(--radius); margin-top: var(--space-base); font-size: var(--fs-body); line-height: var(--lh-body); background: rgba(228,0,43,0.08); border-left: 4px solid var(--red-dark); color: #B30013; }
-.analyzer-info { padding: var(--space-2x) var(--space-2x); border-radius: var(--radius); margin-top: var(--space-base); font-size: var(--fs-body); line-height: var(--lh-body); background: rgba(50,108,229,0.08); border-left: 4px solid var(--blue); color: #1A4CB5; }
-#analyzerResults { margin-top: var(--space-2hx); }
-/* Analyzer scroll targets (results, step jumps) must clear the fixed chrome */
-#analyzerResults, .analyzer-step, #analyzer-unrecognized { scroll-margin-top: calc(var(--chrome-h) + 16px); }
-.analyzer-unrecognized-section { margin-top: var(--space-2hx); }
-.analyzer-unrecognized-section h4 { color: #B30013; margin-bottom: var(--space-base); font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); }
-.plus-indicator { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-small) var(--space-base); background: rgba(228,0,43,0.08); color: #B30013; border-radius: var(--radius-pill); font-weight: 500; margin-left: var(--space-base); }
-.analyzer-step { margin-top: var(--space-3x); padding-left: var(--space-2hx); border-left: 2px solid var(--border); margin-left: var(--space-2x); position: relative; }
-.analyzer-step:last-of-type { border-left-color: transparent; }
-.analyzer-step-header { display: flex; align-items: center; gap: var(--space-base); margin-bottom: var(--space-base); position: relative; }
-/* The five border-radius: 50% below (step number, spinner, complexity dots,
-   status dot, scroll-to-top) are deliberate and outside the F5DS radius scale,
-   which has no circular value: a numbered stepper bead, a spin indicator and a
-   4px-wide state dot cannot take a 4px corner, and F5DS publishes no
-   floating-action-button component to conform the scroll-to-top to. Do not
-   "snap" these to var(--radius). The step number's box-shadow is likewise not an
-   elevation but a knockout ring, punching a surface-coloured gap through the
-   timeline rule behind it — leave it off the --elev-* scale. */
-.analyzer-step-number { width: 32px; height: 32px; border-radius: 50%; background: var(--green-dark); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: var(--fs-body); line-height: var(--lh-body); flex-shrink: 0; position: relative; left: -36px; margin-right: -24px; z-index: 1; box-shadow: 0 0 0 4px var(--surface); }
-.analyzer-step-title { font-family: var(--font-display); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 700; color: var(--text); margin: 0; }
-.analyzer-step-desc { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); margin-bottom: var(--space-2x); }
-.analyzer-yaml-output { position: relative; padding: var(--space-2hx); font-family: var(--mono); font-size: var(--fs-code); line-height: var(--lh-code); white-space: pre; margin: var(--space-base) 0; }
-.analyzer-copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); color: #CCCCCC; z-index: 1; }
-.analyzer-copy-btn:hover { background: rgba(255,255,255,0.25); color: white; }
-.analyzer-copy-btn.copied { background: #007D30; color: white; border-color: #007D30; }
-.analyzer-step-separator { border: none; border-top: 1px dashed var(--border); margin: var(--space-2x) 0 0; }
-.analyzer-crd-group { margin-top: var(--space-2x); padding: var(--space-2x); background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); }
-.analyzer-crd-group-title { font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--blue-dark); margin-bottom: var(--space-base); }
-.analyzer-dual-note { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); font-style: italic; margin-top: var(--space-small); }
-.yaml-key { color: #9cdcfe; }
-.yaml-value { color: #ce9178; }
-.yaml-comment { color: #6a9955; font-style: italic; }
-.yaml-keyword { color: #569cd6; }
-.yaml-bool { color: #569cd6; }
-.yaml-number { color: #b5cea8; }
-.yaml-separator { color: #808080; }
-.analyzer-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2x); margin: var(--space-base) 0; }
-@media (max-width: 900px) { .analyzer-comparison { grid-template-columns: 1fr; } }
-.analyzer-comparison-block { border-radius: var(--radius); overflow: hidden; }
-.analyzer-comparison-block h4 { padding: var(--space-base) var(--space-2x); margin: 0; font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; display: flex; align-items: center; gap: var(--space-base); }
-.analyzer-comparison-block.old h4 { background: rgba(228,0,43,0.08); color: #B30013; }
-.analyzer-comparison-block.new h4 { background: rgba(0,150,57,0.10); color: #025F26; }
-.analyzer-comparison-badge { font-size: var(--fs-badge); line-height: var(--lh-badge); font-weight: 700; padding: var(--space-small) var(--space-base); border-radius: var(--radius-pill); }
-.analyzer-comparison-block.old .analyzer-comparison-badge { background: rgba(228,0,43,0.12); color: #B30013; }
-.analyzer-comparison-block.new .analyzer-comparison-badge { background: rgba(0,150,57,0.15); color: #025F26; }
-.analyzer-comparison-block .analyzer-yaml-output { margin: 0; border-radius: 0 0 var(--radius) var(--radius); min-height: 60px; }
-.analyzer-copy-all { margin-top: var(--space-2hx); }
-.analyzer-copy-all.copied { background: #007D30; border-color: #007D30; }
-.analyzer-step-count { font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; padding: var(--space-small) var(--space-base); border-radius: var(--radius-pill); background: rgba(0,150,57,0.12); color: #025F26; margin-left: var(--space-base); }
-.analyzer-step-count.configmap { background: rgba(171,39,130,0.10); color: #9C1174; }
-.analyzer-step-count.crd { background: rgba(147,61,204,0.10); color: #6E23A1; }
-.analyzer-step-count.unsupported { background: rgba(242,154,54,0.18); color: #733800; }
-.analyzer-step-number.warning { background: #A35415; }
-@media (max-width: 600px) {
-    .analyzer-actions { flex-direction: column; }
-    .strategy-toggle { flex-wrap: wrap; }
-    .strategy-desc { display: none; }
-    .analyzer-actions .btn { width: 100%; text-align: center; }
-    .controls input[type="search"] { min-width: 100%; max-width: 100%; }
-    .analyzer-step-header { flex-wrap: wrap; }
-    .analyzer-step-count { margin-left: var(--space-5x); margin-top: -4px; }
-    .analyzer-copy-all { width: 100%; justify-content: center; }
-    .analyzer-download-btn { width: 100%; justify-content: center; }
-    .analyzer-export-actions { flex-direction: column; }
-    .mapping-table th, .mapping-table td { white-space: normal; word-break: break-word; font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-base) var(--space-base); }
-    .mapping-table code { font-size: var(--fs-caption); line-height: var(--lh-caption); }
-    .sample-dropdown-menu { min-width: 260px; left: auto; right: 0; }
+/* ── Badges ───────────────────────────────────────────────────────────────
+   Which NGINX Ingress Controller construct a mapping targets. Pill radius is
+   legitimate here: F5DS permits it for Tags and Badges. These are categorical
+   hues rather than sentiment ones, and the label always carries the meaning. */
+.badge {
+    display: inline-block;
+    padding: 0 var(--space-base);
+    margin-right: var(--space-small);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    font-weight: 500;
+    white-space: nowrap;
+    background: var(--surface-sunken);
+    color: var(--text);
+    border: 1px solid var(--border);
 }
-@media (max-width: 900px) {
-    .main-inner { padding: var(--space-3hx) var(--space-3x) var(--space-5x); }
-    /* Must match the base rule's `.main-inner section` specificity or it never applies */
-    .main-inner section { border-radius: var(--radius); padding: var(--space-2hx); }
-    h2 { font-size: var(--fs-h2); line-height: var(--lh-h2); }
-    h3 { font-size: var(--fs-h3); line-height: var(--lh-h3); }
-    /* table-layout stays fixed 50/50 (base) at tablet too: codes wrap, so columns
-       stay equal across all tables instead of auto-sizing per-table by content. */
-    .comparison-block pre { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-2x); }
-    .example-content { padding: var(--space-2x); margin: var(--space-base); }
-    .approach-tabs { flex-wrap: wrap; gap: var(--space-small); }
-    .approach-tab { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-base) var(--space-2x); min-height: 44px; }
-    .info-box { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-2x) var(--space-2x); }
-    /* .feature-grid is flex on this page (unlike index.css's grid) — stack via the cards */
-    .feature-card { flex: 1 1 100%; }
-}
-@media (max-width: 600px) {
-    .main-inner { padding: var(--space-2x) var(--space-2x) var(--space-4x); }
-    .main-inner section { padding: var(--space-2x); margin-bottom: var(--space-2hx); }
-    h2 { font-size: var(--fs-h3); line-height: var(--lh-h3); margin-bottom: var(--space-2x); }
-    h3 { font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); }
-    /* Stacked cards: drop the half-width header (it only showed the F5 column,
-       which read confusingly above community-first rows) and instead label both
-       sides per-row — community above, F5 below, split by a dashed rule. The two
-       labels are a matched pair: identical type, indent, spacing and a downward
-       arrow marker, distinguished only by colour (grey = from, green = to). The
-       expand chevron moves to ::after so ::before is free for the community label. */
-    .mapping-table thead { display: none; }
-    .mapping-table td { display: block; width: 100%; }
-    .mapping-table td:first-child { font-size: var(--fs-caption); line-height: var(--lh-caption); padding-bottom: var(--space-base); border-bottom: none; }
-    /* Align both cells to the same left edge (the chevron sits in the shared gutter) */
-    tr.expandable td:first-child, tr.expandable td:last-child { padding-left: var(--space-3x); }
-    tr.expandable td:first-child::before, tr.expandable td:last-child::before { display: block; font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 700; margin-bottom: var(--space-base); }
-    tr.expandable td:first-child::before { content: "\2193 Kubernetes Ingress NGINX (Ingress-NGINX)"; color: var(--text-secondary); }
-    tr.expandable td:first-child::after { left: 8px; }
-    tr.expandable td:last-child { padding-top: var(--space-base); border-top: 1px dashed var(--border); }
-    tr.expandable td:last-child::before { content: "\2193 F5 NGINX Ingress Controller"; color: var(--green-text); }
-    /* Key Differences (the one plain 3-col table) — stack into labeled cards */
-    .diff-table thead { display: none; }
-    .diff-table tr { display: block; border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-base) var(--space-2x); margin-bottom: var(--space-base); }
-    .diff-table td { display: block; border: none; padding: var(--space-small) 0; font-size: var(--fs-body); line-height: var(--lh-body); }
-    .diff-table td:first-child { font-weight: 700; font-size: var(--fs-body); line-height: var(--lh-body); margin-bottom: var(--space-small); }
-    .diff-table td:nth-child(2)::before { content: "Community \2014 "; font-weight: 500; color: var(--text-secondary); }
-    .diff-table td:nth-child(3)::before { content: "F5 NIC \2014 "; font-weight: 500; color: var(--green-text); }
-    .comparison { gap: var(--space-2x); }
-    .comparison-block pre { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-base); }
-    pre { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-2x); }
-    #yamlInput { min-height: 200px; }
-    .doc-list { padding-left: var(--space-3x); }
+.badge-virtualserver,
+.badge-virtualserverroute  { background: var(--blue-tint); border-color: transparent; }
+.badge-policy              { background: var(--purple-tint); border-color: transparent; }
+.badge-transportserver     { background: var(--java-tint); border-color: transparent; }
+.badge-globalconfiguration { background: var(--amber-tint); border-color: transparent; }
+.badge-configmap           { background: var(--surface-sunken); }
+.badge-plus                { background: var(--green-tint); border-color: transparent; font-weight: 700; }
+.badge-new                 { background: var(--emerald-tint); border-color: transparent; }
+.plus-indicator {
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--green-text);
+    font-weight: 500;
 }
 
-.analyzer-empty-state { text-align: center; padding: var(--space-5x) var(--space-2hx); color: var(--text-secondary); }
-.analyzer-empty-state svg { margin-bottom: var(--space-2x); opacity: 0.4; }
-.analyzer-empty-state p { font-size: var(--fs-body); line-height: var(--lh-body); margin: var(--space-small) 0; }
-.analyzer-empty-state .hint { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
-.analyzer-loading { display: flex; align-items: center; justify-content: center; gap: var(--space-base); padding: var(--space-3hx) var(--space-2hx); color: var(--text-secondary); font-size: var(--fs-body); line-height: var(--lh-body); }
-/* 0.7s is kept deliberately: F5DS assigns durations by distance travelled and
-   publishes nothing for a continuous rotation, so there is no token to snap to. */
-.analyzer-loading-spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: analyzer-spin 0.7s linear infinite; }
-@keyframes analyzer-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .analyzer-loading-spinner { animation: none; } }
-.analyzer-success-banner { display: flex; align-items: center; gap: var(--space-base); padding: var(--space-2x) var(--space-2x); background: linear-gradient(135deg, rgba(0,150,57,0.10), rgba(0,150,57,0.16)); border-radius: var(--radius); margin-bottom: var(--space-2x); border: 1px solid rgba(0,150,57,0.30); }
-.analyzer-success-banner svg { flex-shrink: 0; color: #007D30; }
-.analyzer-success-banner .banner-text { font-size: var(--fs-body); line-height: var(--lh-body); color: #025F26; font-weight: 500; }
-.analyzer-success-banner .banner-text strong { font-weight: 700; }
-.analyzer-next-steps { margin-top: var(--space-3x); padding: var(--space-2hx); background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); }
-.analyzer-next-steps h4 { color: var(--green-text); margin: 0 0 var(--space-base); font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); display: flex; align-items: center; gap: var(--space-base); }
-.analyzer-next-steps ul { list-style: none; padding: 0; margin: 0; }
-.analyzer-next-steps li { padding: var(--space-base) 0; font-size: var(--fs-body); line-height: var(--lh-body); }
-.analyzer-next-steps li::before { content: '\2192'; color: var(--green-text); margin-right: var(--space-base); font-weight: 500; }
-/* Underlined, and Regular weight: F5DS says a link is never set in Bold or
-   Medium. Applied here because these are real prose-adjacent links; the card CTA
-   labels on the landing page stay at 500, being card affordance labels rather
-   than inline links. */
-.analyzer-next-steps a { color: var(--green-text); text-decoration: underline; text-underline-offset: 2px; font-weight: 400; }
-.analyzer-complexity { display: inline-flex; align-items: center; gap: var(--space-base); margin-left: var(--space-base); padding: var(--space-small) var(--space-base); border-radius: var(--radius-pill); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; }
-.analyzer-complexity.simple { background: rgba(0,150,57,0.12); color: #025F26; }
-.analyzer-complexity.moderate { background: rgba(242,154,54,0.20); color: #733800; }
-.analyzer-complexity.advanced { background: rgba(228,0,43,0.08); color: #B30013; }
-.analyzer-complexity-dots { display: flex; gap: var(--space-small); }
-.analyzer-complexity-dots span { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.25; }
-.analyzer-complexity-dots span.filled { opacity: 1; }
-.analyzer-yaml-output.collapsed { max-height: 200px; overflow: hidden; }
-.analyzer-yaml-output.collapsed::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: linear-gradient(transparent, var(--code-bg)); pointer-events: none; }
-.analyzer-yaml-expand { background: none; border-color: var(--border); color: var(--green-text); margin-top: var(--space-small); }
-.analyzer-yaml-expand:hover { background: var(--green-dark); color: white; border-color: var(--green-dark); }
-.analyzer-edit-btn { background: var(--surface); border-color: var(--green-dark); color: var(--green-text); margin-top: var(--space-2x); }
-.analyzer-edit-btn:hover { background: var(--green-dark); color: white; }
-@keyframes analyzerFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.analyzer-fade-in { animation: analyzerFadeIn var(--dur-move) var(--ease-enter) forwards; opacity: 0; }
-.analyzer-input-status { display: flex; gap: var(--space-2x); margin-top: var(--space-base); font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
-.analyzer-input-status .status-item { display: flex; align-items: center; gap: var(--space-small); }
-.analyzer-input-status .status-dot { width: 6px; height: 6px; border-radius: 50%; }
-.analyzer-input-status .status-dot.active { background: var(--green); }
-.analyzer-input-status .status-dot.inactive { background: #CCCCCC; }
+/* ── Info box ─────────────────────────────────────────────────────────────
+   Mirrors core.css's .notification; see the file header for why it keeps its
+   own implementation. */
+.info-box {
+    position: relative;
+    padding: var(--space-2x) var(--space-2x) var(--space-2x) var(--space-5x);
+    margin: var(--space-2x) 0;
+    border-radius: var(--radius);
+    border-left: 4px solid var(--border-control);
+    background: var(--surface-sunken);
+    color: var(--text);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+}
+.info-box::before {
+    content: '';
+    position: absolute;
+    left: var(--space-2x);
+    top: calc(var(--space-2x) + (var(--lh-body) - 1rem) / 2);
+    width: 1rem; height: 1rem;
+    -webkit-mask: var(--icon-mask) center / contain no-repeat;
+    mask: var(--icon-mask) center / contain no-repeat;
+}
+.info-box p + p { margin-top: var(--space-base); }
+.info-box.note, .info-box.info {
+    background: var(--purple-tint);
+    border-left-color: var(--purple);
+    --icon-mask: var(--icon-info);
+}
+.info-box.note::before, .info-box.info::before { background: var(--purple); }
+.info-box.tip {
+    background: var(--emerald-tint);
+    border-left-color: var(--emerald);
+    --icon-mask: var(--icon-success);
+}
+.info-box.tip::before { background: var(--emerald); }
+.info-box.warning {
+    background: var(--amber-tint);
+    border-left-color: var(--amber);
+    --icon-mask: var(--icon-warning);
+}
+.info-box.warning::before { background: var(--amber); }
+
+/* End-of-maintenance banner, collapsible and remembered. */
+.eol-warning { margin-bottom: var(--space-base); }
+.eol-compact { display: none; }
+.eol-compact.visible { display: block; }
+.eol-toggle {
+    margin-left: var(--space-base);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+}
+
+/* Install command panel on the Getting Started view. */
+.install-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-2hx);
+    margin: var(--space-2x) 0;
+}
+.install-box h3 {
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    font-weight: 500;
+    margin-bottom: var(--space-base);
+}
+
+/* ── Checklist ────────────────────────────────────────────────────────────
+   Progress is in localStorage, keyed by each item's data-id so reordering the
+   list does not shuffle what a returning visitor has ticked. */
+.checklist-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2x);
+    margin-bottom: var(--space-2x);
+}
+.checklist-progress { font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; }
+.checklist-note { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
+
+.checklist { list-style: none; padding: 0; }
+.checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-base);
+    padding: var(--space-base);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    transition: background var(--dur-colour) linear;
+}
+.checklist li + li { margin-top: 0; }
+.checklist li:hover { background: var(--surface-sunken); }
+.checklist li:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* A control, not type: the box sizes to the line box rather than to a scale
+   step, and its tick is a mask so it inherits no text colour. */
+.checklist li::before {
+    content: '';
+    flex-shrink: 0;
+    width: 1rem; height: 1rem;
+    margin-top: calc((var(--lh-body) - 1rem) / 2);
+    border: 1.5px solid var(--border-control);
+    border-radius: var(--radius-small);
+    transition: background var(--dur-colour) linear, border-color var(--dur-colour) linear;
+}
+.checklist li[aria-checked='true']::before {
+    background: var(--green-text) var(--icon-check) center / 0.75rem no-repeat;
+    border-color: var(--green-text);
+}
+.checklist li[aria-checked='true'] > span { color: var(--text-secondary); text-decoration: line-through; }
+
+/* ── Analyzer ─────────────────────────────────────────────────────────────
+   These names are ours: migration-core.js was rewritten, so nothing carried
+   depends on them. */
+.analyzer-editor { position: relative; margin-bottom: var(--space-2x); }
+.analyzer-input, .analyzer-highlight {
+    width: 100%;
+    min-height: 260px;
+    padding: var(--space-2x);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: var(--fs-code);
+    line-height: var(--lh-code);
+    white-space: pre;
+    overflow: auto;
+    tab-size: 2;
+}
+.analyzer-input {
+    position: relative;
+    z-index: 2;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--code-fg);
+    border: 1px solid var(--code-border);
+    resize: vertical;
+}
+.analyzer-highlight {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    margin: 0;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    color: var(--code-fg);
+    pointer-events: none;
+}
 .analyzer-drop-zone { position: relative; }
-.analyzer-drop-overlay { display: none; position: absolute; inset: 0; background: rgba(0,150,57,0.08); border: 3px dashed var(--green); border-radius: var(--radius); z-index: 10; align-items: center; justify-content: center; pointer-events: none; }
+.analyzer-drop-zone.dragging .analyzer-highlight { border-color: var(--green); }
+.analyzer-drop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    background: var(--green-tint);
+    border: 2px dashed var(--green);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    font-weight: 500;
+}
 .analyzer-drop-zone.dragging .analyzer-drop-overlay { display: flex; }
-.analyzer-drop-zone.dragging #yamlInput { opacity: 0.5; }
-.analyzer-drop-label { background: var(--surface); padding: var(--space-2x) var(--space-3x); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--green-text); box-shadow: var(--elev-1); }
-.analyzer-export-actions { display: flex; gap: var(--space-2hx); flex-wrap: wrap; margin-top: var(--space-2hx); align-items: center; }
-.analyzer-download-btn { background: var(--blue); border-color: var(--blue); color: white; }
-.analyzer-download-btn:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
-.analyzer-download-btn.downloaded { background: #007D30; border-color: #007D30; }
 
-/* ── Dark Mode Overrides ── */
-:is(html, body).dark-mode tr.expandable:hover { background-color: rgba(83,211,107,0.10); border-left-color: rgba(83,211,107,0.4); }
-:is(html, body).dark-mode tr.expandable.expanded { border-left-color: var(--green-text); }
-:is(html, body).dark-mode tr.expandable:focus { outline-color: var(--green-text); background-color: rgba(83,211,107,0.10); }
-:is(html, body).dark-mode tr.expandable td:first-child::after { border-right-color: var(--green-text); border-bottom-color: var(--green-text); }
-:is(html, body).dark-mode tr:not(.expandable):not(.example-row):hover { background-color: rgba(255,255,255,0.03); }
-:is(html, body).dark-mode tr.example-row td { background: var(--bg); }
-:is(html, body).dark-mode .example-content { background: var(--surface); border-left-color: var(--green-text); }
-:is(html, body).dark-mode code { background: rgba(52,52,52,0.5); color: #FFA3E1; }
-:is(html, body).dark-mode .info-box.note { background: rgba(107,159,255,0.10); color: var(--blue); }
-:is(html, body).dark-mode .info-box.tip { background: rgba(83,211,107,0.10); color: var(--green-text); }
-:is(html, body).dark-mode .info-box.warning { background: rgba(242,154,54,0.12); color: var(--orange); }
-:is(html, body).dark-mode .info-box.warning a { color: #FFC180; }
-:is(html, body).dark-mode .info-box.warning code { background: rgba(255,172,92,0.12); color: var(--orange); }
-:is(html, body).dark-mode .main-inner a:visited { color: var(--text); }
-:is(html, body).dark-mode .main-inner a:link { color: var(--blue); }
-:is(html, body).dark-mode .controls input[type="search"]::placeholder { color: #999999; }
+.analyzer-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2x);
+    margin-bottom: var(--space-2x);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+}
+.status-dot-inactive { background: var(--n300); }
 
-:is(html, body).dark-mode .comparison-block.old h4 { background: rgba(255,99,107,0.12); color: #FF918C; }
-:is(html, body).dark-mode .comparison-block.new h4 { background: rgba(83,211,107,0.12); color: #7FE590; }
-:is(html, body).dark-mode .comparison-copy-btn { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); }
-:is(html, body).dark-mode .btn-secondary { background: var(--border); color: var(--text); border-color: var(--border); }
-:is(html, body).dark-mode .btn-secondary:hover { background: #343434; border-color: #343434; }
-:is(html, body).dark-mode .analyzer-success-banner { background: linear-gradient(135deg, rgba(83,211,107,0.12), rgba(83,211,107,0.06)); border-color: rgba(83,211,107,0.3); }
-:is(html, body).dark-mode .analyzer-success-banner svg { color: #7FE590; }
-:is(html, body).dark-mode .analyzer-success-banner .banner-text { color: #7FE590; }
-:is(html, body).dark-mode .analyzer-next-steps h4 { color: var(--green-text); }
-:is(html, body).dark-mode .analyzer-comparison-block.old h4 { background: rgba(255,99,107,0.12); color: #FF918C; }
-:is(html, body).dark-mode .analyzer-comparison-block.new h4 { background: rgba(83,211,107,0.12); color: #7FE590; }
-:is(html, body).dark-mode .analyzer-comparison-block.old .analyzer-comparison-badge { background: rgba(255,99,107,0.2); color: #FF918C; }
-:is(html, body).dark-mode .analyzer-comparison-block.new .analyzer-comparison-badge { background: rgba(83,211,107,0.2); color: #7FE590; }
-:is(html, body).dark-mode .analyzer-edit-btn { background: var(--surface); border-color: var(--green-text); color: var(--green-text); }
-:is(html, body).dark-mode .analyzer-edit-btn:hover { background: var(--green); color: var(--bg); }
-:is(html, body).dark-mode .analyzer-yaml-expand { border-color: var(--border); color: var(--green-text); }
-:is(html, body).dark-mode .analyzer-yaml-expand:hover { background: var(--green); color: var(--bg); border-color: var(--green-text); }
-:is(html, body).dark-mode .analyzer-empty-state svg { stroke: #666666; }
-:is(html, body).dark-mode .badge-virtualserver { background: rgba(93,184,245,0.18); color: #5DB8F5; }
-:is(html, body).dark-mode .badge-virtualserverroute { background: rgba(143,186,255,0.15); color: #8FBAFF; }
-:is(html, body).dark-mode .badge-policy { background: rgba(219,153,255,0.15); color: #DB99FF; }
-:is(html, body).dark-mode .badge-transportserver { background: rgba(255,172,92,0.15); color: #FFAC5C; }
-:is(html, body).dark-mode .badge-globalconfiguration { background: rgba(204,204,204,0.12); color: #CCCCCC; }
-:is(html, body).dark-mode .badge-plus { background: rgba(255,145,140,0.15); color: #FF918C; }
-:is(html, body).dark-mode .badge-configmap { background: rgba(255,163,225,0.15); color: #FFA3E1; }
-:is(html, body).dark-mode .badge-new { background: rgba(83,211,107,0.15); color: #7FE590; border-color: rgba(127,229,144,0.35); }
-:is(html, body).dark-mode .analyzer-pill.found { background: rgba(83,211,107,0.15); color: #7FE590; }
-:is(html, body).dark-mode .analyzer-pill.paths { background: rgba(107,159,255,0.15); color: #6B9FFF; }
-/* Keep each pill's hue consistent between light and dark (crds = orange, unrecognized = red) */
-:is(html, body).dark-mode .analyzer-pill.crds { background: rgba(255,172,92,0.15); color: #FFAC5C; }
-:is(html, body).dark-mode .analyzer-pill.unrecognized { background: rgba(255,145,140,0.12); color: #FF918C; }
-:is(html, body).dark-mode .analyzer-error { background: rgba(255,145,140,0.12); color: #FF918C; border-color: rgba(255,145,140,0.3); }
-:is(html, body).dark-mode .analyzer-info { background: rgba(107,159,255,0.12); color: #6B9FFF; border-color: rgba(107,159,255,0.3); }
-:is(html, body).dark-mode .plus-indicator { background: rgba(255,145,140,0.15); color: #FF918C; }
-:is(html, body).dark-mode .analyzer-complexity.simple { background: rgba(83,211,107,0.15); color: #7FE590; }
-:is(html, body).dark-mode .analyzer-complexity.moderate { background: rgba(255,211,166,0.15); color: #FFD3A6; }
-:is(html, body).dark-mode .analyzer-complexity.advanced { background: rgba(255,145,140,0.15); color: #FF918C; }
-:is(html, body).dark-mode .analyzer-step-count { background: rgba(83,211,107,0.15); color: #7FE590; }
-:is(html, body).dark-mode .analyzer-step-count.configmap { background: rgba(255,163,225,0.15); color: #FFA3E1; }
-:is(html, body).dark-mode .analyzer-step-count.crd { background: rgba(219,153,255,0.15); color: #DB99FF; }
-:is(html, body).dark-mode .analyzer-step-count.unsupported { background: rgba(255,172,92,0.15); color: #FFAC5C; }
-:is(html, body).dark-mode .analyzer-drop-label { background: var(--surface); }
-:is(html, body).dark-mode .controls input[type="search"] { background: var(--surface); color: var(--text); border-color: var(--border); }
-:is(html, body).dark-mode .controls select { border-color: var(--border); }
-:is(html, body).dark-mode .search-count.no-results { color: #FF918C; }
-:is(html, body).dark-mode .analyzer-unrecognized-section h4 { color: #FF918C; }
-:is(html, body).dark-mode .analyzer-card.unrecognized { border-left-color: #FF918C; }
-:is(html, body).dark-mode .sample-badge.simple { background: rgba(83,211,107,0.15); color: #7FE590; }
-:is(html, body).dark-mode .sample-badge.moderate { background: rgba(255,211,166,0.15); color: #FFD3A6; }
-:is(html, body).dark-mode .sample-badge.advanced { background: rgba(255,145,140,0.15); color: #FF918C; }
-:is(html, body).dark-mode .analyzer-download-btn { color: #041538; }
-:is(html, body).dark-mode .analyzer-download-btn:hover { background: #4A7DE1; }
-:is(html, body).dark-mode .analyzer-download-btn.downloaded { background: #42BA5B; color: #003105; }
-.sample-dropdown { position: relative; display: inline-block; }
-/* Layout comes from .btn; only the disclosure caret is local. F5DS calls this the
-   Trailing Icon modifier, used where a button "reveals more options". */
-.sample-dropdown-btn::after { content: '\25BC'; font-size: 0.6rem; opacity: 0.7; }
-/* L1 here is an inference, not a spec value: F5DS states an elevation level for
-   Toast only and explicitly says not to assume one for other overlays. */
-.sample-dropdown-menu { display: none; position: absolute; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--elev-1); min-width: 280px; max-width: calc(100vw - 40px); z-index: 50; overflow: hidden; }
-.sample-dropdown-menu.visible { display: block; animation: analyzerFadeIn var(--dur-colour) var(--ease-enter); }
-.sample-dropdown-item { padding: var(--space-base) var(--space-2x); cursor: pointer; transition: background var(--dur-colour) linear; border-bottom: 1px solid var(--border); }
-.sample-dropdown-item:last-child { border-bottom: none; }
-.sample-dropdown-item:hover { background: rgba(0,150,57,0.08); }
-.sample-dropdown-item .sample-title { font-weight: 500; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text); display: flex; align-items: center; gap: var(--space-base); }
-.sample-dropdown-item .sample-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); margin-top: var(--space-small); }
-.sample-dropdown-item .sample-badge { font-size: var(--fs-badge); line-height: var(--lh-badge); padding: var(--space-small) var(--space-base); border-radius: var(--radius-pill); font-weight: 500; }
-.sample-badge.simple { background: rgba(0,150,57,0.12); color: #025F26; }
-.sample-badge.moderate { background: rgba(242,154,54,0.20); color: #733800; }
-.sample-badge.advanced { background: rgba(228,0,43,0.08); color: #B30013; }
+.analyzer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2hx);
+    align-items: center;
+    margin-bottom: var(--space-2x);
+}
 
-/* ── Migration Strategy Toggle ── */
-.strategy-toggle { display: flex; align-items: center; gap: var(--space-2x); margin: var(--space-2x) 0; padding: var(--space-2x) var(--space-2x); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); }
-.strategy-toggle-label { font-weight: 500; color: var(--text); white-space: nowrap; }
-.strategy-toggle-options { display: flex; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-/* Deliberately not composed onto .btn: this is a Segmented Control, which F5DS
-   names but never documents. It keeps the shared 32px height so it matches the
-   buttons and inputs beside it, but it must stay a seamless flush-joined pair
-   rather than gaining a button's own border and radius. */
-.strategy-option { height: 32px; padding: 0 var(--space-2x); cursor: pointer; font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 500; border: none; background: none; color: var(--text-secondary); transition: background var(--dur-colour) linear, color var(--dur-colour) linear; font-family: var(--font); }
-.strategy-option.active { background: var(--green-dark); color: #fff; }
-.strategy-option:not(.active):hover { background: var(--bg); }
-.strategy-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); margin-left: var(--space-small); }
-:is(html, body).dark-mode .strategy-option.active { background: var(--green); color: #003105; }
-:is(html, body).dark-mode .sample-dropdown-item:hover { background: rgba(83,211,107,0.10); }
-/* Keeps an elevation despite the L0-on-buttons rule: F5DS's own Do list allows
-   elevation on a fixed action bar, and this floats over scrolling content. */
-.scroll-to-top { position: fixed; bottom: 30px; right: 30px; width: 44px; height: 44px; border-radius: 50%; background: var(--green-dark); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: var(--elev-1); z-index: 200; transition: opacity var(--dur-colour) linear, transform var(--dur-colour); }
-.scroll-to-top:hover { transform: scale(1.1); background: #025F26; }
+/* Strategy picker — a segmented control, which F5DS names as the component
+   for switching view or filtering within one context. */
+.strategy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-base);
+    margin-bottom: var(--space-2x);
+}
+.strategy-label {
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+.strategy-options {
+    display: inline-flex;
+    align-self: flex-start;
+    padding: 2px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.strategy-option {
+    height: 28px;
+    padding: 0 var(--space-2x);
+    background: none;
+    border: 0;
+    border-radius: var(--radius-small);
+    font-family: inherit;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
+}
+.strategy-option.active {
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 500;
+    box-shadow: var(--elev-1);
+}
+.strategy-desc { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
+
+/* Sample presets dropdown. F5DS states only that a Toast is L1, so the level
+   for a dropdown is inferred; L1 matches the Toast. */
+.sample { position: relative; }
+.sample-menu {
+    position: absolute;
+    top: calc(100% + var(--space-small));
+    left: 0;
+    z-index: 30;
+    display: none;
+    min-width: 280px;
+    padding: var(--space-small);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-1);
+}
+.sample-menu.visible { display: block; }
+.sample-item {
+    display: block;
+    width: 100%;
+    padding: var(--space-base);
+    background: none;
+    border: 0;
+    border-radius: var(--radius-small);
+    text-align: left;
+    font-family: inherit;
+    color: var(--text);
+    cursor: pointer;
+}
+.sample-item:hover { background: var(--surface-sunken); }
+.sample-title { display: block; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; }
+.sample-desc { display: block; font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
+
+/* Results */
+.analyzer-summary { display: flex; flex-wrap: wrap; gap: var(--space-base); margin-bottom: var(--space-2x); }
+.analyzer-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-small);
+    height: 24px;
+    padding: 0 var(--space-2x);
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    font-family: inherit;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text);
+}
+button.analyzer-pill { cursor: pointer; }
+button.analyzer-pill:hover { border-color: var(--border-control); }
+.analyzer-pill.found { background: var(--green-tint); }
+.analyzer-pill.paths { background: var(--blue-tint); }
+.analyzer-pill.crds { background: var(--purple-tint); }
+.analyzer-pill.unrecognized { background: var(--amber-tint); }
+
+.analyzer-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-2x);
+    padding: var(--space-2x);
+    margin-bottom: var(--space-3x);
+    border-radius: var(--radius);
+    background: var(--emerald-tint);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+}
+.analyzer-complexity {
+    display: flex;
+    align-items: center;
+    gap: var(--space-base);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+}
+.analyzer-dots { display: flex; gap: var(--space-small); }
+.analyzer-dots span { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.25; }
+.analyzer-dots span.filled { opacity: 1; }
+
+.analyzer-step { margin-bottom: var(--space-3x); }
+.analyzer-step-header { display: flex; align-items: center; gap: var(--space-2x); margin-bottom: var(--space-2x); }
+.analyzer-step-number {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--green-text);
+    color: var(--n0);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    font-weight: 700;
+}
+.analyzer-step-number.warning { background: var(--amber); color: var(--n700); }
+.analyzer-step-title { flex: 1; font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 700; }
+.analyzer-step-count {
+    padding: 0 var(--space-base);
+    border-radius: var(--radius-pill);
+    background: var(--green-tint);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+}
+.analyzer-step-count.configmap { background: var(--surface-sunken); }
+.analyzer-step-count.crd { background: var(--purple-tint); }
+.analyzer-step-count.unsupported { background: var(--amber-tint); }
+.analyzer-step-desc { color: var(--text-secondary); margin-bottom: var(--space-2x); }
+
+.analyzer-crd-group { margin-bottom: var(--space-2x); }
+.analyzer-crd-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-base);
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    font-weight: 500;
+    margin-bottom: var(--space-base);
+}
+.analyzer-dual-note {
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-base);
+}
+
+.analyzer-card {
+    padding: var(--space-2x);
+    margin-bottom: var(--space-base);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: var(--radius);
+}
+.analyzer-card.unrecognized { border-left-color: var(--amber); }
+.analyzer-card-title { font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; margin-bottom: var(--space-small); }
+.analyzer-card p { color: var(--text-secondary); }
+
+.analyzer-empty { text-align: center; padding: var(--space-6x) var(--space-3x); color: var(--text-secondary); }
+.analyzer-loading { display: flex; align-items: center; gap: var(--space-base); padding: var(--space-3x); color: var(--text-secondary); }
+.analyzer-spinner {
+    width: 18px; height: 18px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: analyzer-spin 0.7s linear infinite;
+}
+@keyframes analyzer-spin { to { transform: rotate(360deg); } }
+
+.analyzer-export { display: flex; flex-wrap: wrap; gap: var(--space-2hx); margin-top: var(--space-3x); }
+.analyzer-next { margin-top: var(--space-3x); }
+.analyzer-next ul { list-style: none; padding: 0; }
+.analyzer-next li { display: flex; gap: var(--space-base); }
+.analyzer-next li + li { margin-top: var(--space-base); }
+
+/* ── YAML highlight tokens ─────────────────────────────────────────────── */
+.yaml-key { color: var(--blue); }
+.yaml-value { color: var(--java); }
+.yaml-comment { color: var(--emerald); }
+.yaml-bool, .yaml-number { color: var(--amber); }
+.yaml-separator { color: var(--n400); }
+
+/* ── Scroll to top ─────────────────────────────────────────────────────── */
+.scroll-to-top {
+    position: fixed;
+    bottom: var(--space-3x);
+    right: var(--space-3x);
+    z-index: 100;
+    width: 44px; height: 44px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--green-text);
+    color: var(--n0);
+    border: 0;
+    cursor: pointer;
+    box-shadow: var(--elev-1);
+}
 .scroll-to-top.visible { display: flex; }
-:is(html, body).dark-mode .scroll-to-top { background: var(--green); color: var(--bg); }
-:is(html, body).dark-mode .scroll-to-top:hover { background: #42BA5B; }
+.scroll-to-top:hover { background: var(--green-text-hover); box-shadow: var(--elev-2); }
 
+/* ── Heading anchors ───────────────────────────────────────────────────── */
+.heading-anchor {
+    margin-left: var(--space-base);
+    opacity: 0;
+    font-weight: 400;
+    text-decoration: none;
+    color: var(--text-secondary);
+}
+h2:hover .heading-anchor, h3:hover .heading-anchor,
+.heading-anchor:focus-visible { opacity: 1; }
+
+.doc-list { list-style: none; padding: 0; }
+.doc-list li + li { margin-top: var(--space-base); }
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .comparison { grid-template-columns: 1fr; }
+    .mapping-table, .diff-table { table-layout: auto; }
+}
+
+/* ── Print ────────────────────────────────────────────────────────────── */
 @media print {
-    /* Chrome (topbar/sidebar/backdrop/banner/scroll-to-top/copy-btn) is hidden by shared.css */
-    .analyzer-actions, .analyzer-input-status, .analyzer-drop-zone, .analyzer-copy-btn, .analyzer-copy-all, .analyzer-download-btn, .analyzer-edit-btn, .analyzer-yaml-expand, .analyzer-empty-state, .controls, .analyzer-export-actions, .comparison-copy-btn { display: none !important; }
-    .main-inner section { box-shadow: none; break-inside: avoid; }
-    /* Static code examples keep their on-screen dark palette otherwise —
-       browsers strip backgrounds by default, leaving light-gray-on-white text. */
-    /* Selector must be .main-inner pre, not pre: the shared code surface in
-       shared.css is itself .main-inner pre, so a bare `pre` here would lose the
-       border and color-scheme to it on specificity and print a dark border
-       around a light block. */
-    .main-inner pre { background: #F5F5F5 !important; color: #343434 !important; border: 1px solid #CCCCCC; color-scheme: light; }
-    .analyzer-yaml-output { background: #F5F5F5 !important; color: #343434 !important; border: 1px solid #CCCCCC; }
-    .analyzer-yaml-output.collapsed { max-height: none !important; overflow: visible !important; }
-    .analyzer-yaml-output.collapsed::after { display: none !important; }
-    tr.example-row { display: table-row !important; }
-    tr.expandable td:first-child::after { display: none !important; }
-    tr.expandable { border-left: none !important; }
-    /* Print both approach tabs' content — the inactive tab is otherwise lost */
+    .controls, .analyzer-editor, .analyzer-actions, .strategy,
+    .scroll-to-top, .tabs, .jump-row { display: none !important; }
+    .tool-page[hidden] { display: block !important; }
+    .example-row { display: table-row !important; }
     .approach-content { display: block !important; }
-    .yaml-key { color: #045B91 !important; }
-    .yaml-value { color: #B30013 !important; }
-    .yaml-comment { color: #666666 !important; }
-    .yaml-keyword, .yaml-bool { color: #004278 !important; }
-    .yaml-number { color: #007D30 !important; }
-    .yaml-separator { color: #666666 !important; }
-    .analyzer-success-banner { border: 1px solid #999999; }
-    body { background: white; font-size: 11pt; }
+    .comparison-block pre { background: var(--n100) !important; color-scheme: light; }
+    .comparison-block pre code,
+    .comparison-block pre [class^='yaml-'] { color: var(--n700) !important; }
+    .comparison, .analyzer-card, .info-box { break-inside: avoid; }
 }

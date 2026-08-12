@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Component gallery — F5 for Kubernetes</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/InterVariable-subset.woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/core.css">
+<script>
+/* Set the theme before first paint so it never flashes. */
+(function () {
+    try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+    } catch (e) { /* private browsing */ }
+}());
+</script>
+<script defer src="assets/js/chrome.js"></script>
+<style>
+    /* Gallery-only scaffolding. This file is a development harness and is
+       deleted before the rebuild lands — nothing here ships. */
+    .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2x); }
+    .swatch { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .swatch-chip { height: 56px; }
+    .swatch-label { padding: var(--space-base); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+    .swatch-label code { display: block; color: var(--text-secondary); }
+    .specimen + .specimen { margin-top: var(--space-3x); }
+    .row { display: flex; flex-wrap: wrap; gap: var(--space-2x); align-items: center; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-2x); }
+</style>
+</head>
+<body>
+
+<!-- ═══ ICON SPRITE ═══════════════════════════════════════════════════════
+     Inline so there is no extra request and no third-party runtime
+     dependency. 24x24 viewBox, 2px strokes, round caps — the console's
+     line-icon idiom. -->
+<svg class="sr-only" aria-hidden="true" focusable="false">
+  <!-- The NGINX mark. Literal brand colours are correct here: F5DS reserves
+       brand colour for logos, illustrations and pictograms, and the white
+       counter reads on green in both themes so no light/dark swap is needed. -->
+  <symbol id="logo-nginx" viewBox="0 0 53 60"><g transform="translate(-7.198 -0.359)"><path fill="#009639" d="M7.606,45.181a3.019,3.019,0,0,0,1.134,1.126L31.942,59.702a3.044,3.044,0,0,0,3.084,0L58.229,46.306a3.043,3.043,0,0,0,1.541-2.67V16.846a3.044,3.044,0,0,0-1.542-2.67L35.025,0.779a3.04,3.04,0,0,0-3.082,0L8.741,14.175a3.042,3.042,0,0,0-1.543,2.67V43.637a3.025,3.025,0,0,0,.407,1.544"/><path fill="#fff" d="M26.055,40.439a2.984,2.984,0,0,1-5.968,0l.003-20.483a3.111,3.111,0,0,1,3.388-2.899,5.306,5.306,0,0,1,4.067,1.819l.902,1.079L40.914,34.874V20.041a2.984,2.984,0,1,1,5.968,0l-.004,20.481a3.111,3.111,0,0,1-3.388,2.899,5.303,5.303,0,0,1-4.067-1.819L26.054,25.606V40.44Z"/></g></symbol>
+  <symbol id="icon-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></symbol>
+  <symbol id="icon-external" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h4"/></g></symbol>
+  <symbol id="icon-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5a10.5 10.5 0 00-3.32 20.47c.53.1.72-.23.72-.5v-1.8c-2.92.63-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.96-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.47 1.14 3.07.87.1-.68.37-1.14.67-1.4-2.33-.27-4.78-1.17-4.78-5.2 0-1.15.41-2.09 1.09-2.83-.11-.27-.47-1.34.1-2.8 0 0 .88-.28 2.89 1.08a10 10 0 015.26 0c2-1.36 2.89-1.08 2.89-1.08.57 1.46.21 2.53.1 2.8.68.74 1.09 1.68 1.09 2.83 0 4.04-2.46 4.93-4.8 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0012 1.5z"/></symbol>
+  <symbol id="icon-book" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 012-2h13a1 1 0 011 1v14"/><path d="M6 17h14v4H6a2 2 0 010-4z"/></g></symbol>
+  <symbol id="icon-grid" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></g></symbol>
+  <symbol id="icon-box" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></g></symbol>
+  <symbol id="icon-layers" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></g></symbol>
+  <symbol id="icon-tool" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a4 4 0 105.4 5.4l-1.6-1.6-2.2-2.2-1.6-1.6zM13 10L4 19a2 2 0 102.8 2.8L16 13"/></symbol>
+  <symbol id="icon-info" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zM7.25 6.75h1.5v4.5h-1.5v-4.5zM8 4.2a.95.95 0 110 1.9.95.95 0 010-1.9z"/></symbol>
+  <symbol id="icon-success" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm3.03 3.4l-3.9 3.9-1.9-1.9-1.06 1.06 2.96 2.96 4.96-4.96L11.03 5.9z"/></symbol>
+  <symbol id="icon-warning" viewBox="0 0 16 16"><path fill="currentColor" d="M8 .9L.6 14.2h14.8L8 .9zm0 3.1l5 9H3l5-9zm-.75 3.2h1.5v3.2h-1.5V7.2zm.75 4.1a.9.9 0 110 1.8.9.9 0 010-1.8z"/></symbol>
+  <symbol id="icon-error" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm-.75 2.6h1.5v4.2h-1.5V5.1zm.75 5.1a.9.9 0 110 1.8.9.9 0 010-1.8z"/></symbol>
+</svg>
+
+<noscript><p class="noscript-warning">This site works without JavaScript. Version numbers show their last published values and the navigation drawer is unavailable on small screens.</p></noscript>
+
+<a class="skip-link" href="#main">Skip to Content</a>
+<div class="sr-only" aria-live="polite" id="announce"></div>
+
+<!-- ═══ CHROME ════════════════════════════════════════════════════════════
+     Everything between this marker and the matching END marker is byte-
+     identical on every page and is asserted by scripts/check-chrome-sync.py.
+     Edit it here, then run that script. -->
+<!-- chrome:start -->
+<button class="icon-btn menu-toggle" id="menuToggle" type="button"
+        aria-label="Open navigation" aria-expanded="false" aria-controls="nav">
+  <svg aria-hidden="true"><use href="#icon-menu"></use></svg>
+</button>
+
+<a class="brand" href="/">
+  <svg class="brand-mark" aria-hidden="true"><use href="#logo-nginx"></use></svg>
+  <span class="brand-name">F5 for Kubernetes</span>
+</a>
+
+<header class="topbar">
+  <div class="topbar-heading">
+    <nav aria-label="Breadcrumb">
+      <ol class="breadcrumb" id="breadcrumb"></ol>
+    </nav>
+    <div class="topbar-title" id="pageTitle"></div>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-tertiary hide-compact" href="https://docs.nginx.com/" target="_blank" rel="noopener">
+      Documentation
+      <svg aria-hidden="true"><use href="#icon-external"></use></svg>
+    </a>
+    <a class="icon-btn hide-compact" href="https://github.com/nginx/kubernetes.nginx.org"
+       target="_blank" rel="noopener" aria-label="This site on GitHub">
+      <svg aria-hidden="true"><use href="#icon-github"></use></svg>
+    </a>
+    <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark theme" aria-pressed="false">
+      <svg class="theme-icon-light" aria-hidden="true"><use href="#icon-moon"></use></svg>
+      <svg class="theme-icon-dark" aria-hidden="true" hidden><use href="#icon-sun"></use></svg>
+    </button>
+  </div>
+</header>
+
+<div class="nav-backdrop" id="navBackdrop"></div>
+
+<nav class="nav" id="nav" aria-label="Main">
+  <div class="nav-group">
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/">Catalog</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-box"></use></svg>Products</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/products/big-ip-next-for-kubernetes/">BIG-IP Next for Kubernetes
+        <span class="nav-link-meta">L4&ndash;L7 ingress and egress</span></a></li>
+      <li><a class="nav-link" href="/products/container-ingress-services/">Container Ingress Services
+        <span class="nav-link-meta">BIG-IP from Kubernetes</span></a></li>
+      <li><a class="nav-link" href="/products/nginx-ingress-controller/">NGINX Ingress Controller
+        <span class="nav-link-meta">Ingress API</span></a></li>
+      <li><a class="nav-link" href="/products/nginx-gateway-fabric/">NGINX Gateway Fabric
+        <span class="nav-link-meta">Gateway API</span></a></li>
+      <li><a class="nav-link" href="/products/f5-waf-for-nginx/">F5 WAF for NGINX
+        <span class="nav-link-meta">App and API security</span></a></li>
+      <li><a class="nav-link" href="/products/f5-ai-gateway/">F5 AI Gateway
+        <span class="nav-link-meta">AI traffic governance</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-layers"></use></svg>Solutions</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/solutions/better-together/">Better Together
+        <span class="nav-link-meta">How the products combine</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <p class="nav-group-title"><svg aria-hidden="true"><use href="#icon-tool"></use></svg>Tools</p>
+    <ul class="nav-list">
+      <li><a class="nav-link" href="/tools/ingress-nginx-migration/">ingress-nginx Migration
+        <span class="nav-link-meta">Move to NGINX Ingress Controller</span></a></li>
+      <li><a class="nav-link" href="/tools/ingress2gateway/">ingress2gateway
+        <span class="nav-link-meta">Convert Ingress to Gateway API</span></a></li>
+    </ul>
+  </div>
+  <div class="nav-divider"></div>
+  <div class="nav-footer">
+    <p>&copy; <span id="year">2026</span> F5, Inc.</p>
+    <p>Created with AI. Maintained by humans.</p>
+  </div>
+</nav>
+<!-- chrome:end -->
+
+<main class="main" id="main">
+<div class="main-inner">
+
+  <h1>Component gallery</h1>
+  <p class="page-lede">Every F5DS component this site builds on, in one place, so
+     the foundation can be checked in both themes before any page is written.
+     This file is a development harness and is deleted before the rebuild lands.</p>
+
+  <!-- ── Colour ──────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Colour</h2>
+    <p class="page-lede">Neutrals are the F5DS N-ramp. Two are derived because
+       F5DS&rsquo;s own published values fail WCAG AA: secondary text on the page
+       background measures 4.25:1, and the documented icon colour manages 2.42:1
+       on white. Run <code>scripts/check-contrast.py</code> for the full table.</p>
+    <div class="swatches specimen">
+      <div class="swatch"><div class="swatch-chip" style="background:var(--n0)"></div><div class="swatch-label">N0 <code>--surface</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--n100)"></div><div class="swatch-label">N100 <code>--bg</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--n200)"></div><div class="swatch-label">N200 <code>--border</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--n300)"></div><div class="swatch-label">N300 <code>--text-disabled</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--n450)"></div><div class="swatch-label">N450 derived <code>--icon</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--n550)"></div><div class="swatch-label">N550 derived <code>--text-secondary</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--n600)"></div><div class="swatch-label">N600 <code>--text</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--n700)"></div><div class="swatch-label">N700 shadows</div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--green)"></div><div class="swatch-label">NGINX green <code>--green</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--green-text)"></div><div class="swatch-label">Green text/fill <code>--green-text</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--blue)"></div><div class="swatch-label">Dodger Blue <code>--blue</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--blue-text)"></div><div class="swatch-label">Blue text/fill <code>--blue-text</code></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--emerald)"></div><div class="swatch-label">Emerald positive</div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--amber)"></div><div class="swatch-label">Amber attention</div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--pomegranate)"></div><div class="swatch-label">Pomegranate negative</div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:var(--purple)"></div><div class="swatch-label">Medium Purple informative</div></div>
+    </div>
+  </section>
+
+  <!-- ── Type ────────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Type</h2>
+    <p class="page-lede">Inter, weights 400/500/700 only, no tracking anywhere.
+       Each size carries a fixed leading rather than a ratio, so line-height is
+       a length and every rule restates it.</p>
+    <div class="card specimen">
+      <p style="font-size:var(--fs-h1);line-height:var(--lh-h1);font-weight:700">H1 Bold 36/54 &mdash; landing page titles</p>
+      <p style="font-size:var(--fs-h2);line-height:var(--lh-h2);font-weight:700">H2 Bold 24/36 &mdash; home and catalog titles</p>
+      <p style="font-size:var(--fs-h3);line-height:var(--lh-h3);font-weight:400">H3 Regular 18/26 &mdash; page titles</p>
+      <p style="font-size:var(--fs-body-lg);line-height:var(--lh-body-lg);font-weight:500">Body Medium 16/24 &mdash; card titles, nav headers</p>
+      <p style="font-size:var(--fs-body);line-height:var(--lh-body)">Body Regular 14/20 &mdash; the main body and UI size</p>
+      <p style="font-size:var(--fs-caption);line-height:var(--lh-caption)">Caption Regular 12/18 &mdash; breadcrumbs, tags, table headers</p>
+      <p style="font-size:var(--fs-badge);line-height:var(--lh-badge);font-weight:500">CAPTION MEDIUM 10/16 &mdash; BADGES ONLY</p>
+    </div>
+  </section>
+
+  <!-- ── Buttons ─────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Button</h2>
+    <p class="page-lede">Exactly one Primary per group, 20px between buttons,
+       never truncates, always elevation L0. Primary uses <code>--green-text</code>
+       rather than <code>--green</code>: white on <code>#009639</code> is 3.87:1
+       and fails AA.</p>
+    <div class="card specimen">
+      <div class="btn-row">
+        <button class="btn btn-primary" type="button">Get Started</button>
+        <button class="btn btn-secondary" type="button">View Documentation</button>
+        <button class="btn btn-accent" type="button">Explore</button>
+        <button class="btn btn-tertiary" type="button">Learn More</button>
+        <button class="btn btn-secondary" type="button" disabled>Disabled</button>
+      </div>
+    </div>
+    <div class="card specimen">
+      <div class="btn-row">
+        <button class="btn btn-primary btn-xs" type="button">XS 24</button>
+        <button class="btn btn-primary" type="button">S 32 default</button>
+        <button class="btn btn-primary btn-md" type="button">M 40</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tags and status ─────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Tag and status</h2>
+    <p class="page-lede">Tags are the only elements permitted the pill radius.
+       A status dot is never rendered without its label &mdash; Emerald and Amber
+       measure 2.02:1 and 1.60:1 on white and cannot reach the 3:1 non-text bar
+       at any usable saturation, so the label carries the meaning and the hue
+       only reinforces it.</p>
+    <div class="card specimen">
+      <div class="row">
+        <span class="tag">Apache 2.0</span>
+        <span class="tag tag-info">Early Access</span>
+        <span class="tag tag-positive">Documented</span>
+        <span class="tag tag-attention">Limited Availability</span>
+        <span class="tag tag-negative">End of maintenance</span>
+      </div>
+    </div>
+    <div class="card specimen">
+      <div class="row">
+        <span class="status"><span class="status-dot status-dot-positive"></span>Open source</span>
+        <span class="status"><span class="status-dot status-dot-info"></span>Commercial</span>
+        <span class="status"><span class="status-dot status-dot-attention"></span>Requires NGINX Plus</span>
+        <span class="status"><span class="status-dot status-dot-neutral"></span>Upstream project</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Cards ───────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Card</h2>
+    <p class="page-lede">F5DS publishes no Card component; this geometry is taken
+       from the console&rsquo;s own Home page &mdash; white surface, hairline border,
+       4px radius, and no shadow at rest. Interactive cards strengthen on hover
+       without translating.</p>
+    <div class="grid-3 specimen">
+      <div class="card">
+        <p class="card-title">Static card</p>
+        <p class="card-body">Border only. Elevation is reserved for surfaces that genuinely float above the page.</p>
+      </div>
+      <a class="card card-interactive" href="#main">
+        <p class="card-title">Interactive card <span aria-hidden="true">&rsaquo;</span></p>
+        <p class="card-body">Hover strengthens the border and adds L1. Deliberately no lift &mdash; a page of cards rising at once is a lot of motion for a documentation site.</p>
+      </a>
+      <div class="card">
+        <div class="empty-state">
+          <p class="empty-state-title">No results found</p>
+          <p>Try a different search term.</p>
+          <button class="btn btn-secondary btn-xs" type="button">Clear Filters</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Notifications ───────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Notification</h2>
+    <p class="page-lede">Four sentiments, each with a fixed icon. Body text stays
+       N600 in all four &mdash; sentiment is carried by icon, border and background,
+       never by text colour, so it survives being read in greyscale.</p>
+    <div class="specimen">
+      <div class="notification notification-info">
+        <svg aria-hidden="true"><use href="#icon-info"></use></svg>
+        <div><p class="notification-title">Repository archived</p>
+        <p>The Container Ingress Services repository is no longer monitored on GitHub. Releases continue through the Red Hat Container Registry, Docker Hub and Quay, and support goes to F5 Technical Support.</p></div>
+      </div>
+      <div class="notification notification-positive">
+        <svg aria-hidden="true"><use href="#icon-success"></use></svg>
+        <div><p class="notification-title">Documented integration</p>
+        <p>F5 publishes a deployment guide and a compatibility matrix for this combination.</p></div>
+      </div>
+      <div class="notification notification-attention">
+        <svg aria-hidden="true"><use href="#icon-warning"></use></svg>
+        <div><p class="notification-title">Requires NGINX Plus</p>
+        <p>F5 WAF for NGINX runs only on the NGINX Plus data plane and needs a separate subscription.</p></div>
+      </div>
+      <div class="notification notification-negative">
+        <svg aria-hidden="true"><use href="#icon-error"></use></svg>
+        <div><p class="notification-title">No direct equivalent</p>
+        <p>This annotation has no counterpart and needs a different approach.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Table ───────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Table</h2>
+    <p class="page-lede">The console&rsquo;s services table, which the Catalog page
+       is built on. F5DS publishes no Table component, so cell padding is inferred
+       from its screens; the Caption Bold column header is spec.</p>
+    <div class="card specimen" style="padding:0">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr>
+            <th scope="col">Product</th><th scope="col">Description</th>
+            <th scope="col">Docs</th><th scope="col">Licence</th><th scope="col">Action</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><a href="#main">BIG-IP Next for Kubernetes</a></td>
+              <td>L4&ndash;L7 ingress and egress at the North/South gateway</td>
+              <td><a class="link-external" href="#main" aria-label="BIG-IP Next for Kubernetes documentation"><svg aria-hidden="true"><use href="#icon-external"></use></svg></a></td>
+              <td><span class="status"><span class="status-dot status-dot-info"></span>Commercial</span></td>
+              <td><a class="btn btn-accent btn-xs" href="#main">Explore</a></td>
+            </tr>
+            <tr>
+              <td><a href="#main">NGINX Ingress Controller</a></td>
+              <td>Ingress API controller with NGINX in the same pod</td>
+              <td><a class="link-external" href="#main" aria-label="NGINX Ingress Controller documentation"><svg aria-hidden="true"><use href="#icon-external"></use></svg></a></td>
+              <td><span class="status"><span class="status-dot status-dot-positive"></span>Apache 2.0</span></td>
+              <td><a class="btn btn-accent btn-xs" href="#main">Explore</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tabs ────────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Tabs</h2>
+    <div class="card specimen">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" type="button" aria-selected="true">Overview</button>
+        <button class="tab" role="tab" type="button" aria-selected="false">Install</button>
+        <button class="tab" role="tab" type="button" aria-selected="false">Compatibility</button>
+      </div>
+      <p>Fixed 32px height with a 20px gap to the content below. The active
+         indicator animates from the left edge.</p>
+    </div>
+  </section>
+
+  <!-- ── Code ────────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Code</h2>
+    <p class="page-lede">The code surface stays dark in both themes, tinted with
+       N700 rather than black. Copy buttons are injected by
+       <code>chrome.js</code> so a page can never hand-write one that drifts
+       from the block it belongs to.</p>
+    <div class="code-block specimen" data-copy-label="the Helm install command"><code><span class="tok-comment"># Install via Helm from the OCI registry</span>
+<span class="tok-cmd">helm</span> install nginx-ingress \
+  oci://ghcr.io/nginx/charts/nginx-ingress \
+  <span class="tok-flag">--version</span> <span class="tok-str">2.6.4</span> \
+  <span class="tok-flag">--namespace</span> nginx-ingress <span class="tok-flag">--create-namespace</span></code></div>
+  </section>
+
+  <!-- ── Links ───────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Link</h2>
+    <div class="card specimen">
+      <p>A <a href="#main">default link</a> navigates. An
+         <a class="link-external" href="https://docs.nginx.com/" target="_blank" rel="noopener">external link<svg aria-hidden="true"><use href="#icon-external"></use></svg></a>
+         always carries the trailing icon and opens a new tab. Links never
+         perform actions &mdash; that is a button&rsquo;s job.</p>
+      <p><a class="link-arrow" href="#main">Go to Catalog <span aria-hidden="true">&rsaquo;</span></a></p>
+    </div>
+  </section>
+
+</div>
+</main>
+
+<script>
+/* Gallery-only: the real pages set these server-side in their markup. */
+document.getElementById('pageTitle').textContent = 'Component gallery';
+document.getElementById('breadcrumb').innerHTML =
+    '<li><a href="/">Home</a></li><li aria-current="page">Component gallery</li>';
+</script>
+</body>
+</html>

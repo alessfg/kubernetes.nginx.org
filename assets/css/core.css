@@ -1,0 +1,843 @@
+/* core.css — reset, base typography, F5DS components, and the app shell.
+   =========================================================================
+   Loaded on every page, after tokens.css and before the page stylesheet.
+
+   Nothing in this file writes a literal colour, size, space, radius, shadow
+   or duration; every value resolves to a token in tokens.css. The two
+   exceptions are structural (0, 1px hairlines, and percentage/viewport
+   geometry), which are not design decisions.
+
+   Components here are the ones F5DS actually documents. Where the system is
+   silent — it publishes no Card, Table, Breadcrumb or Page Header component —
+   the geometry is inferred from the console's own screens and marked as such,
+   so the next person knows which rules are spec and which are observation.
+   ========================================================================= */
+
+/* ── Webfont ───────────────────────────────────────────────────────────────
+   Inter, self-hosted and subset to the glyphs this site renders. One 112 KB
+   variable request covers every weight. Never a CDN — see
+   assets/fonts/README.md for provenance and how to regenerate. */
+@font-face {
+    font-family: 'InterVariable';
+    src: url('../fonts/InterVariable-subset.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Metric-matched stand-in for the swap window. font-display:swap renders text
+   in the fallback until the woff2 lands; without matched metrics that hand-off
+   reflows the page. Arial at the same font-size is ~4.7% narrower than Inter
+   and sits on a different baseline, so these overrides scale and re-seat it to
+   occupy Inter's exact box — the swap then changes letterforms only.
+
+   Values are derived from these specific files: Inter's own hhea metrics, and
+   the average advance width of Inter instanced at each weight against the
+   matching Arial face. Recompute if the font is regenerated; the script is in
+   assets/fonts/README.md.
+
+   Two faces rather than one because a single face with no font-weight
+   descriptor leaves the browser to *synthesise* bold, which smears the
+   stand-in. The 700 face deliberately has no local('Arial') last resort: if
+   Arial Bold is missing we want synthesis from the 400 face, not
+   regular-weight glyphs in the 700 slot. 400 and 700 cover 500 too — CSS font
+   matching resolves 500 down to 400 within a family, so it gets a real face. */
+@font-face {
+    font-family: 'Inter Fallback';
+    src: local('Arial');
+    font-weight: 400;
+    font-style: normal;
+    ascent-override: 92.54%;
+    descent-override: 23.04%;
+    line-gap-override: 0.00%;
+    size-adjust: 104.68%;
+}
+@font-face {
+    font-family: 'Inter Fallback';
+    src: local('Arial Bold'), local('Arial-BoldMT');
+    font-weight: 700;
+    font-style: normal;
+    ascent-override: 92.97%;
+    descent-override: 23.15%;
+    line-gap-override: 0.00%;
+    size-adjust: 104.20%;
+}
+
+
+/* ── Reset and base ───────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+/* F5DS pairs a fixed leading with each size rather than one global ratio, so
+   line-height is a length everywhere. Every rule that changes font-size below
+   restates its paired --lh-*; none of them inherit this one. */
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text); }
+h1 { font-size: var(--fs-h1); line-height: var(--lh-h1); }
+h2 { font-size: var(--fs-h2); line-height: var(--lh-h2); }
+h3 { font-size: var(--fs-h3); line-height: var(--lh-h3); }
+h4, h5, h6 { font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); }
+
+p { font-size: var(--fs-body); line-height: var(--lh-body); }
+p + p { margin-top: var(--space-base); }
+
+img, svg { display: block; max-width: 100%; }
+svg { flex-shrink: 0; }
+
+ul, ol { list-style-position: outside; padding-left: var(--space-2x); }
+li { font-size: var(--fs-body); line-height: var(--lh-body); }
+li + li { margin-top: var(--space-small); }
+
+strong, b { font-weight: 700; }
+
+hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: var(--space-3x) 0;
+}
+
+/* ── Links ────────────────────────────────────────────────────────────────
+   F5DS: links navigate, never act — an action is a Button. Default and
+   External are the two documented variants; External always carries a
+   trailing icon and opens a new tab. */
+a { color: var(--blue-text); text-decoration: underline; text-underline-offset: 2px; }
+a:hover { color: var(--blue-text-hover); }
+a:visited { color: var(--blue-text); }
+
+/* Anchors that wrap a whole card or row are structural, not links in the
+   typographic sense, and take their colour from the content inside. */
+a.plain, a.plain:visited { color: inherit; text-decoration: none; }
+
+.link-external { display: inline-flex; align-items: center; gap: var(--space-small); }
+.link-external svg { width: 12px; height: 12px; }
+
+/* "Go to Workspace ›" — the console's standard forward affordance. */
+.link-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-small);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    font-weight: 500;
+}
+
+/* ── Focus ────────────────────────────────────────────────────────────────
+   One idiom sitewide: an outline. Never a box-shadow ring — a ring is
+   invisible against the code surface and clipped by overflow containers. */
+:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-small);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* ── Accessibility helpers ────────────────────────────────────────────────── */
+
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.skip-link {
+    position: absolute;
+    top: var(--space-base);
+    left: var(--space-base);
+    z-index: 500;
+    padding: var(--space-base) var(--space-2x);
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-2);
+    text-decoration: none;
+    transform: translateY(-200%);
+}
+.skip-link:focus { transform: translateY(0); }
+
+.noscript-warning {
+    padding: var(--space-base) var(--space-2x);
+    background: var(--amber-tint);
+    color: var(--text);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    text-align: center;
+}
+
+
+/* ═══ App shell ═══════════════════════════════════════════════════════════
+   The console puts the branding block in the navigation column's header row
+   and runs the top bar alongside it, so the two chrome elements share one
+   band across the top. Everything is fixed; only .main scrolls. */
+
+.brand {
+    position: fixed;
+    top: 0; left: 0;
+    width: var(--nav-w);
+    height: var(--topbar-h);
+    z-index: 210;
+    display: flex;
+    align-items: center;
+    gap: var(--space-base);
+    padding: 0 var(--space-2x);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+}
+.brand:hover { color: var(--text); }
+/* The NGINX mark is taller than it is wide (53:60), so height drives it. */
+.brand-mark { height: 28px; width: auto; }
+.brand-name {
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    font-weight: 700;
+}
+
+.topbar {
+    position: fixed;
+    top: 0; right: 0;
+    left: var(--nav-w);
+    height: var(--topbar-h);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2x);
+    padding: 0 var(--space-3x);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+.topbar-heading { flex: 1; min-width: 0; }
+/* The page title lives in the top bar, above the content area — an XC
+   signature. Breadcrumb sits above it in Caption, the title in H3 Regular,
+   which is what the console uses for a page title (H1/H2 are reserved for
+   landing and catalog pages inside the content area). */
+.topbar-title {
+    font-size: var(--fs-h3);
+    line-height: var(--lh-h3);
+    font-weight: 400;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.topbar-actions { display: flex; align-items: center; gap: var(--space-base); }
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-small);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+    list-style: none;
+    padding: 0;
+}
+.breadcrumb li { font-size: var(--fs-caption); line-height: var(--lh-caption); margin: 0; }
+.breadcrumb li + li::before {
+    content: '›';
+    margin-right: var(--space-small);
+    color: var(--icon);
+}
+.breadcrumb a { font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.breadcrumb [aria-current] { color: var(--text-secondary); }
+
+/* Icon-only control: theme toggle, menu toggle. 32px is F5DS's S button
+   height; the 44px minimum below 900px is a WCAG target-size addition. */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
+}
+.icon-btn:hover { background: var(--surface-sunken); color: var(--text); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.menu-toggle { display: none; }
+
+/* ── Primary Navigation ───────────────────────────────────────────────────
+   F5DS spec: fixed 264px, full height, a Header and a Body of nav groups
+   with group icon, group title, nav items and an active indicator. Text
+   wraps and never truncates. The selected-item highlight is the one place
+   --radius-small is specified. */
+
+.nav {
+    position: fixed;
+    top: var(--topbar-h); left: 0; bottom: 0;
+    width: var(--nav-w);
+    z-index: 190;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: var(--space-2x) 0 var(--space-4x);
+}
+
+.nav-group + .nav-group { margin-top: var(--space-3x); }
+
+.nav-group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-base);
+    padding: 0 var(--space-2x) var(--space-base);
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    font-weight: 500;
+    color: var(--text);
+}
+.nav-group-title svg { width: 18px; height: 18px; color: var(--icon); }
+
+.nav-list { list-style: none; padding: 0; margin: 0; }
+.nav-list li { margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); }
+
+.nav-link {
+    position: relative;
+    display: block;
+    padding: var(--space-base) var(--space-2x) var(--space-base) var(--space-4x);
+    color: var(--text);
+    text-decoration: none;
+    border-radius: var(--radius-small);
+    transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
+}
+.nav-link:hover { background: var(--surface-sunken); color: var(--text); }
+.nav-link:visited { color: var(--text); }
+
+/* Active item. The console marks the current page in green on NGINX-branded
+   surfaces — same signal as its primary button — with a rail on the left. */
+.nav-link[aria-current] {
+    color: var(--green-text);
+    font-weight: 500;
+    background: var(--surface-sunken);
+}
+.nav-link[aria-current]::before {
+    content: '';
+    position: absolute;
+    left: 0; top: var(--space-small); bottom: var(--space-small);
+    width: 3px;
+    border-radius: var(--radius-small);
+    background: var(--green);
+}
+
+.nav-link-meta {
+    display: block;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+}
+
+.nav-divider {
+    height: 1px;
+    background: var(--border);
+    margin: var(--space-3x) var(--space-2x);
+}
+
+.nav-footer {
+    padding: 0 var(--space-2x);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+}
+.nav-footer p { font-size: var(--fs-caption); line-height: var(--lh-caption); }
+
+.nav-backdrop { display: none; }
+
+/* ── Main ─────────────────────────────────────────────────────────────────
+   F5DS's 20px page margin is not adopted: it assumes a dense product screen
+   in a chrome-heavy shell, and on a wide documentation page it puts prose
+   against the viewport edge. 48px gutters instead. */
+.main {
+    margin-left: var(--nav-w);
+    margin-top: var(--topbar-h);
+    min-height: calc(100vh - var(--topbar-h));
+}
+.main-inner {
+    max-width: var(--content-max);
+    padding: var(--space-4x) var(--gutter) var(--space-8x);
+}
+
+/* Content-area link colour is page-scoped on purpose. Declaring it globally
+   would override the navigation and top bar, whose links inherit --text. */
+.main-inner a:not(.btn):not(.plain):not(.tag) { color: var(--blue-text); }
+.main-inner a:not(.btn):not(.plain):not(.tag):hover { color: var(--blue-text-hover); }
+
+.page-lede {
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    color: var(--text-secondary);
+    max-width: 72ch;
+}
+
+.section + .section { margin-top: var(--space-5x); }
+.section-title {
+    font-size: var(--fs-h2);
+    line-height: var(--lh-h2);
+    font-weight: 700;
+    margin-bottom: var(--space-2x);
+}
+.section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2x);
+    margin-bottom: var(--space-2x);
+}
+.section-head .section-title { margin-bottom: 0; }
+
+
+/* ═══ Components ══════════════════════════════════════════════════════════ */
+
+/* ── Button ───────────────────────────────────────────────────────────────
+   F5DS documents seven variants and three sizes. Rules that matter: exactly
+   one Primary per group, 20px between buttons in a group, buttons never
+   truncate, and elevation is always L0 because a button carries its own
+   affordance. Sizes are S-32 (default), M-40, XS-24. */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-base);
+    height: 32px;
+    padding: 0 var(--space-2hx);
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    font-weight: 400;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: var(--elev-0);
+    transition: background var(--dur-colour) linear,
+                border-color var(--dur-colour) linear,
+                color var(--dur-colour) linear;
+}
+.btn svg { width: 16px; height: 16px; }
+.btn-xs { height: 24px; padding: 0 var(--space-2x); }
+.btn-md { height: 40px; padding: 0 var(--space-3x); }
+
+/* NGINX green leads on this site, matching the console's NGINX-branded
+   surfaces. --green-text rather than --green as the fill: white on #009639 is
+   3.87:1 and fails AA, white on #007D30 is 5.28:1. */
+.btn-primary,
+.btn-primary:visited {
+    background: var(--green-text);
+    border-color: var(--green-text);
+    color: var(--n0);
+}
+.btn-primary:hover {
+    background: var(--green-text-hover);
+    border-color: var(--green-text-hover);
+    color: var(--n0);
+}
+
+.btn-secondary,
+.btn-secondary:visited {
+    background: var(--surface);
+    border-color: var(--border-control);
+    color: var(--text);
+}
+.btn-secondary:hover { background: var(--surface-sunken); color: var(--text); }
+
+/* The console's table-row action: an outlined button in the platform accent. */
+.btn-accent,
+.btn-accent:visited {
+    background: var(--surface);
+    border-color: var(--blue-text);
+    color: var(--blue-text);
+}
+.btn-accent:hover {
+    background: var(--blue-tint);
+    border-color: var(--blue-text-hover);
+    color: var(--blue-text-hover);
+}
+
+/* Tertiary carries no border and no padding — it is a button that reads as a
+   link but performs an action. */
+.btn-tertiary,
+.btn-tertiary:visited {
+    background: none;
+    border-color: transparent;
+    padding: 0;
+    height: auto;
+    color: var(--blue-text);
+}
+.btn-tertiary:hover { color: var(--blue-text-hover); text-decoration: underline; }
+
+.btn[disabled], .btn-disabled {
+    background: var(--surface-sunken);
+    border-color: var(--border);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* F5DS's group gap is 20px, not 16px. */
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--space-2hx); align-items: center; }
+
+:is(html, body).dark .btn-primary,
+:is(html, body).dark .btn-primary:visited {
+    background: var(--green);
+    border-color: var(--green);
+    color: var(--n700);
+}
+:is(html, body).dark .btn-primary:hover {
+    background: var(--green-text-hover);
+    border-color: var(--green-text-hover);
+    color: var(--n700);
+}
+
+/* ── Tag ──────────────────────────────────────────────────────────────────
+   Tags and Badges are the only elements permitted --radius-pill. Caption
+   Regular 12px per the type spec. */
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-small);
+    padding: 0 var(--space-base);
+    height: 20px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    font-weight: 400;
+    white-space: nowrap;
+    text-decoration: none;
+}
+.tag-info      { background: var(--purple-tint);      border-color: transparent; }
+.tag-positive  { background: var(--emerald-tint);     border-color: transparent; }
+.tag-attention { background: var(--amber-tint);       border-color: transparent; }
+.tag-negative  { background: var(--pomegranate-tint); border-color: transparent; }
+
+/* Status dot. NEVER rendered without its text label — Emerald and Amber
+   measure 2.02:1 and 1.60:1 on white and cannot reach the 3:1 non-text bar at
+   any usable saturation, so the hue is redundant reinforcement and the label
+   carries the meaning. See scripts/check-contrast.py for the full reasoning. */
+.status { display: inline-flex; align-items: center; gap: var(--space-base); white-space: nowrap; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.status-dot-positive  { background: var(--emerald); }
+.status-dot-attention { background: var(--amber); }
+.status-dot-negative  { background: var(--pomegranate); }
+.status-dot-info      { background: var(--purple); }
+.status-dot-neutral   { background: var(--n400); }
+
+/* ── Card ─────────────────────────────────────────────────────────────────
+   F5DS publishes no Card component. Geometry is taken from the console's own
+   Home and landing pages: white surface, 1px N200 border, 4px radius, and
+   NO shadow at rest — elevation is reserved for surfaces that genuinely
+   float. 20px padding is F5DS's "between page content or panels" step, which
+   is what the annotated Workspace Card uses. */
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-2hx);
+}
+.card-title {
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    font-weight: 500;
+    margin-bottom: var(--space-base);
+}
+.card-body { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); }
+
+/* Interactive card. F5DS treats elevation as a hover affordance; the site
+   deliberately does not translate on hover — 'Elevate Up' is a Motion-page
+   catalogue entry rather than a mandate, and a page of cards lifting at once
+   is a lot of motion for a documentation site. Shadow and border only. */
+.card-interactive {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--dur-colour) linear,
+                box-shadow var(--dur-elev) linear;
+}
+.card-interactive:visited { color: inherit; }
+.card-interactive:hover {
+    border-color: var(--border-control);
+    box-shadow: var(--elev-1);
+}
+
+/* ── Table ────────────────────────────────────────────────────────────────
+   F5DS publishes no Table component either; cell padding is inferred from the
+   console's services table. Column headers are Caption Bold per the type
+   spec, which does document them. */
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td {
+    padding: var(--space-base) var(--space-2x);
+    text-align: left;
+    vertical-align: middle;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    border-bottom: 1px solid var(--border);
+}
+.table thead th {
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    font-weight: 700;
+    color: var(--text-secondary);
+    background: var(--surface-sunken);
+    white-space: nowrap;
+}
+.table tbody tr:last-child td { border-bottom: 0; }
+.table-wrap { overflow-x: auto; }
+
+/* ── Notification ─────────────────────────────────────────────────────────
+   F5DS binds each sentiment to a fixed icon and states that body text stays
+   N600 in all four — sentiment is carried by icon, border and background
+   only, never by text colour. The icon is mandatory: it is what makes the
+   sentiment legible to anyone who cannot separate the hues. */
+.notification {
+    display: flex;
+    gap: var(--space-base);
+    padding: var(--space-2x);
+    border-radius: var(--radius);
+    border-left: 4px solid var(--border-control);
+    background: var(--surface-sunken);
+    color: var(--text);
+}
+/* The icon is optically centred on the first line of body text rather than
+   nudged by a magic number: (leading - icon height) / 2, both from the scale. */
+.notification svg { width: 1rem; height: 1rem; margin-top: calc((var(--lh-body) - 1rem) / 2); }
+.notification-title {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    font-weight: 700;
+    margin-bottom: var(--space-small);
+}
+.notification p { font-size: var(--fs-body); line-height: var(--lh-body); }
+.notification-info      { background: var(--purple-tint);      border-left-color: var(--purple); }
+.notification-info      svg { color: var(--purple); }
+.notification-positive  { background: var(--emerald-tint);     border-left-color: var(--emerald); }
+.notification-positive  svg { color: var(--emerald); }
+.notification-attention { background: var(--amber-tint);       border-left-color: var(--amber); }
+.notification-attention svg { color: var(--amber); }
+.notification-negative  { background: var(--pomegranate-tint); border-left-color: var(--pomegranate); }
+.notification-negative  svg { color: var(--pomegranate); }
+.notification + .notification { margin-top: var(--space-base); }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────
+   F5DS: fixed 32px height, 20px gap to the content below, exactly one active
+   tab, and an active indicator that animates 0→100% from the left edge. */
+.tabs {
+    display: flex;
+    gap: var(--space-3x);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-2hx);
+    overflow-x: auto;
+}
+.tab {
+    position: relative;
+    height: 32px;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected='true'] { color: var(--text); font-weight: 500; }
+.tab[aria-selected='true']::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: -1px;
+    width: 100%; height: 2px;
+    background: var(--green);
+    animation: tab-indicator var(--dur-reveal) var(--ease-enter);
+}
+@keyframes tab-indicator { from { width: 0; } to { width: 100%; } }
+
+/* ── Code ─────────────────────────────────────────────────────────────────
+   The code surface stays dark in both themes, tinted with N700 rather than
+   black so it sits in the same colour world as the rest of the site. */
+code, kbd, samp {
+    font-family: var(--mono);
+    font-size: 0.9em;   /* relative to its context, not a scale step */
+}
+:not(pre) > code {
+    padding: var(--space-xsmall) var(--space-small);
+    border-radius: var(--radius-small);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.code-block {
+    position: relative;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: var(--radius);
+    padding: var(--space-2hx);
+    overflow-x: auto;
+    color-scheme: dark;
+}
+.code-block code {
+    display: block;
+    font-family: var(--mono);
+    font-size: var(--fs-code);
+    line-height: var(--lh-code);
+    color: var(--code-fg);
+    white-space: pre;
+    background: none;
+    border: 0;
+    padding: 0;
+}
+.code-block + .code-block { margin-top: var(--space-2x); }
+.code-block .tok-comment { color: var(--emerald); }
+.code-block .tok-cmd     { color: var(--blue); }
+.code-block .tok-flag    { color: var(--amber); }
+.code-block .tok-str     { color: var(--java); }
+
+.copy-btn {
+    position: absolute;
+    top: var(--space-base);
+    right: var(--space-base);
+    z-index: 2;
+    background: var(--on-code);
+    border-color: var(--on-code-strong);
+    color: var(--n300);
+}
+.copy-btn:hover { background: var(--on-code-strong); color: var(--n0); }
+.copy-btn.is-copied {
+    background: var(--emerald-tint);
+    border-color: transparent;
+    color: var(--n700);
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────
+   F5DS's "Empty Space Card": message centred inside a card. */
+.empty-state { text-align: center; padding: var(--space-6x) var(--space-3x); }
+.empty-state-title {
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    font-weight: 700;
+    margin-bottom: var(--space-base);
+}
+.empty-state p { color: var(--text-secondary); margin-bottom: var(--space-2x); }
+
+
+/* ═══ Responsive ══════════════════════════════════════════════════════════
+   F5DS publishes no breakpoints, so these are local conventions. 900px is
+   where the navigation stops fitting alongside content; 600px is where the
+   top bar has to shed its utility links. */
+
+@media (max-width: 900px) {
+    .brand {
+        position: fixed;
+        width: auto;
+        border-right: 0;
+        padding-left: var(--space-2x);
+        left: 44px;   /* clears the menu toggle */
+    }
+    .topbar { left: 0; padding-left: 0; justify-content: flex-end; }
+    .topbar-heading { display: none; }
+
+    .menu-toggle {
+        display: inline-flex;
+        position: fixed;
+        top: 0; left: 0;
+        z-index: 220;
+        width: 44px; height: var(--topbar-h);
+        border-radius: 0;
+    }
+
+    /* Drawer. visibility rather than display so the transition runs, and so
+       the panel is removed from the tab order while closed. */
+    .nav {
+        top: var(--topbar-h);
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition: transform var(--dur-move) var(--ease-exit),
+                    visibility 0s linear var(--dur-move);
+        box-shadow: var(--elev-2);
+    }
+    .nav.is-open {
+        transform: translateX(0);
+        visibility: visible;
+        transition: transform var(--dur-move) var(--ease-enter),
+                    visibility 0s;
+    }
+    .nav-backdrop {
+        display: block;
+        position: fixed;
+        inset: var(--topbar-h) 0 0;
+        z-index: 180;
+        background: var(--scrim);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity var(--dur-colour) linear, visibility 0s linear var(--dur-colour);
+    }
+    .nav-backdrop.is-visible { opacity: 1; visibility: visible; transition: opacity var(--dur-colour) linear; }
+
+    .main { margin-left: 0; }
+    .main-inner { padding: var(--space-3x) var(--space-3x) var(--space-6x); }
+
+    /* WCAG target size beats F5DS's fixed 32px on touch. */
+    .btn, .tab, .icon-btn { min-height: 44px; }
+    .btn-xs { min-height: 32px; }
+}
+
+@media (max-width: 600px) {
+    .main-inner { padding: var(--space-2hx) var(--space-2x) var(--space-5x); }
+    .hide-compact { display: none; }
+    .btn-row .btn { width: 100%; }
+    h1 { font-size: var(--fs-h2); line-height: var(--lh-h2); }
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────
+   F5DS is silent on this; it is an addition rather than a deviation. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ── Print ────────────────────────────────────────────────────────────────── */
+@media print {
+    .brand, .topbar, .nav, .nav-backdrop, .menu-toggle,
+    .skip-link, .copy-btn { display: none !important; }
+    .main { margin: 0; }
+    .main-inner { max-width: none; padding: 0; }
+    .code-block {
+        background: var(--n100) !important;
+        border-color: var(--n300);
+        color-scheme: light;
+    }
+    .code-block code,
+    .code-block [class^='tok-'] { color: var(--n700) !important; }
+    .card { break-inside: avoid; }
+}

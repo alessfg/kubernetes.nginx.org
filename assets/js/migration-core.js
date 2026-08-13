@@ -1235,9 +1235,7 @@
                 h4.textContent = plan.unrecognized.title;
                 unrecSection.appendChild(h4);
                 let desc = document.createElement('p');
-                desc.style.fontSize = '0.9rem';
-                desc.style.color = 'var(--text-secondary)';
-                desc.style.marginBottom = '10px';
+                desc.className = 'analyzer-unrecognized-desc';
                 desc.textContent = plan.unrecognized.desc;
                 unrecSection.appendChild(desc);
                 plan.unrecognized.items.forEach(function(u) {
@@ -1253,13 +1251,11 @@
                     unrecSection.appendChild(uCard);
                 });
                 let contributeP = document.createElement('p');
-                contributeP.style.fontSize = '0.85rem';
-                contributeP.style.marginTop = '10px';
+                contributeP.className = 'analyzer-contribute';
                 let contributeLink = document.createElement('a');
                 contributeLink.href = 'https://github.com/nginx/kubernetes.nginx.org';
                 contributeLink.target = '_blank';
                 contributeLink.rel = 'noopener noreferrer';
-                contributeLink.style.color = 'var(--green-text)';
                 contributeLink.textContent = 'Contribute a mapping on GitHub →';
                 contributeP.appendChild(contributeLink);
                 unrecSection.appendChild(contributeP);

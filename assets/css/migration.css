@@ -372,15 +372,39 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
     font-weight: 500;
     white-space: nowrap;
 }
-.badge-virtualserver,
-.badge-virtualserverroute  { background: var(--blue-tint); border-color: transparent; }
-.badge-policy              { background: var(--purple-tint); border-color: transparent; }
-.badge-transportserver     { background: var(--java-tint); border-color: transparent; }
+/* Badges have to be told apart at a glance: the reference guide runs hundreds
+   of rows and the badge is how you know which construct a row is about. Two
+   pairs were previously indistinguishable — VirtualServer and
+   VirtualServerRoute both carried --blue-tint, and annotation and ConfigMap
+   both carried --surface-sunken — and every badge shared one text colour, so a
+   10-16% tint was doing all the work.
+
+   Each kind now gets its own hue AND a matching text colour, which is what
+   actually separates them. There are only five text-safe hues to spend
+   (--green-text, --blue-text, --pomegranate-text, --java-text, --purple-text);
+   there is deliberately no amber or emerald text token, because neither clears
+   the contrast bar as text at any usable saturation. So the two remaining kinds
+   are separated by treatment instead of hue: the outlined variants pair with
+   their filled counterpart, which also reads correctly — VirtualServerRoute is
+   a VirtualServer's subordinate, and an annotation is a ConfigMap's. */
+.badge-virtualserver       { background: var(--blue-tint); border-color: transparent; color: var(--blue-text); }
+.badge-virtualserverroute  { background: var(--surface); border-color: var(--blue-text); color: var(--blue-text); }
+.badge-policy              { background: var(--purple-tint); border-color: transparent; color: var(--purple-text); }
+.badge-transportserver     { background: var(--java-tint); border-color: transparent; color: var(--java-text); }
+/* Amber has no text token by design, so this one keeps the default text
+   colour; the tint is unique in the set, which is enough to place it. */
 .badge-globalconfiguration { background: var(--amber-tint); border-color: transparent; }
-.badge-annotation          { background: var(--surface-sunken); }
 .badge-configmap           { background: var(--surface-sunken); }
-.badge-plus                { background: var(--pomegranate-tint); border-color: transparent; font-weight: 700; }
-.badge-new                 { background: var(--emerald-tint); border-color: transparent; }
+.badge-annotation          { background: var(--surface); border-color: var(--border-strong); }
+.badge-plus                { background: var(--pomegranate-tint); border-color: transparent; color: var(--pomegranate-text); font-weight: 700; }
+.badge-new                 { background: var(--green-tint); border-color: transparent; color: var(--green-text); }
+
+/* Dark mode is fine for every badge except this one: --blue-text on the dark
+   blue tint measures 4.27:1, just under the 4.5 bar for text this size. The
+   next step up the ramp clears it at 5.39:1. Computed, not eyeballed — and not
+   caught by check-contrast.py, which asserts a fixed pairing list and does not
+   know about badge pairings. */
+:is(html, body).dark-mode .badge-virtualserver { color: var(--blue-deep); }
 .plus-indicator {
     margin-left: var(--space-base);
     padding: 0 var(--space-base);

@@ -238,6 +238,14 @@ tr.example-row td { padding: 0; background: var(--surface-sunken); white-space: 
    Inline code sits on a neutral tint with body text rather than a magenta,
    because F5DS has no code-text colour and a hue there would collide with the
    sentiment set. The block surface comes from the shared code tokens. */
+/* Inline code carries a colour of its own rather than the body text colour.
+   The guide is mostly annotation names, so a page of neutral chips gives the
+   eye nothing to catch — the pre-F5DS design coloured them Raspberry #9C1174
+   for exactly this reason, and flattening them to --text lost the scannability.
+   --purple-text is the nearest on-system equivalent (F5DS publishes no
+   magenta): 6.45:1 on the chip, against 7.20:1 for the Raspberry it replaces.
+   Purple also marks the Policy badge, but a badge and an inline code span are
+   never mistaken for one another. */
 code {
     padding: var(--space-xsmall) var(--space-small);
     background: var(--surface-sunken);
@@ -245,7 +253,7 @@ code {
     border-radius: var(--radius-small);
     font-family: var(--mono);
     font-size: 0.9em;
-    color: var(--text);
+    color: var(--purple-text);
 }
 pre {
     margin: var(--space-2x) 0;
@@ -267,14 +275,23 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
    the one place in the tool where the two sides are colour-coded, because the
    direction of the migration is the whole point. The heading text carries the
    meaning either way. */
-.comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2x); }
-/* Flex column, and the <pre> inside flexes to fill. The grid stretches both
-   blocks to the height of the taller one, so without this the shorter side's
-   code surface stops early and leaves a band of card background below it. */
+/* `align-items: start` is load-bearing. By default a grid stretches both
+   blocks to the height of the taller one, and these two sides are routinely
+   very different lengths — a two-line "no direct equivalent" comment opposite
+   forty lines of VirtualServer YAML. Stretching then forces a choice between
+   two bad outcomes: leave the <pre> at its natural height and a band of card
+   background hangs below it, or make the <pre> fill and a two-line snippet
+   becomes a 1,000px slab of dark surface. Not stretching avoids both — each
+   block is exactly as tall as its content, and the sides simply end where they
+   end. */
+.comparison {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--space-2x);
+}
 .comparison-block {
     position: relative;
-    display: flex;
-    flex-direction: column;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
@@ -292,7 +309,7 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 }
 .comparison-block.old h4 { background: var(--pomegranate-tint); color: var(--text); }
 .comparison-block.new h4 { background: var(--green-tint); color: var(--text); }
-.comparison-block pre { flex: 1; margin: 0; border: 0; border-radius: 0; }
+.comparison-block pre { margin: 0; border: 0; border-radius: 0; }
 .comparison-copy-btn {
     padding: 0 var(--space-base);
     min-height: 20px;
@@ -958,12 +975,11 @@ button.analyzer-pill { font-family: var(--font); }
     font-style: italic;
 }
 
-.analyzer-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2x); margin: var(--space-base) 0; }
-/* Same flex treatment as .comparison-block, for the same reason: the two sides
-   rarely have equal line counts, and the grid stretches them to match. */
+.analyzer-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start; gap: var(--space-2x); margin: var(--space-base) 0; }
+/* Same reasoning as .comparison-block: not stretched, so a short generated
+   resource does not become a tall empty panel beside a long one. */
 .analyzer-comparison-block {
-    display: flex;
-    flex-direction: column;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
@@ -989,7 +1005,7 @@ button.analyzer-pill { font-family: var(--font); }
     line-height: var(--lh-badge);
     font-weight: 700;
 }
-.analyzer-comparison-block .analyzer-yaml-output { flex: 1; margin: 0; border: 0; border-radius: 0; min-height: 60px; }
+.analyzer-comparison-block .analyzer-yaml-output { margin: 0; border: 0; border-radius: 0; min-height: 60px; }
 
 .analyzer-empty-state { text-align: center; padding: var(--space-5x) var(--space-2hx); color: var(--text-secondary); }
 .analyzer-empty-state svg { margin-bottom: var(--space-2x); color: var(--icon); }
@@ -1294,7 +1310,10 @@ button.analyzer-pill { font-family: var(--font); }
    in index.css: declaring it globally would override the chrome. */
 :is(html, body).dark-mode .main-inner a:link { color: var(--blue-text); }
 :is(html, body).dark-mode .main-inner a:visited { color: var(--blue-text); }
-:is(html, body).dark-mode code { background: var(--surface-sunken); border-color: var(--border); color: var(--text); }
+/* Keep the inline-code colour in dark too — this rule outranks the base one,
+   so leaving --text here would silently drop the colour on the dark theme.
+   --purple-text dark measures 6.58:1 on the chip. */
+:is(html, body).dark-mode code { background: var(--surface-sunken); border-color: var(--border); color: var(--purple-text); }
 :is(html, body).dark-mode .install-box a:link,
 :is(html, body).dark-mode .install-box a:visited { color: var(--n400); }
 :is(html, body).dark-mode .analyzer-comparison-badge { background: var(--surface); }

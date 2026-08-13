@@ -21,9 +21,10 @@ CSS and JS are split into external files under `assets/` (shared chrome + per-pa
 
 ```
 assets/
-  css/  shared.css        # chrome: @font-face, design tokens, type scale, reset, topbar, sidebar, event banner, dark mode, layout, accessibility
-        index.css         # landing-page-only styles (hero, feature/project grids, compat tables, CTAs, code blocks)
-        migration.css     # migration-tool styles shared by all migration pages (analyzer UI, mapping/reference tables, badges, checklist, print)
+  css/  tokens.css        # THE design surface: every colour, size, space, radius, shadow, duration. No selectors.
+        shared.css        # @font-face, reset, chrome (topbar/sidebar/banner), and the components both pages use
+        index.css         # landing-page-only styles (hero, feature/project grids, compat tables, CTAs)
+        migration.css     # migration-tool styles (analyzer UI, mapping/reference tables, badges, checklist, print)
   js/   shared.js         # chrome behavior: dark-mode toggle, sidebar drawer, copy-to-clipboard, copyright year (globals)
         index.js          # landing-page behavior: version auto-fetch, SPA product switching, entrance animation, YouTube
         migration-core.js           # source-agnostic migration-tool engine: analyzer orchestration/rendering, table filtering, page nav, checklist; defines window.MigrationTool (NIC target versions + shared utils)
@@ -32,18 +33,88 @@ assets/
   fonts/ InterVariable-subset.woff2, OFL.txt, README.md   # the site's only webfont — see README.md for provenance and how to regenerate
 ```
 
-Loading rules (all pages): `shared.css` is linked before the page CSS; `shared.js` is loaded before the page JS (the page scripts are IIFEs that call shared.js globals like `closeSidebar` / `copyToClipboard`). Migration pages load **three** scripts in this exact order: `shared.js` → `migration-<source>.js` → `migration-core.js`. The source module must load before the core (the core reads `window.MIGRATION_SOURCE` at top level); source modules never touch the DOM and may dereference `MigrationTool.*` only inside function bodies (call time), never at top level. Asset paths are **relative** (`assets/css/…`, `assets/js/…`, no leading `/`) so they resolve identically locally, in PR previews, and in production. Every page also carries a `<link rel="preload" as="font" … crossorigin>` for the woff2 **before** the stylesheet links — the `@font-face` lives inside `shared.css`, so without the preload the font is not discoverable until that CSS has parsed. The inline `<head>` dark-mode flash-prevention `<script>` and the page-specific JSON-LD stay inline; classic (non-module) scripts keep functions global.
+Loading rules (all pages): **`tokens.css` → `shared.css` → the page CSS**, in that order; `shared.js` is loaded before the page JS (the page scripts are IIFEs that call shared.js globals like `closeSidebar` / `copyToClipboard`). Migration pages load **three** scripts in this exact order: `shared.js` → `migration-<source>.js` → `migration-core.js`. The source module must load before the core (the core reads `window.MIGRATION_SOURCE` at top level); source modules never touch the DOM and may dereference `MigrationTool.*` only inside function bodies (call time), never at top level. Asset paths are **relative** (`assets/css/…`, `assets/js/…`, no leading `/`) so they resolve identically locally, in PR previews, and in production. Every page also carries a `<link rel="preload" as="font" … crossorigin>` for the woff2 **before** the stylesheet links — the `@font-face` lives inside `shared.css`, so without the preload the font is not discoverable until that CSS has parsed. The inline `<head>` dark-mode flash-prevention `<script>` and the page-specific JSON-LD stay inline; classic (non-module) scripts keep functions global.
 
-## Typography
+## Design system
 
-The site sets type in **Inter**, per the **F5 Design System (F5DS)** — the design system for F5 Distributed Cloud product UI (`~/.claude/skills/f5-product-ui-core`). This is deliberately a *different* standard from the F5 marketing brand (`f5-brand-core`: Neusa Next Pro Wide / Proxima Nova), which the site used until 2026-08-07; those faces are license-gated on brand.f5.com and could never be self-hosted, so most visitors only ever saw a metric-corrected Arial standing in for them. **Do not blend the two standards** — a value correct in one is a defect in the other. Note the site's *colors* still follow the marketing/NGINX palette (Jade green lead, K8s blue tooling accent); only the type system comes from F5DS, so an F5DS scanner run flags every color and that is expected.
+The site follows the **F5 Design System (F5DS)** — the design system behind the F5 Distributed Cloud console (`~/.claude/skills/f5-product-ui-core`, plus the live zeroheight styleguide via the `zeroheight` MCP). **All of it**: colour, spacing, radius, elevation, motion and type. It previously ran F5DS type over the F5 marketing palette, and that split is gone — if you find a note anywhere saying an F5DS scanner "flags every colour and that is expected", it is stale.
 
-- **All sizes go through the scale tokens in `shared.css`** (`--fs-*` / `--lh-*`): `h1` 36/54, `h2` 24/36, `h3` 18/26, `body-lg` 16/24, `body` 14/20, `caption` 12/18, `badge` 10/16, `code` 14/24. Never write a raw `rem`/`px` font-size — including in inline `style=` attributes and in JS-generated `cssText`, both of which exist in the migration tool and are easy to miss.
+Do not blend F5DS with the F5 **marketing** brand (`f5-brand-core`: Neusa Next Pro Wide / Proxima Nova, F5 Red, the Brand Center ramps). A value correct in one is a defect in the other, and `scripts/check-tokens.py` fails on the retired marketing hexes by name.
+
+### NGINX green leads, and that is not a deviation
+
+F5DS's platform primary is Dodger Blue `#4F73FF`. This site leads with **NGINX green `#009639`**, which is what F5 actually ships: in the F5XC console the NGINX One workspace marks its active navigation item in green and uses a green primary button, while platform-level pages in the same console use Dodger Blue.
+
+- **NGINX green** — the lead accent. Active nav item, primary buttons, section rails, the "new side" of a comparison.
+- **Dodger Blue** — platform and tooling. Content links, focus rings, the two Kubernetes tools, the VirtualServer badge family. It replaced Kubernetes brand blue `#326CE5`.
+- **F5 Brand Red `#E4002B` is absent entirely.** F5DS restricts it to logo, illustrations and pictograms and forbids it as a CTA, link, accent or error colour. Negative sentiment is Pomegranate.
+
+### Three F5DS pairings fail WCAG AA
+
+F5DS publishes **no accessibility guidance at all**, and three of its own published combinations fail. `tokens.css` carries derived tokens for each, with the measured ratio in a comment:
+
+| F5DS value | Measured | Replacement |
+|---|---|---|
+| N500 secondary text on the N100 page background | 4.25:1 | `--n550` `#677185` — 4.62:1 on N100, 4.91:1 on N0 |
+| N400, documented as the icon colour, on white | 2.42:1 | `--n450` `#848FA5` — 3.25:1 on N0, 3.06:1 on N100 |
+| White on Dodger Blue `#4F73FF` | 4.02:1 | `--blue-text` `#2E50D9` — 6.43:1 |
+
+Same for green: white on `#009639` is 3.87:1, so **every filled green button uses `--green-dark` `#007D30`**, not `--green`.
+
+**Emerald and Amber cannot reach the 3:1 non-text bar at any usable saturation** — 2.02:1 and 1.60:1 on white, and even F5DS's own hover values only manage 2.95:1 and 2.23:1. So a **status dot is never rendered without its text label**, and an info box is never rendered without its sentiment icon. That is F5DS's own rule (colour must never be the only signal), not a workaround. A status hue is **never used as text**.
+
+### Spacing, radius, elevation
+
+Never write a raw value at a call site — including inline `style=` and JS-generated `style`.
+
+- **Spacing** (`--space-*`): base 8, every value a multiple of 4. **12px is not in the system** (resolve to 8 or 16 by context, never to itself), and **2px is only used between a label and its form control**. `--space-6x` 48 and `--space-8x` 64 extend past F5DS's published 40px ceiling using its own `Nx = 8N` formula.
+- **Radius**: `--radius` 4px for everything, replacing f5.com's 5px; `--radius-small` 2px only when too small for 4px; **`--radius-pill` for Tags and Badges only**.
+- **Elevation**: `--elev-*` only, N700-tinted. **Cards are border-only at rest** — the console does this on its own landing pages, reserving shadow for surfaces that genuinely float. There is still **no hover lift**: F5DS's `Elevate Up` is a Motion-page catalogue entry, not a mandate.
+- **Type**: every size through `--fs-*`/`--lh-*`. F5DS pairs a **fixed leading with each size**, so `line-height` is a length, not a multiplier: **any rule that sets `font-size` must restate the paired `--lh-*`.** Weights 400/500/700 only. **Zero `letter-spacing` declarations anywhere.**
+
+### Typography
+
+- **All sizes go through the scale tokens in `tokens.css`** (`--fs-*` / `--lh-*`): `h1` 36/54, `h2` 24/36, `h3` 18/26, `body-lg` 16/24, `body` 14/20, `caption` 12/18, `badge` 10/16, `code` 14/24. Never write a raw `rem`/`px` font-size — including in inline `style=` attributes and in JS-generated `cssText`, both of which exist in the migration tool and are easy to miss.
 - F5DS pairs a **fixed leading with each size** rather than one global ratio, so `line-height` is a length, not a multiplier: any rule that sets `font-size` must restate the paired `--lh-*`.
 - **Weights are 400 / 500 / 700 only.** No 300, no 600.
 - **`letter-spacing` is 0 on every style** — the scale specifies no tracking anywhere, so there should be no `letter-spacing` declaration in the CSS at all.
-- **Documented deviations** (keep them, don't "fix" them): `--mono` stays SF Mono rather than F5DS's Courier, which is unreadable at code-block sizes — docs.nginx.com deviates identically with JetBrains Mono. The glyph-only sizes (`.checklist li::before` ☐, `.sample-dropdown-btn::after` ▼), the em-based inline `code` size, and the print stylesheet's `11pt` are icons/relative/print, not type.
+- **Sanctioned type deviations**, tracked in `check-tokens.py`: `--mono` stays SF Mono rather than F5DS's Courier, which is unreadable at code-block sizes (docs.nginx.com deviates identically); and inline `code` sizes at `0.9em`, relative to its context rather than off the scale. The glyph-only sizes this list used to name are gone — the checklist's ☐/☑ became a real box with a masked tick, and the dropdown's ▼ became a CSS caret.
 - The font is **self-hosted, never a CDN**. See `assets/fonts/README.md` before upgrading or re-subsetting it — in particular, `→` is used 29 times in the mapping tables and is outside both stock Google `latin` and `latin-ext` ranges.
+
+### Documented deviations (keep these; don't let a scanner "fix" them)
+
+| Deviation | Why |
+|---|---|
+| **NGINX green leads, not Dodger Blue** | What F5 ships on NGINX-branded console surfaces. See above. |
+| **No hover lift** — shadow only, no `translateY` | A page of cards rising at once is a lot of motion for a docs site. |
+| **Dark theme** | F5DS publishes none (Early Availability only). Authored here, deepening into the same N-ramp — N700 page, N600 surface — with both accents lightened until they clear 4.5:1 on both. |
+| **Two button vocabularies** — `.cta*` and `.btn*` | Given identical geometry in `shared.css` rather than merged, because consolidating means editing markup in two pages for no visual gain. Compose new work onto `.btn`. |
+| **`--mono` = SF Mono** (not Courier) | Unreadable at code-block sizes; docs.nginx.com deviates identically. |
+| **900px / 600px breakpoints, and all max-widths** | F5DS publishes no breakpoints and never states its fixed grid's maximum width. |
+| **48px content gutters** (not F5DS's 20px page margin) | 20px assumes a dense product screen in a chrome-heavy shell; on a wide docs page it puts prose against the viewport edge. |
+| **`min-height: 44px` on mobile controls** | WCAG target size beats F5DS's fixed 32px. |
+| **`prefers-reduced-motion` kill switch** | F5DS is silent; an addition, not a deviation. |
+| **`border-radius: 50%` on dots and spinners** | A 6px state dot and a spinner cannot take a 4px corner. |
+| **Hover scale on the checklist marker and scroll-to-top** | Kept by explicit decision — the checklist marker's scale is that row's only hover feedback. |
+
+**Inferred, not published** — say so when touching these: table cell padding (F5DS has **no** table component), info-box internal padding, which elevation level a dropdown gets (only Toast=L1 is stated), and any spacing above 40px.
+
+## Invariant guards
+
+Four scripts, no dependencies. Run all four after any change.
+
+```bash
+python3 scripts/check-tokens.py     # token invariants + retired marketing colours + undefined var()
+python3 scripts/check-contrast.py   # every colour pairing against WCAG 2.1 AA, both themes
+python3 scripts/check-classes.py    # every class used by markup or JS resolves to a CSS rule
+node    scripts/test-analyzer.js    # the migration analyzer, under a DOM stub
+```
+
+Three things to understand about them:
+
+1. **The F5DS scanner (`~/.claude/skills/f5-product-ui-core/scripts/scan_ui_tokens.py`) is not a sufficient gate.** It cannot resolve `var()`, so a correct `var(--space-2x)` is invisible to it while a literal `16px` counts as on-token. Its spacing and typography dimensions read low *because* this site uses tokens. `check-tokens.py` reads literals instead.
+2. **These are scripts, not shell greps, partly because a mistyped shell variable reports "clean" for a check that never ran** — which happened twice while building them.
+3. **`check-classes.py` is the one that matters most after a restyle.** A class that loses its rule does not error; the element just renders unstyled, which is invisible on a page with thousands of rows. It reports unused classes too, but never fails on them — this codebase has dormant-by-design CSS (the event banner ran for three weeks in 2026 for a conference; the blogs/videos sections are built but unlinked). Run `git log -S` before deleting anything on that list.
 
 ## Key Files
 
@@ -75,10 +146,10 @@ The analyzer is pure data — the source module's `parseInput` → `buildPlan` r
 
 ## Shared UI Elements
 
-The shared "chrome" lives in `assets/css/shared.css` and `assets/js/shared.js` as the single source of truth — **edit it once there**, not in two places. This covers:
+The shared "chrome" lives in `assets/css/shared.css` and `assets/js/shared.js` as the single source of truth — **edit it once there**, not in two places. Its *values* all come from `tokens.css`; `shared.css` writes no literals. This covers:
 
 - **Event banner** (Announcements) — the green fixed banner, its CSS (`.event-banner`, `body.has-banner` offsets), and JS init
-- **Top bar** — the NGINX logo, GitHub link, and dark-mode toggle (CSS + dark-toggle wiring in `shared.js`)
+- **Top bar** — the branding block (which occupies the navigation column's header row, console-style), the **page title**, the GitHub link and the dark-mode toggle. The page title element is still called `.mobile-breadcrumb` / `#mobileBreadcrumb` for historical reasons: it began as a mobile-only breadcrumb and is now shown at every width, with `index.js` keeping its text in step with the active view. Do not rename it without updating `index.js` and `migration-core.js`.
 - **Sidebar** — structure, external links, copyright, and the drawer open/close behavior (`shared.js`)
 - **Dark mode** — design-token overrides and chrome (topbar/sidebar) colors in `shared.css`; the dark-mode toggle logic in `shared.js`
 

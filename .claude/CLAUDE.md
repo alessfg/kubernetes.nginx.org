@@ -117,7 +117,7 @@ Four things to understand about them:
 1. **The F5DS scanner (`~/.claude/skills/f5-product-ui-core/scripts/scan_ui_tokens.py`) is not a sufficient gate.** It cannot resolve `var()`, so a correct `var(--space-2x)` is invisible to it while a literal `16px` counts as on-token. Its spacing and typography dimensions read low *because* this site uses tokens. `check-tokens.py` reads literals instead.
 2. **These are scripts, not shell greps, because a mistyped shell construct reports "clean" for a check that never ran.** This has now happened four times: a `$F` that expanded to one filename, broken `grep -c` arithmetic, a zsh glob swallowing `--include`, and a `for c in "python3 …"; do $c; done` loop where zsh treated each whole string as one command name — that last one printed `exit=0` four times having run nothing. **Invoke each script on its own line.** If you must capture status through a pipe, zsh is `${pipestatus[1]}`, not `$?`.
 3. **`check-classes.py` is the one that matters most after a restyle.** A class that loses its rule does not error; the element just renders unstyled, which is invisible on a page with thousands of rows. It reports unused classes too, but never fails on them — this codebase has dormant-by-design CSS (the event banner ran for three weeks in 2026 for a conference; the blogs/videos sections are built but unlinked). Run `git log -S` before deleting anything on that list.
-4. **None of the four can see the rendered page.** Every one of them is a static reader, so the entire class of visual defect — a stretched grid, a collapsed flex item, a truncated label, a card wrapping 3+1 — passes all four green. See *Verifying visual changes* below.
+4. **None of the four can see the rendered page.** Every one of them is a static reader, so the entire class of visual defect — a stretched grid, a collapsed flex item, a truncated label, a card wrapping 3+1 — passes all four green. Treat a clean run as "nothing is structurally broken", not "it looks right".
 
 ## Key Files
 
@@ -125,23 +125,6 @@ Four things to understand about them:
 - `ingress-nginx-migration.html` — **The live migration tool** at `https://kubernetes.nginx.org/ingress-nginx-migration.html`. Interactive YAML analyzer, 130+ annotation mappings, CRD migration examples, and ConfigMap migration guidance. Styles live in `assets/css/{shared,migration}.css`; scripts are `assets/js/shared.js` + `assets/js/migration-ingress-nginx.js` + `assets/js/migration-core.js` (in that order).
 
 ## Workflow
-
-### Verifying visual changes
-
-The four guards are static readers; none of them renders anything, so every purely visual defect passes them green. Four such bugs shipped before being caught by eye. Take a screenshot and look at it:
-
-```bash
-CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-"$CHROME" --headless=new --disable-gpu --hide-scrollbars --virtual-time-budget=4000 \
-  --window-size=1440,1400 --screenshot=/tmp/shot.png "file://$PWD/index.html"
-```
-
-Then read `/tmp/shot.png`. Relative asset paths mean `file://` works — don't bother serving.
-
-Two traps, both of which produced a wrong conclusion before being pinned down:
-
-- **macOS Chrome clamps the window to ~500px wide.** `--window-size=380,…` still renders at a 500px viewport and merely *crops the PNG* to 380, which looks exactly like a content overflow. To test phone widths, put the page in a sized `<iframe>` inside a throwaway probe page and screenshot that (add `--allow-file-access-from-files`). Delete the probe afterwards.
-- **To measure rather than guess**, inject a script that writes `getBoundingClientRect()` / `getComputedStyle` values into the DOM as text and screenshot the result. Two rounds of reasoning about flex sizing were wrong where one measurement was right.
 
 ### Landing page (`index.html`)
 

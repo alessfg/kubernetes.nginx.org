@@ -205,20 +205,35 @@ body {
 .menu-toggle:hover { background: var(--surface-sunken); }
 .menu-toggle svg { width: 20px; height: 20px; }
 
-/* Branding block. Fixed to the navigation width so the page title beside it
-   lines up with the content area, which is what makes the console's top band
-   read as one continuous row rather than a floating header. */
+/* Branding block. The logo sits at the left of the bar and the label follows
+   it, which is the shape the site had before the redesign and the shape
+   production still has — rather than a block pinned to the navigation width
+   with the logo centred inside it. Pinning it was an attempt to make the top
+   band read as one column with the sidebar, but it spends 264px on a 99px
+   logo and pushes the label a third of the way across the bar for no gain.
+
+   The separator is a short centred rule rather than a full-height border, so
+   the bar is not divided into two panes: it marks where the brand ends and
+   the page begins, at the same weight the console uses. */
 .topbar-brand {
+    position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;   /* centred in the column, not hugging its left */
     gap: var(--space-base);
-    width: var(--sidebar-w);
-    padding: 0 var(--space-2x);
-    border-right: 1px solid var(--border);
+    padding: 0 var(--space-3x) 0 var(--space-2x);
     text-decoration: none;
     color: var(--text);
     flex-shrink: 0;
+}
+.topbar-brand::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: var(--space-4x);
+    background: var(--border);
 }
 .topbar-brand:focus-visible { outline-offset: -2px; }
 .topbar-brand svg { flex-shrink: 0; }
@@ -228,11 +243,14 @@ body {
 :is(html, body).dark-mode .topbar-brand .brand-logo-light { display: none; }
 :is(html, body).dark-mode .topbar-brand .brand-logo-dark { display: block; }
 /* ── Page heading ─────────────────────────────────────────────────────────
-   The site label sits ABOVE the page title, not beside the logo. That is what
-   the console does ("Distributed Cloud Console" over "Home"), and it is also
-   the only arrangement that fits: the branding block is pinned to the 264px
-   navigation width, which leaves 232px, and the logo plus a label like
-   "Networking for Kubernetes" needs more than that — it used to truncate. */
+   One line, sitting to the right of the brand's divider. Which line it is
+   depends on the width — the site label above 900px, the page title at or
+   below it, where the drawer hides the sidebar's active-item marker. Both
+   rules are below; the ≤900px block swaps them.
+
+   The label is deliberately OUTSIDE the branding block. An earlier version put
+   it inside a 264px block beside the logo, where 99px of logo left too little
+   for a label like "Networking for Kubernetes" and it truncated. */
 .topbar-heading {
     display: flex;
     flex-direction: column;
@@ -795,9 +813,8 @@ code, kbd, samp {
     }
     .main { margin-left: 0; }
     .menu-toggle { display: flex; }
-    /* The branding block stops claiming the navigation width once the
-       navigation is a drawer, so it also stops centring. */
-    .topbar-brand { width: auto; justify-content: flex-start; }
+    /* The brand already hugs the left at every width, so nothing about the
+       block changes here — only the room around the heading tightens. */
     .topbar-heading { padding: 0 var(--space-2x); }
     /* Swap the two lines: the site label goes, the page title arrives. */
     .topbar-eyebrow { display: none; }
@@ -810,7 +827,7 @@ code, kbd, samp {
 }
 
 @media (max-width: 600px) {
-    .topbar-brand { padding: 0 var(--space-2x); }
+    .topbar-brand { padding: 0 var(--space-2x) 0 var(--space-base); }
     .topbar-link.hide-mobile { display: none; }
     /* The page title stays on a phone. Once the navigation is a closed drawer
        it is the only thing saying which page you are on, which is what this

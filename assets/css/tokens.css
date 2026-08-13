@@ -313,9 +313,15 @@
        max-widths are local conventions, not spec values.
 
        --banner-h is overridden by body.has-banner; --chrome-h composes the two
-       so components never repeat the arithmetic. */
+       so components never repeat the arithmetic.
+
+       --topbar-h is 52px, matching the bar this site already shipped. F5DS
+       publishes no top-bar height; 64px was chosen here and read as loose
+       against production, which is where the extra white space above every
+       page came from. 52 holds a 28px logo with 11.5px of clearance either
+       side, and the heading is one line, so nothing is under pressure. */
     --sidebar-w: 264px;
-    --topbar-h:  64px;
+    --topbar-h:  52px;
     --banner-h:  0px;
     --chrome-h:  calc(var(--topbar-h) + var(--banner-h));
 }

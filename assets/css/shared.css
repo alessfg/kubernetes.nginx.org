@@ -175,10 +175,22 @@ body {
     align-items: stretch;
     justify-content: space-between;
     background: var(--surface);
-    border-bottom: 1px solid var(--border);
     transition: background var(--dur-reveal) linear,
                 border-color var(--dur-reveal) linear,
                 top var(--dur-colour) linear;
+}
+/* The bottom rule starts where the navigation column ends, so it never runs
+   underneath the branding block. That makes the brand and the sidebar below it
+   read as one continuous column, which is what the console does — a rule under
+   the logo boxes it off from the navigation it belongs to. Full width again
+   once the navigation collapses to a drawer and there is no column to align
+   with. */
+.topbar::after {
+    content: '';
+    position: absolute;
+    left: var(--sidebar-w); right: 0; bottom: 0;
+    height: 1px;
+    background: var(--border);
 }
 
 .topbar-left { display: flex; align-items: stretch; min-width: 0; }
@@ -207,6 +219,7 @@ body {
 .topbar-brand {
     display: flex;
     align-items: center;
+    justify-content: center;   /* centred in the column, not hugging its left */
     gap: var(--space-base);
     width: var(--sidebar-w);
     padding: 0 var(--space-2x);
@@ -611,6 +624,16 @@ body.has-banner { --banner-h: 36px; }
     --icon-success: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 118 13.5 5.5 5.5 0 018 2.5zm3.03 3.4l-3.9 3.9-1.9-1.9-1.06 1.06 2.96 2.96 4.96-4.96L11.03 5.9z'/%3E%3C/svg%3E");
     --icon-warning: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 .9L.6 14.2h14.8L8 .9zm0 3.1l5 9H3l5-9zm-.75 3.2h1.5v3.2h-1.5V7.2zm.75 4.1a.9.9 0 110 1.8.9.9 0 010-1.8z'/%3E%3C/svg%3E");
     --icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M3 8.5l3.5 3.5 7-7.5'/%3E%3C/svg%3E");
+
+    /* The hexagon lattice, carried over from the pre-F5DS design. A 43.3x75
+       tile: one pointy-top hexagon with a stem hanging below it, so tiled it
+       reads as a linked lattice rather than loose cells. Used by the landing
+       hero only (index.css), but it lives here because this block is the one
+       home for the site's inline SVG assets, which is what keeps them
+       auditable. The stroke is white and the tile is hue-agnostic — it sits
+       over whichever tint its section already has. `%23fff` is percent-encoded,
+       so check-tokens.py's hex scan does not see it, same as --icon-check. */
+    --pattern-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='43.3' height='75'%3E%3Cpath d='M0 12.5L21.65 0L43.3 12.5L43.3 37.5L21.65 50L0 37.5Z M21.65 50L21.65 75' fill='none' stroke='%23fff' stroke-width='2.4'/%3E%3C/svg%3E");
 }
 
 .info-box {
@@ -757,8 +780,10 @@ code, kbd, samp {
     .main { margin-left: 0; }
     .menu-toggle { display: flex; }
     /* The branding block stops claiming the navigation width once the
-       navigation is a drawer. */
-    .topbar-brand { width: auto; }
+       navigation is a drawer, so it also stops centring and the bottom rule
+       goes back to full width — there is no column left to align either to. */
+    .topbar-brand { width: auto; justify-content: flex-start; }
+    .topbar::after { left: 0; }
     .topbar-heading { padding: 0 var(--space-2x); }
     .topbar-eyebrow { display: none; }
     .mobile-breadcrumb { font-size: var(--fs-body); line-height: var(--lh-body); }

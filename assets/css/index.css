@@ -47,13 +47,14 @@
 
 .page-hero {
     position: relative;
+    overflow: hidden;          /* the pattern layer must not escape the section */
     padding: var(--space-6x) var(--space-6x) var(--space-5x);
     background: var(--surface);
-    border-bottom: 1px solid var(--border);
 }
-/* A flat tint per section rather than a gradient. Each is a 10–16% wash of the
-   section's own hue over the surface, which is enough to tell the pages apart
-   without reading as decoration. */
+/* A flat tint per section. Each is a 10–16% wash of the section's own hue over
+   the surface, which is enough to tell the pages apart without reading as
+   decoration. The edges are softened by ::after below rather than by making
+   these gradients, so the hue stays a single token per section. */
 .page-hero.home,
 .page-hero.nic,
 .page-hero.ngf       { background: var(--green-tint); }
@@ -62,7 +63,77 @@
 .page-hero.blogs     { background: var(--java-tint); }
 .page-hero.videos    { background: var(--pomegranate-tint); }
 
-.page-hero-content { position: relative; max-width: 900px; }
+/* Every soft edge, in one overlay. Two layers of the page background painted
+   back over the tint: downward, so the band dissolves into the page instead of
+   ending on a border; and rightward from the navigation, so the tint ramps up
+   out of the sidebar rather than starting at full strength against it. It
+   covers the whole hero (inset: 0, not bottom-only) because the left wash needs
+   the full height. z-index 1 puts it above ::before — so the lattice fades with
+   the colour rather than staying crisp over a fading band — and below
+   .page-hero-content at z-index 2, which is what keeps it off the CTA. */
+.page-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background: linear-gradient(to bottom, transparent 72%, var(--bg) 100%),
+                linear-gradient(to right, var(--bg) 0, transparent 22%);
+}
+
+.page-hero-content { position: relative; z-index: 2; max-width: 900px; }
+
+/* ── The hexagon lattice — the landing hero, and nowhere else ─────────────
+   Carried over from the pre-F5DS design, where it was the page's strongest
+   NGINX signal. F5DS has no background-texture class (see the deviations table
+   in CLAUDE.md), so this is a deliberate departure, confined to the front door:
+   the section heroes below get the same edge treatment without the motif, which
+   keeps the reference pages quiet.
+
+   Two intersecting masks. The horizontal one concentrates the lattice on the
+   right, where the hero is empty, and clears it from behind the headline and
+   CTA — so no text ever sits on texture and no contrast pairing changes. The
+   vertical one feathers the top and bottom. Together they mean the tile has no
+   hard edge on any side; the right simply runs off the viewport. */
+.page-hero.home::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--pattern-hex);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, transparent 26%, #000 78%),
+                        linear-gradient(to bottom, transparent 0, #000 16%, #000 64%, transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, transparent 26%, #000 78%),
+                        linear-gradient(to bottom, transparent 0, #000 16%, #000 64%, transparent 100%);
+    -webkit-mask-composite: source-in;
+            mask-composite: intersect;
+}
+/* Non-negotiable: at full strength the white strokes cut straight through the
+   headline on a dark page. The pre-F5DS design clamped to 0.04; the mask here
+   already removes the lattice from behind the copy, so it tolerates more. */
+:is(html, body).dark-mode .page-hero.home::before { opacity: 0.10; }
+
+/* ── Section heroes: the same diagonal, carried without the motif ─────────
+   A light wash on the same 105deg angle as the landing lattice, so the two tie
+   together as one system rather than the home page looking unrelated. Their
+   bottom dissolve also starts higher than the landing hero's, because these
+   heroes are shorter and a late start leaves a visible band edge. */
+.page-hero.nic::before,
+.page-hero.ngf::before,
+.page-hero.migration::before,
+.page-hero.i2g::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 20%, var(--hero-wash) 62%, transparent 100%);
+}
+.page-hero.nic::after,
+.page-hero.ngf::after,
+.page-hero.migration::after,
+.page-hero.i2g::after {
+    background: linear-gradient(to bottom, transparent 60%, var(--bg) 100%),
+                linear-gradient(to right, var(--bg) 0, transparent 22%);
+}
 
 /* Hero eyebrow. Labelled typographically rather than with a container — a
    filled capsule is off-idiom, and the pill radius is reserved for tags and
@@ -127,6 +198,15 @@
 .coming-soon-label { font-weight: 500; color: var(--text-secondary); }
 
 .page-body { padding: var(--space-5x) var(--space-6x) var(--space-8x); max-width: 1140px; }
+
+/* The product and tool pages open with a CTA row, and three spacing values were
+   stacking under the hero: its 40px bottom padding, this block's 40px top
+   padding, and .cta-row's own 32px top margin — 113px measured. That margin is
+   meant to separate a CTA row from content above it inside the body; as the
+   first child there is no content above it, only padding, so it double-counted.
+   Zeroing it and easing the top padding brings the row to 64px under the hero. */
+.page-body > .cta-row:first-child { margin-top: 0; }
+.page-body:has(> .cta-row:first-child) { padding-top: var(--space-3x); }
 /* Content-area link colour, scoped so it cannot override the chrome. Card
    anchors are excluded so they keep `inherit`. */
 .page-body a:link:not(.cta):not(.feature-card):not(.project-card) { color: var(--blue-text); }
@@ -512,6 +592,11 @@ a.feature-card, a.feature-card:link, a.feature-card:visited { text-decoration: n
     .page-hero h1 { font-size: var(--fs-h3); line-height: var(--lh-h3); }
     .page-hero p { font-size: var(--fs-body); line-height: var(--lh-body); }
     .page-body { padding: var(--space-2hx) var(--space-2x) var(--space-4x); }
+    /* No room for the lattice on a phone: the hero is short and full-bleed, so
+       the mask has no empty right-hand region to occupy and the tile would run
+       straight under the copy. The edge washes stay — they are what removes the
+       band edge, which matters more at this width, not less. */
+    .page-hero.home::before { display: none; }
     .cta-row { flex-direction: column; }
     .cta { justify-content: center; width: 100%; }
     .preview-stats { gap: var(--space-2hx); }
@@ -522,6 +607,10 @@ a.feature-card, a.feature-card:link, a.feature-card:visited { text-decoration: n
    Chrome hiding and the dark-token reset live in shared.css. */
 @media print {
     .page-hero { background: var(--n0) !important; }
+    /* The rule above only resets the element's own background; both decorative
+       layers are separate boxes and would otherwise print. */
+    .page-hero::before,
+    .page-hero::after { display: none !important; }
     .code-block { background: var(--n100) !important; border-color: var(--n300); color-scheme: light; }
     .code-block code,
     .code-block .cmd, .code-block .flag,

@@ -113,6 +113,14 @@
     --blue-deep:       #1F3CB0;   /* derived one step darker */
     --blue-tint:       rgba(79, 115, 255, 0.10);
 
+    /* Hero edge wash. Painted back OVER a hero's tint to soften where the band
+       meets the navigation and where it meets the page, so no hero has a hard
+       edge on any side. It is the page background rather than a neutral grey,
+       which is what makes the tint appear to dissolve into the page instead of
+       fading to a different colour. Decorative only — it never sits under text,
+       so it carries no contrast requirement. */
+    --hero-wash:       rgba(255, 255, 255, 0.50);
+
     /* One focus idiom for the whole site: an outline, never a box-shadow ring.
        Dodger Blue rather than green, because focus is a platform affordance
        rather than a brand one, and because it stays distinguishable from the
@@ -325,6 +333,12 @@
     --blue-dark: #7893FF;
     --blue-deep: #93A9FF;
     --blue-tint: rgba(120, 147, 255, 0.16);
+
+    /* The wash has to invert: on a dark page the tint is lifted above the
+       background, so softening it means darkening toward N700, not lightening
+       toward white. A white wash here would brighten the very edges it is
+       meant to dissolve. */
+    --hero-wash: rgba(11, 22, 64, 0.38);
 
     /* Status hues hold their hue but swap tints for low-alpha washes of
        themselves; the base colours are all >= 4.5:1 on N600 as text. */

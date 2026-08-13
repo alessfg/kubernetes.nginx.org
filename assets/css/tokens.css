@@ -167,6 +167,29 @@
        same reason. */
     --code-bg:     #0B1640;
     --code-fg:     #E6E9F3;
+
+    /* ── Code syntax — a DOCUMENTED EXEMPTION ─────────────────────────────
+       F5DS defines no code palette. It publishes no syntax-highlighting
+       guidance at all, and its status hues are the wrong instrument: they
+       carry sentiment rather than token role, they are not tuned to
+       differentiate six things at a glance, and two of them (Emerald, Amber)
+       are forbidden as text by this site's own contrast rule — which the
+       previous values broke, using --emerald for comments and --amber for
+       numbers.
+
+       These are VS Code Dark+, the same palette the pre-F5DS design used and
+       the same family docs.nginx.com uses, changed only where contrast
+       required it. Ratios are measured against --code-bg #0B1640; the code
+       surface is dark in both themes (dark mode only deepens it to #060D28,
+       which raises every figure), so one set covers both. */
+    --code-key:     #9CDCFE;  /* 11.71:1 — mapping keys */
+    --code-string:  #CE9178;  /*  6.60:1 — quoted values */
+    --code-comment: #6A9955;  /*  5.24:1 — comments */
+    --code-keyword: #569CD6;  /*  5.92:1 — keywords, booleans, commands */
+    --code-number:  #B5CEA8;  /* 10.27:1 — numbers */
+    --code-punct:   #8B9099;  /*  5.44:1 — separators. VS Code's own #808080
+                                 measures 4.42:1 here, under the bar, so this
+                                 is one step lighter. */
     --code-border: #2A3A6E;
     --on-code:        rgba(255, 255, 255, 0.08);
     --on-code-strong: rgba(255, 255, 255, 0.16);

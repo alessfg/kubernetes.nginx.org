@@ -724,10 +724,13 @@ code, kbd, samp {
     border: 0;
     padding: 0;
 }
-.code-block .cmd     { color: var(--blue); }
-.code-block .flag    { color: var(--amber); }
-.code-block .comment { color: var(--emerald); }
-.code-block .str     { color: var(--java); }
+/* Same code palette as the YAML highlighter — see the exemption in tokens.css.
+   These previously used status hues, which meant --amber and --emerald were
+   being rendered as text, against this site's own rule. */
+.code-block .cmd     { color: var(--code-keyword); }
+.code-block .flag    { color: var(--code-key); }
+.code-block .comment { color: var(--code-comment); }
+.code-block .str     { color: var(--code-string); }
 
 .copy-btn {
     position: absolute;

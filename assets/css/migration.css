@@ -712,13 +712,15 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 #yamlInput:focus { outline: none; }
 .yaml-editor:focus-within .yaml-highlight-layer { border-color: var(--focus); }
 
-.yaml-key       { color: var(--blue); }
-.yaml-value     { color: var(--java); }
-.yaml-comment   { color: var(--emerald); font-style: italic; }
-.yaml-keyword   { color: var(--purple); }
-.yaml-bool      { color: var(--amber); }
-.yaml-number    { color: var(--amber); }
-.yaml-separator { color: var(--n400); }
+/* Syntax colours come from the code palette in tokens.css, not from the
+   status hues — see the exemption note there. */
+.yaml-key       { color: var(--code-key); }
+.yaml-value     { color: var(--code-string); }
+.yaml-comment   { color: var(--code-comment); font-style: italic; }
+.yaml-keyword   { color: var(--code-keyword); }
+.yaml-bool      { color: var(--code-keyword); }
+.yaml-number    { color: var(--code-number); }
+.yaml-separator { color: var(--code-punct); }
 
 
 /* ── Analyzer ─────────────────────────────────────────────────────────────── */
@@ -1426,6 +1428,15 @@ button.analyzer-pill { font-family: var(--font); }
         color-scheme: light;
     }
     .install-box h3, .install-box code, .analyzer-install-cmd code { color: var(--n700) !important; }
+    /* The code surface inverts to light above, so the syntax colours have to
+       invert too or they print light-on-light. On-token, all AA on white. */
+    .yaml-key       { color: var(--blue-text) !important; }
+    .yaml-value     { color: var(--pomegranate-text) !important; }
+    .yaml-comment   { color: var(--text-secondary) !important; }
+    .yaml-keyword,
+    .yaml-bool      { color: var(--purple-text) !important; }
+    .yaml-number    { color: var(--green-text) !important; }
+    .yaml-separator { color: var(--text-secondary) !important; }
     .analyzer-yaml-output.collapsed { max-height: none !important; overflow: visible !important; }
     .analyzer-yaml-output.collapsed::after { display: none !important; }
 

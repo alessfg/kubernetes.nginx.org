@@ -235,25 +235,32 @@ tr.example-row td { padding: 0; background: var(--surface-sunken); white-space: 
 
 
 /* ── Code ─────────────────────────────────────────────────────────────────
-   Inline code sits on a neutral tint with body text rather than a magenta,
-   because F5DS has no code-text colour and a hue there would collide with the
-   sentiment set. The block surface comes from the shared code tokens. */
-/* Inline code carries a colour of its own rather than the body text colour.
-   The guide is mostly annotation names, so a page of neutral chips gives the
-   eye nothing to catch — the pre-F5DS design coloured them Raspberry #9C1174
-   for exactly this reason, and flattening them to --text lost the scannability.
-   --purple-text is the nearest on-system equivalent (F5DS publishes no
-   magenta): 6.45:1 on the chip, against 7.20:1 for the Raspberry it replaces.
-   Purple also marks the Policy badge, but a badge and an inline code span are
-   never mistaken for one another. */
+   Inline code is a wash with no border and no colour of its own, the way
+   GitHub, Slack and Stack Overflow all render it. Two earlier attempts are
+   worth not repeating: a coloured chip, and a bordered one.
+
+   Colour first. The guide is mostly annotation names, so the argument was that
+   neutral chips give the eye nothing to catch, and --purple-text stood in for
+   the pre-F5DS Raspberry #9C1174. But every hue in this system is already
+   spoken for — blue is links, green is the brand accent, pomegranate reads as
+   an error, and purple/java read as blue-violet and teal, which is to say as
+   links again. A colour that means nothing in a system where colour means
+   something is worse than no colour.
+
+   Then the border. A mapping cell here holds up to ten annotation names
+   stacked; ten outlined boxes turn the cell into a grid. The wash separates
+   the chip from prose without drawing a box around it.
+
+   Corners are var(--radius) 4px, the same as every other surface — GitHub's
+   own 6px is not in this system. The block surface comes from --code-*. */
 code {
     padding: var(--space-xsmall) var(--space-small);
-    background: var(--surface-sunken);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-small);
+    background: var(--code-chip-bg);
+    border: 0;
+    border-radius: var(--radius);
     font-family: var(--mono);
     font-size: 0.9em;
-    color: var(--purple-text);
+    color: inherit;
 }
 pre {
     margin: var(--space-2x) 0;
@@ -315,7 +322,7 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
     min-height: 20px;
     background: var(--surface);
     border: 1px solid var(--border-control);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
     color: var(--text-secondary);
     font-family: var(--font);
     font-size: var(--fs-caption);
@@ -464,7 +471,7 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
     padding: var(--space-2x);
     background: var(--on-code);
     border: 0;
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
 }
 .install-box code { background: none; border: 0; color: var(--code-fg); }
 .install-box a:link, .install-box a:visited { color: var(--n300); text-decoration: underline; text-underline-offset: 2px; }
@@ -478,7 +485,7 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
     padding: 0 var(--space-base);
     background: none;
     border: 1px solid currentColor;
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
     color: inherit;
     font-family: var(--font);
     font-size: var(--fs-caption);
@@ -658,7 +665,7 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
     min-height: 20px;
     background: var(--on-code);
     border: 1px solid var(--on-code-strong);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
     color: var(--n300);
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
@@ -927,7 +934,7 @@ button.analyzer-pill { font-family: var(--font); }
     min-height: 24px;
     background: var(--on-code);
     border: 1px solid var(--on-code-strong);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
     color: var(--n300);
     font-family: var(--font);
     font-size: var(--fs-caption);
@@ -1267,7 +1274,7 @@ button.analyzer-pill { font-family: var(--font); }
     min-height: 28px;
     background: none;
     border: none;
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
     color: var(--text-secondary);
     font-family: var(--font);
     font-size: var(--fs-caption);
@@ -1312,10 +1319,11 @@ button.analyzer-pill { font-family: var(--font); }
    in index.css: declaring it globally would override the chrome. */
 :is(html, body).dark-mode .main-inner a:link { color: var(--blue-text); }
 :is(html, body).dark-mode .main-inner a:visited { color: var(--blue-text); }
-/* Keep the inline-code colour in dark too — this rule outranks the base one,
-   so leaving --text here would silently drop the colour on the dark theme.
-   --purple-text dark measures 6.58:1 on the chip. */
-:is(html, body).dark-mode code { background: var(--surface-sunken); border-color: var(--border); color: var(--purple-text); }
+/* The chip needs no dark override: --code-chip-bg is N400 at 22%, so it lifts
+   the dark surface the same way it tints the light one, and `color: inherit`
+   follows the theme's own text colour. The rule that used to live here set a
+   background, a border-colour and a purple; it outranked the base rule, which
+   is exactly how a base-rule change can silently fail to reach dark mode. */
 :is(html, body).dark-mode .install-box a:link,
 :is(html, body).dark-mode .install-box a:visited { color: var(--n400); }
 :is(html, body).dark-mode .analyzer-comparison-badge { background: var(--surface); }

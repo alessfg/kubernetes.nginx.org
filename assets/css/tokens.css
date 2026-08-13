@@ -200,6 +200,15 @@
     --on-code:        rgba(255, 255, 255, 0.08);
     --on-code-strong: rgba(255, 255, 255, 0.16);
 
+    /* Inline code sits on a wash with no border, which is how GitHub, Slack and
+       Stack Overflow all render it: the monospace face and the tint already say
+       "code", and a 1px outline around a run of ten annotation names in one
+       table cell turns the cell into a grid of boxes. N400 at 22% is the one
+       value that works unchanged in both themes — it lightens N0 to #E9EBEF and
+       over the dark surface it lifts rather than muddies, so the chip needs no
+       dark override at all. Body text on it: 13.21:1 light, 9.99:1 dark. */
+    --code-chip-bg: rgba(158, 167, 184, 0.22);
+
     /* ── Border radius ─────────────────────────────────────────────────────
        F5DS publishes four values and one rule: 4px for all components and UI
        elements, except Tags and Badges, and except elements too small for 4px.

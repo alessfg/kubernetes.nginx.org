@@ -109,7 +109,7 @@ body {
 :focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
 }
 :focus:not(:focus-visible) { outline: none; }
 
@@ -444,7 +444,7 @@ body.has-banner { --banner-h: 36px; }
     width: 100%;
     padding: var(--space-base) var(--space-base) var(--space-base) var(--space-2x);
     border: none;
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
     background: none;
     color: var(--text);
     font-family: var(--font);
@@ -514,7 +514,7 @@ body.has-banner { --banner-h: 36px; }
     align-items: center;
     gap: var(--space-base);
     padding: var(--space-base);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius);
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
     text-decoration: none;

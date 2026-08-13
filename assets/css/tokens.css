@@ -165,8 +165,15 @@
        the same colour world as everything else. The two --on-code washes are
        for controls that sit ON that surface, and are theme-independent for the
        same reason. */
-    --code-bg:     #0B1640;
-    --code-fg:     #E6E9F3;
+    /* Near-black and NEUTRAL, not the N700 navy the rest of the site uses.
+       A navy surface sits in the same hue family as the blue-family syntax
+       tokens (keys #9CDCFE, keywords #569CD6), so they separate poorly against
+       it even though their luminance contrast is fine — the complaint was
+       readability, and hue proximity was the cause rather than contrast. This
+       is VS Code Dark+'s own editor background, which is what the token palette
+       above was designed against. Part of the same code exemption. */
+    --code-bg:     #1E1E1E;
+    --code-fg:     #D4D4D4;
 
     /* ── Code syntax — a DOCUMENTED EXEMPTION ─────────────────────────────
        F5DS defines no code palette. It publishes no syntax-highlighting
@@ -179,18 +186,17 @@
 
        These are VS Code Dark+, the same palette the pre-F5DS design used and
        the same family docs.nginx.com uses, changed only where contrast
-       required it. Ratios are measured against --code-bg #0B1640; the code
-       surface is dark in both themes (dark mode only deepens it to #060D28,
-       which raises every figure), so one set covers both. */
-    --code-key:     #9CDCFE;  /* 11.71:1 — mapping keys */
-    --code-string:  #CE9178;  /*  6.60:1 — quoted values */
-    --code-comment: #6A9955;  /*  5.24:1 — comments */
-    --code-keyword: #569CD6;  /*  5.92:1 — keywords, booleans, commands */
-    --code-number:  #B5CEA8;  /* 10.27:1 — numbers */
-    --code-punct:   #8B9099;  /*  5.44:1 — separators. VS Code's own #808080
-                                 measures 4.42:1 here, under the bar, so this
+       required it. Ratios are measured against --code-bg #1E1E1E; the code
+       surface is the same in both themes, so one set covers both. */
+    --code-key:     #9CDCFE;  /* 11.18:1 — mapping keys */
+    --code-string:  #CE9178;  /*  6.31:1 — quoted values */
+    --code-comment: #6A9955;  /*  5.00:1 — comments */
+    --code-keyword: #569CD6;  /*  5.65:1 — keywords, booleans, commands */
+    --code-number:  #B5CEA8;  /*  9.81:1 — numbers */
+    --code-punct:   #8B9099;  /*  5.20:1 — separators. VS Code's own #808080
+                                 measures 4.19:1 here, under the bar, so this
                                  is one step lighter. */
-    --code-border: #2A3A6E;
+    --code-border: #333333;
     --on-code:        rgba(255, 255, 255, 0.08);
     --on-code-strong: rgba(255, 255, 255, 0.16);
 
@@ -374,8 +380,10 @@
     --java-text:        #4FE0BC;   /* 8.94:1 on N600 */
     --purple-text:      #B3A6F0;   /* 7.03:1 on N600 */
 
-    --code-bg:     #060D28;
-    --code-border: #2A3A6E;
+    /* The code surface is its own world and does not follow the theme —
+       one background means one set of contrast figures to maintain. */
+    --code-bg:     #1E1E1E;
+    --code-border: #333333;
 
     --elev-1: 0 2px 10px rgba(0, 0, 0, 0.5);
     --elev-2: 0 1px 4px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.45);

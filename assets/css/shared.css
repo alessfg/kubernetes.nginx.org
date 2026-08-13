@@ -188,6 +188,9 @@ body {
     align-items: center;
     justify-content: center;
     width: 44px;
+    /* A WCAG touch target must not absorb layout pressure: it is otherwise a
+       shrinkable flex item and would drop below 44px under crowding. */
+    flex-shrink: 0;
     background: none;
     border: 0;
     border-right: 1px solid var(--border);
@@ -230,6 +233,13 @@ body {
     flex-direction: column;
     justify-content: center;
     padding: 0 var(--space-3x);
+    /* The heading is the only item in the bar that gives way — the brand, the
+       menu toggle and `.topbar-right` are all pinned. `min-width: 0` lets it
+       go below its content width, which means that under enough crowding it
+       collapses to nothing rather than ellipsising. That is why the narrow
+       breakpoint below buys it room by dropping the "Contribute" label
+       instead of relying on the ellipsis. */
+    flex: 1 1 auto;
     min-width: 0;
 }
 .topbar-eyebrow {
@@ -762,7 +772,18 @@ code, kbd, samp {
 @media (max-width: 600px) {
     .topbar-brand { padding: 0 var(--space-2x); }
     .topbar-link.hide-mobile { display: none; }
-    .topbar-heading { display: none; }
+    /* The page title stays on a phone. Once the navigation is a closed drawer
+       it is the only thing saying which page you are on, which is what this
+       element was originally added for. It needs room to be worth showing,
+       though: measured at 375px, with both utility labels present the heading
+       collapsed to 0px, and at 320px the logo and the GitHub icon touched. So
+       the utility links go icon-only here, which buys back ~80px. The icons
+       keep their own `aria-label`, so dropping the text costs no
+       accessible name. */
+    .topbar-heading { padding: 0 var(--space-base); }
+    .topbar-link-label { display: none; }
+    .topbar-link { padding: 0 var(--space-base); }
+    .topbar-right { padding: 0 var(--space-base); }
 }
 
 

@@ -18,7 +18,12 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Repo root: this file lives at <root>/.github/scripts/, so three levels up.
+# The guards sit under .github/ rather than scripts/ because GitHub Pages
+# serves this branch verbatim (.nojekyll), and a plain scripts/ directory
+# was being published — verified: /scripts/check-tokens.py returned 200,
+# while dot-directories 404.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CSS_DIR = os.path.join(ROOT, 'assets', 'css')
 JS_DIR = os.path.join(ROOT, 'assets', 'js')

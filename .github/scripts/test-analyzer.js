@@ -18,7 +18,9 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const ROOT = path.dirname(__dirname);
+// Repo root: this file lives at <root>/.github/scripts/, so two levels up
+// from __dirname. Under .github/ so GitHub Pages does not publish it.
+const ROOT = path.dirname(path.dirname(__dirname));
 
 /* A chainable no-op element: every property read returns something callable or
    indexable, so DOM code runs to completion without a real document. */

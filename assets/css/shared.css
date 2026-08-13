@@ -255,16 +255,9 @@ body {
     flex: 1 1 auto;
     min-width: 0;
 }
-/* The site label is the whole heading on a wide screen: one line beside the
-   logo, which is the shape the bar had before the redesign. H3 at the muted
-   text colour — `--n550` measures 4.91:1 on the N0 bar, and 18px counts as
-   normal text, so it clears the 4.5:1 bar rather than the large-text 3:1 one.
-   The stacked eyebrow-over-title arrangement is gone; the page title is now
-   mobile-only, below. */
 .topbar-eyebrow {
-    font-size: var(--fs-h3);
-    line-height: var(--lh-h3);
-    font-weight: 400;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -278,11 +271,7 @@ body {
    page title; H1/H2 are reserved for content-area headings. Its class name is
    now misleading; renaming it means touching index.js and migration-core.js. */
 .mobile-breadcrumb {
-    /* Mobile-only again, as the class name says. On a wide screen the sidebar
-       already marks the active page, so the bar carries the site label instead;
-       once the navigation collapses to a drawer that marker is hidden and the
-       page title becomes the useful line. The ≤900px block swaps the two. */
-    display: none;
+    display: block;
     font-size: var(--fs-h3);
     line-height: var(--lh-h3);
     font-weight: 400;
@@ -796,9 +785,8 @@ code, kbd, samp {
     .topbar-brand { width: auto; justify-content: flex-start; }
     .topbar::after { left: 0; }
     .topbar-heading { padding: 0 var(--space-2x); }
-    /* Swap the two lines: the site label goes, the page title arrives. */
     .topbar-eyebrow { display: none; }
-    .mobile-breadcrumb { display: block; font-size: var(--fs-body); line-height: var(--lh-body); }
+    .mobile-breadcrumb { font-size: var(--fs-body); line-height: var(--lh-body); }
     .topbar-right { padding: 0 var(--space-2x); }
 
     /* WCAG target size beats F5DS's fixed 32px on touch. */

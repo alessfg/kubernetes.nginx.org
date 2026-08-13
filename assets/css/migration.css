@@ -268,8 +268,13 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
    direction of the migration is the whole point. The heading text carries the
    meaning either way. */
 .comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2x); }
+/* Flex column, and the <pre> inside flexes to fill. The grid stretches both
+   blocks to the height of the taller one, so without this the shorter side's
+   code surface stops early and leaves a band of card background below it. */
 .comparison-block {
     position: relative;
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
@@ -287,7 +292,7 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 }
 .comparison-block.old h4 { background: var(--pomegranate-tint); color: var(--text); }
 .comparison-block.new h4 { background: var(--green-tint); color: var(--text); }
-.comparison-block pre { margin: 0; border: 0; border-radius: 0; }
+.comparison-block pre { flex: 1; margin: 0; border: 0; border-radius: 0; }
 .comparison-copy-btn {
     padding: 0 var(--space-base);
     min-height: 20px;
@@ -930,7 +935,15 @@ button.analyzer-pill { font-family: var(--font); }
 }
 
 .analyzer-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2x); margin: var(--space-base) 0; }
-.analyzer-comparison-block { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+/* Same flex treatment as .comparison-block, for the same reason: the two sides
+   rarely have equal line counts, and the grid stretches them to match. */
+.analyzer-comparison-block {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
 .analyzer-comparison-block h4 {
     display: flex;
     align-items: center;
@@ -952,7 +965,7 @@ button.analyzer-pill { font-family: var(--font); }
     line-height: var(--lh-badge);
     font-weight: 700;
 }
-.analyzer-comparison-block .analyzer-yaml-output { margin: 0; border: 0; border-radius: 0; min-height: 60px; }
+.analyzer-comparison-block .analyzer-yaml-output { flex: 1; margin: 0; border: 0; border-radius: 0; min-height: 60px; }
 
 .analyzer-empty-state { text-align: center; padding: var(--space-5x) var(--space-2hx); color: var(--text-secondary); }
 .analyzer-empty-state svg { margin-bottom: var(--space-2x); color: var(--icon); }

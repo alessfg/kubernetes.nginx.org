@@ -219,14 +219,22 @@ body {
 .topbar-brand .brand-logo-dark { display: none; }
 :is(html, body).dark-mode .topbar-brand .brand-logo-light { display: none; }
 :is(html, body).dark-mode .topbar-brand .brand-logo-dark { display: block; }
-.topbar-brand span {
-    font-family: var(--font-display);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-    font-weight: 700;
+/* ── Page heading ─────────────────────────────────────────────────────────
+   The site label sits ABOVE the page title, not beside the logo. That is what
+   the console does ("Distributed Cloud Console" over "Home"), and it is also
+   the only arrangement that fits: the branding block is pinned to the 264px
+   navigation width, which leaves 232px, and the logo plus a label like
+   "Networking for Kubernetes" needs more than that — it used to truncate. */
+.topbar-heading {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 var(--space-3x);
+    min-width: 0;
 }
-.topbar-brand .sub {
-    font-weight: 400;
+.topbar-eyebrow {
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -235,14 +243,12 @@ body {
 
 /* The page title. This element already existed as a mobile-only breadcrumb,
    and index.js already keeps its text in step with the active view — it is now
-   promoted to every width, because a page title sitting in the top band beside
-   the branding is the console's clearest structural signature. H3 Regular is
-   what F5DS assigns to a page title; H1/H2 are reserved for content-area
-   headings. */
+   shown at every width, because a page title sitting in the top band is the
+   console's clearest structural signature. H3 Regular is what F5DS assigns to a
+   page title; H1/H2 are reserved for content-area headings. Its class name is
+   now misleading; renaming it means touching index.js and migration-core.js. */
 .mobile-breadcrumb {
-    display: flex;
-    align-items: center;
-    padding: 0 var(--space-3x);
+    display: block;
     font-size: var(--fs-h3);
     line-height: var(--lh-h3);
     font-weight: 400;
@@ -743,8 +749,9 @@ code, kbd, samp {
     /* The branding block stops claiming the navigation width once the
        navigation is a drawer. */
     .topbar-brand { width: auto; }
-    .topbar-brand .sub { display: none; }
-    .mobile-breadcrumb { padding: 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body); }
+    .topbar-heading { padding: 0 var(--space-2x); }
+    .topbar-eyebrow { display: none; }
+    .mobile-breadcrumb { font-size: var(--fs-body); line-height: var(--lh-body); }
     .topbar-right { padding: 0 var(--space-2x); }
 
     /* WCAG target size beats F5DS's fixed 32px on touch. */
@@ -755,7 +762,7 @@ code, kbd, samp {
 @media (max-width: 600px) {
     .topbar-brand { padding: 0 var(--space-2x); }
     .topbar-link.hide-mobile { display: none; }
-    .mobile-breadcrumb { display: none; }
+    .topbar-heading { display: none; }
 }
 
 

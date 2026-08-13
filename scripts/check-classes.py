@@ -40,7 +40,7 @@ STATE_ONLY = {
     'warning', 'note', 'tip', 'info', 'tip-green', 'desc', 'num', 'label',
     'positive', 'attention', 'negative',
     # utility hooks with no styling of their own
-    'hide-mobile', 'plain', 'sub', 'hint', 'banner-text', 'card-fit',
+    'hide-mobile', 'plain', 'hint', 'banner-text', 'card-fit',
     'card-link', 'description', 'str', 'cmd', 'flag', 'comment',
     'brand-logo-light', 'brand-logo-dark', 'nginx-glyph',
     'dark-icon-moon', 'dark-icon-sun', 'or-text',

@@ -155,9 +155,12 @@
    "between page content or panels" step, which is what the console's own
    annotated cards measure. */
 
+/* Two per row, not auto-fill. Auto-fill gave three columns on a wide viewport,
+   which left the fourth card alone on its own row — both of these grids hold
+   four items, so a 2x2 block reads far better than 3+1. */
 .feature-grid, .project-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2x);
     margin: var(--space-2hx) 0 var(--space-4x);
 }
@@ -499,6 +502,7 @@ a.feature-card, a.feature-card:link, a.feature-card:visited { text-decoration: n
     .page-hero { padding: var(--space-4x) var(--space-3x) var(--space-3x); }
     .page-hero h1 { font-size: var(--fs-h2); line-height: var(--lh-h2); }
     .page-body { padding: var(--space-3hx) var(--space-3x) var(--space-5x); }
+    .feature-grid, .project-grid { grid-template-columns: 1fr; }
     .details-grid, .annotation-grid { grid-template-columns: 1fr; }
     .annotation-grid-header:nth-child(2) { display: none; }
 }

@@ -175,22 +175,14 @@ body {
     align-items: stretch;
     justify-content: space-between;
     background: var(--surface);
+    /* Full-width bottom rule, running under the branding block as well. An
+       earlier version started it at --sidebar-w so the brand and sidebar read
+       as one column; the console screenshots show the rule crossing the whole
+       bar, so it is back to a plain border. */
+    border-bottom: 1px solid var(--border);
     transition: background var(--dur-reveal) linear,
                 border-color var(--dur-reveal) linear,
                 top var(--dur-colour) linear;
-}
-/* The bottom rule starts where the navigation column ends, so it never runs
-   underneath the branding block. That makes the brand and the sidebar below it
-   read as one continuous column, which is what the console does — a rule under
-   the logo boxes it off from the navigation it belongs to. Full width again
-   once the navigation collapses to a drawer and there is no column to align
-   with. */
-.topbar::after {
-    content: '';
-    position: absolute;
-    left: var(--sidebar-w); right: 0; bottom: 0;
-    height: 1px;
-    background: var(--border);
 }
 
 .topbar-left { display: flex; align-items: stretch; min-width: 0; }
@@ -476,6 +468,11 @@ body.has-banner { --banner-h: 36px; }
 .sidebar-link-name {
     font-size: var(--fs-body);
     line-height: var(--lh-body);
+    /* Medium, so the project name reads as the title of its row and the version
+       line below it as metadata. Matches what main used on the active item, but
+       applied to every row rather than only the active one — the hierarchy is
+       between name and description, not between selected and unselected. */
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -511,7 +508,12 @@ body.has-banner { --banner-h: 36px; }
 .sidebar-ext svg { flex-shrink: 0; color: var(--icon); }
 
 .sidebar-copyright {
-    padding: var(--space-2x) var(--space-2x) var(--space-base);
+    /* 8px side padding rather than 16, so the trademark line fits on one line.
+       Measured: the string needs 244px at 12px and 16px padding left only 231,
+       so "Inc." was orphaning onto a second line. 8px gives 247. The whole
+       block moves with it rather than the trademark line alone, which keeps the
+       three footer lines aligned to each other. */
+    padding: var(--space-2x) var(--space-base) var(--space-base);
     margin-top: auto;
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
@@ -791,10 +793,8 @@ code, kbd, samp {
     .main { margin-left: 0; }
     .menu-toggle { display: flex; }
     /* The branding block stops claiming the navigation width once the
-       navigation is a drawer, so it also stops centring and the bottom rule
-       goes back to full width — there is no column left to align either to. */
+       navigation is a drawer, so it also stops centring. */
     .topbar-brand { width: auto; justify-content: flex-start; }
-    .topbar::after { left: 0; }
     .topbar-heading { padding: 0 var(--space-2x); }
     /* Swap the two lines: the site label goes, the page title arrives. */
     .topbar-eyebrow { display: none; }

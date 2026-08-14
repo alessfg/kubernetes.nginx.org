@@ -430,14 +430,12 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 .badge-policy              { background: var(--badge-policy-bg); border-color: transparent; color: var(--badge-policy-fg); }
 .badge-transportserver     { background: var(--badge-ts-bg);     border-color: transparent; color: var(--badge-ts-fg); }
 .badge-configmap           { background: var(--badge-cm-bg);     border-color: transparent; color: var(--badge-cm-fg); }
+.badge-globalconfiguration { background: var(--badge-gc-bg);     border-color: transparent; color: var(--badge-gc-fg); }
 .badge-plus                { background: var(--badge-plus-bg);   border-color: transparent; color: var(--badge-plus-fg); font-weight: 700; }
 .badge-new                 { background: var(--badge-new-bg);    border-color: transparent; color: var(--badge-new-fg); }
-/* The two neutrals. Elm is the graph palette's only teal and misses the bar as
-   a label, so there is no eighth and ninth family to spend — and these two are
-   the right ones to leave uncoloured: GlobalConfiguration is cluster-wide
-   plumbing, and an annotation is the thing every other badge is an
-   alternative to. The pre-F5DS design left both neutral as well. */
-.badge-globalconfiguration { background: var(--surface-sunken); border-color: var(--border-strong); }
+/* The one neutral, and it is the right one to leave uncoloured: an annotation
+   is the absence of a CRD — the thing every other badge here is an alternative
+   to — so it reads as the baseline rather than as a ninth category. */
 .badge-annotation          { background: var(--surface); border-color: var(--border-strong); }
 .plus-indicator {
     margin-left: var(--space-base);

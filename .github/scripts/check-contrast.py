@@ -169,9 +169,9 @@ BADGES = [
     ('--badge-policy-fg', '--badge-policy-bg', 'Policy badge'),
     ('--badge-ts-fg',     '--badge-ts-bg',     'TransportServer badge'),
     ('--badge-cm-fg',     '--badge-cm-bg',     'ConfigMap badge'),
+    ('--badge-gc-fg',     '--badge-gc-bg',     'GlobalConfiguration badge'),
     ('--badge-plus-fg',   '--badge-plus-bg',   'NGINX Plus badge'),
     ('--badge-new-fg',    '--badge-new-bg',    'New badge'),
-    ('--text',            '--surface-sunken',  'GlobalConfiguration badge (neutral)'),
     ('--text',            '--surface',         'annotation badge (neutral)'),
 ]
 

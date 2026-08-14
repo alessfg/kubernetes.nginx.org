@@ -172,15 +172,29 @@
        labels in light mode, the tint fills; in dark the tint labels and fills
        at 16%. Every pairing is measured in check-contrast.py, both themes.
 
-       Two kinds stay neutral. Elm #28837E is the palette's only teal and
-       measures 4.26:1 on N100, under the bar, so there is no safe teal
-       family; GlobalConfiguration and annotation take the neutral treatment
-       instead, which is also what the pre-F5DS design did. */
+       Only `annotation` stays neutral, and deliberately: it is the absence of
+       a CRD, the thing every other badge is an alternative to.
+
+       Teal is missing from the set on purpose. Elm #28837E is the palette's
+       only dark teal and it clears nothing — 4.01:1 on Light Cyan, 3.83:1 on
+       the Java tint, 3.59:1 on Ice, 4.26:1 on N100 — so there is no teal
+       family available at any fill, only a teal-looking one that fails.
+
+       Green appears once, on New. ConfigMap was tried in the palette's olive
+       family and pulled back out: green is already the brand accent, the CTA
+       fill, the active-nav mark and the New badge, and a fifth green stops
+       meaning anything. It takes Cobalt instead — a third blue, but the palest
+       fill of the three and the furthest label from the other two, and
+       ConfigMap is the legacy config surface sitting beside the CRDs anyway.
+
+       The palette's yellows and browns cannot carry a label at all: Golden
+       Brown on Early Dawn is 4.41:1 and Mai Tai 4.15:1, both under the bar. */
     --badge-vs-fg:     #044A77;  --badge-vs-bg:     #BBE4FD;  /* Regal / French Pass */
     --badge-vsr-fg:    #352A6D;  --badge-vsr-bg:    #B3CDFF;  /* Paris / Melrose */
     --badge-policy-fg: #5242AA;  --badge-policy-bg: #CAC5EC;  /* Gigas / Prelude */
     --badge-ts-fg:     #723E04;  --badge-ts-bg:     #FFE7CA;  /* Peru Tan / Tequila */
-    --badge-cm-fg:     #6A0B6A;  --badge-cm-bg:     #FCE4F8;  /* Palatinate / Selago */
+    --badge-cm-fg:     #0041A3;  --badge-cm-bg:     #E0EAFF;  /* Cobalt / Solitude */
+    --badge-gc-fg:     #6A0B6A;  --badge-gc-bg:     #FCE4F8;  /* Palatinate / Selago */
     --badge-plus-fg:   #7E2B37;  --badge-plus-bg:   #FDE4E4;  /* Nutmeg / Cinderella */
     --badge-new-fg:    #135213;  --badge-new-bg:    #DAF7D5;  /* Parsley / Romance */
 
@@ -429,7 +443,8 @@
     --badge-vsr-fg:    #B3CDFF;  --badge-vsr-bg:    rgba(179, 205, 255, 0.16);
     --badge-policy-fg: #CAC5EC;  --badge-policy-bg: rgba(202, 197, 236, 0.16);
     --badge-ts-fg:     #FFE7CA;  --badge-ts-bg:     rgba(255, 231, 202, 0.16);
-    --badge-cm-fg:     #FCE4F8;  --badge-cm-bg:     rgba(252, 228, 248, 0.16);
+    --badge-cm-fg:     #E0EAFF;  --badge-cm-bg:     rgba(224, 234, 255, 0.16);
+    --badge-gc-fg:     #FCE4F8;  --badge-gc-bg:     rgba(252, 228, 248, 0.16);
     --badge-plus-fg:   #FDE4E4;  --badge-plus-bg:   rgba(253, 228, 228, 0.16);
     --badge-new-fg:    #DAF7D5;  --badge-new-bg:    rgba(218, 247, 213, 0.16);
 

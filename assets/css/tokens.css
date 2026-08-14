@@ -211,6 +211,24 @@
        where an F5DS pairing misses AA. Production derives the same value for
        the same badge and lands at #005250, one step deeper still.
 
+       ── Why ConfigMap takes the INNER tint ─────────────────────────────────
+       Nearest-family is necessary but not sufficient: families 2 and 9 are
+       adjacent on the wheel, so ConfigMap and NGINX Plus land near each other
+       whatever their labels do. Measured as CIEDE2000 across all 36 pairs in
+       the set, ConfigMap on Selago #FCE4F8 against Plus on Carousel Pink is
+       ΔE 6.3 — the closest pair by a distance, where every other pair is 10.3
+       or more. Production has the same 3.6 collision and survives it because
+       its labels are 28.3 apart; ours are 21.1, which is not enough cover.
+
+       So ConfigMap takes Chantilly #F7BDED, family 2's inner tint, instead of
+       the outer Selago that matches production's weight exactly. That is a
+       deliberate one-step departure and it buys ΔE 6.3 -> 15.9 in light and
+       6.3 -> 15.9 on the dark labels. The alternative — moving Plus to family
+       8 — scores the same but drags Plus 23° off the production red it is
+       within 2.9° of today, so the departure is spent here instead.
+
+       This is also why ConfigMap is no longer the palest chip in the row.
+
        Family 6 (olive) and family 11 (yellow) go unspent. Olive was tried on
        ConfigMap and is wrong for a reason the hue table makes obvious: no
        production badge is anywhere near it. */
@@ -218,7 +236,7 @@
     --badge-vsr-fg:    #0041A3;  --badge-vsr-bg:    #B3CDFF;  /* 3  Cobalt / Melrose      */
     --badge-policy-fg: #5242AA;  --badge-policy-bg: #CAC5EC;  /* 1  Gigas / Prelude       */
     --badge-ts-fg:     #723E04;  --badge-ts-bg:     #FFE7CA;  /* 10 Peru Tan / Tequila    */
-    --badge-cm-fg:     #6A0B6A;  --badge-cm-bg:     #FCE4F8;  /* 2  Palatinate / Selago   */
+    --badge-cm-fg:     #6A0B6A;  --badge-cm-bg:     #F7BDED;  /* 2  Palatinate / Chantilly*/
     --badge-plus-fg:   #7E2B37;  --badge-plus-bg:   #F5DFE3;  /* 9  Nutmeg / Carousel Pink*/
     --badge-note-fg:   #1D5E5A;  --badge-note-bg:   #D0F9F9;  /* 5  Elm-dk / Light Cyan   */
     --badge-new-fg:    #135213;  --badge-new-bg:    #DAF7D5;  /* 7  Parsley / Romance     */
@@ -472,7 +490,7 @@
     --badge-vsr-fg:    #B3CDFF;  --badge-vsr-bg:    rgba(179, 205, 255, 0.16);
     --badge-policy-fg: #CAC5EC;  --badge-policy-bg: rgba(202, 197, 236, 0.16);
     --badge-ts-fg:     #FFE7CA;  --badge-ts-bg:     rgba(255, 231, 202, 0.16);
-    --badge-cm-fg:     #FCE4F8;  --badge-cm-bg:     rgba(252, 228, 248, 0.16);
+    --badge-cm-fg:     #F7BDED;  --badge-cm-bg:     rgba(247, 189, 237, 0.16);
     --badge-plus-fg:   #F5DFE3;  --badge-plus-bg:   rgba(245, 223, 227, 0.16);
     --badge-note-fg:   #D0F9F9;  --badge-note-bg:   rgba(208, 249, 249, 0.16);
     --badge-new-fg:    #DAF7D5;  --badge-new-bg:    rgba(218, 247, 213, 0.16);

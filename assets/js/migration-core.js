@@ -62,8 +62,10 @@
             return indent + key + ': "' + escaped + '"';
         }
 
-        // Normalize CRLF/CR and split a manifest into YAML documents
-        // ("---" separators, optionally followed by a comment).
+        // Normalize CRLF/CR and split a manifest into YAML documents. The
+        // separator may carry a trailing comment — `helm template` emits
+        // `--- # Source: chart/templates/x.yaml`. An indented `---` is
+        // content, not a separator, which the ^ anchor already handles.
         function splitDocuments(yamlText) {
             return yamlText.replace(/\r\n?/g, '\n').split(/^---(?:\s+#.*)?\s*$/m);
         }

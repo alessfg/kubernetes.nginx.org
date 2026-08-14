@@ -23,18 +23,42 @@ F5DS's platform primary is Dodger Blue `#4F73FF`. This site leads with **NGINX g
 - **Dodger Blue** — platform and tooling: content links, focus rings, the two Kubernetes tools. It replaced Kubernetes brand blue `#326CE5` — same job, F5's hue rather than the CNCF one.
 - **F5 Brand Red `#E4002B` is absent entirely.** F5DS restricts it to logo, illustrations and pictograms and forbids it as a CTA, link, accent or error colour. Negative sentiment is Pomegranate.
 
-## The CRD badges use F5DS's graph palette
+## The whole F5DS colour inventory is available, not just the sentiment set
 
-The nine badges in the migration tool name nine kinds of resource, and the five text-safe sentiment hues cannot carry that. They ran out after five, so the sixth and seventh were separated by *treatment* instead of hue — which is how VirtualServerRoute became an unfilled pill that read as a button — and the hues meant the wrong thing besides: Policy in the Informative purple said nothing informative, NGINX Plus in a status red said error.
+This is the most useful thing in this file, so it comes first.
 
-F5DS publishes a palette for exactly this job: **Graph Colors**, 50 `Shades & Tints` plus 5 `Visualizations` in the ZH Foundations - Colors library. Seven families carry a badge, each a shade/tint pair — the shade labels in light mode and the tint fills; the reverse in dark, fill at 16%. One token per family drives both themes, so no badge needs a dark-mode override and a family cannot drift apart.
+F5DS's *default* palette — Dodger Blue plus the four sentiment hues and Java — is small, and it is tuned for sentiment rather than for telling N things apart. A documentation surface needs more than that: category badges, code syntax, comparison sides. **The rest of the shipped palette is fair game for any of it.**
 
-Two constraints found by measuring, worth not rediscovering:
+What F5DS actually ships, all quotable:
 
-- **There is no usable teal.** Elm `#28837E` is the palette's only dark teal and it clears nothing: 4.01:1 on Light Cyan, 3.83:1 on the Java tint, 3.59:1 on Ice, 4.26:1 on N100.
-- **The yellows and browns cannot carry a label.** Golden Brown on Early Dawn is 4.41:1; Mai Tai on Early Dawn is 4.15:1.
+| Group | Count | Notes |
+|---|---|---|
+| Primary — Dodger Blue | 3 | base, hover `#2E50D9`, light `#DBE2FF` |
+| Brand `#E4002B` | 1 | **restricted**: logo, illustrations, pictograms only. Never a CTA, link, accent or error colour. |
+| AI Assist | 2 | `#1152B2` / `#003E99` |
+| Neutrals N0–N700 | 8 | |
+| Status | 5 | Emerald, Amber, Pomegranate, Medium Purple, Java, each with hover and light |
+| **Shades & Tints** | **50** | named paint colours; the graph-series extension set |
+| **Visualizations** | **5** | Atlantis, Chetwode Blue, Gigas, Lavender Magenta, Red Violet |
 
-`annotation` is therefore the only neutral badge, which is also the right one to leave uncoloured — it is the absence of a CRD, the thing every other badge is an alternative to. ConfigMap is a third blue (Cobalt/Solitude) rather than a second green, because green is already the brand accent, the CTA fill, the active-nav mark and the New badge.
+The bottom two rows are the ones people forget, and they are where a docs site should look first when it needs a colour that means "a different category" rather than "a sentiment". Using them is not a deviation — it is using the system as published.
+
+**Two rules when reaching into them:**
+
+1. **Stay inside F5DS's hues.** Pick a published colour, do not invent one.
+2. **Derive lightness, and measure.** A published value missing the contrast bar on its own tint does not make the hue unusable — it makes that *value* unusable. Deepen or lighten along the same hue and record the measured ratio, exactly as `--n550`, `--n450` and `--blue-text` already do. Elm `#28837E` on Light Cyan is 4.01:1 and fails; deepened along its own 176.7° hue to `#1D5E5A` it is 6.64:1 and passes. Label derived values as derived so the next reader knows which are quotable as F5DS.
+
+The same applies anywhere a colour is needed, not only badges.
+
+## How the CRD badges use it
+
+Eight badge kinds, and the five text-safe sentiment hues could not carry that. They ran out after five, so the sixth and seventh were separated by *treatment* instead of hue — which is how VirtualServerRoute became an unfilled pill that read as a button — and the hues meant the wrong thing besides: Policy in the Informative purple said nothing informative, NGINX Plus in a status red said error.
+
+The badges use **Graph Colors** instead: a shade/tint pair per family, the shade labelling in light mode over the tint fill, the reverse in dark with the fill at 16%. One token per family drives both themes, so no badge needs a dark-mode override and a family cannot drift apart.
+
+**Which family each badge gets is not an aesthetic choice.** Production already ships a badge identity for each of these and readers know them, so the assignment is a translation: take the production hue, give the badge the graph family nearest it on the hue circle. Production lands within 5° of a family for five of the eight. `tokens.css` carries the full hue table, the CIEDE2000 collision analysis behind ConfigMap taking family 2's *inner* tint, and the reasoning for GlobalConfiguration being the neutral — production gives it saturation 0.00, so there is no hue to match.
+
+Teal (family 5) is deliberately unspent rather than unusable: production styles a teal `.badge-annotation` that renders nowhere, so the family is reserved in case that badge is ever wanted. If it is, note that it needs a derived label — see the derivation rule above.
 
 ## F5DS publishes no accessibility guidance, and three of its pairings fail AA
 

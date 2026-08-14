@@ -159,6 +159,22 @@ PAIRS = [
 # to these tokens is visible, but they are not assertions.
 STATUS = ['--emerald', '--amber', '--pomegranate', '--purple', '--java']
 
+# CRD badges. One entry per graph-colour family; the token names are identical
+# in both themes and resolve to that theme's values, so this list is shared
+# rather than split. These were previously unchecked — the badge palette was
+# the largest set of colour pairings on the site with no assertion behind it.
+BADGES = [
+    ('--badge-vs-fg',     '--badge-vs-bg',     'VirtualServer badge'),
+    ('--badge-vsr-fg',    '--badge-vsr-bg',    'VirtualServerRoute badge'),
+    ('--badge-policy-fg', '--badge-policy-bg', 'Policy badge'),
+    ('--badge-ts-fg',     '--badge-ts-bg',     'TransportServer badge'),
+    ('--badge-cm-fg',     '--badge-cm-bg',     'ConfigMap badge'),
+    ('--badge-plus-fg',   '--badge-plus-bg',   'NGINX Plus badge'),
+    ('--badge-new-fg',    '--badge-new-bg',    'New badge'),
+    ('--text',            '--surface-sunken',  'GlobalConfiguration badge (neutral)'),
+    ('--text',            '--surface',         'annotation badge (neutral)'),
+]
+
 # Filled buttons: the label colour differs per theme, so these are declared
 # per theme rather than as shared pairs.
 BUTTONS = {
@@ -179,6 +195,7 @@ def main():
         print('-' * 62)
         checks = [(f, b, m, d) for f, b, m, d in PAIRS]
         checks += [(f, b, TEXT_AA, d) for f, b, d in BUTTONS[theme]]
+        checks += [(f, b, TEXT_AA, d) for f, b, d in BADGES]
 
         for fg_t, bg_t, minimum, desc in checks:
             bg = to_rgba(resolve(bg_t, theme, blocks))

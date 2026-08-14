@@ -157,6 +157,33 @@
        accent or error colour. Negative sentiment is Pomegranate. The site used
        it as a section accent before; that is retired. */
 
+    /* ── Badge palette: F5DS graph colours ─────────────────────────────────
+       The CRD badges name nine kinds of resource, and the five text-safe
+       sentiment hues cannot carry that: they were spent after five, the sixth
+       and seventh had to be separated by treatment instead of hue, and a
+       reader ended up decoding an outlined pill against a filled one. They
+       also carried the wrong meaning — "Policy CRD" in the Informative purple
+       says nothing informative, and "NGINX Plus" in a status red says error.
+
+       F5DS publishes a second, larger palette for exactly the job of telling
+       N categories apart: the Graph Colors set (`Shades & Tints/` and
+       `Visualizations/` in the ZH Foundations - Colors library, 50 + 5
+       values). Each family below is one of its shade/tint pairs — the shade
+       labels in light mode, the tint fills; in dark the tint labels and fills
+       at 16%. Every pairing is measured in check-contrast.py, both themes.
+
+       Two kinds stay neutral. Elm #28837E is the palette's only teal and
+       measures 4.26:1 on N100, under the bar, so there is no safe teal
+       family; GlobalConfiguration and annotation take the neutral treatment
+       instead, which is also what the pre-F5DS design did. */
+    --badge-vs-fg:     #044A77;  --badge-vs-bg:     #BBE4FD;  /* Regal / French Pass */
+    --badge-vsr-fg:    #352A6D;  --badge-vsr-bg:    #B3CDFF;  /* Paris / Melrose */
+    --badge-policy-fg: #5242AA;  --badge-policy-bg: #CAC5EC;  /* Gigas / Prelude */
+    --badge-ts-fg:     #723E04;  --badge-ts-bg:     #FFE7CA;  /* Peru Tan / Tequila */
+    --badge-cm-fg:     #6A0B6A;  --badge-cm-bg:     #FCE4F8;  /* Palatinate / Selago */
+    --badge-plus-fg:   #7E2B37;  --badge-plus-bg:   #FDE4E4;  /* Nutmeg / Cinderella */
+    --badge-new-fg:    #135213;  --badge-new-bg:    #DAF7D5;  /* Parsley / Romance */
+
     /* Scrim behind the mobile navigation drawer: N700 at 40%, never black. */
     --scrim: rgba(11, 22, 64, 0.40);
 
@@ -394,6 +421,17 @@
     --pomegranate-text: #FF8A70;   /* 6.05:1 on N600 */
     --java-text:        #4FE0BC;   /* 8.94:1 on N600 */
     --purple-text:      #B3A6F0;   /* 7.03:1 on N600 */
+
+    /* Badges invert: the graph family's tint becomes the label, and the fill
+       is that same tint at 16% over the surface. One value per family drives
+       both, so a family cannot drift apart between themes. */
+    --badge-vs-fg:     #BBE4FD;  --badge-vs-bg:     rgba(187, 228, 253, 0.16);
+    --badge-vsr-fg:    #B3CDFF;  --badge-vsr-bg:    rgba(179, 205, 255, 0.16);
+    --badge-policy-fg: #CAC5EC;  --badge-policy-bg: rgba(202, 197, 236, 0.16);
+    --badge-ts-fg:     #FFE7CA;  --badge-ts-bg:     rgba(255, 231, 202, 0.16);
+    --badge-cm-fg:     #FCE4F8;  --badge-cm-bg:     rgba(252, 228, 248, 0.16);
+    --badge-plus-fg:   #FDE4E4;  --badge-plus-bg:   rgba(253, 228, 228, 0.16);
+    --badge-new-fg:    #DAF7D5;  --badge-new-bg:    rgba(218, 247, 213, 0.16);
 
     /* The code surface is its own world and does not follow the theme —
        one background means one set of contrast figures to maintain. */

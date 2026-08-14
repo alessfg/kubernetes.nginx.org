@@ -407,28 +407,38 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
    actually separates them. There are only five text-safe hues to spend
    (--green-text, --blue-text, --pomegranate-text, --java-text, --purple-text);
    there is deliberately no amber or emerald text token, because neither clears
-   the contrast bar as text at any usable saturation. So the two remaining kinds
-   are separated by treatment instead of hue: the outlined variants pair with
-   their filled counterpart, which also reads correctly — VirtualServerRoute is
-   a VirtualServer's subordinate, and an annotation is a ConfigMap's. */
-.badge-virtualserver       { background: var(--blue-tint); border-color: transparent; color: var(--blue-text); }
-.badge-virtualserverroute  { background: var(--surface); border-color: var(--blue-text); color: var(--blue-text); }
-.badge-policy              { background: var(--purple-tint); border-color: transparent; color: var(--purple-text); }
-.badge-transportserver     { background: var(--java-tint); border-color: transparent; color: var(--java-text); }
-/* Amber has no text token by design, so this one keeps the default text
-   colour; the tint is unique in the set, which is enough to place it. */
-.badge-globalconfiguration { background: var(--amber-tint); border-color: transparent; }
-.badge-configmap           { background: var(--surface-sunken); }
-.badge-annotation          { background: var(--surface); border-color: var(--border-strong); }
-.badge-plus                { background: var(--pomegranate-tint); border-color: transparent; color: var(--pomegranate-text); font-weight: 700; }
-.badge-new                 { background: var(--green-tint); border-color: transparent; color: var(--green-text); }
+   the contrast bar as text at any usable saturation.
 
-/* Dark mode is fine for every badge except this one: --blue-text on the dark
-   blue tint measures 4.27:1, just under the 4.5 bar for text this size. The
-   next step up the ramp clears it at 5.39:1. Computed, not eyeballed — and not
-   caught by check-contrast.py, which asserts a fixed pairing list and does not
-   know about badge pairings. */
-:is(html, body).dark-mode .badge-virtualserver { color: var(--blue-deep); }
+   So the badges moved off the sentiment set entirely, onto F5DS's graph
+   palette — the one part of the system published for telling N categories
+   apart. The tokens carry the reasoning; three things it fixes here:
+
+   - Nine kinds now get nine appearances. Under the sentiment set the sixth and
+     seventh had to be separated by *treatment*, which put an unfilled pill
+     next to a filled one and made VirtualServerRoute read as a button.
+   - The sentiment hues go back to meaning sentiment. A Policy badge in the
+     Informative purple was saying nothing informative, and NGINX Plus in a
+     status red was saying error.
+   - Every pairing is asserted by check-contrast.py now, in both themes. The
+     rule this file used to carry — that the guard "does not know about badge
+     pairings" — no longer holds; it does.
+
+   Both themes come from one token per family, so a family cannot drift apart
+   between them, and no badge needs a dark-mode override. */
+.badge-virtualserver       { background: var(--badge-vs-bg);     border-color: transparent; color: var(--badge-vs-fg); }
+.badge-virtualserverroute  { background: var(--badge-vsr-bg);    border-color: transparent; color: var(--badge-vsr-fg); }
+.badge-policy              { background: var(--badge-policy-bg); border-color: transparent; color: var(--badge-policy-fg); }
+.badge-transportserver     { background: var(--badge-ts-bg);     border-color: transparent; color: var(--badge-ts-fg); }
+.badge-configmap           { background: var(--badge-cm-bg);     border-color: transparent; color: var(--badge-cm-fg); }
+.badge-plus                { background: var(--badge-plus-bg);   border-color: transparent; color: var(--badge-plus-fg); font-weight: 700; }
+.badge-new                 { background: var(--badge-new-bg);    border-color: transparent; color: var(--badge-new-fg); }
+/* The two neutrals. Elm is the graph palette's only teal and misses the bar as
+   a label, so there is no eighth and ninth family to spend — and these two are
+   the right ones to leave uncoloured: GlobalConfiguration is cluster-wide
+   plumbing, and an annotation is the thing every other badge is an
+   alternative to. The pre-F5DS design left both neutral as well. */
+.badge-globalconfiguration { background: var(--surface-sunken); border-color: var(--border-strong); }
+.badge-annotation          { background: var(--surface); border-color: var(--border-strong); }
 .plus-indicator {
     margin-left: var(--space-base);
     padding: 0 var(--space-base);

@@ -17,6 +17,8 @@ This is a documentation-only site; entries track notable content and tooling upd
 - Added four dependency-free checks under `.github/scripts/` (design tokens, colour contrast, class resolution, analyzer behaviour), now run in CI on every push and pull request.
 - The ingress-nginx analyzer now splits YAML documents through the shared engine helper instead of its own copy, so it recognises `---` separators that carry a trailing comment — the form `helm template` emits.
 - Replaced `CLAUDE.md` with `AGENTS.md` at the repository root, so every AI coding tool reads the same instructions.
+- Traefik migration tool (`traefik-migration.html`) — interactive analyzer for Traefik resources (IngressRoute, Middleware, TraefikService, TCP/UDP routes), mappings for all 24 OSS HTTP middlewares and the Traefik Ingress annotations, TLS/cert-manager guidance, and static-configuration translation. Documented against Traefik v3.7.6 and NGINX Ingress Controller v5.5.1.
+- The migration tools now share one engine: `assets/js/migration-core.js` plus a per-source module (`migration-ingress-nginx.js`, `migration-traefik.js`).
 
 ## 1.0.0 (March 4, 2026)
 

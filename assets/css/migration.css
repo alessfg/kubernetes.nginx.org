@@ -423,20 +423,25 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
      rule this file used to carry — that the guard "does not know about badge
      pairings" — no longer holds; it does.
 
-   Both themes come from one token per family, so a family cannot drift apart
-   between them, and no badge needs a dark-mode override. */
+   WHICH family each badge gets is settled in tokens.css by hue distance from
+   the badge's PRODUCTION colour, so a reader coming from the live site meets
+   the same nine identities. Do not re-pick one of these on taste alone —
+   check the hue table there first. Both themes come from one token per family,
+   so a family cannot drift apart between them, and no badge needs a dark-mode
+   override. */
 .badge-virtualserver       { background: var(--badge-vs-bg);     border-color: transparent; color: var(--badge-vs-fg); }
 .badge-virtualserverroute  { background: var(--badge-vsr-bg);    border-color: transparent; color: var(--badge-vsr-fg); }
 .badge-policy              { background: var(--badge-policy-bg); border-color: transparent; color: var(--badge-policy-fg); }
 .badge-transportserver     { background: var(--badge-ts-bg);     border-color: transparent; color: var(--badge-ts-fg); }
 .badge-configmap           { background: var(--badge-cm-bg);     border-color: transparent; color: var(--badge-cm-fg); }
-.badge-globalconfiguration { background: var(--badge-gc-bg);     border-color: transparent; color: var(--badge-gc-fg); }
 .badge-plus                { background: var(--badge-plus-bg);   border-color: transparent; color: var(--badge-plus-fg); font-weight: 700; }
 .badge-new                 { background: var(--badge-new-bg);    border-color: transparent; color: var(--badge-new-fg); }
-/* The one neutral, and it is the right one to leave uncoloured: an annotation
-   is the absence of a CRD — the thing every other badge here is an alternative
-   to — so it reads as the baseline rather than as a ninth category. */
-.badge-annotation          { background: var(--surface); border-color: var(--border-strong); }
+.badge-annotation          { background: var(--badge-note-bg);   border-color: transparent; color: var(--badge-note-fg); }
+/* The one neutral, and production agrees — GlobalConfiguration is grey there,
+   at zero saturation, so it is the only badge with no nearest graph family.
+   It is also the right one to leave uncoloured: GlobalConfiguration is
+   cluster-scoped infrastructure, not a per-route construct like the rest. */
+.badge-globalconfiguration { background: var(--badge-gc-bg);     border-color: transparent; color: var(--badge-gc-fg); }
 .plus-indicator {
     margin-left: var(--space-base);
     padding: 0 var(--space-base);

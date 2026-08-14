@@ -773,7 +773,7 @@ code, kbd, samp {
    saturation — even F5DS's own hover values only reach 2.95:1 and 2.23:1 — so
    the hue is redundant reinforcement and the label carries the meaning. That
    is F5DS's own rule (colour is never the only signal), not a workaround. See
-   scripts/check-contrast.py for the measurements. */
+   .github/scripts/check-contrast.py for the measurements. */
 .status-dot {
     width: 8px; height: 8px;
     border-radius: 50%;

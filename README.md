@@ -44,15 +44,15 @@ Then open <http://localhost:8000>.
 There is no CI for these yet; run them before opening a pull request.
 
 ```console
-python3 scripts/check-tokens.py     # token invariants, retired colours, undefined var()
-python3 scripts/check-contrast.py   # every colour pairing against WCAG 2.1 AA, both themes
-python3 scripts/check-classes.py    # every class used by markup or JS resolves to a CSS rule
-node    scripts/test-analyzer.js    # the migration analyzer, under a DOM stub
+python3 .github/scripts/check-tokens.py     # token invariants, retired colours, undefined var()
+python3 .github/scripts/check-contrast.py   # every colour pairing against WCAG 2.1 AA, both themes
+python3 .github/scripts/check-classes.py    # every class used by markup or JS resolves to a CSS rule
+node    .github/scripts/test-analyzer.js    # the migration analyzer, under a DOM stub
 ```
 
 Two of those are worth a word. `check-classes.py` matters most after a style change: a class that loses its rule does not error, the element just renders unstyled, which is invisible on a page with thousands of rows. And `test-analyzer.js` exists because `buildPlan` runs each CRD generator inside a `try/catch` that only warns — a broken generator silently drops its resource and the tool still looks like it worked, so the script counts `console.warn` rather than waiting for a thrown exception.
 
-`.claude/CLAUDE.md` holds the full working spec: the design-system rules and their documented deviations, the migration tool's data-versus-presentation boundary, the version-accuracy rules and the release checklist.
+`AGENTS.md` holds the working spec every coding agent reads, with the detail in `.claude/skills/`: the design-system rules and their documented deviations, the migration tool's data-versus-presentation boundary, the version-accuracy rules and the release checklist.
 
 ## Contributing
 

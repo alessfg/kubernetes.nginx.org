@@ -158,7 +158,7 @@
        it as a section accent before; that is retired. */
 
     /* ── Badge palette: F5DS graph colours ─────────────────────────────────
-       The CRD badges name nine kinds of resource, and the five text-safe
+       The CRD badges name eight kinds of resource, and the five text-safe
        sentiment hues cannot carry that: they were spent after five, the sixth
        and seventh had to be separated by treatment instead of hue, and a
        reader ended up decoding an outlined pill against a filled one. They
@@ -174,11 +174,11 @@
 
        ── Which family each badge gets is NOT a fresh aesthetic choice ───────
        The production site already ships a badge identity for every one of
-       these nine, and readers know them. So the assignment is a translation,
-       not a redesign: take the production hue, and give the badge the graph
-       family nearest it. Measured on the hue circle, production lands inside
-       5° of a family for five of the nine, and the two ties resolve cleanly
-       because each badge's nearest free family is also its nearest overall:
+       these, and readers know them. So the assignment is a translation, not a
+       redesign: take the production hue, and give the badge the graph family
+       nearest it. Measured on the hue circle, production lands inside 5° of a
+       family for five of the eight, and the ties resolve cleanly because each
+       badge's nearest free family is also its nearest overall:
 
          VirtualServer        #0072B0  201°  ->  fam 4  cyan-blue   Δ 2.2°
          VirtualServerRoute   #0E41AA  220°  ->  fam 3  blue        Δ 4.1°
@@ -187,29 +187,34 @@
          ConfigMap            #AB2782  319°  ->  fam 2  magenta     Δ18.2°
          GlobalConfiguration  #343434    —   ->  neutral, sat 0.00
          NGINX Plus           #E4002B  349°  ->  fam 9  rose        Δ 2.9°
-         annotation           #009C93  177°  ->  fam 5  teal        Δ 0.5°
          New                  #009639  143°  ->  fam 7  green       Δ22.8°
 
-       Two corrections fall out of that table, and both were self-inflicted.
-       ConfigMap is magenta in production and GlobalConfiguration is grey; a
-       previous revision here swapped exactly those two the wrong way round,
+       The correction that falls out of that table was self-inflicted:
+       ConfigMap is magenta in production and GlobalConfiguration is grey, and
+       a previous revision here swapped exactly those two the wrong way round,
        then spent three more revisions hunting a colour for ConfigMap that was
-       never the problem. And `annotation` is not neutral in production — it
-       is teal, which is why the neutral slot belongs to GlobalConfiguration.
-       GlobalConfiguration is the right one to leave uncoloured anyway: it is
-       cluster-scoped infrastructure rather than a per-route construct.
+       never the problem. GlobalConfiguration is the right one to leave
+       uncoloured anyway — it is cluster-scoped infrastructure rather than a
+       per-route construct — and at sat 0.00 production gives it no hue to
+       match in the first place.
 
-       ── The one derived label ──────────────────────────────────────────────
-       The idiom is family SHADE as the label on family TINT as the fill, and
-       teal is the single family that cannot do it: Elm #28837E is its darkest
-       value and reaches only 4.01:1 on Light Cyan and 3.59:1 on Ice. That is
-       a constraint of the idiom, not of the palette — N600 clears 8.01:1 on
-       Turquoise — but putting one badge in a neutral label while eight wear
-       their own hue is the separated-by-treatment mistake the sentiment set
-       was abandoned for. So Elm is darkened along its own hue (176.7°) to
-       #1D5E5A, exactly as --n550, --blue-text and --green-dark are derived
-       where an F5DS pairing misses AA. Production derives the same value for
-       the same badge and lands at #005250, one step deeper still.
+       ── There is no annotation badge, and teal is therefore unspent ────────
+       Production styles a teal `.badge-annotation` (#009C93, 0.5° off family
+       5), and an earlier revision of this file duly gave it a derived teal
+       label here. It renders nowhere. `git log -S` finds the class applied to
+       an element in exactly zero commits across the tool's whole history —
+       the only hits are the rule itself, from when the styles lived in an
+       inline <style> block. check-classes.py could not say so, because a
+       blanket `badge-` prefix hook exempted every badge class from its
+       unreferenced report; that hook is now a list of the five names
+       migration-core.js actually composes at runtime.
+
+       Family 5 stays reserved rather than reassigned. If an annotation badge
+       is ever wanted, note that teal is the one family that cannot label
+       itself under this idiom — Elm #28837E, its darkest value, reaches only
+       4.01:1 on Light Cyan and 3.59:1 on Ice. Darkening Elm along its own hue
+       (176.7°) to #1D5E5A clears it at 6.64:1, which is the same derivation
+       --n550 and --blue-text use; production's own #005250 is one step deeper.
 
        ── Why ConfigMap takes the INNER tint ─────────────────────────────────
        Nearest-family is necessary but not sufficient: families 2 and 9 are
@@ -238,7 +243,6 @@
     --badge-ts-fg:     #723E04;  --badge-ts-bg:     #FFE7CA;  /* 10 Peru Tan / Tequila    */
     --badge-cm-fg:     #6A0B6A;  --badge-cm-bg:     #F7BDED;  /* 2  Palatinate / Chantilly*/
     --badge-plus-fg:   #7E2B37;  --badge-plus-bg:   #F5DFE3;  /* 9  Nutmeg / Carousel Pink*/
-    --badge-note-fg:   #1D5E5A;  --badge-note-bg:   #D0F9F9;  /* 5  Elm-dk / Light Cyan   */
     --badge-new-fg:    #135213;  --badge-new-bg:    #DAF7D5;  /* 7  Parsley / Romance     */
     /* The one neutral, and production agrees: GlobalConfiguration is grey. */
     --badge-gc-fg:     var(--n600);  --badge-gc-bg: var(--n200);
@@ -492,7 +496,6 @@
     --badge-ts-fg:     #FFE7CA;  --badge-ts-bg:     rgba(255, 231, 202, 0.16);
     --badge-cm-fg:     #F7BDED;  --badge-cm-bg:     rgba(247, 189, 237, 0.16);
     --badge-plus-fg:   #F5DFE3;  --badge-plus-bg:   rgba(245, 223, 227, 0.16);
-    --badge-note-fg:   #D0F9F9;  --badge-note-bg:   rgba(208, 249, 249, 0.16);
     --badge-new-fg:    #DAF7D5;  --badge-new-bg:    rgba(218, 247, 213, 0.16);
     --badge-gc-fg:     var(--n200);  --badge-gc-bg: rgba(230, 233, 243, 0.16);
 

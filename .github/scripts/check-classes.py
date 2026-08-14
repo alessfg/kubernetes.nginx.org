@@ -66,10 +66,22 @@ STATE_ONLY = {
     'analyzer-card-header', 'found-annotations',
 }
 
-# `badge-` is a documented prefix hook: migration-core.js composes a badge class
-# from a CRD kind at runtime, so the concrete names live in the data module
-# rather than in any source file this script can read.
-PREFIX_HOOKS = ('badge-',)
+# migration-core.js composes a badge class from a CRD kind at runtime
+# (`kindBadge.className = 'badge badge-' + badgeClass`), so those names never
+# appear as literals. They are NOT unreadable, though: `kindBadgeMap` in the
+# same file enumerates exactly these five, so they are listed rather than
+# waved through by prefix.
+#
+# This was a blanket `badge-` prefix hook, and the blanket cost real money:
+# it exempted every badge class from the unreferenced report, so
+# `.badge-annotation` sat in the CSS through the tool's entire history —
+# never once applied to an element, in any commit — and was restyled twice
+# by people who assumed it rendered. Keep this a list. If a badge kind is
+# added to kindBadgeMap, add it here too.
+RUNTIME_COMPOSED = {
+    'badge-policy', 'badge-virtualserver', 'badge-virtualserverroute',
+    'badge-transportserver', 'badge-globalconfiguration',
+}
 
 
 def read(path):
@@ -147,14 +159,20 @@ def main():
     for name, where in used.items():
         if name in defined or name in STATE_ONLY:
             continue
-        if any(name.startswith(p) for p in PREFIX_HOOKS):
+        if name in RUNTIME_COMPOSED:
+            continue
+        # A trailing hyphen means the string literal was cut off by a `+`, so
+        # this is the stem of a runtime-composed name ('badge badge-' + kind)
+        # rather than a class anything renders. The composed results are listed
+        # in RUNTIME_COMPOSED above; the stem itself is never a real class.
+        if name.endswith('-'):
             continue
         unstyled[name] = where
 
     unused = sorted(
         n for n in defined
         if n not in used and n not in STATE_ONLY
-        and not any(n.startswith(p) for p in PREFIX_HOOKS)
+        and n not in RUNTIME_COMPOSED
     )
 
     print(f'{len(defined)} classes defined in CSS, {len(used)} referenced by markup or JS\n')

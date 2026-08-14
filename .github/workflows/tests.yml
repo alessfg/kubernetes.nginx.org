@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  node-tests:
-    name: Analyzer, conversion & wiring tests
+  checks:
+    name: Design checks, analyzer & wiring tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,15 +24,10 @@ jobs:
       - name: Syntax-check all first-party scripts
         run: node --check assets/js/*.js
 
-      # Dependency-free suite (node:test) — analyzer regressions for every
-      # source module, semantic conversion cases, and page↔engine↔module
-      # wiring checks. See test/ and the notes in AGENTS.md.
-      - name: Run tests
-        run: node --test
-
-      # The design checks, one step each. None of them can see the rendered
-      # page — a green run means nothing is structurally broken, not that it
-      # looks right. Separate steps so a failure names itself in the log.
+      # The four design checks, one step each so a failure names itself in the
+      # log rather than hiding inside a compound command. None of them can see
+      # the rendered page: a green run means nothing is structurally broken,
+      # not that the page looks right.
       - name: Check design tokens
         run: python3 .github/scripts/check-tokens.py
 
@@ -42,5 +37,13 @@ jobs:
       - name: Check every class resolves to a rule
         run: python3 .github/scripts/check-classes.py
 
-      - name: Check the ingress-nginx analyzer
+      - name: Check the migration analyzer
         run: node .github/scripts/test-analyzer.js
+
+      # Dependency-free suite (node:test) — analyzer regressions for every
+      # source module, semantic conversion cases, and page↔engine↔module
+      # wiring checks. Lives on the branches that ship a second migration
+      # tool; `node --test` exits 0 where there is no test/ directory, so this
+      # file stays identical across main and the preview branches.
+      - name: Run the test suite
+        run: node --test

@@ -171,7 +171,6 @@ BADGES = [
     ('--badge-cm-fg',     '--badge-cm-bg',     'ConfigMap badge'),
     ('--badge-plus-fg',   '--badge-plus-bg',   'NGINX Plus badge'),
     ('--badge-new-fg',    '--badge-new-bg',    'New badge'),
-    ('--badge-note-fg',   '--badge-note-bg',   'annotation badge'),
     ('--badge-gc-fg',     '--badge-gc-bg',     'GlobalConfiguration badge (neutral)'),
 ]
 

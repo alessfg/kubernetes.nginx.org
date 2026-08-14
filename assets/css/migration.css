@@ -436,7 +436,14 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 .badge-configmap           { background: var(--badge-cm-bg);     border-color: transparent; color: var(--badge-cm-fg); }
 .badge-plus                { background: var(--badge-plus-bg);   border-color: transparent; color: var(--badge-plus-fg); font-weight: 700; }
 .badge-new                 { background: var(--badge-new-bg);    border-color: transparent; color: var(--badge-new-fg); }
-.badge-annotation          { background: var(--badge-note-bg);   border-color: transparent; color: var(--badge-note-fg); }
+/* There is no `.badge-annotation` rule, and that is not an oversight: the
+   class has never been applied to an element in this tool's history — the
+   only hits `git log -S` finds are the rule itself, back when the styles were
+   an inline <style> block. It was restyled twice by people (me included) who
+   assumed it rendered, most recently into a derived teal. check-classes.py
+   reports it now; it used to be hidden by a blanket `badge-` prefix hook.
+   If an annotation badge is ever wanted, family 5 (teal) is unspent and
+   tokens.css records the derived label it needs. */
 /* The one neutral, and production agrees — GlobalConfiguration is grey there,
    at zero saturation, so it is the only badge with no nearest graph family.
    It is also the right one to leave uncoloured: GlobalConfiguration is

@@ -23,9 +23,15 @@ The community site for NGINX's Kubernetes ecosystem, served via GitHub Pages at 
   - CRD migration examples
   - ConfigMap migration guidance
 
+- **[HAProxy Migration Tool](https://kubernetes.nginx.org/haproxy-migration.html)** (`haproxy-migration.html`) — Interactive tool for migrating from the HAProxy Kubernetes Ingress Controller (`haproxytech/kubernetes-ingress`) to the NGINX Ingress Controller. Features include:
+  - Interactive analyzer for annotated Ingress/Service objects, the HAProxy ConfigMap, and Global/Defaults/Backend/TCP custom resources
+  - 80+ annotation mappings across all three HAProxy config scopes, plus controller-flag and CRD-field tables
+  - route-acl canary translation to VirtualServer traffic splits and matches
+  - TCP services conversion to GlobalConfiguration listeners and TransportServer resources
+
 ## Project Structure
 
-This is a documentation-only project with **no build system and no package manager**. All pages are static HTML with first-party CSS/JS under `assets/` and no third-party runtime dependencies of any kind — including the webfont, which is self-hosted.
+This is a documentation-only project with **no build system and no package manager**. All pages are static HTML with first-party CSS/JS under `assets/` and no third-party runtime dependencies of any kind — including the webfont, which is self-hosted. A dependency-free test suite under `test/` (`node --test`, run in CI) covers the migration tools' analyzer behavior, value-conversion semantics, and page/engine wiring.
 
 The site follows the **F5 Design System**, the design system behind the F5 Distributed Cloud console. `assets/css/tokens.css` is the whole design surface: every colour, size, space, radius, shadow and duration used anywhere resolves to a token declared there.
 

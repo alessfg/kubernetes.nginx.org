@@ -172,31 +172,58 @@
        labels in light mode, the tint fills; in dark the tint labels and fills
        at 16%. Every pairing is measured in check-contrast.py, both themes.
 
-       Only `annotation` stays neutral, and deliberately: it is the absence of
-       a CRD, the thing every other badge is an alternative to.
+       ── Which family each badge gets is NOT a fresh aesthetic choice ───────
+       The production site already ships a badge identity for every one of
+       these nine, and readers know them. So the assignment is a translation,
+       not a redesign: take the production hue, and give the badge the graph
+       family nearest it. Measured on the hue circle, production lands inside
+       5° of a family for five of the nine, and the two ties resolve cleanly
+       because each badge's nearest free family is also its nearest overall:
 
-       Teal is missing from the set on purpose. Elm #28837E is the palette's
-       only dark teal and it clears nothing — 4.01:1 on Light Cyan, 3.83:1 on
-       the Java tint, 3.59:1 on Ice, 4.26:1 on N100 — so there is no teal
-       family available at any fill, only a teal-looking one that fails.
+         VirtualServer        #0072B0  201°  ->  fam 4  cyan-blue   Δ 2.2°
+         VirtualServerRoute   #0E41AA  220°  ->  fam 3  blue        Δ 4.1°
+         Policy               #933DCC  276°  ->  fam 1  purple      Δ27°
+         TransportServer      #F29A36   32°  ->  fam 10 orange      Δ 0.4°
+         ConfigMap            #AB2782  319°  ->  fam 2  magenta     Δ18.2°
+         GlobalConfiguration  #343434    —   ->  neutral, sat 0.00
+         NGINX Plus           #E4002B  349°  ->  fam 9  rose        Δ 2.9°
+         annotation           #009C93  177°  ->  fam 5  teal        Δ 0.5°
+         New                  #009639  143°  ->  fam 7  green       Δ22.8°
 
-       Green appears once, on New. ConfigMap was tried in the palette's olive
-       family and pulled back out: green is already the brand accent, the CTA
-       fill, the active-nav mark and the New badge, and a fifth green stops
-       meaning anything. It takes Cobalt instead — a third blue, but the palest
-       fill of the three and the furthest label from the other two, and
-       ConfigMap is the legacy config surface sitting beside the CRDs anyway.
+       Two corrections fall out of that table, and both were self-inflicted.
+       ConfigMap is magenta in production and GlobalConfiguration is grey; a
+       previous revision here swapped exactly those two the wrong way round,
+       then spent three more revisions hunting a colour for ConfigMap that was
+       never the problem. And `annotation` is not neutral in production — it
+       is teal, which is why the neutral slot belongs to GlobalConfiguration.
+       GlobalConfiguration is the right one to leave uncoloured anyway: it is
+       cluster-scoped infrastructure rather than a per-route construct.
 
-       The palette's yellows and browns cannot carry a label at all: Golden
-       Brown on Early Dawn is 4.41:1 and Mai Tai 4.15:1, both under the bar. */
-    --badge-vs-fg:     #044A77;  --badge-vs-bg:     #BBE4FD;  /* Regal / French Pass */
-    --badge-vsr-fg:    #352A6D;  --badge-vsr-bg:    #B3CDFF;  /* Paris / Melrose */
-    --badge-policy-fg: #5242AA;  --badge-policy-bg: #CAC5EC;  /* Gigas / Prelude */
-    --badge-ts-fg:     #723E04;  --badge-ts-bg:     #FFE7CA;  /* Peru Tan / Tequila */
-    --badge-cm-fg:     #0041A3;  --badge-cm-bg:     #E0EAFF;  /* Cobalt / Solitude */
-    --badge-gc-fg:     #6A0B6A;  --badge-gc-bg:     #FCE4F8;  /* Palatinate / Selago */
-    --badge-plus-fg:   #7E2B37;  --badge-plus-bg:   #FDE4E4;  /* Nutmeg / Cinderella */
-    --badge-new-fg:    #135213;  --badge-new-bg:    #DAF7D5;  /* Parsley / Romance */
+       ── The one derived label ──────────────────────────────────────────────
+       The idiom is family SHADE as the label on family TINT as the fill, and
+       teal is the single family that cannot do it: Elm #28837E is its darkest
+       value and reaches only 4.01:1 on Light Cyan and 3.59:1 on Ice. That is
+       a constraint of the idiom, not of the palette — N600 clears 8.01:1 on
+       Turquoise — but putting one badge in a neutral label while eight wear
+       their own hue is the separated-by-treatment mistake the sentiment set
+       was abandoned for. So Elm is darkened along its own hue (176.7°) to
+       #1D5E5A, exactly as --n550, --blue-text and --green-dark are derived
+       where an F5DS pairing misses AA. Production derives the same value for
+       the same badge and lands at #005250, one step deeper still.
+
+       Family 6 (olive) and family 11 (yellow) go unspent. Olive was tried on
+       ConfigMap and is wrong for a reason the hue table makes obvious: no
+       production badge is anywhere near it. */
+    --badge-vs-fg:     #044A77;  --badge-vs-bg:     #BBE4FD;  /* 4  Regal / French Pass   */
+    --badge-vsr-fg:    #0041A3;  --badge-vsr-bg:    #B3CDFF;  /* 3  Cobalt / Melrose      */
+    --badge-policy-fg: #5242AA;  --badge-policy-bg: #CAC5EC;  /* 1  Gigas / Prelude       */
+    --badge-ts-fg:     #723E04;  --badge-ts-bg:     #FFE7CA;  /* 10 Peru Tan / Tequila    */
+    --badge-cm-fg:     #6A0B6A;  --badge-cm-bg:     #FCE4F8;  /* 2  Palatinate / Selago   */
+    --badge-plus-fg:   #7E2B37;  --badge-plus-bg:   #F5DFE3;  /* 9  Nutmeg / Carousel Pink*/
+    --badge-note-fg:   #1D5E5A;  --badge-note-bg:   #D0F9F9;  /* 5  Elm-dk / Light Cyan   */
+    --badge-new-fg:    #135213;  --badge-new-bg:    #DAF7D5;  /* 7  Parsley / Romance     */
+    /* The one neutral, and production agrees: GlobalConfiguration is grey. */
+    --badge-gc-fg:     var(--n600);  --badge-gc-bg: var(--n200);
 
     /* Scrim behind the mobile navigation drawer: N700 at 40%, never black. */
     --scrim: rgba(11, 22, 64, 0.40);
@@ -438,15 +465,18 @@
 
     /* Badges invert: the graph family's tint becomes the label, and the fill
        is that same tint at 16% over the surface. One value per family drives
-       both, so a family cannot drift apart between themes. */
+       both, so a family cannot drift apart between themes — including the two
+       that are not graph families, where the light fill is N200 and the dark
+       label is the same N200. */
     --badge-vs-fg:     #BBE4FD;  --badge-vs-bg:     rgba(187, 228, 253, 0.16);
     --badge-vsr-fg:    #B3CDFF;  --badge-vsr-bg:    rgba(179, 205, 255, 0.16);
     --badge-policy-fg: #CAC5EC;  --badge-policy-bg: rgba(202, 197, 236, 0.16);
     --badge-ts-fg:     #FFE7CA;  --badge-ts-bg:     rgba(255, 231, 202, 0.16);
-    --badge-cm-fg:     #E0EAFF;  --badge-cm-bg:     rgba(224, 234, 255, 0.16);
-    --badge-gc-fg:     #FCE4F8;  --badge-gc-bg:     rgba(252, 228, 248, 0.16);
-    --badge-plus-fg:   #FDE4E4;  --badge-plus-bg:   rgba(253, 228, 228, 0.16);
+    --badge-cm-fg:     #FCE4F8;  --badge-cm-bg:     rgba(252, 228, 248, 0.16);
+    --badge-plus-fg:   #F5DFE3;  --badge-plus-bg:   rgba(245, 223, 227, 0.16);
+    --badge-note-fg:   #D0F9F9;  --badge-note-bg:   rgba(208, 249, 249, 0.16);
     --badge-new-fg:    #DAF7D5;  --badge-new-bg:    rgba(218, 247, 213, 0.16);
+    --badge-gc-fg:     var(--n200);  --badge-gc-bg: rgba(230, 233, 243, 0.16);
 
     /* The code surface is its own world and does not follow the theme —
        one background means one set of contrast figures to maintain. */

@@ -26,6 +26,21 @@ jobs:
 
       # Dependency-free suite (node:test) — analyzer regressions for every
       # source module, semantic conversion cases, and page↔engine↔module
-      # wiring checks. See test/ and the notes in .claude/CLAUDE.md.
+      # wiring checks. See test/ and the notes in AGENTS.md.
       - name: Run tests
         run: node --test
+
+      # The design checks, one step each. None of them can see the rendered
+      # page — a green run means nothing is structurally broken, not that it
+      # looks right. Separate steps so a failure names itself in the log.
+      - name: Check design tokens
+        run: python3 .github/scripts/check-tokens.py
+
+      - name: Check colour contrast
+        run: python3 .github/scripts/check-contrast.py
+
+      - name: Check every class resolves to a rule
+        run: python3 .github/scripts/check-classes.py
+
+      - name: Check the ingress-nginx analyzer
+        run: node .github/scripts/test-analyzer.js

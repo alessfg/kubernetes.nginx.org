@@ -21,8 +21,17 @@ jobs:
         with:
           node-version: "22"
 
+      # One `node --check` per file, because the flag parses only its first
+      # positional argument and silently discards the rest: `node --check
+      # good.js broken.js` exits 0. Passing the glob therefore only ever
+      # checked assets/js/index.js, and shared.js — which both pages depend
+      # on — was never parsed by anything.
       - name: Syntax-check all first-party scripts
-        run: node --check assets/js/*.js
+        run: |
+          for f in assets/js/*.js; do
+            echo "checking $f"
+            node --check "$f" || exit 1
+          done
 
       # The four design checks, one step each so a failure names itself in the
       # log rather than hiding inside a compound command. None of them can see

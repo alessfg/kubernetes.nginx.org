@@ -84,8 +84,9 @@ const sandbox = {
     setTimeout, clearTimeout, setInterval, clearInterval,
     Blob: class {}, URL: { createObjectURL() { return ''; }, revokeObjectURL() {} },
     FileReader: class {},
-    announce() {},
-    copyToClipboard() {},
+    /* announce / copyToClipboard are deliberately NOT stubbed here: they come
+       from assets/js/shared.js, which this script loads for real. Stubbing them
+       would mask the file the page scripts depend on most. */
     /* window-level APIs migration-core.js binds at load. */
     addEventListener() {},
     removeEventListener() {},
@@ -125,9 +126,31 @@ console.log('Loading the analyzer...');
 /* Order matters and is the inverse of what it looks like: the source module
    only dereferences MigrationTool inside function bodies (call time), while
    migration-core.js reads window.MIGRATION_SOURCE at top level. So source
-   first, core second — which is also the order the page loads them in. */
+   first, core second — which is also the order the page loads them in.
+
+   shared.js goes first, exactly as the page loads it. It is loaded for real
+   rather than stubbed because it is the single source of truth for the top
+   bar, drawer, dark mode and copy buttons on both pages, and running it here
+   is the only place anything executes it outside a browser. */
+load('assets/js/shared.js');
 load('assets/js/migration-ingress-nginx.js');
 load('assets/js/migration-core.js');
+
+/* The globals shared.js publishes that the page scripts call unqualified.
+   Renaming one here without updating its call sites throws nothing at load —
+   the button simply stops working — so the boundary is asserted instead. */
+const SHARED_GLOBALS = [
+    'announce', 'openSidebar', 'closeSidebar', 'copyToClipboard', 'addCopyLabel'
+];
+const missingShared = SHARED_GLOBALS.filter(
+    name => typeof sandbox[name] !== 'function');
+if (missingShared.length) {
+    console.error('FAIL  assets/js/shared.js did not define: '
+        + missingShared.join(', '));
+    process.exit(1);
+}
+console.log(`  all ${SHARED_GLOBALS.length} shared.js globals the page scripts `
+    + 'call are defined');
 
 const SOURCE = sandbox.window.MIGRATION_SOURCE;
 const MT = sandbox.window.MigrationTool;

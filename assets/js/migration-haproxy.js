@@ -2631,11 +2631,13 @@
                 sections: [
                     { id: 'mappings', filterSource: 'oss', search: 'searchInput', category: 'categoryFilter', count: 'searchCount' },
                     { id: 'plus-mappings', filterSource: 'plus', search: 'searchInputPlus', category: 'categoryFilterPlus', count: 'searchCountPlus' },
-                    { id: 'configmap-mappings', filterSource: 'configmap', search: 'searchInputConfigMap', category: 'categoryFilterConfigMap', count: 'searchCountConfigMap' }
+                    { id: 'configmap-mappings', filterSource: 'configmap', search: 'searchInputConfigMap', category: 'categoryFilterConfigMap', count: 'searchCountConfigMap' },
+                    { id: 'crd-mappings', filterSource: 'crd', search: 'searchInputCrd', category: 'categoryFilterCrd', count: 'searchCountCrd' },
+                    { id: 'flag-mappings', filterSource: 'flags', search: 'searchInputFlags', category: 'categoryFilterFlags', count: 'searchCountFlags' }
                 ],
                 sectionPageMap: {
                     overview: 'getting-started', 'why-migrate': 'getting-started', features: 'getting-started', installation: 'getting-started', checklist: 'getting-started', 'phased-migration': 'getting-started', resources: 'getting-started',
-                    differences: 'reference', 'mappings': 'reference', 'plus-mappings': 'reference', 'configmap-mappings': 'reference'
+                    differences: 'reference', 'mappings': 'reference', 'plus-mappings': 'reference', 'configmap-mappings': 'reference', 'crd-mappings': 'reference', 'flag-mappings': 'reference'
                 },
                 defaultPage: 'getting-started',
                 fallbackPage: 'reference'

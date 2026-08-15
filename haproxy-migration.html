@@ -147,7 +147,9 @@
                             <li><button class="sidebar-link" data-section="differences"><span class="dot"></span><span class="sidebar-link-name">Key differences</span></button></li>
                             <li><button class="sidebar-link" data-section="mappings"><span class="dot"></span><span class="sidebar-link-name">NGINX mappings</span></button></li>
                             <li><button class="sidebar-link" data-section="plus-mappings"><span class="dot"></span><span class="sidebar-link-name">NGINX Plus mappings</span></button></li>
-                            <li><button class="sidebar-link" data-section="configmap-mappings"><span class="dot"></span><span class="sidebar-link-name">Static config mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="configmap-mappings"><span class="dot"></span><span class="sidebar-link-name">ConfigMap mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="crd-mappings"><span class="dot"></span><span class="sidebar-link-name">CRD mappings</span></button></li>
+                            <li><button class="sidebar-link" data-section="flag-mappings"><span class="dot"></span><span class="sidebar-link-name">Controller flag mappings</span></button></li>
                         </ul>
                     </li>
                 </ul>
@@ -3601,12 +3603,12 @@ spec:
 
         <!-- Static Config Mappings -->
         <section id="configmap-mappings">
-            <h2>ConfigMap, CRD &amp; flag mappings</h2>
-            <p>HAProxy's controller ConfigMap keys, Global/Defaults CRD fields, and controller CLI flags map to the F5 NGINX Ingress Controller's global <code>nginx-config</code> ConfigMap, GlobalConfiguration CRD, or deployment flags. These settings apply controller-wide.</p>
+            <h2>ConfigMap mappings</h2>
+            <p>HAProxy's controller ConfigMap keys map to the F5 NGINX Ingress Controller's global <code>nginx-config</code> ConfigMap. These settings apply controller-wide, not per application.</p>
 
             <div class="controls">
-                <input type="search" id="searchInputConfigMap" placeholder="Search static config keys..." data-filter-source="configmap" aria-label="Search static config mappings">
-                <select id="categoryFilterConfigMap" data-filter-source="configmap" aria-label="Filter static config by category">
+                <input type="search" id="searchInputConfigMap" placeholder="Search ConfigMap keys..." data-filter-source="configmap" aria-label="Search ConfigMap keys">
+                <select id="categoryFilterConfigMap" data-filter-source="configmap" aria-label="Filter ConfigMap keys by category">
                     <option value="">All categories</option>
                 </select>
                 <span id="searchCountConfigMap" class="search-count" aria-live="polite"></span>
@@ -4230,6 +4232,147 @@ data:
                 </table>
             </div>
 
+            <!-- TCP Services -->
+            <h3 id="static-tcp-services">TCP services</h3>
+            <div class="info-box note"><strong>L4 model:</strong> HAProxy's TCP CRD and the legacy <code>tcp-services</code> ConfigMap both become a GlobalConfiguration TCP listener plus a TransportServer per entry. The listener port must be pre-declared in the single GlobalConfiguration (<code>-global-configuration &lt;ns&gt;/&lt;name&gt;</code>) and exposed on the controller Service. L4 content-switching/ACL rules do not port (streamSnippets only).</div>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="static-tcp-services"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>TCP</code> CRD (v1 &amp; v3)</td>
+                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> + <span class="badge badge-transportserver">TransportServer CRD</span></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
+kind: TCP
+metadata:
+  name: redis-tcp
+spec:
+  - name: redis
+    frontend:
+      name: redis-fe
+      binds:
+        redis:
+          name: redis
+          port: 6379
+    service:
+      name: redis
+      port: 6379</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: GlobalConfiguration
+metadata:
+  name: nginx-configuration
+  namespace: nginx-ingress
+spec:
+  listeners:
+    - name: redis-tcp
+      port: 6379
+      protocol: TCP
+---
+apiVersion: k8s.nginx.org/v1
+kind: TransportServer
+metadata:
+  name: redis
+spec:
+  listener:
+    name: redis-tcp
+    protocol: TCP
+  upstreams:
+    - name: backend
+      service: redis
+      port: 6379
+  action:
+    pass: backend</code></pre></div>
+                            </div>
+                            <div class="info-box warning"><strong>L4 rules lost:</strong> TransportServer has no ACL / content-switching / <code>tcp-request</code> fields — <code>acl_list</code>, <code>backend_switching_rule_list</code>, <code>tcp_request_rule_list</code>, <code>capture_list</code>, and <code>filter_list</code> have no equivalent (streamSnippets only, <code>-enable-snippets</code>). Extra <code>services[]</code> on one entry cannot be routed between (each backend needs its own listener + TransportServer).</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>--configmap-tcp-services</code></td>
+                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> + <span class="badge badge-transportserver">TransportServer CRD</span></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># legacy tcp-services ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-tcp-services
+data:
+  "6379": default/redis:6379  # &lt;listenPort&gt;: &lt;ns&gt;/&lt;svc&gt;:&lt;svcPort&gt;[:ssl]</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: GlobalConfiguration
+metadata:
+  name: nginx-configuration
+  namespace: nginx-ingress
+spec:
+  listeners:
+    - name: redis-6379-tcp
+      port: 6379
+      protocol: TCP
+---
+apiVersion: k8s.nginx.org/v1
+kind: TransportServer
+metadata:
+  name: redis-6379
+  namespace: default
+spec:
+  listener:
+    name: redis-6379-tcp
+    protocol: TCP
+  upstreams:
+    - name: backend
+      service: redis
+      port: 6379
+  action:
+    pass: backend</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> One GlobalConfiguration listener + TransportServer per data entry. There is no NIC flag analogous to <code>--configmap-tcp-services</code> — the resources replace it.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td>TCP bind SSL offloading (<code>:ssl</code> / <code>ssl_certificate</code>)</td>
+                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.tls.secret</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>data:
+  "6379": default/redis:6379:ssl  # hostless SSL offload</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>spec:
+  listener:
+    name: redis-6379-tcp
+    protocol: TCP
+  host: # OPTIONAL — only needed to SNI-differentiate multiple TransportServers on one listener
+  tls:
+    secret: redis-tls  # kubernetes.io/tls Secret in this namespace
+  upstreams:
+    - name: backend
+      service: redis
+      port: 6379
+  action:
+    pass: backend</code></pre></div>
+                            </div>
+                            <div class="info-box warning"><strong>Partial:</strong> NIC terminates TLS over TCP from <code>spec.tls.secret</code> alone — <code>spec.host</code> is <strong>not</strong> required, so HAProxy's hostless SSL offload <em>is</em> reproducible (add an SNI <code>spec.host</code> only to differentiate multiple TransportServers on one listener). Filesystem-path certificates have no equivalent (Secrets only). This is termination, not passthrough (see <code>ssl-passthrough</code>).</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+        <section id="crd-mappings">
+            <h2>CRD mappings</h2>
+            <p>HAProxy's Global, Defaults, Backend and Frontend CRD fields map to F5 NGINX Ingress Controller <code>nginx-config</code> ConfigMap keys, the GlobalConfiguration CRD, or per-application VirtualServer fields.</p>
+
+            <div class="controls">
+                <input type="search" id="searchInputCrd" placeholder="Search CRD fields..." data-filter-source="crd" aria-label="Search CRD fields">
+                <select id="categoryFilterCrd" data-filter-source="crd" aria-label="Filter CRD fields by category">
+                    <option value="">All categories</option>
+                </select>
+                <span id="searchCountCrd" class="search-count" aria-live="polite"></span>
+                <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
+                <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
+            </div>
+
             <!-- HAProxy Global CRD -->
             <h3 id="crd-global">HAProxy Global CRD</h3>
             <div class="info-box warning"><strong>Precedence inversion:</strong> HAProxy Global CRs <strong>replace</strong> annotation config outright (the CR wins). The NIC ConfigMap instead sets <em>defaults</em> that per-resource annotations override. Also drop the <code>cr-global</code> ConfigMap pointer — NIC has no CR indirection; migrate the referenced CR's <em>content</em>.</div>
@@ -4663,129 +4806,20 @@ spec:
                 </table>
             </div>
 
-            <!-- TCP Services -->
-            <h3 id="static-tcp-services">TCP services</h3>
-            <div class="info-box note"><strong>L4 model:</strong> HAProxy's TCP CRD and the legacy <code>tcp-services</code> ConfigMap both become a GlobalConfiguration TCP listener plus a TransportServer per entry. The listener port must be pre-declared in the single GlobalConfiguration (<code>-global-configuration &lt;ns&gt;/&lt;name&gt;</code>) and exposed on the controller Service. L4 content-switching/ACL rules do not port (streamSnippets only).</div>
-            <div class="table-wrapper">
-                <table class="mapping-table" aria-labelledby="static-tcp-services"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                    <tbody>
-                        <tr class="expandable">
-                            <td><code>TCP</code> CRD (v1 &amp; v3)</td>
-                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> + <span class="badge badge-transportserver">TransportServer CRD</span></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
-kind: TCP
-metadata:
-  name: redis-tcp
-spec:
-  - name: redis
-    frontend:
-      name: redis-fe
-      binds:
-        redis:
-          name: redis
-          port: 6379
-    service:
-      name: redis
-      port: 6379</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: GlobalConfiguration
-metadata:
-  name: nginx-configuration
-  namespace: nginx-ingress
-spec:
-  listeners:
-    - name: redis-tcp
-      port: 6379
-      protocol: TCP
----
-apiVersion: k8s.nginx.org/v1
-kind: TransportServer
-metadata:
-  name: redis
-spec:
-  listener:
-    name: redis-tcp
-    protocol: TCP
-  upstreams:
-    - name: backend
-      service: redis
-      port: 6379
-  action:
-    pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>L4 rules lost:</strong> TransportServer has no ACL / content-switching / <code>tcp-request</code> fields — <code>acl_list</code>, <code>backend_switching_rule_list</code>, <code>tcp_request_rule_list</code>, <code>capture_list</code>, and <code>filter_list</code> have no equivalent (streamSnippets only, <code>-enable-snippets</code>). Extra <code>services[]</code> on one entry cannot be routed between (each backend needs its own listener + TransportServer).</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>--configmap-tcp-services</code></td>
-                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> + <span class="badge badge-transportserver">TransportServer CRD</span></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># legacy tcp-services ConfigMap
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-tcp-services
-data:
-  "6379": default/redis:6379  # &lt;listenPort&gt;: &lt;ns&gt;/&lt;svc&gt;:&lt;svcPort&gt;[:ssl]</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: GlobalConfiguration
-metadata:
-  name: nginx-configuration
-  namespace: nginx-ingress
-spec:
-  listeners:
-    - name: redis-6379-tcp
-      port: 6379
-      protocol: TCP
----
-apiVersion: k8s.nginx.org/v1
-kind: TransportServer
-metadata:
-  name: redis-6379
-  namespace: default
-spec:
-  listener:
-    name: redis-6379-tcp
-    protocol: TCP
-  upstreams:
-    - name: backend
-      service: redis
-      port: 6379
-  action:
-    pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> One GlobalConfiguration listener + TransportServer per data entry. There is no NIC flag analogous to <code>--configmap-tcp-services</code> — the resources replace it.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td>TCP bind SSL offloading (<code>:ssl</code> / <code>ssl_certificate</code>)</td>
-                            <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.tls.secret</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>data:
-  "6379": default/redis:6379:ssl  # hostless SSL offload</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>spec:
-  listener:
-    name: redis-6379-tcp
-    protocol: TCP
-  host: # OPTIONAL — only needed to SNI-differentiate multiple TransportServers on one listener
-  tls:
-    secret: redis-tls  # kubernetes.io/tls Secret in this namespace
-  upstreams:
-    - name: backend
-      service: redis
-      port: 6379
-  action:
-    pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>Partial:</strong> NIC terminates TLS over TCP from <code>spec.tls.secret</code> alone — <code>spec.host</code> is <strong>not</strong> required, so HAProxy's hostless SSL offload <em>is</em> reproducible (add an SNI <code>spec.host</code> only to differentiate multiple TransportServers on one listener). Filesystem-path certificates have no equivalent (Secrets only). This is termination, not passthrough (see <code>ssl-passthrough</code>).</div>
-                        </div></td></tr>
-                    </tbody>
-                </table>
+        </section>
+
+        <section id="flag-mappings">
+            <h2>Controller flag mappings</h2>
+            <p>HAProxy controller command-line flags and their F5 NGINX Ingress Controller equivalents. These are deployment-time settings, set on the controller Deployment rather than on an Ingress.</p>
+
+            <div class="controls">
+                <input type="search" id="searchInputFlags" placeholder="Search controller flags..." data-filter-source="flags" aria-label="Search controller flags">
+                <select id="categoryFilterFlags" data-filter-source="flags" aria-label="Filter controller flags by category">
+                    <option value="">All categories</option>
+                </select>
+                <span id="searchCountFlags" class="search-count" aria-live="polite"></span>
+                <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
+                <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
             </div>
 
             <!-- Controller CLI Flags -->
@@ -5044,6 +5078,7 @@ spec:
             </div>
 
         </section>
+
         </div><!-- /.tool-page #page-reference -->
         </div><!-- /.main-inner -->
         </main>

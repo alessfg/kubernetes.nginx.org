@@ -1,0 +1,123 @@
+name: Upstream watch
+
+# Nothing tells anyone that upstream shipped a release. The only signal has been
+# a human noticing, which is how all three products drifted for about a month —
+# and the drift is invisible in a browser, because index.js fetches live
+# versions, so the landing page renders current numbers while every file in the
+# repo says otherwise. The migration tool has no fetch path, so what it shows is
+# whatever was last typed.
+#
+# This opens or updates ONE issue when the pins disagree with upstream. It does
+# not open a pull request: a bump needs the compatibility table, the
+# latest-3-Kubernetes-minors judgement and, for NGF, a Supported Resources
+# review — all of which are judgement calls, not substitutions. See
+# .claude/skills/release-update/SKILL.md.
+
+on:
+  schedule:
+    # Mondays, matching ossf_scorecard.yml.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    name: Compare pinned versions against upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # The repo's own checker first: if the site is internally inconsistent,
+      # that is a different and more urgent problem than being behind upstream,
+      # and the issue body should not conflate them.
+      - name: Check the site is internally consistent
+        id: internal
+        continue-on-error: true
+        run: python3 .github/scripts/check-versions.py
+
+      - name: Compare against upstream
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          latest() { gh api "repos/$1/releases/latest" --jq .tag_name 2>/dev/null || echo "?"; }
+
+          pin_nic=$(sed -n "s/.*nic:.*release: '\([^']*\)'.*/\1/p" assets/js/index.js)
+          pin_nic_helm=$(sed -n "s/.*nic:.*helm: '\([^']*\)'.*/\1/p" assets/js/index.js)
+          pin_ngf=$(sed -n "s/.*ngf:.*release: '\([^']*\)'.*/\1/p" assets/js/index.js)
+          pin_i2g=$(sed -n "s/.*i2g:.*release: '\([^']*\)'.*/\1/p" assets/js/index.js)
+
+          up_nic=$(latest nginx/kubernetes-ingress)
+          up_ngf=$(latest nginx/nginx-gateway-fabric)
+          up_i2g=$(latest kubernetes-sigs/ingress2gateway)
+
+          # The NGINX row of each compatibility table, at the upstream tag.
+          up_nic_nginx=$(gh api "repos/nginx/kubernetes-ingress/contents/build/Dockerfile?ref=$up_nic" \
+            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null \
+            | sed -n 's/^ARG NGINX_OSS_VERSION=\(.*\)$/\1/p' | head -1)
+          up_nic_helm=$(gh api "repos/nginx/kubernetes-ingress/contents/charts/nginx-ingress/Chart.yaml?ref=$up_nic" \
+            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null \
+            | sed -n 's/^version: \(.*\)$/\1/p' | head -1)
+
+          # The latest three Kubernetes minors, which is what the tables show.
+          k8s=$(gh api "repos/kubernetes/kubernetes/releases?per_page=40" \
+            --jq '[.[] | select(.prerelease == false) | .tag_name | capture("v(?<m>[0-9]+\\.[0-9]+)").m] | unique_by(.) | sort_by(split(".") | map(tonumber)) | reverse | .[0:3] | reverse | join(", ")' 2>/dev/null)
+
+          {
+            echo "| Product | Pinned | Upstream |"
+            echo "|---|---|---|"
+            echo "| NGINX Ingress Controller | \`$pin_nic\` (chart \`$pin_nic_helm\`) | \`$up_nic\` (chart \`v$up_nic_helm\`) |"
+            echo "| NGINX Gateway Fabric | \`$pin_ngf\` | \`$up_ngf\` |"
+            echo "| ingress2gateway | \`$pin_i2g\` | \`$up_i2g\` |"
+            echo ""
+            echo "NIC's NGINX OSS version at \`$up_nic\`: \`$up_nic_nginx\`."
+            echo "Latest three Kubernetes minors: \`$k8s\`."
+          } > table.md
+
+          drift=0
+          [ "$pin_nic" != "$up_nic" ] && drift=1
+          [ "$pin_ngf" != "$up_ngf" ] && drift=1
+          [ "$pin_i2g" != "$up_i2g" ] && drift=1
+          echo "drift=$drift" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the tracking issue
+        if: steps.compare.outputs.drift == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Upstream releases are ahead of the versions on the site"
+        run: |
+          set -uo pipefail
+          {
+            echo "One or more products the site documents have shipped a release."
+            echo ""
+            cat table.md
+            echo ""
+            echo "Follow \`.claude/skills/release-update/SKILL.md\`. It covers the"
+            echo "three version formats a plain grep misses, the ingress2gateway"
+            echo "touchpoints, and the feature badges that must NOT be swept along."
+            echo ""
+            echo "Verify with \`python3 .github/scripts/check-versions.py\` — it asserts"
+            echo "every copy agrees, but it cannot tell you what the correct upstream"
+            echo "version is. That judgement, the compatibility table and the"
+            echo "Kubernetes window are yours."
+            echo ""
+            echo "_Updated automatically by \`.github/workflows/upstream-watch.yml\`._"
+          } > body.md
+
+          existing=$(gh issue list --state open --search "$TITLE in:title" \
+            --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file body.md
+            echo "Updated issue #$existing"
+          else
+            gh issue create --title "$TITLE" --body-file body.md
+          fi

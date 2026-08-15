@@ -4,17 +4,32 @@ on:
   push:
     branches: [main, "preview/**"]
   pull_request:
+  # So a result can be reproduced on demand. Without it, confirming a fix on a
+  # branch means pushing an empty commit.
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# Supersede an in-flight run when the same ref is pushed again — on a repo where
+# push is deploy, the run that matters is the latest one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   checks:
     name: Design checks, analyzer & wiring tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Nothing here pushes; matches ossf_scorecard.yml.
+          persist-credentials: false
+          # check-branch-freshness needs origin/main to compare against.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -73,3 +88,31 @@ jobs:
             exit 1
           fi
           node --test .github/test/*.test.js
+
+      # A branch is graded by ITS OWN copy of the checks and the shared engine,
+      # which means a stale branch is graded by weaker ones. Measured across the
+      # preview branches: both shipped a copy-button bug that had already been
+      # fixed on main, a dead ruleset, and an AGENTS.md missing its only
+      # absolute prohibition — and CI was green on all of it, because the check
+      # that finds the dead ruleset only existed on main.
+      #
+      # So: the shared engine and the checks are owned by main, and a branch
+      # must have merged main's copy of them before its own green run means
+      # anything. Warns rather than fails, because the fix is a merge the author
+      # may reasonably want to schedule.
+      - name: Check the branch carries main's engine and checks
+        if: github.ref != 'refs/heads/main'
+        run: |
+          git fetch --no-tags --depth=0 origin main 2>/dev/null || git fetch --no-tags origin main
+          stale=0
+          for path in .github/scripts .github/test assets/js/shared.js assets/js/migration-core.js AGENTS.md; do
+            if ! git diff --quiet origin/main...HEAD -- "$path" 2>/dev/null; then
+              behind=$(git rev-list --count HEAD..origin/main -- "$path")
+              if [ "$behind" -gt 0 ]; then
+                echo "::warning file=$path::$path is $behind commit(s) behind origin/main. This branch is being graded by its own older copy."
+                stale=1
+              fi
+            fi
+          done
+          [ "$stale" = "0" ] && echo "Branch carries main's engine and checks."
+          exit 0

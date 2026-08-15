@@ -1656,17 +1656,48 @@
             let allSubnavs = document.querySelectorAll('.sidebar-subnav');
 
             let currentPage = SOURCE.reference.defaultPage;
+            // The page's own <title>, read once before anything switches, so the
+            // per-view titles below compose against it without the source module
+            // having to declare it.
+            let baseTitle = document.title;
 
             function showPage(id, opts) {
                 opts = opts || {};
                 let switching = (id !== currentPage);
                 currentPage = id;
+                let pageNames = SOURCE.strings.pageNames;
+
+                // Whether keyboard focus is currently inside a tool page. That page
+                // is about to be hidden, which would strand focus on an element in a
+                // hidden subtree — it is not perceivable, and hidden="until-found"
+                // content is out of the accessibility tree. The one trigger of this
+                // shape on the page is the "config analyzer" link in the Getting
+                // started tip. Read BEFORE the pages are toggled.
+                //
+                // Deliberately not unconditional: a sidebar link lives outside the
+                // pages, so clicking one keeps its focus where the user put it.
+                let focusLeavingPage = !!(document.activeElement &&
+                    document.activeElement.closest &&
+                    document.activeElement.closest('.tool-page'));
 
                 // Toggle tool-page visibility — inactive pages are hidden="until-found"
                 // (not display:none) so browser find-in-page can search their content.
                 document.querySelectorAll('.tool-page').forEach(function(p) { p.classList.remove('active'); p.setAttribute('hidden', 'until-found'); });
                 let page = document.getElementById('page-' + id);
-                if (page) { page.removeAttribute('hidden'); page.classList.add('active'); }
+                if (page) {
+                    page.removeAttribute('hidden');
+                    page.classList.add('active');
+                    if (focusLeavingPage) {
+                        page.setAttribute('tabindex', '-1');
+                        page.focus({ preventScroll: true });
+                    }
+                }
+
+                // Tab title per view. Every switch below pushes a history entry, so
+                // without this the whole tool shares one label in the tab, in the
+                // Back-button menu and to a screen reader. The default page carries
+                // the bare site title, matching the landing page's treatment of Home.
+                document.title = (id === SOURCE.reference.defaultPage ? '' : (pageNames[id] || id) + ' — ') + baseTitle;
 
                 // Update sidebar active states
                 pageLinks.forEach(function(l) { l.classList.remove('active'); l.removeAttribute('aria-current'); });
@@ -1692,7 +1723,6 @@
                 }
 
                 // Announce page switch for screen readers
-                let pageNames = SOURCE.strings.pageNames;
                 if (switching) {
                     announce('Navigated to ' + (pageNames[id] || id));
                 }

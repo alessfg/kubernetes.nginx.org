@@ -12,11 +12,15 @@ body:
 
         Remember to redact any sensitive information such as authentication credentials and/or license keys!
 
-        **Note:** If you are seeking community support, please start a new topic in the [NGINX Community forum][forum]. If you wish to discuss the codebase, please start a new thread via [GitHub discussions][discussions].
+        **Note:** If you are seeking community support, please start a new topic in the [NGINX Community forum][forum].
+
+        This repository is the **website** at kubernetes.nginx.org. For bugs in the products it documents, report them on their own repositories: [NGINX Ingress Controller][nic], [NGINX Gateway Fabric][ngf] or [ingress2gateway][i2g].
 
         [issue search]: https://github.com/nginx/kubernetes.nginx.org/search?q=is%3Aissue&type=issues
-        [discussions]: https://github.com/nginx/kubernetes.nginx.org/discussions
         [forum]: https://community.nginx.org
+        [nic]: https://github.com/nginx/kubernetes-ingress/issues
+        [ngf]: https://github.com/nginx/nginx-gateway-fabric/issues
+        [i2g]: https://github.com/kubernetes-sigs/ingress2gateway/issues
 
   - type: textarea
     id: overview
@@ -45,18 +49,46 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: page
+    attributes:
+      label: Which page?
+      options:
+        - Landing page (kubernetes.nginx.org)
+        - Ingress-NGINX migration tool
+        - Both / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Exact URL
+      description: Include the `#anchor` — both pages are single-page apps, so the anchor identifies the view you were on.
+      placeholder: https://kubernetes.nginx.org/ingress-nginx-migration.html#mappings
+    validations:
+      required: true
+
   - type: textarea
     id: environment
     attributes:
-      label: Environment Details
-      description: Please provide details about your environment.
+      label: Environment
+      description: The layout changes at 900px and 600px, and the site has a light and a dark theme, so these three usually determine whether a visual bug reproduces.
       value: |
-        - Target deployment platform: [e.g. AWS/GCP/local cluster/etc...]
-        - Target OS: [e.g. RHEL 9/Ubuntu 24.04/etc...]
-        - Version of this project or specific commit: [e.g. 1.4.3/commit hash]
-        - Version of any relevant project languages: [e.g. Kubernetes 1.30/Python 3.9.7/etc...]
+        - Browser and version: [e.g. Firefox 141, Safari 18.2]
+        - Window width: [e.g. 1440px, or "phone in portrait"]
+        - Theme: [light / dark / followed my system]
     validations:
       required: true
+
+  - type: textarea
+    id: yaml
+    attributes:
+      label: Analyzer input
+      description: If the bug is in the migration tool's YAML analyzer, paste the input that triggers it. Redact hostnames, secret names and anything else sensitive.
+      render: yaml
+    validations:
+      required: false
 
   - type: textarea
     id: context

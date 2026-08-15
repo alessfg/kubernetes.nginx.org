@@ -14,6 +14,7 @@ low precisely *because* this site uses tokens. These checks read literals.
 Usage:  python3 .github/scripts/check-tokens.py
 Exit:   0 all invariants hold, 1 one or more violations.
 """
+import json
 import os
 import re
 import sys
@@ -132,6 +133,126 @@ class Check:
             self.exemptions.append(entry)
 
 
+def check_value_rules(c, path, lineno, line):
+    """The declaration-local literal rules.
+
+    Factored out so they can run over inline `style=` attributes as well as
+    stylesheets. AGENTS.md names inline style= and JS-generated cssText as the
+    two places raw values hide and calls them "easy to miss" — and they were
+    exactly the two places nothing looked. Verified by planting
+    `style="padding: 13px; border-radius: 9px; font-size: 11px;
+    letter-spacing: .05em"` in the markup: the run reported "All design-token
+    invariants hold", including the tracking AGENTS.md says appears nowhere.
+    """
+    # 12px is explicitly outside the F5DS spacing system.
+    if re.search(SPACING_PROPS + r':[^;{}"]*\b12px', line):
+        c.fail(path, lineno, '12px is not in the spacing system', line)
+
+    # Radius comes from a token; 50% is exempted above.
+    if re.search(r'border-radius:[^;}"]*\d+px', line):
+        c.fail(path, lineno, 'literal border-radius (use --radius*)', line)
+
+    # The pill token is 999, not 9999.
+    if '9999px' in line:
+        c.fail(path, lineno, '9999px (the pill token is 999px)', line)
+
+    # Every font-size goes through the scale.
+    if re.search(r'font-size: *[0-9]', line):
+        c.fail(path, lineno, 'literal font-size (use --fs-*)', line)
+
+    # The scale specifies no tracking anywhere.
+    if 'letter-spacing' in line:
+        c.fail(path, lineno, 'letter-spacing (the scale specifies none)', line)
+
+    # Every font-family goes through a token, except the two literals the
+    # @font-face block and its metric-matched fallback declare.
+    m = re.search(r'font-family: *([^;}]+)', line)
+    if m:
+        value = m.group(1).strip()
+        if any(f.lower() in value.lower() for f in RETIRED_FONTS):
+            c.fail(path, lineno,
+                   'marketing-brand typeface (this site is F5DS: Inter)', line)
+        elif value not in FONT_TOKENS and value not in FONT_LITERALS:
+            c.fail(path, lineno,
+                   'literal font-family (use --font/--font-display/--mono)', line)
+
+    # Off-system weights. A two-number value is a variable font's weight AXIS
+    # RANGE in @font-face, not a weight being applied.
+    m = re.search(r'font-weight: *([^;}]+)', line)
+    if m:
+        value = m.group(1).strip()
+        if re.fullmatch(r'\d+', value) and value not in ('400', '500', '700'):
+            c.fail(path, lineno, f'font-weight {value} (400/500/700 only)', line)
+
+    # Arithmetic: every spacing literal a multiple of 4; >40 a multiple of 8.
+    # 1px hairlines and the documented 2px label-to-control gap are excepted.
+    for m in re.finditer(SPACING_PROPS + r': *([^;}]+)', line):
+        for px in re.findall(r'-?\d+px', m.group(1)):
+            n = abs(int(px[:-2]))
+            if n % 4 and n not in (1, 2):
+                c.fail(path, lineno, f'off-grid spacing {px}', line)
+            elif n > 40 and n % 8:
+                c.fail(path, lineno, f'spacing {px} above 40 is not /8', line)
+
+
+def check_inline_styles(c, html_paths):
+    """Run the same literal rules over every inline style= attribute."""
+    for path in html_paths:
+        with open(path, encoding='utf-8') as fh:
+            for lineno, line in enumerate(fh, 1):
+                for decls in re.findall(r'style="([^"]*)"', line):
+                    if is_exempt(decls):
+                        c.note(path, lineno, decls)
+                        continue
+                    check_value_rules(c, path, lineno, decls)
+                    check_type_pairing(c, path, lineno, decls)
+
+
+def check_type_pairing(c, path, lineno, block):
+    """F5DS pairs a fixed leading with each size, so --fs-X needs --lh-X.
+
+    AGENTS.md: "any rule that sets font-size must restate the paired --lh-*".
+    Suffix-matching is the strict form and every existing site already
+    satisfies it, so there is no reason to accept the loose one.
+    """
+    fs = re.search(r'font-size: *var\(--fs-([\w-]+)\)', block)
+    if not fs:
+        return
+    lh = re.search(r'line-height: *var\(--lh-([\w-]+)\)', block)
+    if not lh:
+        c.fail(path, lineno, f'font-size --fs-{fs.group(1)} with no paired line-height', block)
+    elif lh.group(1) != fs.group(1):
+        c.fail(path, lineno,
+               f'--fs-{fs.group(1)} paired with --lh-{lh.group(1)} (suffixes must match)',
+               block)
+
+
+def check_manifest(c, expected):
+    """site.webmanifest holds two colours that are copies of tokens.
+
+    The theme-color check goes to real trouble asserting the four <meta> copies
+    track --surface, and its file set is CSS + JS + root HTML — so the manifest
+    was the one copy nobody looked at, in a repo whose most-repeated rule is
+    never to write a raw value at a call site. JSON cannot hold a var(), so
+    this asserts the value instead.
+
+    `expected` is {json key: (token name, resolved value)}.
+    """
+    path = os.path.join(ROOT, 'site.webmanifest')
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding='utf-8') as fh:
+        try:
+            manifest = json.load(fh)
+        except json.JSONDecodeError as err:
+            c.fail(path, 1, f'site.webmanifest is not valid JSON: {err}', '')
+            return
+    for key, (token, want) in expected.items():
+        got = manifest.get(key)
+        if want and got and got.upper() != want.upper():
+            c.fail(path, 1, f'{key} is {got}, but {token} is {want}', f'"{key}": "{got}"')
+
+
 def run():
     c = Check()
     css = walk(CSS_DIR, '.css')
@@ -153,20 +274,12 @@ def run():
                 c.note(path, lineno, line)
                 continue
 
-            # 12px is explicitly outside the F5DS spacing system.
-            if re.search(SPACING_PROPS + r':[^;{}"]*\b12px', line):
-                c.fail(path, lineno, '12px is not in the spacing system', line)
-
-            # Radius comes from a token; 50% is exempted above.
-            if re.search(r'border-radius:[^;}"]*\d+px', line):
-                c.fail(path, lineno, 'literal border-radius (use --radius*)', line)
-
-            # The pill token is 999, not 9999.
-            if '9999px' in line:
-                c.fail(path, lineno, '9999px (the pill token is 999px)', line)
+            check_value_rules(c, path, lineno, line)
 
             # Elevation is N700-tinted. Black is allowed only inside the dark
-            # theme, where an 8% N700 tint would be invisible.
+            # theme, where an 8% N700 tint would be invisible. Needs the
+            # surrounding rule block, so it stays here rather than moving into
+            # check_value_rules with the declaration-local rules.
             if re.search(r'box-shadow:[^;}"]*rgba\(0, *0, *0', line):
                 if '.dark' not in raw[:raw.find(line)].rsplit('}', 1)[-1]:
                     c.fail(path, lineno, 'raw black shadow (use --elev-*)', line)
@@ -175,46 +288,18 @@ def run():
             if re.search(r':focus[^{]*\{[^}]*box-shadow', line):
                 c.fail(path, lineno, 'focus via box-shadow (use outline)', line)
 
-            # Every font-size goes through the scale.
-            if re.search(r'font-size: *[0-9]', line):
-                c.fail(path, lineno, 'literal font-size (use --fs-*)', line)
+        # Type pairing is per rule BLOCK, not per line: the two declarations
+        # are usually on consecutive lines.
+        for block in re.finditer(r'\{[^{}]*\}', strip_css_comments(raw)):
+            if 'font-size' not in block.group(0):
+                continue
+            if is_exempt(block.group(0)):
+                continue
+            lineno = raw[:block.start()].count('\n') + 1
+            check_type_pairing(c, path, lineno, block.group(0))
 
-            # The scale specifies no tracking anywhere.
-            if 'letter-spacing' in line:
-                c.fail(path, lineno, 'letter-spacing (the scale specifies none)', line)
-
-            # Every font-family goes through a token, except the two literals
-            # the @font-face block and its metric-matched fallback declare.
-            m = re.search(r'font-family: *([^;}]+)', line)
-            if m:
-                value = m.group(1).strip()
-                if any(f.lower() in value.lower() for f in RETIRED_FONTS):
-                    c.fail(path, lineno,
-                           'marketing-brand typeface (this site is F5DS: Inter)',
-                           line)
-                elif value not in FONT_TOKENS and value not in FONT_LITERALS:
-                    c.fail(path, lineno,
-                           'literal font-family (use --font/--font-display/--mono)',
-                           line)
-
-            # Off-system weights. A two-number value is a variable font's
-            # weight AXIS RANGE in @font-face, not a weight being applied.
-            m = re.search(r'font-weight: *([^;}]+)', line)
-            if m:
-                value = m.group(1).strip()
-                if re.fullmatch(r'\d+', value) and value not in ('400', '500', '700'):
-                    c.fail(path, lineno, f'font-weight {value} (400/500/700 only)', line)
-
-            # Arithmetic: every spacing literal a multiple of 4; >40 a
-            # multiple of 8. 1px hairlines and the documented 2px label-to-
-            # control gap are excepted.
-            for m in re.finditer(SPACING_PROPS + r': *([^;}]+)', line):
-                for px in re.findall(r'-?\d+px', m.group(1)):
-                    n = abs(int(px[:-2]))
-                    if n % 4 and n not in (1, 2):
-                        c.fail(path, lineno, f'off-grid spacing {px}', line)
-                    elif n > 40 and n % 8:
-                        c.fail(path, lineno, f'spacing {px} above 40 is not /8', line)
+    # ── Inline style= attributes ──────────────────────────────────────────
+    check_inline_styles(c, html)
 
     # ── JS rules ──────────────────────────────────────────────────────────
     for path in js:
@@ -392,6 +477,12 @@ def run():
                             c.fail(path, lineno,
                                    f'theme-color {hexv} matches neither --surface '
                                    f'({want_light} light, {want_dark} dark)', line)
+
+        # The manifest's two colours are copies of the same light-theme tokens.
+        check_manifest(c, {
+            'theme_color': ('--surface', want_light),
+            'background_color': ('--bg', resolve('--bg', root.group(1))),
+        })
 
     # ── Undefined custom properties ───────────────────────────────────────
     # An unresolvable var() does not error, it silently yields nothing — the

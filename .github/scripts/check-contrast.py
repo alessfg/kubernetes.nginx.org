@@ -14,9 +14,11 @@ import sys
 
 # Repo root: this file lives at <root>/.github/scripts/, so three levels up.
 # These checks sit under .github/ rather than scripts/ because GitHub Pages
-# serves this branch verbatim (.nojekyll), and a plain scripts/ directory
-# was being published — verified: /scripts/check-tokens.py returned 200,
-# while dot-directories 404.
+# publishes this branch and a plain scripts/ directory was being served —
+# verified: /scripts/check-tokens.py returned 200. Dot-directories 404 because
+# Jekyll runs here and skips dot-prefixed paths. There is deliberately no
+# .nojekyll: adding one disables Jekyll rather than configuring it, taking the
+# dot-prefix exclusion with it and publishing .github/ wholesale.
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOKENS = os.path.join(ROOT, 'assets', 'css', 'tokens.css')
 

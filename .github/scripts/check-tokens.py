@@ -21,17 +21,16 @@ import sys
 
 # Repo root: this file lives at <root>/.github/scripts/, so three levels up.
 # These checks sit under .github/ rather than scripts/ because GitHub Pages
-# serves this branch verbatim (.nojekyll), and a plain scripts/ directory
-# was being published — verified: /scripts/check-tokens.py returned 200,
-# while dot-directories 404.
+# publishes this branch and a plain scripts/ directory was being served —
+# verified: /scripts/check-tokens.py returned 200. Dot-directories 404 because
+# Jekyll runs here and skips dot-prefixed paths. There is deliberately no
+# .nojekyll: adding one disables Jekyll rather than configuring it, taking the
+# dot-prefix exclusion with it and publishing .github/ wholesale.
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CSS_DIR = os.path.join(ROOT, 'assets', 'css')
 JS_DIR = os.path.join(ROOT, 'assets', 'js')
 
-# Sanctioned deviations, each with the reason it is allowed. A violation whose
-# (file, line-content) matches one of these is reported as an exemption rather
-# than a failure, so the list stays visible instead of silently shrinking.
 # ── Typeface ──────────────────────────────────────────────────────────────
 # The retired-colour list below catches the marketing palette by hex, but
 # nothing read a font-family, which left the typeface — the most visible thing
@@ -48,6 +47,9 @@ FONT_TOKENS = ('var(--font)', 'var(--font-display)', 'var(--mono)')
 FONT_LITERALS = ("'InterVariable'", "'Inter Fallback'")
 RETIRED_FONTS = ('Neusa', 'Proxima')
 
+# Sanctioned deviations, each with the reason it is allowed. A violation whose
+# (file, line-content) matches one of these is reported as an exemption rather
+# than a failure, so the list stays visible instead of silently shrinking.
 EXEMPT = [
     ('font-size: 0.9em',
      'inline code sizes relative to its context, not off the scale'),

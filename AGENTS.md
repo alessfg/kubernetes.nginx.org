@@ -87,27 +87,38 @@ The site follows the **F5 Design System (F5DS)**, the system behind the F5 Distr
 
 ## Checks
 
-Six commands, no dependencies. Run all six after any change, **each on its own line**. `.github/workflows/tests.yml` runs the same six on every push and pull request, one step each.
+One command, no dependencies:
 
 ```bash
-for f in assets/js/*.js; do node --check "$f" || break; done   # one per file: `node --check a.js b.js` only parses a.js
-python3 .github/scripts/check-tokens.py     # token invariants + retired marketing colours/typefaces + undefined var()
-python3 .github/scripts/check-contrast.py   # every colour pairing against WCAG 2.1 AA, both themes
-python3 .github/scripts/check-classes.py    # every class used by markup or JS resolves to a CSS rule
+python3 .github/scripts/check-all.py
+```
+
+It runs all eight and prints how many **ran**, which is the number that matters. Run them individually when you want one check's full output:
+
+```bash
+python3 .github/scripts/check-syntax.py     # every script parses (one `node --check` per file)
+python3 .github/scripts/check-tokens.py     # token invariants, retired colours/typefaces, undefined var(), webfont coverage
+python3 .github/scripts/check-contrast.py   # every colour pairing against WCAG 2.1 AA, both themes, plus pairings derived from the CSS
+python3 .github/scripts/check-classes.py    # classes resolve to rules; load order, asset paths and navigation labels hold
+python3 .github/scripts/check-versions.py   # every version string agrees with its source of truth
+python3 .github/scripts/check-markup.py     # tag balance, duplicate ids, anchors, JSON-LD
 node    .github/scripts/test-analyzer.js    # the migration analyzer, under a DOM stub
 node --test .github/test/*.test.js          # page ↔ engine ↔ module wiring
 ```
 
-Why one per line: a mistyped shell construct reports "clean" for a check that never ran, which has now happened six times — a `$F` that expanded to one filename, broken `grep -c` arithmetic, a zsh glob swallowing `--include`, a `for c in "python3 …"; do $c; done` loop where zsh treated each whole string as one command name and printed `exit=0` four times having run nothing, a `$b:` followed by a path in zsh (parsed as a history modifier, so `$b:assets/…` silently became `mainssets/…`), and — for two months, inside CI — `node --check assets/js/*.js`, which parses only the first glob match. If you must capture status through a pipe, zsh is `${pipestatus[1]}`, not `$?`.
+`.github/workflows/tests.yml` runs the same eight on every push and pull request, one step each.
+
+Why a runner rather than a shell line, and why one command per line when you run them by hand: a mistyped shell construct reports "clean" for a check that never ran, which has now happened six times — a `$F` that expanded to one filename, broken `grep -c` arithmetic, a zsh glob swallowing `--include`, a `for c in "python3 …"; do $c; done` loop where zsh treated each whole string as one command name and printed `exit=0` four times having run nothing, a `$b:` followed by a path in zsh (parsed as a history modifier, so `$b:assets/…` silently became `mainssets/…`), and — for two months, inside CI — `node --check assets/js/*.js`, which parses only the first glob match. If you must capture status through a pipe, zsh is `${pipestatus[1]}`, not `$?`.
 
 The same shape is why the test step names its glob and guards on `find`: `node --test` exits 0 when it matches no files, so a moved directory turns it into a green no-op.
 
-Four things to know about them:
+Five things to know about them:
 
 1. **None of them can see the rendered page.** Every one is a static reader, so the entire class of visual defect — a stretched grid, a collapsed flex item, a truncated label, a card wrapping 3+1 — passes all of them green. A clean run means "nothing is structurally broken", not "it looks right". Render and look.
-2. **`check-contrast.py` only asserts the pairings listed inside it.** A new coloured surface is unchecked until someone adds it; that is how the badge palette drifted.
+2. **`check-contrast.py` now derives pairings from the stylesheets as well as asserting a hand-written list**, so a new coloured surface is measured without anyone remembering to add it. Two limits remain: it only sees pairs declared through tokens in the same rule (or a dark override of one), and it cannot know which text is large enough for the 3:1 bar, so it holds everything to 4.5:1.
 3. **`check-classes.py` matters most after a restyle.** A class that loses its rule does not error — the element just renders unstyled, which is invisible on a page with thousands of rows. It reports unused classes too but never fails on them: there is dormant-by-design CSS here, listed by name in the script's own `DORMANT` set — the event banner and the ingress2gateway annotation grid, both built ahead of their content. Run `git log -S` before deleting anything on that list.
-4. **They live under `.github/` because Pages publishes this branch.** A top-level `scripts/` was being served (`/scripts/check-tokens.py` returned 200); dot-directories 404, because Jekyll runs on this branch and skips dot-prefixed paths. **There is no `.nojekyll` here and adding one would publish `.github/` wholesale** — it disables Jekyll rather than configuring it, so the dot-prefix exclusion goes with it. Anything else that must not be served goes under `.github/` too, which is why the test suite is at `.github/test/` rather than `test/`. Each script and the test loader derive `ROOT` by walking up from their own path, so moving one means fixing that.
+4. **`check-all.py` is a Python runner, not a shell one.** That is the point: a literal `(label, argv)` tuple per check, no globbing or word-splitting between it and the process, an assertion that the result count matches the declared count, and a summary line naming how many ran. A missing script or interpreter is a failure, never a skip.
+5. **They live under `.github/` because Pages publishes this branch.** A top-level `scripts/` was being served (`/scripts/check-tokens.py` returned 200); dot-directories 404, because Jekyll runs on this branch and skips dot-prefixed paths. **There is no `.nojekyll` here and adding one would publish `.github/` wholesale** — it disables Jekyll rather than configuring it, so the dot-prefix exclusion goes with it. Anything else that must not be served goes under `.github/` too, which is why the test suite is at `.github/test/` rather than `test/`. Each script and the test loader derive `ROOT` by walking up from their own path, so moving one means fixing that.
 
 ## Branches, deploying, and undoing
 
@@ -211,4 +222,5 @@ These are Claude Code skills, but they are plain markdown — any agent can read
 
 - **`.claude/skills/f5ds-design/SKILL.md`** — why the design decisions are what they are: the accent split, the three F5DS pairings that fail WCAG AA and their replacements, the badge graph palette, the full type scale, and every deviation with its justification. Read before changing a design value or "fixing" a deviation.
 - **`.claude/skills/migration-tool/SKILL.md`** — authoring and verifying the migration tool: the engine split, row ordering and cell conventions, the Node verification recipe and its silent-failure gotcha, and the four-point accuracy check.
-- **`.claude/skills/release-update/SKILL.md`** — the checklist for an NIC or NGF release, including the compatibility table and Kubernetes-version rules that are the steps most often missed.
+- **`.claude/skills/release-update/SKILL.md`** — the checklist for an NIC, NGF or ingress2gateway release, including the three version formats a plain grep misses, the feature badges that must *not* be swept along, and the compatibility table and Kubernetes-version rules that are the steps most often missed.
+- **`.claude/skills/verify-visually/SKILL.md`** — how to actually look at the site: `shot.sh`, DOM measurement, and the four facts that make a correct render command look like it failed. Read before reporting that anything visual was verified.

@@ -169,7 +169,17 @@ const CONTRACT = [
     'storage.checklist', 'storage.eolCollapsed',
     'analyzer.samplePresets', 'analyzer.defaultPreset',
     'analyzer.parseInput', 'analyzer.buildPlan',
-    'export.filename', 'export.header'
+    'export.filename', 'export.header',
+    /* Four more the core reads that this list used to omit, so the caption
+       above was not true of it. Each drives visible chrome rather than the
+       analysis, which is why their absence renders a blank instead of
+       throwing: the version pills, the input status line, the EOL banner's
+       two-part text, and the strategy selector. Derived by enumerating every
+       `SOURCE.` dereference in migration-core.js. */
+    'versionBindings',
+    'inputStatus.pattern', 'inputStatus.noun',
+    'eolCompact.strongText', 'eolCompact.restText',
+    'analyzer.strategies.initial', 'analyzer.strategies.descriptions'
 ];
 
 function dig(obj, dotted) {
@@ -212,7 +222,13 @@ function checkGeneratorContract() {
     const src = fs.readFileSync(
         path.join(ROOT, 'assets/js/migration-ingress-nginx.js'), 'utf8');
     const named = new Set([...src.matchAll(/templateFn:\s*"([^"]+)"/g)].map(m => m[1]));
-    const defined = new Set([...src.matchAll(/^\s{12}(generate\w+):\s*function/gm)].map(m => m[1]));
+    /* Indentation-agnostic, and accepts both the `name: function` and
+       `name(...)` forms. Pinning exactly twelve leading spaces meant a
+       reindent would silently empty this set, and an empty `defined` makes
+       every forward check fail loudly but every reverse check pass — the
+       dead-code direction would have gone quiet. */
+    const defined = new Set([...src.matchAll(
+        /^\s*(generate\w+)\s*(?::\s*function\b|\()/gm)].map(m => m[1]));
 
     const problems = [];
     for (const fn of [...named].sort()) {
@@ -227,6 +243,47 @@ function checkGeneratorContract() {
         }
     }
     return { problems, named: named.size, defined: defined.size };
+}
+
+/* ── The transform vocabulary ───────────────────────────────────────────────
+   `translateValue` ends in `default: return value`, so a misspelled transform
+   is not an error — it is a silent fallthrough that emits the RAW annotation
+   value where a templated directive belonged. Proven: replacing all ten
+   `transform: "snippetWrap"` with `"snipetWrap"` still exits 0 and still
+   reports "All 6 preset/strategy combinations produced a clean plan", because
+   no sample preset happens to exercise those mappings.
+
+   mirrorSnippet is the one legitimate absence: it is dispatched by an explicit
+   `hasMirrorSnippet` branch rather than by a case. Keep this allowlist at
+   exactly the transforms handled outside the switch. */
+const TRANSFORMS_HANDLED_OUTSIDE_SWITCH = new Set(['mirrorSnippet']);
+
+function checkTransformVocabulary() {
+    const src = fs.readFileSync(
+        path.join(ROOT, 'assets/js/migration-ingress-nginx.js'), 'utf8');
+    const named = new Set([...src.matchAll(/transform:\s*"([^"]+)"/g)].map(m => m[1]));
+
+    const fn = src.match(/function translateValue\b[\s\S]*?\n {8}\}/);
+    if (!fn) {
+        return { problems: ['could not locate translateValue to read its cases'],
+                 named: named.size, cases: 0 };
+    }
+    const cases = new Set([...fn[0].matchAll(/case\s+'([^']+)'/g)].map(m => m[1]));
+
+    const problems = [];
+    for (const t of [...named].sort()) {
+        if (!cases.has(t) && !TRANSFORMS_HANDLED_OUTSIDE_SWITCH.has(t)) {
+            problems.push(`transform "${t}" is named by a mapping but translateValue has no `
+                + 'case for it — it falls through to `default: return value` and emits the '
+                + 'raw annotation value, with no warning');
+        }
+    }
+    for (const t of [...cases].sort()) {
+        if (!named.has(t)) {
+            problems.push(`translateValue handles "${t}" but no mapping names it — dead branch`);
+        }
+    }
+    return { problems, named: named.size, cases: cases.size };
 }
 
 /* ── The mappings ↔ reference-table contract, both directions ───────────────
@@ -247,8 +304,14 @@ function checkReferenceTables() {
     for (const m of src.matchAll(/community:\s*\[(.*?)\]/gs)) {
         for (const lit of m[1].matchAll(/"([^"]+)"/g)) { mapped.add(lit[1]); }
     }
+    /* Table cells only. Scanning the whole document counted an annotation as
+       "documented" when it appeared solely inside some other row's example
+       YAML — so a mapping could lose its own row and this check would still
+       pass on the strength of a mention in an unrelated <pre>. Restricting to
+       <td> content yields the same 130 today, and now means it. */
+    const cells = [...html.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m => m[1]).join('\n');
     const documented = new Set(
-        [...html.matchAll(/nginx\.ingress\.kubernetes\.io\/([a-z0-9-]+)/g)].map(m => m[1]));
+        [...cells.matchAll(/nginx\.ingress\.kubernetes\.io\/([a-z0-9-]+)/g)].map(m => m[1]));
 
     const problems = [];
     for (const a of [...documented].sort()) {
@@ -266,6 +329,24 @@ function checkReferenceTables() {
     return { problems, mapped: mapped.size, documented: documented.size };
 }
 
+/* Frozen shape of every preset/strategy run. Without these the loop below
+   asserts only `findings > 0` and `steps > 0`, which is satisfied by almost
+   any wrong answer: a mapping can stop contributing a CRD, or a step can lose
+   half its blocks, and the run stays green because the counts are printed and
+   never compared. This is the cheapest possible guard on the tool's actual
+   output — six lines, and it fails the moment a number moves.
+
+   When a number legitimately changes, update it here in the same commit as
+   the change, and say in the message which way it moved and why. */
+const EXPECTED = {
+    'simple/crd':          { findings: 5,  steps: 1, blocks: 1, exported: 1 },
+    'simple/annotation':   { findings: 5,  steps: 1, blocks: 1, exported: 1 },
+    'moderate/crd':        { findings: 12, steps: 2, blocks: 2, exported: 2 },
+    'moderate/annotation': { findings: 12, steps: 2, blocks: 2, exported: 2 },
+    'advanced/crd':        { findings: 24, steps: 3, blocks: 5, exported: 6 },
+    'advanced/annotation': { findings: 24, steps: 3, blocks: 6, exported: 4 }
+};
+
 const presets = Object.keys(SOURCE.analyzer.samplePresets);
 let failures = 0;
 
@@ -277,6 +358,16 @@ if (gen.problems.length) {
 } else {
     console.log(`  ok    ${gen.named} templateFn reference(s) and `
         + `${gen.defined} generator(s) agree in both directions`);
+}
+
+console.log('\nChecking the transform vocabulary...');
+const tv = checkTransformVocabulary();
+if (tv.problems.length) {
+    tv.problems.forEach(p => console.error(`  FAIL  ${p}`));
+    failures += tv.problems.length;
+} else {
+    console.log(`  ok    ${tv.named} declared transform(s) and ${tv.cases} `
+        + 'translateValue case(s) agree in both directions');
 }
 
 console.log('\nChecking the mappings ↔ reference tables...');
@@ -341,6 +432,22 @@ for (const preset of presets) {
         if (unknown.length) {
             console.error(`  FAIL  ${label}: block types the renderer does not `
                 + `handle: ${[...new Set(unknown)].join(', ')}`);
+            failures++;
+            continue;
+        }
+
+        const want = EXPECTED[label];
+        if (!want) {
+            console.error(`  FAIL  ${label}: no EXPECTED entry — add one so this `
+                + 'preset/strategy is asserted rather than merely printed');
+            failures++;
+            continue;
+        }
+        const got = { findings, steps, blocks, exported };
+        const moved = Object.keys(want).filter(k => want[k] !== got[k]);
+        if (moved.length) {
+            console.error(`  FAIL  ${label}: `
+                + moved.map(k => `${k} ${want[k]} -> ${got[k]}`).join(', '));
             failures++;
             continue;
         }

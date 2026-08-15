@@ -302,13 +302,14 @@
        dark override at all. Body text on it: 13.21:1 light, 9.99:1 dark. */
     --code-chip-bg: rgba(158, 167, 184, 0.22);
 
-    /* The blue-washed variant of that chip, for a flag or option name called
-       out in running prose. The wash is --blue-tint, so the foreground cannot
-       be --blue: Dodger Blue on its own 10% tint is 3.56:1, which is fine for
-       a mark and fails for text, and this is text. --blue-text clears it at
-       5.70:1. Dark needs its own value because --blue and --blue-text collapse
-       to the same #7893FF there (4.25:1 on the tint); --blue-deep is 5.37:1. */
-    --code-accent-fg: var(--blue-text);
+    /* The accessible foreground for anything sitting on --blue-tint: the
+       blue-washed inline-code chip, and the ingress2gateway version pill.
+       The foreground cannot be --blue — Dodger Blue on its own 10% tint is
+       3.56:1, fine for a mark and short of the bar for text, and both of
+       these are text. --blue-text clears it at 5.70:1. Dark needs its own
+       value because --blue and --blue-text collapse to the same #7893FF
+       there (4.25:1 on the tint); --blue-deep is 5.37:1. */
+    --on-blue-tint: var(--blue-text);
 
     /* ── Border radius ─────────────────────────────────────────────────────
        F5DS publishes four values and one rule: 4px for all components and UI
@@ -488,7 +489,7 @@
         /* --blue-text collapses onto --blue here, and #7893FF on its own 16%
            tint is 4.25:1 — below the text bar. --blue-deep is the next step up
            and clears it at 5.37:1 on the card, 6.05:1 on the page. */
-        --code-accent-fg: var(--blue-deep);
+        --on-blue-tint: var(--blue-deep);
 
         /* The wash has to invert: on a dark page the tint is lifted above the
            background, so softening it means darkening toward N700, not lightening

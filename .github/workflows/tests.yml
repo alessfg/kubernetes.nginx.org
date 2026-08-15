@@ -46,6 +46,9 @@ jobs:
       - name: Check every class resolves to a rule
         run: python3 .github/scripts/check-classes.py
 
+      - name: Check every version string agrees
+        run: python3 .github/scripts/check-versions.py
+
       - name: Check the migration analyzer
         run: node .github/scripts/test-analyzer.js
 

@@ -31,6 +31,22 @@ JS_DIR = os.path.join(ROOT, 'assets', 'js')
 # Sanctioned deviations, each with the reason it is allowed. A violation whose
 # (file, line-content) matches one of these is reported as an exemption rather
 # than a failure, so the list stays visible instead of silently shrinking.
+# ── Typeface ──────────────────────────────────────────────────────────────
+# The retired-colour list below catches the marketing palette by hex, but
+# nothing read a font-family, which left the typeface — the most visible thing
+# on the page — as the one part of the marketing brand with no guard at all.
+#
+# This site follows the F5 *product* design system, so the face is Inter,
+# self-hosted and subsetted. Neusa Next Pro Wide and Proxima Nova belong to the
+# marketing brand: correct there, a defect here, and licence-gated and unhosted
+# besides, so swapping one in falls back to a system face for every visitor
+# while every other check stays green.
+FONT_TOKENS = ('var(--font)', 'var(--font-display)', 'var(--mono)')
+# Declared literally on purpose: the @font-face family, and the metric-matched
+# local fallback that holds the layout until the woff2 arrives.
+FONT_LITERALS = ("'InterVariable'", "'Inter Fallback'")
+RETIRED_FONTS = ('Neusa', 'Proxima')
+
 EXEMPT = [
     ('font-size: 0.9em',
      'inline code sizes relative to its context, not off the scale'),
@@ -167,6 +183,20 @@ def run():
             if 'letter-spacing' in line:
                 c.fail(path, lineno, 'letter-spacing (the scale specifies none)', line)
 
+            # Every font-family goes through a token, except the two literals
+            # the @font-face block and its metric-matched fallback declare.
+            m = re.search(r'font-family: *([^;}]+)', line)
+            if m:
+                value = m.group(1).strip()
+                if any(f.lower() in value.lower() for f in RETIRED_FONTS):
+                    c.fail(path, lineno,
+                           'marketing-brand typeface (this site is F5DS: Inter)',
+                           line)
+                elif value not in FONT_TOKENS and value not in FONT_LITERALS:
+                    c.fail(path, lineno,
+                           'literal font-family (use --font/--font-display/--mono)',
+                           line)
+
             # Off-system weights. A two-number value is a variable font's
             # weight AXIS RANGE in @font-face, not a weight being applied.
             m = re.search(r'font-weight: *([^;}]+)', line)
@@ -194,6 +224,8 @@ def run():
                     c.fail(path, lineno, 'literal font-size in JS (use a class)', line)
                 if 'letterSpacing' in line:
                     c.fail(path, lineno, 'letter-spacing in JS', line)
+                if 'fontFamily' in line or 'font-family' in line:
+                    c.fail(path, lineno, 'font-family in JS (use a class)', line)
 
     # ── Raw colour literals at call sites ─────────────────────────────────
     # "Never write a raw value at a call site" is the most-repeated rule in

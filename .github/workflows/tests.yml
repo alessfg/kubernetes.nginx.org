@@ -49,10 +49,18 @@ jobs:
       - name: Check the migration analyzer
         run: node .github/scripts/test-analyzer.js
 
-      # Dependency-free suite (node:test) — analyzer regressions for every
-      # source module, semantic conversion cases, and page↔engine↔module
-      # wiring checks. Lives on the branches that ship a second migration
-      # tool; `node --test` exits 0 where there is no test/ directory, so this
-      # file stays identical across main and the preview branches.
+      # Dependency-free suite (node:test) — page↔engine↔module wiring checks,
+      # plus per-source analyzer and conversion cases on the branches that ship
+      # a second migration tool.
+      #
+      # The guard matters: `node --test` exits 0 when it finds no test files,
+      # so a deleted or renamed .github/test/ turns this step into a green
+      # no-op under a name that claims otherwise. That is the same shape as the
+      # `node --check` glob bug above, and the incident list in AGENTS.md.
       - name: Run the test suite
-        run: node --test
+        run: |
+          if [ -z "$(find .github/test -name '*.test.js' -print -quit 2>/dev/null)" ]; then
+            echo "::error::No .github/test/**/*.test.js found — 'node --test' would pass vacuously."
+            exit 1
+          fi
+          node --test .github/test/*.test.js

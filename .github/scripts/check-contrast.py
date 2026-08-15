@@ -353,13 +353,24 @@ def check_ratio_comments(blocks):
 
 
 def main():
+    # Quiet by default. Sixty PASS lines are ~1,200 tokens of "nothing is
+    # wrong", reprinted every time anyone verifies anything; the measurements
+    # matter when you are choosing a colour, not when you are confirming you
+    # broke nothing. FAIL lines always print, at any verbosity.
+    verbose = '-v' in sys.argv or '--verbose' in sys.argv
+
+    def say(text, always=False):
+        if verbose or always:
+            print(text)
+
     with open(TOKENS, encoding='utf-8') as fh:
         blocks = parse_blocks(fh.read())
 
     failures = []
+    n_pairs = 0
     for theme in ('light', 'dark'):
-        print(f'\n{theme.upper()} THEME')
-        print('-' * 62)
+        say(f'\n{theme.upper()} THEME')
+        say('-' * 62)
         checks = [(f, b, m, d) for f, b, m, d in PAIRS]
         checks += [(f, b, TEXT_AA, d) for f, b, d in BUTTONS[theme]]
         checks += [(f, b, TEXT_AA, d) for f, b, d in BADGES]
@@ -373,40 +384,43 @@ def main():
                 fg = composite(fg, bg)
             r = contrast(fg, bg)
             ok = r >= minimum
+            n_pairs += 1
             if not ok:
                 failures.append(f'{theme}: {desc} — {r:.2f}:1, needs {minimum}')
-            print(f'  {"PASS" if ok else "FAIL"}  {r:5.2f}:1  (min {minimum})  {desc}')
+            say(f'  {"PASS" if ok else "FAIL"}  {r:5.2f}:1  (min {minimum})  {desc}',
+                always=not ok)
 
-        print('  --  status hues, reported not asserted; never used as text  --')
+        say('  --  status hues, reported not asserted; never used as text  --')
         surf = to_rgba(resolve('--surface', theme, blocks))
         for s in STATUS:
             r = contrast(to_rgba(resolve(s, theme, blocks)), surf)
-            print(f'        {r:5.2f}:1            {s[2:]} mark on a card')
+            say(f'        {r:5.2f}:1            {s[2:]} mark on a card')
 
-    print('\nDERIVED FROM THE STYLESHEETS')
-    print('-' * 62)
+    say('\nDERIVED FROM THE STYLESHEETS')
+    say('-' * 62)
     derived, n_derived = check_derived(blocks)
-    print(f'  {len(derived)} failure(s) across {n_derived} token pairing(s) declared in CSS')
+    say(f'  {len(derived)} failure(s) across {n_derived} token pairing(s) declared in CSS')
     for d in derived:
         print(f'    FAIL  {d}')
     failures += derived
 
-    print('\nMEASURED-RATIO COMMENTS IN tokens.css')
-    print('-' * 62)
+    say('\nMEASURED-RATIO COMMENTS IN tokens.css')
+    say('-' * 62)
     comments, n_comments = check_ratio_comments(blocks)
-    print(f'  {len(comments)} wrong of {n_comments} parseable')
+    say(f'  {len(comments)} wrong of {n_comments} parseable')
     for c in comments:
         print(f'    FAIL  {c}')
     failures += comments
 
-    print()
     if failures:
-        print(f'{len(failures)} contrast failure(s):')
+        print(f'\n{len(failures)} contrast failure(s):')
         for f in failures:
             print(f'  - {f}')
         return 1
-    print('All colour pairings clear WCAG 2.1 AA, every pairing the stylesheets')
-    print('declare is measured, and every ratio comment matches its measurement.')
+    # The counts are the assertion: "all clear" means nothing if the reason is
+    # that nothing was measured.
+    print(f'contrast OK — {n_pairs} asserted pairings, {n_derived} derived from '
+          f'CSS, {n_comments} ratio comments, both themes.  -v for every measurement.')
     return 0
 
 

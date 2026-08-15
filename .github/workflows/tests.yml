@@ -89,6 +89,14 @@ jobs:
           fi
           node --test .github/test/*.test.js
 
+      # where.py is a token-saving navigation aid, not a correctness check — but
+      # a locator that silently matches nothing reads as "that thing is not in
+      # this repo", which is worse than no locator at all. Its self-test asserts
+      # each resolver still finds a known-present thing, by KIND rather than by
+      # line number, so ordinary edits do not turn it red.
+      - name: Check the locator still resolves
+        run: python3 .github/scripts/where.py --self-test
+
       # A branch is graded by ITS OWN copy of the checks and the shared engine,
       # which means a stale branch is graded by weaker ones. Measured across the
       # preview branches: both shipped a copy-button bug that had already been

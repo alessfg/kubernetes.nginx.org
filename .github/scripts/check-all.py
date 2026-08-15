@@ -40,6 +40,7 @@ CHECKS = [
     ('migration analyzer', ['node', '.github/scripts/test-analyzer.js']),
     ('wiring suite', ['node', '--test', '.github/test/index.test.js',
                       '.github/test/wiring.test.js']),
+    ('locator', [sys.executable, '.github/scripts/where.py', '--self-test']),
 ]
 
 

@@ -536,6 +536,41 @@ function writeMappingIndex() {
 const indexed = writeMappingIndex();
 console.log(`\nWrote .github/data/mapping-index.json (${indexed} mappings).`);
 
+/* ── Accuracy provenance ────────────────────────────────────────────────────
+   The three Version-reference banners assert that the whole tool "is based on"
+   a given NIC release. That is one claim about 57 mappings and 19 generators,
+   and nothing records when any individual one was last checked against a
+   tagged source — so a version bump silently re-asserts them all.
+
+   A mapping may carry `verified: "v5.5.4"`, meaning its four-point accuracy
+   check (see the migration-tool skill) was done against that tag. This reports
+   how many are behind the current pin. It never fails: the same reasoning as
+   the unused-class report in check-classes.py — a number that only goes down
+   is useful, a wall of red is ignored. */
+function reportProvenance() {
+    const src = fs.readFileSync(
+        path.join(ROOT, 'assets/js/migration-ingress-nginx.js'), 'utf8');
+    const chunks = src.split(/\n\s*\{\s*community:/).slice(1);
+    const current = MT.NIC.VERSION;
+    let verified = 0;
+    let stale = 0;
+    for (const chunk of chunks) {
+        const m = chunk.match(/verified:\s*"([^"]+)"/);
+        if (!m) { continue; }
+        verified++;
+        if (m[1] !== current) { stale++; }
+    }
+    const unmarked = chunks.length - verified;
+    console.log(`\nAccuracy provenance (reported, never failed):`);
+    console.log(`  ${verified} of ${chunks.length} mapping(s) record a verified: tag`
+        + `; ${stale} of those are behind ${current}, ${unmarked} carry none.`);
+    if (unmarked === chunks.length) {
+        console.log('  Add `verified: "<tag>"` to a mapping when its four-point accuracy');
+        console.log('  check is done, so the queue shrinks instead of being re-audited whole.');
+    }
+}
+reportProvenance();
+
 console.log('');
 if (errors.length) {
     console.error(`${errors.length} console.error during the run:`);

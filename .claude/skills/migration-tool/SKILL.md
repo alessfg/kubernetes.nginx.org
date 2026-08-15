@@ -157,6 +157,13 @@ Also sanity-check generated `k8s.nginx.org/v1` field names against the `json:` t
 
 Every annotation, ConfigMap key, CRD field or feature documented here **must exist in the version the tool's Version Reference banner names**. Verify with `mcp__github__get_file_contents` against that tag — not `main`, and never from memory. Never document unreleased features.
 
+**Record the result.** When you complete the four-point check for a mapping, add
+`verified: "<tag>"` to it. The Version-reference banner makes one claim about all
+57 mappings at once, so a version bump silently re-asserts every one of them;
+`test-analyzer.js` prints how many carry a tag and how many are behind the
+current pin, which turns an unbounded re-audit into a queue that shrinks. It
+never fails on it — an empty queue is a goal, not a gate.
+
 That rule catches **fabrication**. It does not catch **staleness** — a construct that does exist but is described with outdated semantics, wrong defaults or status codes, or an incomplete field set. Staleness is the more dangerous of the two because an existence check passes straight over it, and adversarial intuition about these constructs is wrong roughly half the time. So check all four against the tagged source in both repos:
 
 1. **Exists** — the annotation or field is in the pinned version.

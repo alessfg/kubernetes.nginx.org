@@ -6,12 +6,12 @@ Keep this file to rules that must apply **before** anything is read — the ones
 
 ## What this is
 
-A documentation-only site covering NGINX on Kubernetes: a landing page for the ecosystem plus an interactive migration tool. No build system and no package manager; there *are* checks and a test suite, and CI runs them on every push and pull request — see [Checks](#checks). Static HTML with CSS/JS in `assets/`, no CDN or third-party runtime dependencies. Owned by F5, Inc., Apache 2.0.
+A documentation-only site covering NGINX on Kubernetes: a landing page for the ecosystem plus an interactive migration tool. No build system and no package manager; there *are* checks and a test suite, and CI runs them on every push and pull request — see [Checks](#checks). Static HTML with CSS/JS in `assets/`, no CDN and no third-party runtime dependencies — with one deliberate exception: the featured videos load poster images from `i.ytimg.com` and are click-to-play into `youtube-nocookie`, so nothing off-origin runs until a reader asks for it. Owned by F5, Inc., Apache 2.0.
 
 It covers four things: **NGINX Ingress Controller** (`nginx/kubernetes-ingress`), **NGINX Gateway Fabric** (`nginx/nginx-gateway-fabric`), the **NGINX Ingress Migration Tool** (community `kubernetes/ingress-nginx` → NIC), and **ingress2gateway** (`kubernetes-sigs/ingress2gateway`).
 
 - `index.html` — the live landing page, a hub linking to all four. Markup only; styles in `assets/css/{shared,index}.css`, behavior in `assets/js/{shared,index}.js`.
-- `ingress-nginx-migration.html` — the live migration tool: YAML analyzer, 130+ annotation mappings, CRD examples, ConfigMap guidance.
+- `ingress-nginx-migration.html` — the live migration tool: YAML analyzer, 130 annotation mappings, CRD examples, ConfigMap guidance. **4,952 lines / ~92k tokens — do not read it whole.** Navigate by `grep -n '<section id='` and `grep -n '<h3 id='`; `.github/data/mapping-index.json` maps every annotation to its category, anchor and CRD generator.
 - Repo `nginx/kubernetes.nginx.org`; GitHub Pages serves `main` at https://kubernetes.nginx.org/.
 
 **Never touch `CHANGELOG.md` unless you are explicitly asked to.** Its entries are release-shaped and written by hand, and a released section can already be on `main` and serving production — so "helpfully" appending to one revises a shipped record. Make the code change, mention in your summary that the changelog is untouched, and let the maintainer decide whether the work warrants an entry and under which version.
@@ -20,7 +20,8 @@ It covers four things: **NGINX Ingress Controller** (`nginx/kubernetes-ingress`)
 
 ```
 assets/
-  css/  tokens.css        # THE design surface: every colour, size, space, radius, shadow, duration. No selectors.
+  css/  tokens.css        # THE design surface: every colour, size, space, radius, shadow, duration.
+        #                   Declarations only — two blocks, `:root` and the `@media screen` dark theme.
         shared.css        # @font-face, reset, top bar, sidebar and banner, components both pages use
         index.css         # landing page only (hero, feature/project grids, compat tables, CTAs)
         migration.css     # migration tool (analyzer UI, mapping/reference tables, badges, checklist, print)
@@ -39,17 +40,17 @@ These fail silently — nothing errors, the page just renders wrong.
 - **CSS order on every page: `tokens.css` → `shared.css` → the page CSS.**
 - **`shared.js` before the page JS.** Page scripts are IIFEs calling shared.js globals like `closeSidebar` / `copyToClipboard`.
 - **Migration pages load three scripts in this order: `shared.js` → `migration-<source>.js` → `migration-core.js`.** The source module must precede the core, because the core reads `window.MIGRATION_SOURCE` at top level. Source modules never touch the DOM and may dereference `MigrationTool.*` only inside function bodies, never at top level.
-- **Asset paths are relative** (`assets/css/…`, no leading `/`) so they resolve identically locally, in PR previews and in production.
+- **Asset paths are relative** (`assets/css/…`, no leading `/`) so they resolve identically from the filesystem, from a local server and in production. (There is no PR preview environment — Pages serves `main` only.)
 - **Every page carries `<link rel="preload" as="font" … crossorigin>` for the woff2 *before* the stylesheet links.** The `@font-face` lives inside `shared.css`, so without the preload the font is not discoverable until that CSS has parsed.
 - The inline `<head>` dark-mode flash-prevention script and the page-specific JSON-LD stay inline. Classic (non-module) scripts keep functions global.
 - The font is **self-hosted, never a CDN** — see `assets/fonts/README.md` before upgrading or re-subsetting it.
 
 ## Shared header, sidebar and banner
 
-These shared parts live in `assets/css/shared.css` and `assets/js/shared.js` as the single source of truth — **edit it once there**, not per page. Its values all come from `tokens.css`; `shared.css` writes no literals. It covers the event banner, the top bar, the sidebar and its drawer, and the dark-mode token overrides plus toggle.
+These shared parts live in `assets/css/shared.css` and `assets/js/shared.js` as the single source of truth — **edit it once there**, not per page. Its colours, spacing, type and elevation all come from `tokens.css`. `shared.css` does write a few structural literals — the 44px mobile touch target, the 32px brand rule, the 3px nav rail, the 1px hairlines — and carries a second `:root` block of `--icon-*` and `--pattern-hex` values that `tokens.css` does not contain. It covers the event banner, the top bar, the sidebar and its drawer, and the dark-mode token overrides plus toggle.
 
-- **The topbar/sidebar/banner markup is duplicated in both HTML pages and must stay structurally in sync** — the shared CSS/JS keys off `#sidebar`, `#sidebarBackdrop`, `#menuToggle`, `#darkToggle`, `.topbar`, `.event-banner`, `#copyright-year`, `#page-announce`.
-- **Top bar**: `--topbar-h` 52px. Logo left-aligned at the start of the bar, then a short centred rule (`.topbar-brand::after`, 32px tall) rather than a full-height border, then the heading; GitHub link and dark-mode toggle at the right. The heading is **one line, and which line depends on width** — above 900px `.topbar-eyebrow` carries the site/tool label and `.mobile-breadcrumb` is hidden; at or below 900px they swap, because the drawer hides the sidebar's active-item marker. `index.js` and `migration-core.js` both keep `.mobile-breadcrumb` in step with the active view, so renaming it means touching both.
+- **The topbar/sidebar/banner markup is duplicated in both HTML pages and must stay structurally in sync** — the shared CSS/JS keys off `#sidebar`, `#sidebarBackdrop`, `#menuToggle`, `#darkToggle`, `#mobileBreadcrumb`, `.topbar`, `.event-banner`, `#copyright-year`, `#page-announce`. `check-classes.py` asserts every id `shared.js` queries exists on every page.
+- **Top bar**: `--topbar-h` 52px. Logo left-aligned at the start of the bar, then a short centred rule (`.topbar-brand::after`, 32px tall) rather than a full-height border, then the heading; GitHub link and dark-mode toggle at the right. The heading is **one line, and which line depends on width** — above 900px `.topbar-eyebrow` carries the site/tool label and `.mobile-breadcrumb` is hidden; at or below 900px they swap, because the drawer hides the sidebar's active-item marker. `index.js` and `migration-core.js` both keep it in step with the active view via `getElementById('mobileBreadcrumb')`, so renaming that **id** means touching both. The `.mobile-breadcrumb` class is styling only and appears in neither script.
 - **Tried and reverted, don't re-propose**: pinning the branding block to `--sidebar-w` with the logo centred inside it (spends 264px on a 99px logo, and a label like "Networking for Kubernetes" truncated when it sat inside); a `.topbar::after` bottom rule starting at `--sidebar-w`; a stacked eyebrow-over-title heading; a 64px bar.
 - **Page-scoped exception — dark-mode content link colours.** These (`a:link`, `a:visited`) must be scoped to the content area (`.page-body` in `index.css`, `.main-inner` in `migration.css`) and stay in the **per-page** CSS. Never in `shared.css`, never global, or they override the topbar/sidebar link colours.
 
@@ -105,8 +106,66 @@ Four things to know about them:
 
 1. **None of them can see the rendered page.** Every one is a static reader, so the entire class of visual defect — a stretched grid, a collapsed flex item, a truncated label, a card wrapping 3+1 — passes all of them green. A clean run means "nothing is structurally broken", not "it looks right". Render and look.
 2. **`check-contrast.py` only asserts the pairings listed inside it.** A new coloured surface is unchecked until someone adds it; that is how the badge palette drifted.
-3. **`check-classes.py` matters most after a restyle.** A class that loses its rule does not error — the element just renders unstyled, which is invisible on a page with thousands of rows. It reports unused classes too but never fails on them: there is dormant-by-design CSS here (the event banner, the built-but-unlinked blogs/videos sections). Run `git log -S` before deleting anything on that list.
+3. **`check-classes.py` matters most after a restyle.** A class that loses its rule does not error — the element just renders unstyled, which is invisible on a page with thousands of rows. It reports unused classes too but never fails on them: there is dormant-by-design CSS here, listed by name in the script's own `DORMANT` set — the event banner and the ingress2gateway annotation grid, both built ahead of their content. Run `git log -S` before deleting anything on that list.
 4. **They live under `.github/` because Pages publishes this branch.** A top-level `scripts/` was being served (`/scripts/check-tokens.py` returned 200); dot-directories 404, because Jekyll runs on this branch and skips dot-prefixed paths. **There is no `.nojekyll` here and adding one would publish `.github/` wholesale** — it disables Jekyll rather than configuring it, so the dot-prefix exclusion goes with it. Anything else that must not be served goes under `.github/` too, which is why the test suite is at `.github/test/` rather than `test/`. Each script and the test loader derive `ROOT` by walking up from their own path, so moving one means fixing that.
+
+## Branches, deploying, and undoing
+
+**Pushing to `main` is deploying.** Pages serves this branch; a push is live in
+roughly a minute, and CI finishes at about the same time, so a red run does not
+stop a bad commit reaching production. Verify before you push, not after.
+
+- Routine work goes straight to `main`. Large or risky efforts get a branch by
+  explicit request.
+- `preview/**` branches carry additional migration tools built on the same
+  engine. **`main` owns the shared engine and the checks** — `assets/js/shared.js`,
+  `assets/js/migration-core.js`, `.github/scripts/`, `.github/test/` and this
+  file. A branch behind `main` on those is graded by its own older checks, so CI
+  warns about it. Merge `main` into the branch rather than porting fixes across.
+- To undo something already on `main`: `git revert <sha>` and push. **Never**
+  `push --force`, `reset --hard` or `clean` on a branch that has been pushed —
+  the deployed history is the record.
+
+Agent permissions, hooks and MCP servers are deliberately **not** checked in:
+they are a property of whoever is working, not of the project. If you want the
+checks to run automatically before a turn ends, point a `Stop` hook at
+`.claude/hooks/verify-before-stop.sh` from your own settings — the script is
+tracked, its wiring is yours. It no-ops on a clean tree and honours
+`SKIP_REPO_VERIFY=1`.
+
+## Where the reasoning is written down
+
+The commit bodies are the largest body of decision-making in this repository —
+around 4,000 words, containing a genre that exists in no other file: what was
+tried, what was rejected, and how it was verified. Before re-proposing something
+or deleting something that looks dead:
+
+```bash
+git log --grep='Considered and rejected'   # ideas already weighed and dropped
+git log -S'<name>'                         # why a class, token or function exists
+```
+
+Write commits the same way: what changed, why, what was rejected, and how it was
+verified. A commit that records a fault injection ("planted X, the check
+reported Y") is worth more later than one that says "fix check".
+
+## Performance budget
+
+Numbers to stay near, not a hard gate. Measured on the migration page: **789KB
+uncompressed** (HTML 333, CSS 128, JS 218, font 110), **4,860 elements**, 130
+mapping rows. Content grows this page; if a change moves any of these
+appreciably, say so.
+
+One invariant behind that: `filterTable` caches row text in a `WeakMap` and is
+debounced. It used to call `row.textContent.toLowerCase()` on every row on every
+keystroke, re-serialising 75 row subtrees per character. Do not undo that.
+
+## Spelling
+
+British in agent-facing prose and code comments (`colour`, `behaviour`) —
+166 occurrences, including in `tokens.css` comments, which are served to every
+visitor. American in user-facing page copy. CSS property names are `color`
+regardless. If a style tool proposes normalising these, it is out of scope here.
 
 ## Migration tool: the one rule that cannot wait
 
@@ -134,7 +193,7 @@ Prefer GitHub MCP tools over WebFetch for these.
 
 **NGINX Ingress Controller** (`nginx/kubernetes-ingress`)
 
-- GitHub: https://github.com/nginx/kubernetes-ingress — docs tree at `docs/content`, CRD types at `pkg/apis/configuration/v1/types.go`
+- GitHub: https://github.com/nginx/kubernetes-ingress — CRD types at `pkg/apis/configuration/v1/types.go`. The prose docs are **not** in this repo; they live in `nginx/documentation` (next line).
 - Annotations: https://github.com/nginx/documentation/blob/main/content/nic/configuration/ingress-resources/advanced-configuration-with-annotations.md
 - Docs site: https://docs.nginx.com/nginx-ingress-controller/ — published annotations at `/configuration/ingress-resources/advanced-configuration-with-annotations/`, and the VirtualServer/VirtualServerRoute, Policy, TransportServer and GlobalConfiguration resource pages under `/configuration/`
 - Migration guide: https://docs.nginx.com/nginx-ingress-controller/install/migrate-ingress-nginx

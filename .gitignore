@@ -42,4 +42,10 @@ __pycache__/
 #################################
 # Agent harness, machine-local  #
 #################################
+# Permissions, hooks and MCP servers are a local choice, not a property of the
+# project: they carry machine paths and credentials, and pinning them here
+# would impose one person's setup on every contributor. The hook SCRIPT is
+# tracked (.claude/hooks/) so anyone can point their own settings at it.
+.claude/settings.json
 .claude/settings.local.json
+.mcp.json

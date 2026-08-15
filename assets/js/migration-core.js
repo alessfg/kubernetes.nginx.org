@@ -12,12 +12,12 @@
         'use strict';
         // Single source of truth for the F5 NGINX Ingress Controller (the migration
         // TARGET) versions the tool pages are documented against. Bump these when
-        // updating the Version Reference (see the release checklist in CLAUDE.md;
+        // updating the Version Reference (see .claude/skills/release-update/SKILL.md;
         // also update the version pills/install URLs in index.html). The source
         // controller's version lives at the top of its migration-<source>.js.
         const NIC = {
-            VERSION: 'v5.5.1',
-            HELM_VERSION: '2.6.1'
+            VERSION: 'v5.5.4',
+            HELM_VERSION: '2.6.4'
         };
         NIC.CRD_INSTALL_CMD = 'kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/' + NIC.VERSION + '/deploy/crds.yaml';
         NIC.HELM_INSTALL_CMD = 'helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version ' + NIC.HELM_VERSION + ' --set controller.enableCustomResources=true';

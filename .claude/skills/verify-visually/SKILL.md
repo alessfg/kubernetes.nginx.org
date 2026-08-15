@@ -37,8 +37,16 @@ toggled from `localStorage.darkMode`. `shot.sh` seeds that key ahead of the
 inline script, which is the only reliable way to choose a theme. If you render
 by hand and get a dark page you did not ask for, this is why.
 
-**3. `--screenshot` captures the viewport, not the page.** Pass a tall
-`--height`; the default here is 1200.
+**3. `--screenshot` captures the viewport, not the page — and it captures it at
+scroll position zero.** Those two together are nastier than either alone: deep-
+link to `#mappings`, the document scrolls, and a fixed 1200px capture of a
+4,751px page comes back almost entirely blank, because the content has moved out
+of the captured band. It looks like the page failed to render.
+
+`shot.sh` handles this by measuring the laid-out document first and sizing the
+window to it, capped at 8000px (it says so when it caps). Pass `--height` to
+override. If you render by hand, size the window to the document or you will be
+looking at empty space.
 
 **4. Widths below 500px are a lie on macOS.** The viewport is clamped, so 320,
 375 and 400 all render at 500 and the PNG is cropped — which reads exactly like

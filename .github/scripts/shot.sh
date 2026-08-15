@@ -22,7 +22,7 @@ OUT_DIR="${SHOT_OUT:-${TMPDIR:-/tmp}}"
 PORT="${SHOT_PORT:-8899}"
 
 TARGET="${1:-index.html}"; shift || true
-WIDTH=1400; HEIGHT=1200; DARK=0; MEASURE=""
+WIDTH=1400; HEIGHT=""; DARK=0; MEASURE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --dark) DARK=1 ;;
@@ -83,6 +83,17 @@ html = open(src, encoding='utf-8').read()
 inject = ("<script>try{localStorage.setItem('darkMode','%s')}catch(e){}</script>\n    " % seed)
 marker = "<script>try{let s=localStorage.getItem('darkMode')"
 html = html.replace(marker, inject + marker, 1)
+
+# Publish the laid-out document height as an attribute, so a --dump-dom pass
+# can read it and size the screenshot window to the whole page.
+html = html.replace('</body>', """
+<script>
+window.addEventListener('load', function () { setTimeout(function () {
+  document.body.setAttribute('data-doc-height',
+    String(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)));
+}, 350); });
+</script>
+</body>""", 1)
 if measure:
     probe = """
 <script>
@@ -121,6 +132,25 @@ PNG="$OUT_DIR/$STAMP.png"
 TIMEOUT=""
 command -v timeout >/dev/null && TIMEOUT="timeout 30"
 command -v gtimeout >/dev/null && TIMEOUT="gtimeout 30"
+
+# --screenshot captures the VIEWPORT, not the page, and it captures it at scroll
+# position zero. Deep-linking to a hash scrolls the document, so a fixed-height
+# capture of a 4,751px page comes back almost entirely blank — the content has
+# moved out of the captured band. Sizing the window to the document avoids both
+# problems at once, so unless a height was asked for explicitly, measure first.
+if [ -z "$HEIGHT" ]; then
+  DOC_H="$($TIMEOUT "$CHROME" --headless=new --disable-gpu --no-sandbox \
+    --window-size="$WIDTH,1200" --virtual-time-budget=6000 --dump-dom "$URL" 2>/dev/null \
+    | grep -o 'data-doc-height="[0-9]*"' | head -1 | grep -o '[0-9]*')"
+  if [ -n "${DOC_H:-}" ] && [ "$DOC_H" -gt 1200 ] 2>/dev/null; then
+    # Cap it: a 30,000px PNG is not something anyone reads, and some builds
+    # refuse to allocate it.
+    HEIGHT=$([ "$DOC_H" -gt 8000 ] && echo 8000 || echo "$DOC_H")
+    [ "$DOC_H" -gt 8000 ] && echo "note: page is ${DOC_H}px tall; capturing the first 8000px." >&2
+  else
+    HEIGHT=1200
+  fi
+fi
 
 $TIMEOUT "$CHROME" --headless=new --disable-gpu --no-sandbox --hide-scrollbars \
   --window-size="$WIDTH,$HEIGHT" --virtual-time-budget=6000 \

@@ -23,15 +23,10 @@ jobs:
 
       # One `node --check` per file, because the flag parses only its first
       # positional argument and silently discards the rest: `node --check
-      # good.js broken.js` exits 0. Passing the glob therefore only ever
-      # checked assets/js/index.js, and shared.js — which both pages depend
-      # on — was never parsed by anything.
+      # good.js broken.js` exits 0. The loop lives in Python rather than in
+      # this YAML so the glob never reaches a shell.
       - name: Syntax-check all first-party scripts
-        run: |
-          for f in assets/js/*.js; do
-            echo "checking $f"
-            node --check "$f" || exit 1
-          done
+        run: python3 .github/scripts/check-syntax.py
 
       # The four design checks, one step each so a failure names itself in the
       # log rather than hiding inside a compound command. None of them can see
@@ -49,8 +44,19 @@ jobs:
       - name: Check every version string agrees
         run: python3 .github/scripts/check-versions.py
 
+      - name: Check markup structure
+        run: python3 .github/scripts/check-markup.py
+
       - name: Check the migration analyzer
         run: node .github/scripts/test-analyzer.js
+
+      # test-analyzer.js regenerates .github/data/mapping-index.json from the
+      # source module every run. Committing it means an agent can answer "which
+      # section documents this annotation" with one small read instead of
+      # grepping 4,952 lines; this step is what stops the committed copy going
+      # stale, since a generated file nobody verifies is worse than none.
+      - name: Check the generated mapping index is current
+        run: git diff --exit-code -- .github/data/
 
       # Dependency-free suite (node:test) — page↔engine↔module wiring checks,
       # plus per-source analyzer and conversion cases on the branches that ship

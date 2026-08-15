@@ -227,6 +227,72 @@ def check_type_pairing(c, path, lineno, block):
                block)
 
 
+def subset_codepoints():
+    """The codepoints the shipped woff2 covers, read out of the font README.
+
+    Parsed rather than duplicated, so the README stays the single source of
+    truth for the subset — it is also the file that documents how to
+    regenerate it.
+    """
+    path = os.path.join(ROOT, 'assets', 'fonts', 'README.md')
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding='utf-8') as fh:
+        m = re.search(r"--unicodes='([^']+)'", fh.read())
+    if not m:
+        return None
+    allowed = set()
+    for part in m.group(1).split(','):
+        part = part.strip()
+        if '-' in part:
+            lo, hi = part.split('-')
+            allowed.update(range(int(lo.replace('U+', ''), 16),
+                                 int(hi.replace('U+', ''), 16) + 1))
+        elif part:
+            allowed.add(int(part.replace('U+', ''), 16))
+    return allowed
+
+
+def check_font_coverage(c, html_paths, js_paths):
+    """Every rendered character must exist in the subsetted webfont.
+
+    This is a silent-failure surface that only CONTENT work triggers, which is
+    why nothing pointed at it: assets/fonts/README.md names the symptom
+    exactly — "one glyph rendering in a different face" — but AGENTS.md sends
+    you there only "before upgrading or re-subsetting", and the trigger is
+    writing a new table row containing a character nobody thought about. No
+    check, no reviewer and no screenshot at normal size catches one arrow
+    rendering in the fallback face.
+
+    Text nodes and JS string literals only: attribute values, class names and
+    URLs never reach the page as glyphs.
+    """
+    allowed = subset_codepoints()
+    if allowed is None:
+        return
+    for path in html_paths:
+        with open(path, encoding='utf-8') as fh:
+            raw = fh.read()
+        raw = re.sub(r'<(script|style)\b.*?</\1>', ' ', raw, flags=re.S)
+        for lineno, line in enumerate(raw.split('\n'), 1):
+            # Strip tags so attribute values are not mistaken for content.
+            for ch in re.sub(r'<[^>]*>', '', line):
+                if ord(ch) > 127 and ord(ch) not in allowed:
+                    c.fail(path, lineno,
+                           f'U+{ord(ch):04X} {ch!r} is outside the webfont subset — it '
+                           'will render in a fallback face (see assets/fonts/README.md)',
+                           line)
+    for path in js_paths:
+        with open(path, encoding='utf-8') as fh:
+            for lineno, line in enumerate(fh, 1):
+                for lit in re.findall(r"'([^'\\]*)'|\"([^\"\\]*)\"", line):
+                    for ch in (lit[0] or lit[1]):
+                        if ord(ch) > 127 and ord(ch) not in allowed:
+                            c.fail(path, lineno,
+                                   f'U+{ord(ch):04X} {ch!r} is outside the webfont subset',
+                                   line)
+
+
 def check_manifest(c, expected):
     """site.webmanifest holds two colours that are copies of tokens.
 
@@ -300,6 +366,9 @@ def run():
 
     # ── Inline style= attributes ──────────────────────────────────────────
     check_inline_styles(c, html)
+
+    # ── Webfont coverage ──────────────────────────────────────────────────
+    check_font_coverage(c, html, js)
 
     # ── JS rules ──────────────────────────────────────────────────────────
     for path in js:

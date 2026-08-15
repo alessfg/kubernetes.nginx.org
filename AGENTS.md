@@ -6,7 +6,7 @@ Keep this file to rules that must apply **before** anything is read — the ones
 
 ## What this is
 
-A documentation-only site covering NGINX on Kubernetes: a landing page for the ecosystem plus an interactive migration tool. No build system, no tests, no package manager. Static HTML with CSS/JS in `assets/`, no CDN or third-party runtime dependencies. Owned by F5, Inc., Apache 2.0.
+A documentation-only site covering NGINX on Kubernetes: a landing page for the ecosystem plus an interactive migration tool. No build system and no package manager; there *are* checks and a test suite, and CI runs them on every push and pull request — see [Checks](#checks). Static HTML with CSS/JS in `assets/`, no CDN or third-party runtime dependencies. Owned by F5, Inc., Apache 2.0.
 
 It covers four things: **NGINX Ingress Controller** (`nginx/kubernetes-ingress`), **NGINX Gateway Fabric** (`nginx/nginx-gateway-fabric`), the **NGINX Ingress Migration Tool** (community `kubernetes/ingress-nginx` → NIC), and **ingress2gateway** (`kubernetes-sigs/ingress2gateway`).
 
@@ -80,23 +80,27 @@ The site follows the **F5 Design System (F5DS)**, the system behind the F5 Distr
 
 ## Checks
 
-Four scripts, no dependencies. Run all four after any change, **each on its own line**.
+Six commands, no dependencies. Run all six after any change, **each on its own line**. `.github/workflows/tests.yml` runs the same six on every push and pull request, one step each.
 
 ```bash
-python3 .github/scripts/check-tokens.py     # token invariants + retired marketing colours + undefined var()
+for f in assets/js/*.js; do node --check "$f" || break; done   # one per file: `node --check a.js b.js` only parses a.js
+python3 .github/scripts/check-tokens.py     # token invariants + retired marketing colours/typefaces + undefined var()
 python3 .github/scripts/check-contrast.py   # every colour pairing against WCAG 2.1 AA, both themes
 python3 .github/scripts/check-classes.py    # every class used by markup or JS resolves to a CSS rule
 node    .github/scripts/test-analyzer.js    # the migration analyzer, under a DOM stub
+node --test .github/test/*.test.js          # page ↔ engine ↔ module wiring
 ```
 
-Why one per line: a mistyped shell construct reports "clean" for a check that never ran, which has now happened four times — a `$F` that expanded to one filename, broken `grep -c` arithmetic, a zsh glob swallowing `--include`, and a `for c in "python3 …"; do $c; done` loop where zsh treated each whole string as one command name and printed `exit=0` four times having run nothing. If you must capture status through a pipe, zsh is `${pipestatus[1]}`, not `$?`.
+Why one per line: a mistyped shell construct reports "clean" for a check that never ran, which has now happened six times — a `$F` that expanded to one filename, broken `grep -c` arithmetic, a zsh glob swallowing `--include`, a `for c in "python3 …"; do $c; done` loop where zsh treated each whole string as one command name and printed `exit=0` four times having run nothing, a `$b:` followed by a path in zsh (parsed as a history modifier, so `$b:assets/…` silently became `mainssets/…`), and — for two months, inside CI — `node --check assets/js/*.js`, which parses only the first glob match. If you must capture status through a pipe, zsh is `${pipestatus[1]}`, not `$?`.
+
+The same shape is why the test step names its glob and guards on `find`: `node --test` exits 0 when it matches no files, so a moved directory turns it into a green no-op.
 
 Four things to know about them:
 
-1. **None of the four can see the rendered page.** Every one is a static reader, so the entire class of visual defect — a stretched grid, a collapsed flex item, a truncated label, a card wrapping 3+1 — passes all four green. A clean run means "nothing is structurally broken", not "it looks right". Render and look.
+1. **None of them can see the rendered page.** Every one is a static reader, so the entire class of visual defect — a stretched grid, a collapsed flex item, a truncated label, a card wrapping 3+1 — passes all of them green. A clean run means "nothing is structurally broken", not "it looks right". Render and look.
 2. **`check-contrast.py` only asserts the pairings listed inside it.** A new coloured surface is unchecked until someone adds it; that is how the badge palette drifted.
 3. **`check-classes.py` matters most after a restyle.** A class that loses its rule does not error — the element just renders unstyled, which is invisible on a page with thousands of rows. It reports unused classes too but never fails on them: there is dormant-by-design CSS here (the event banner, the built-but-unlinked blogs/videos sections). Run `git log -S` before deleting anything on that list.
-4. **They live under `.github/` because Pages publishes this branch verbatim.** `.nojekyll` disables Jekyll processing but excludes nothing, so a top-level `scripts/` was being served (`/scripts/check-tokens.py` returned 200). Dot-directories 404. Each script derives `ROOT` three levels up from `__file__`, so moving them means fixing that.
+4. **They live under `.github/` because Pages publishes this branch.** A top-level `scripts/` was being served (`/scripts/check-tokens.py` returned 200); dot-directories 404, because Jekyll runs on this branch and skips dot-prefixed paths. **There is no `.nojekyll` here and adding one would publish `.github/` wholesale** — it disables Jekyll rather than configuring it, so the dot-prefix exclusion goes with it. Anything else that must not be served goes under `.github/` too, which is why the test suite is at `.github/test/` rather than `test/`. Each script and the test loader derive `ROOT` by walking up from their own path, so moving one means fixing that.
 
 ## Migration tool: the one rule that cannot wait
 

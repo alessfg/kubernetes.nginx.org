@@ -11,7 +11,9 @@ The following is a set of guidelines for contributing to this project. We really
 
 ## Getting Started
 
-This is a documentation-only project with no build step. Clone the repo, edit the self-contained HTML files (`index.html` and `ingress-nginx-migration.html`), and open them directly in a browser to preview your changes. See the [README](/README.md) for an overview of the project and its structure.
+This is a documentation-only project with no build step. Clone the repo and open `index.html` directly in a browser to preview your changes; paths are relative, so this works from the filesystem, and `python3 -m http.server` gets you closer to production.
+
+The two pages (`index.html` and `ingress-nginx-migration.html`) hold markup only — their styles and behaviour live in `assets/css/` and `assets/js/`, shared between both pages, so a change there affects more than the file you are editing. Run the checks listed in the [README](/README.md#checks) before opening a pull request; CI runs the same ones.
 
 <!-- ### Project Overview & Structure (OPTIONAL) -->
 

@@ -41,16 +41,20 @@ Then open <http://localhost:8000>.
 
 ### Checks
 
-There is no CI for these yet; run them before opening a pull request.
+CI runs all of these on every push and pull request, one step each, via [`.github/workflows/tests.yml`](/.github/workflows/tests.yml). Run them locally before opening a pull request:
 
 ```console
-python3 .github/scripts/check-tokens.py     # token invariants, retired colours, undefined var()
+for f in assets/js/*.js; do node --check "$f" || break; done   # syntax, one file per invocation
+python3 .github/scripts/check-tokens.py     # token invariants, retired colours and typefaces, undefined var()
 python3 .github/scripts/check-contrast.py   # every colour pairing against WCAG 2.1 AA, both themes
 python3 .github/scripts/check-classes.py    # every class used by markup or JS resolves to a CSS rule
 node    .github/scripts/test-analyzer.js    # the migration analyzer, under a DOM stub
+node --test .github/test/*.test.js          # page ↔ engine ↔ module wiring
 ```
 
-Two of those are worth a word. `check-classes.py` matters most after a style change: a class that loses its rule does not error, the element just renders unstyled, which is invisible on a page with thousands of rows. And `test-analyzer.js` exists because `buildPlan` runs each CRD generator inside a `try/catch` that only warns — a broken generator silently drops its resource and the tool still looks like it worked, so the script counts `console.warn` rather than waiting for a thrown exception.
+A few of those are worth a word. The syntax check runs one file per invocation because `node --check` parses only its first argument and ignores the rest. `check-classes.py` matters most after a style change: a class that loses its rule does not error, the element just renders unstyled, which is invisible on a page with thousands of rows. `test-analyzer.js` exists because `buildPlan` runs each CRD generator inside a `try/catch` that only warns — a broken generator silently drops its resource and the tool still looks like it worked, so the script counts `console.warn` rather than waiting for a thrown exception. And the wiring suite catches the breaks that are invisible to all of the above: an element id the engine queries but the page no longer has, a `data-action` with no handler, or the three scripts loading in the wrong order.
+
+None of them can see the rendered page, so a green run means nothing is structurally broken — not that it looks right.
 
 `AGENTS.md` holds the working spec every coding agent reads, with the detail in `.claude/skills/`: the design-system rules and their documented deviations, the migration tool's data-versus-presentation boundary, the version-accuracy rules and the release checklist.
 

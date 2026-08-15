@@ -135,6 +135,12 @@ git log -S'<name>'                         # why a class, token or function exis
 
 Write commits the same way: what changed, why, what was rejected, how it was verified.
 
+**Keep it proportionate.** The whole history holds ~4,000 words; a body over ~15
+lines is almost always padding. Record the fault you planted and the decision you
+rejected, not a narrative of the work. The same goes for what you report back:
+answer in a few lines, skip tables and headings for small results, and do not
+re-verify what you have already verified.
+
 ## Performance budget
 
 Numbers to stay near, not a hard gate. Migration page: **789KB uncompressed** (HTML 333, CSS 128, JS 218, font 110), **4,860 elements**, 130 mapping rows. Content grows this page; if a change moves any of these appreciably, say so.

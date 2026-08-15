@@ -74,7 +74,13 @@ The site follows the **F5 Design System (F5DS)**, the system behind the F5 Distr
   button and tab labels take Title Case, which is what F5DS specifies for them.
   A toggle is not a button: F5DS puts toggles in sentence case, which is why the
   migration strategy selector stays lowercase. And the sidebar labels *are* the
-  `<h2>` headings they link to, so they cannot diverge from the headings.
+  `<h2>` headings they link to, so they match the headings verbatim — with one
+  measured exception: `.sidebar-link-name` is `white-space: nowrap` inside a
+  264px rail, so a heading that would clip is shortened instead. Today that is
+  "Config analyzer" for "Ingress NGINX config analyzer" (the full string
+  measures ~285px against ~226px of usable width). Shorten only when it clips,
+  and measure rather than assume — "Phased migration strategy" is 150.5px and
+  fits, which is why it is spelled out in full.
 
 **Documented deviations — do not "fix" these.** Each has a reason, in the `f5ds-design` skill: NGINX green leads rather than Dodger Blue; the hexagon lattice in the landing hero; no hover lift; the authored dark theme; two button vocabularies (`.cta*` and `.btn*`); `--mono` = SF Mono; the VS Code code palette and its neutral `#1E1E1E` surface; inline code as a borderless wash; the 900/600px breakpoints and all max-widths; 48px content gutters; `min-height: 44px` on mobile controls; `border-radius: 50%` on dots and spinners; hover scale on the checklist marker and scroll-to-top.
 

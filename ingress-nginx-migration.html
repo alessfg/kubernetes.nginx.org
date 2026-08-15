@@ -121,7 +121,7 @@
                         <ul class="sidebar-subnav open" id="subnav-getting-started">
                             <li><button class="sidebar-link" data-section="overview"><span class="dot"></span><span class="sidebar-link-name">Overview</span></button></li>
                             <li><button class="sidebar-link" data-section="why-migrate"><span class="dot"></span><span class="sidebar-link-name">Why migrate?</span></button></li>
-                            <li><button class="sidebar-link" data-section="phased-migration"><span class="dot"></span><span class="sidebar-link-name">Phased migration</span></button></li>
+                            <li><button class="sidebar-link" data-section="phased-migration"><span class="dot"></span><span class="sidebar-link-name">Phased migration strategy</span></button></li>
                             <li><button class="sidebar-link" data-section="features"><span class="dot"></span><span class="sidebar-link-name">CRDs summary</span></button></li>
                             <li><button class="sidebar-link" data-section="installation"><span class="dot"></span><span class="sidebar-link-name">Installing CRDs</span></button></li>
                             <li><button class="sidebar-link" data-section="checklist"><span class="dot"></span><span class="sidebar-link-name">Migration checklist</span></button></li>
@@ -304,7 +304,7 @@
         <!-- Installation -->
         <section id="installation">
             <h2 id="installing-crds">Installing CRDs</h2>
-            <p>CRDs can be installed via Helm or manually using manifests, depending on your deployment method. See the <a href="https://docs.nginx.com/nginx-ingress-controller/installation/" target="_blank" rel="noopener">F5 NGINX Ingress Controller installation docs</a> for full instructions.</p>
+            <p>CRDs can be installed via Helm or manually using manifests, depending on your deployment method. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/" target="_blank" rel="noopener">F5 NGINX Ingress Controller installation docs</a> for full instructions.</p>
             <div class="install-box"><h3>Helm (example)</h3>
                 <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">If you install the F5 NGINX Ingress Controller via Helm, CRDs are included automatically. To ensure they are enabled:</p>
                 <pre><code data-nic-helm-install>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version 2.6.1 --set controller.enableCustomResources=true</code></pre>
@@ -353,7 +353,6 @@
             </ul>
         </section>
 
-        <!-- Phased Migration Strategy -->
         <!-- Resources -->
         <section id="resources">
             <h2 id="additional-resources">Additional resources</h2>

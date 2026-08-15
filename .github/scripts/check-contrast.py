@@ -127,6 +127,7 @@ PAIRS = [
     ('--text', '--purple-tint', TEXT_AA, 'notification text, informative'),
     ('--code-fg', '--code-bg', TEXT_AA, 'code on the code surface'),
     ('--text', '--code-chip-bg', TEXT_AA, 'inline code on its chip wash'),
+    ('--code-accent-fg', '--blue-tint', TEXT_AA, 'inline code on the blue wash'),
     ('--border-control', '--surface', NONTEXT_AA, 'control boundary on a card'),
     ('--border-control', '--bg', NONTEXT_AA, 'control boundary on the page'),
 ]

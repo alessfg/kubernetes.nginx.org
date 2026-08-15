@@ -12,7 +12,7 @@
         'use strict';
         // Single source of truth for the F5 NGINX Ingress Controller (the migration
         // TARGET) versions the tool pages are documented against. Bump these when
-        // updating the Version Reference (see the release checklist in CLAUDE.md;
+        // updating the Version Reference (see .claude/skills/release-update/SKILL.md;
         // also update the version pills/install URLs in index.html). The source
         // controller's version lives at the top of its migration-<source>.js.
         const NIC = {

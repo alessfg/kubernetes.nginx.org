@@ -351,7 +351,7 @@ a.feature-card, a.feature-card:link, a.feature-card:visited { text-decoration: n
     margin-bottom: var(--space-base);
 }
 .code-block + .code-block { margin-top: var(--space-2x); }
-.code-accent { background: var(--blue-tint); color: var(--blue); }
+.code-accent { background: var(--blue-tint); color: var(--code-accent-fg); }
 
 
 /* ── CTAs ─────────────────────────────────────────────────────────────────

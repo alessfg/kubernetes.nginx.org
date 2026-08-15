@@ -28,3 +28,18 @@ Thumbs.db
 # Logs #
 ########
 *.log
+
+##########################################
+# Byte-code from the checks in .github/   #
+##########################################
+# Running the checks exactly as AGENTS.md prescribes creates these. Left
+# untracked-but-unignored they dirty `git status`, which is the signal used to
+# prove a temporary edit was reverted — and a reflexive `git add -A` then
+# commits byte-code to a public repo.
+__pycache__/
+*.py[cod]
+
+#################################
+# Agent harness, machine-local  #
+#################################
+.claude/settings.local.json

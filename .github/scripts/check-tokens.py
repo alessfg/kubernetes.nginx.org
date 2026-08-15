@@ -321,7 +321,6 @@ def run():
     # bar. They live in a <meta content> and in a setAttribute call, neither of
     # which can hold a var(), so the only way to keep them honest is to assert
     # them: four copies of two values, and nothing else would notice a drift.
-    tok = {}
     with open(os.path.join(CSS_DIR, 'tokens.css'), encoding='utf-8') as fh:
         tokens_src = strip_css_comments(fh.read())
 
@@ -377,13 +376,39 @@ def run():
             for name in re.findall(r'var\(\s*(--[\w-]+)', line):
                 used.setdefault(name, (path, lineno, line))
 
+    # JS and HTML too: migration-core.js sets inline styles that resolve tokens
+    # (`calc(100% + var(--space-base))`), and a token referenced only from there
+    # would otherwise read as unreferenced below.
+    for path in js + html:
+        with open(path, encoding='utf-8') as fh:
+            for lineno, line in enumerate(fh, 1):
+                for name in re.findall(r'var\(\s*(--[\w-]+)', line):
+                    used.setdefault(name, (path, lineno, line))
+
     for name, (path, lineno, line) in sorted(used.items()):
         if name not in defined:
             c.fail(path, lineno, f'undefined custom property {name}', line)
 
     # Unused tokens are reported, not failed — some exist for pages not yet
     # rebuilt, and a design system carries a little slack by design.
+    #
+    # The count alone used to be printed, which is why four of these sat here
+    # unnoticed through two reviews: a bare "5 unreferenced" is not actionable.
+    # The names are listed now, minus the ones that are unreferenced ON PURPOSE
+    # because they complete a published scale. Deleting a rung from a ramp makes
+    # tokens.css a worse reference than leaving it, and this file IS the
+    # reference — AGENTS.md calls it "THE design surface".
+    SCALE_COMPLETE = {
+        '--n500':        'a rung of the F5DS N0–N700 neutral ramp',
+        '--icon-subtle': 'completes the icon pair with --icon',
+        '--purple-text': 'completes the accessible-text set with --pomegranate-text / --java-text; '
+                         'also named by this script as the remedy for retired Eggplant 5',
+        '--dur-travel':  'D5 of the F5DS motion scale, alongside D2/D3/D4',
+        '--space-4hx':   'the 36px half-step; 2hx/3hx are both in use, so the '
+                         'gap would be the odd one out',
+    }
     unused = sorted(n for n in defined if n not in used)
+    unexplained = [n for n in unused if n not in SCALE_COMPLETE]
 
     # ── Report ────────────────────────────────────────────────────────────
     scanned = len(css) + len(js) + len(html)
@@ -391,6 +416,21 @@ def run():
           f'({len(css)} css, {len(js)} js, {len(html)} html)')
     print(f'{len(defined)} custom properties defined, {len(used)} referenced, '
           f'{len(unused)} unreferenced\n')
+
+    if unused:
+        kept = [n for n in unused if n in SCALE_COMPLETE]
+        if kept:
+            print(f'{len(kept)} unreferenced by design (scale completeness — do not delete):')
+            for n in kept:
+                print(f'  {n} — {SCALE_COMPLETE[n]}')
+            print()
+        if unexplained:
+            print(f'{len(unexplained)} unreferenced and unexplained '
+                  f'(reported, not failed):')
+            for n in unexplained:
+                print(f'  {n}')
+            print('  Either use it, delete it, or add it to SCALE_COMPLETE '
+                  'in this script with the reason.\n')
 
     if c.exemptions:
         print(f'{len(c.exemptions)} sanctioned deviation(s):')

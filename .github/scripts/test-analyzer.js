@@ -171,9 +171,102 @@ console.log(`  all ${CONTRACT.length} required properties present`);
    long — so it is asserted here instead. */
 const RENDERABLE = new Set(['comparison', 'dual-note', 'crd-install-note', 'crd-group']);
 
-console.log('\nRunning every sample preset through both strategies...');
+/* ── The mapping ↔ generator contract, both directions ──────────────────────
+   This file's stated premise is that a broken CRD generator shows up as a
+   console.warn. There is a hole in that: the generator is looked up as
+
+       if (om.crdKind && om.templateFn && CRD_GENERATORS[om.templateFn] && …)
+
+   so a MISSPELLED templateFn makes the condition false and the resource is
+   dropped before the try/catch that produces the warning. Nothing observes it —
+   the presets still yield steps, the run stays green, and the CRD is simply
+   absent from the plan. The forward direction below closes that.
+
+   The reverse direction catches a generator nothing names, which is how
+   generateWAFPolicy sat in the module unreferenced. Both are pure text
+   analysis of the source module, so neither needs the DOM stub. */
+function checkGeneratorContract() {
+    const src = fs.readFileSync(
+        path.join(ROOT, 'assets/js/migration-ingress-nginx.js'), 'utf8');
+    const named = new Set([...src.matchAll(/templateFn:\s*"([^"]+)"/g)].map(m => m[1]));
+    const defined = new Set([...src.matchAll(/^\s{12}(generate\w+):\s*function/gm)].map(m => m[1]));
+
+    const problems = [];
+    for (const fn of [...named].sort()) {
+        if (!defined.has(fn)) {
+            problems.push(`templateFn "${fn}" is named by a mapping but no generator `
+                + 'defines it — its CRD is silently dropped, with no console.warn');
+        }
+    }
+    for (const fn of [...defined].sort()) {
+        if (!named.has(fn)) {
+            problems.push(`generator "${fn}" is defined but no mapping names it — dead code`);
+        }
+    }
+    return { problems, named: named.size, defined: defined.size };
+}
+
+/* ── The mappings ↔ reference-table contract, both directions ───────────────
+   AGENTS.md calls this the migration tool's first rule and "the recurring bug
+   here", and nothing enforced it. Every community annotation the analyzer maps
+   must be documented in a reference table, and every annotation the reference
+   tables document must be mapped — otherwise the tool either recognises
+   something it never explains, or explains something it silently drops into
+   "unrecognized". Row-level only: it cannot tell whether a hand-written example
+   YAML has drifted from its still-correct generator. */
+function checkReferenceTables() {
+    const src = fs.readFileSync(
+        path.join(ROOT, 'assets/js/migration-ingress-nginx.js'), 'utf8');
+    const html = fs.readFileSync(
+        path.join(ROOT, 'ingress-nginx-migration.html'), 'utf8');
+
+    const mapped = new Set();
+    for (const m of src.matchAll(/community:\s*\[(.*?)\]/gs)) {
+        for (const lit of m[1].matchAll(/"([^"]+)"/g)) { mapped.add(lit[1]); }
+    }
+    const documented = new Set(
+        [...html.matchAll(/nginx\.ingress\.kubernetes\.io\/([a-z0-9-]+)/g)].map(m => m[1]));
+
+    const problems = [];
+    for (const a of [...documented].sort()) {
+        if (!mapped.has(a)) {
+            problems.push(`"${a}" is documented in a reference table but the analyzer `
+                + 'has no mapping — pasting it lands in "unrecognized"');
+        }
+    }
+    for (const a of [...mapped].sort()) {
+        if (!documented.has(a)) {
+            problems.push(`"${a}" is mapped by the analyzer but appears in no reference `
+                + 'table row — the tool acts on something it never documents');
+        }
+    }
+    return { problems, mapped: mapped.size, documented: documented.size };
+}
+
 const presets = Object.keys(SOURCE.analyzer.samplePresets);
 let failures = 0;
+
+console.log('\nChecking the mapping ↔ generator contract...');
+const gen = checkGeneratorContract();
+if (gen.problems.length) {
+    gen.problems.forEach(p => console.error(`  FAIL  ${p}`));
+    failures += gen.problems.length;
+} else {
+    console.log(`  ok    ${gen.named} templateFn reference(s) and `
+        + `${gen.defined} generator(s) agree in both directions`);
+}
+
+console.log('\nChecking the mappings ↔ reference tables...');
+const ref = checkReferenceTables();
+if (ref.problems.length) {
+    ref.problems.forEach(p => console.error(`  FAIL  ${p}`));
+    failures += ref.problems.length;
+} else {
+    console.log(`  ok    ${ref.mapped} mapped annotations and `
+        + `${ref.documented} documented annotations agree in both directions`);
+}
+
+console.log('\nRunning every sample preset through both strategies...');
 
 for (const preset of presets) {
     for (const strategy of ['crd', 'annotation']) {

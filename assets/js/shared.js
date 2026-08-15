@@ -82,21 +82,40 @@ function closeSidebar() {
 }
 
 /* ── Copy to Clipboard ── */
-function copyToClipboard(text, btn) {
+// `announceText` overrides the screen-reader message for buttons that copy
+// something other than a code snippet (e.g. the analyzer's Copy All).
+function copyToClipboard(text, btn, announceText) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function() {
-            showCopied(btn);
+            showCopied(btn, announceText);
         }).catch(function() {
-            fallbackCopy(text, btn);
+            fallbackCopy(text, btn, announceText);
         });
     } else {
-        fallbackCopy(text, btn);
+        fallbackCopy(text, btn, announceText);
     }
+}
+
+// Give a button a dedicated label node and return it. Buttons that carry an
+// icon must not have their whole textContent rewritten on copy — that deletes
+// the icon — so the label is isolated here and the helpers below target it.
+function addCopyLabel(btn, text) {
+    let label = document.createElement('span');
+    label.className = 'copy-label';
+    label.textContent = text;
+    btn.appendChild(label);
+    return label;
+}
+
+// The node whose text the copy helpers rewrite: the dedicated label if the
+// button has one, otherwise the button itself (plain text-only copy buttons).
+function copyLabelNode(btn) {
+    return btn.querySelector('.copy-label') || btn;
 }
 
 // Returns whether the copy actually succeeded — execCommand('copy') signals
 // failure by returning false, not by throwing.
-function fallbackCopy(text, btn) {
+function fallbackCopy(text, btn, announceText) {
     let ta = document.createElement('textarea');
     ta.value = text;
     ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
@@ -109,18 +128,27 @@ function fallbackCopy(text, btn) {
     finally {
         document.body.removeChild(ta);
     }
-    if (btn) { if (ok) showCopied(btn); else showCopyFailed(btn); }
+    if (btn) { if (ok) showCopied(btn, announceText); else showCopyFailed(btn, announceText); }
     return ok;
 }
 
-function showCopied(btn) {
+// The original label, remembered on first use so the reset restores whatever
+// the button actually said rather than assuming 'Copy'.
+function restingLabel(btn) {
+    let node = copyLabelNode(btn);
+    if (btn._copyRestLabel === undefined) btn._copyRestLabel = node.textContent;
+    return btn._copyRestLabel;
+}
+
+function showCopied(btn, announceText) {
     if (!btn) return;
     if (btn._copyTimeout) clearTimeout(btn._copyTimeout);
-    btn.textContent = 'Copied!';
+    let node = copyLabelNode(btn), rest = restingLabel(btn);
+    node.textContent = 'Copied!';
     btn.classList.add('copied');
-    announce('Code copied to clipboard');
+    announce(announceText || 'Code copied to clipboard');
     btn._copyTimeout = setTimeout(function() {
-        btn.textContent = 'Copy';
+        node.textContent = rest;
         btn.classList.remove('copied');
     }, 2000);
 }
@@ -128,12 +156,13 @@ function showCopied(btn) {
 function showCopyFailed(btn) {
     if (!btn) return;
     if (btn._copyTimeout) clearTimeout(btn._copyTimeout);
-    btn.textContent = 'Failed';
+    let node = copyLabelNode(btn), rest = restingLabel(btn);
+    node.textContent = 'Failed';
     // A cancelled success timer would otherwise leave the class behind forever.
     btn.classList.remove('copied');
     announce('Copy failed');
     btn._copyTimeout = setTimeout(function() {
-        btn.textContent = 'Copy';
+        node.textContent = rest;
     }, 2000);
 }
 

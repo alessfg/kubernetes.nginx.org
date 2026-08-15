@@ -45,7 +45,9 @@ STATE_ONLY = {
     'warning', 'note', 'tip', 'info', 'tip-green', 'desc', 'num', 'label',
     'positive', 'attention', 'negative',
     # utility hooks with no styling of their own
-    'hide-mobile', 'plain', 'hint', 'banner-text', 'card-fit',
+    # copy-label   the span shared.js swaps text into so a copy button's icon
+    #              survives the "Copied!" state; layout comes from the button
+    'hide-mobile', 'plain', 'hint', 'banner-text', 'card-fit', 'copy-label',
     'card-link', 'description', 'str', 'cmd', 'flag', 'comment',
     'brand-logo-light', 'brand-logo-dark', 'nginx-glyph',
     'dark-icon-moon', 'dark-icon-sun', 'or-text',
@@ -119,6 +121,25 @@ def strip_comments(css):
     return re.sub(r'/\*.*?\*/', '', css, flags=re.S)
 
 
+def page_stylesheets(text):
+    """The stylesheets a page actually links, in order.
+
+    Used for the per-page pass below. Without it this check unions every page's
+    markup against every stylesheet, so a class used on page A silently
+    "covers" a rule that only page B loads. That is not hypothetical: a
+    17-line `.copy-btn` ruleset sat in migration.css for the life of the
+    restyle styling nothing, because index.html uses `.copy-btn` and the
+    global union could not tell the two pages apart.
+    """
+    return re.findall(r'<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"', text)
+
+
+def page_scripts(text):
+    """The first-party scripts a page loads, in order."""
+    return [s for s in re.findall(r'<script[^>]+src="([^"]+)"', text)
+            if s.startswith('assets/js/')]
+
+
 def css_selectors_only(css):
     """Drop comments, url() payloads and quoted strings before scanning.
 
@@ -185,55 +206,102 @@ def check_shared_markup():
     return failures
 
 
+def classes_defined_in(css_path):
+    return set(re.findall(r'\.(-?[A-Za-z_][\w-]*)', css_selectors_only(read(css_path))))
+
+
+def classes_used_in_markup(html_path):
+    text = re.sub(r'<!--.*?-->', '', read(html_path), flags=re.S)
+    names = set()
+    for attr in re.findall(r'class="([^"]*)"', text):
+        names.update(attr.split())
+    return names
+
+
+def classes_used_in_js(js_path):
+    text = read(js_path)
+    found = []
+    found += re.findall(r"classList\.(?:add|remove|toggle|contains)\(([^)]*)\)", text)
+    # The whole right-hand side, not just a literal sitting immediately
+    # after the `=`. A ternary — `className = x ? 'analyzer-error' :
+    # 'analyzer-info'` — used to slip past, so both live classes were
+    # reported as unused and were one deletion away from being removed.
+    for expr in re.findall(r"(?:className|classList)\s*=\s*([^;\n]+)", text):
+        # Every string literal on the right-hand side is a class, EXCEPT one
+        # being compared against — `type === 'error' ? 'analyzer-error' :
+        # 'analyzer-info'` assigns two classes and compares a third.
+        #
+        # This used to keep only what followed the `?`, which was wrong in the
+        # other direction: `'analyzer-step-number' + (cls ? ' ' + cls : '')`
+        # has its base class BEFORE the `?`, so the base was dropped and a live
+        # class was reported as unused. Drop comparison operands by name
+        # instead of slicing the expression by position.
+        compared = set(re.findall(r"[=!]==?\s*'([^']+)'", expr))
+        found += [lit for lit in re.findall(r"'([^']+)'", expr) if lit not in compared]
+    found += re.findall(r"setAttribute\(\s*'class'\s*,\s*([^)]*)\)", text)
+    # Also catch classes inside HTML the renderer builds as a string —
+    # otherwise a live class looks unreferenced and could be deleted.
+    found += re.findall(r'class="([^"]+)"', text)
+    found += re.findall(r"class=\\?'([^'\\]+)", text)
+    # ...and classes passed to a querySelector, which are equally live.
+    for sel in re.findall(r"querySelector(?:All)?\(\s*'([^']+)'", text):
+        found += re.findall(r'\.(-?[A-Za-z_][\w-]*)', sel)
+    names = set()
+    for blob in found:
+        # some patterns above capture a whole argument list, so pull the
+        # string literals back out before splitting on whitespace
+        parts = re.findall(r"'([^']+)'", blob) if "'" in blob else [blob]
+        for part in parts:
+            names.update(part.split())
+    return names
+
+
+def check_page_scoped_css():
+    """Rules in a page-exclusive stylesheet that its own page never uses.
+
+    The global pass below cannot see these: it unions every page's markup
+    against every stylesheet, so a class used on page A covers a rule only
+    page B loads. Only stylesheets loaded by exactly one page are checked —
+    shared.css and tokens.css legitimately carry rules one page doesn't use.
+    """
+    pages = html_files()
+    sheet_owners = {}
+    used_by_page = {}
+    for page in pages:
+        text = read(page)
+        for sheet in page_stylesheets(text):
+            sheet_owners.setdefault(sheet, []).append(page)
+        names = classes_used_in_markup(page)
+        for script in page_scripts(text):
+            names |= classes_used_in_js(script)
+        used_by_page[page] = names
+
+    problems = []
+    for sheet, owners in sorted(sheet_owners.items()):
+        if len(owners) != 1:
+            continue
+        page = owners[0]
+        orphans = (classes_defined_in(sheet)
+                   - used_by_page[page] - STATE_ONLY - RUNTIME_COMPOSED - DORMANT)
+        for name in sorted(orphans):
+            problems.append(f'.{name}  ({sheet} is loaded only by {page}, which never uses it)')
+    return problems
+
+
 def main():
     # ── what CSS defines ──────────────────────────────────────────────────
     defined = set()
     for f in css_files():
-        for name in re.findall(r'\.(-?[A-Za-z_][\w-]*)', css_selectors_only(read(f))):
-            defined.add(name)
+        defined |= classes_defined_in(f)
 
-    # ── what the markup uses ──────────────────────────────────────────────
+    # ── what the markup and JS use ────────────────────────────────────────
     used = {}
     for f in html_files():
-        text = re.sub(r'<!--.*?-->', '', read(f), flags=re.S)
-        for attr in re.findall(r'class="([^"]*)"', text):
-            for name in attr.split():
-                used.setdefault(name, set()).add(f)
-
-    # ── what JS sets at runtime ───────────────────────────────────────────
+        for name in classes_used_in_markup(f):
+            used.setdefault(name, set()).add(f)
     for f in js_files():
-        text = read(f)
-        found = []
-        found += re.findall(r"classList\.(?:add|remove|toggle|contains)\(([^)]*)\)", text)
-        # The whole right-hand side, not just a literal sitting immediately
-        # after the `=`. A ternary — `className = x ? 'analyzer-error' :
-        # 'analyzer-info'` — used to slip past, so both live classes were
-        # reported as unused and were one deletion away from being removed.
-        for expr in re.findall(r"(?:className|classList)\s*=\s*([^;\n]+)", text):
-            # In a ternary the test is not a class — `type === 'error' ?
-            # 'analyzer-error' : 'analyzer-info'` assigns the two branches and
-            # compares against the third. Keep what follows the `?`.
-            if '?' in expr:
-                expr = expr.split('?', 1)[1]
-            found += re.findall(r"'([^']+)'", expr)
-        found += re.findall(r"setAttribute\(\s*'class'\s*,\s*([^)]*)\)", text)
-        # Also catch classes inside HTML the renderer builds as a string —
-        # otherwise a live class looks unreferenced and could be deleted.
-        found += re.findall(r'class="([^"]+)"', text)
-        found += re.findall(r"class=\\?'([^'\\]+)", text)
-        # ...and classes passed to a querySelector, which are equally live.
-        for sel in re.findall(r"querySelector(?:All)?\(\s*'([^']+)'", text):
-            found += re.findall(r'\.(-?[A-Za-z_][\w-]*)', sel)
-        for blob in found:
-            # some patterns above capture a whole argument list, so pull the
-            # string literals back out before splitting on whitespace
-            if "'" in blob:
-                parts = re.findall(r"'([^']+)'", blob)
-            else:
-                parts = [blob]
-            for part in parts:
-                for name in part.split():
-                    used.setdefault(name, set()).add(f)
+        for name in classes_used_in_js(f):
+            used.setdefault(name, set()).add(f)
 
     # ── report ────────────────────────────────────────────────────────────
     unstyled = {}
@@ -277,15 +345,23 @@ def main():
             print(f'  {d}')
         print()
 
+    page_scoped = check_page_scoped_css()
+    if page_scoped:
+        print(f'{len(page_scoped)} STYLED BUT UNREACHABLE ON ITS OWN PAGE:')
+        for p in page_scoped:
+            print(f'  {p}')
+        print()
+
     if unstyled:
         print(f'{len(unstyled)} USED BUT UNSTYLED:')
         for n, where in sorted(unstyled.items()):
             print(f'  .{n}  (referenced in {", ".join(sorted(where))})')
 
-    if unstyled or drift:
+    if unstyled or drift or page_scoped:
         return 1
 
     print('Every class used by the markup or JS resolves to a CSS rule,')
+    print('every page-exclusive stylesheet only styles things its page can render,')
     print('and the shared top bar and sidebar footer match across both pages.')
     return 0
 

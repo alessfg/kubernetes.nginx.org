@@ -200,13 +200,13 @@
             return warnings;
         }
 
-        function parseYamlAnnotations(yamlText) {
+        // Takes the pre-split documents from parseInput (an array of line
+        // arrays), not raw text — splitting and line-splitting the whole
+        // manifest twice, once here and once in parseIngressSpec, was the
+        // analyzer's largest avoidable cost on a big paste.
+        function parseYamlAnnotations(docs) {
             let results = [];
-            // The shared splitter also normalizes CRLF/CR, so line-by-line
-            // parsing below never trips on a trailing \r.
-            let docs = splitDocuments(yamlText);
-            docs.forEach(function(doc, docIndex) {
-                let lines = doc.split('\n');
+            docs.forEach(function(lines, docIndex) {
                 let inAnnotations = false;
                 let annotationIndent = -1;
                 for (let i = 0; i < lines.length; i++) {
@@ -334,13 +334,12 @@
             return { value: result, note: null };
         }
 
-        // Extract Ingress spec fields (host, service, port, path, tls, name) from YAML text
-        function parseIngressSpec(yamlText) {
+        // Extract Ingress spec fields (host, service, port, path, tls, name) from
+        // the pre-split documents parseInput hands over.
+        function parseIngressSpec(docs) {
             let specs = [];
-            let docs = splitDocuments(yamlText);
-            docs.forEach(function(doc) {
+            docs.forEach(function(lines) {
                 let spec = { host: null, serviceName: null, servicePort: null, path: null, tlsSecret: null, ingressName: null };
-                let lines = doc.split('\n');
                 for (let i = 0; i < lines.length; i++) {
                     let line = lines[i];
                     let trimmed = line.trim();
@@ -641,9 +640,6 @@
                 if (samesite) lines.push('        samesite: ' + samesite.toLowerCase());
                 lines.push('  routes:', '    - path: ' + specPath(spec), '      action:', '        pass: backend');
                 return lines.join('\n');
-            },
-            generateWAFPolicy: function(found) {
-                return ['apiVersion: k8s.nginx.org/v1', 'kind: Policy', 'metadata:', '  name: waf-policy', 'spec:', '  waf:', '    enable: true', '    apPolicy: "default/waf-policy"', '    securityLogs:', '      - enable: true', '        apLogConf: "default/log-config"', '        logDest: "syslog:server=syslog:514"'].join('\n');
             }
         };
 
@@ -710,37 +706,31 @@
                         srvLines.push('}');
                         annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/mirror-target', fromAnnotations: [], to: 'nginx.org/server-snippets', value: '|\\n  ' + srvLines.join('\\n  '), originalValue: mirrorTarget || '', entry: entry });
                     } else {
-                        // Special handling for backend-protocol — selects correct F5 NGINX Ingress Controller annotation based on value
-                        let hasBackendProtocol = Object.keys(om.annotations).some(function(k) { return om.annotations[k].transform === 'backendProtocol'; });
-                        if (hasBackendProtocol) {
-                            entry.foundAnnotations.forEach(function(a) {
-                                let spec = om.annotations[a.annotation];
-                                if (spec && spec.transform === 'backendProtocol') {
-                                    let upperVal = (a.value || '').toUpperCase();
-                                    let svcName = specService(ingressSpec);
-                                    if (upperVal === 'GRPC' || upperVal === 'GRPCS') {
-                                        annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, fromAnnotations: [{ annotation: a.annotation, value: a.value }], to: 'nginx.org/grpc-services', value: svcName, originalValue: a.value, entry: entry });
-                                    } else if (upperVal === 'HTTPS') {
-                                        annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, fromAnnotations: [{ annotation: a.annotation, value: a.value }], to: 'nginx.org/ssl-services', value: svcName, originalValue: a.value, entry: entry });
-                                    } else if (upperVal === 'HTTP') {
-                                        infoNotes.push({ annotation: a.annotation, value: a.value, message: 'HTTP is the default protocol in F5 NGINX Ingress Controller. Remove this annotation — no replacement is needed.', entry: entry });
-                                    } else if (upperVal === 'AUTO_HTTP' || upperVal === 'FCGI') {
-                                        infoNotes.push({ annotation: a.annotation, value: a.value, message: upperVal + ' has no direct equivalent in F5 NGINX Ingress Controller. Review your backend protocol strategy before migrating.', entry: entry });
-                                    }
-                                } else if (spec) {
-                                    let translated = unwrapTranslated(translateValue(a.value, spec.transform, spec.template, entry.foundAnnotations));
-                                    annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, fromAnnotations: [{ annotation: a.annotation, value: a.value }], to: spec.key, value: translated.value, note: translated.note, originalValue: a.value, entry: entry });
+                        // One loop for every annotation. backend-protocol is the
+                        // single special case — its NIC key depends on the value,
+                        // so it branches here rather than duplicating the generic
+                        // path in a parallel loop (which is what this was).
+                        entry.foundAnnotations.forEach(function(a) {
+                            let spec = om.annotations[a.annotation];
+                            if (!spec) return;
+                            if (spec.transform === 'backendProtocol') {
+                                let upperVal = (a.value || '').toUpperCase();
+                                let svcName = specService(ingressSpec);
+                                let fromAnnotations = [{ annotation: a.annotation, value: a.value }];
+                                if (upperVal === 'GRPC' || upperVal === 'GRPCS') {
+                                    annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, fromAnnotations: fromAnnotations, to: 'nginx.org/grpc-services', value: svcName, originalValue: a.value, entry: entry });
+                                } else if (upperVal === 'HTTPS') {
+                                    annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, fromAnnotations: fromAnnotations, to: 'nginx.org/ssl-services', value: svcName, originalValue: a.value, entry: entry });
+                                } else if (upperVal === 'HTTP') {
+                                    infoNotes.push({ annotation: a.annotation, value: a.value, message: 'HTTP is the default protocol in F5 NGINX Ingress Controller. Remove this annotation — no replacement is needed.', entry: entry });
+                                } else if (upperVal === 'AUTO_HTTP' || upperVal === 'FCGI') {
+                                    infoNotes.push({ annotation: a.annotation, value: a.value, message: upperVal + ' has no direct equivalent in F5 NGINX Ingress Controller. Review your backend protocol strategy before migrating.', entry: entry });
                                 }
-                            });
-                        } else {
-                            entry.foundAnnotations.forEach(function(a) {
-                                let spec = om.annotations[a.annotation];
-                                if (spec) {
-                                    let translated = unwrapTranslated(translateValue(a.value, spec.transform, spec.template, entry.foundAnnotations));
-                                    annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, fromAnnotations: [{ annotation: a.annotation, value: a.value }], to: spec.key, value: translated.value, note: translated.note, originalValue: a.value, entry: entry });
-                                }
-                            });
-                        }
+                                return;
+                            }
+                            let translated = unwrapTranslated(translateValue(a.value, spec.transform, spec.template, entry.foundAnnotations));
+                            annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, fromAnnotations: [{ annotation: a.annotation, value: a.value }], to: spec.key, value: translated.value, note: translated.note, originalValue: a.value, entry: entry });
+                        });
                     }
                 }
 
@@ -847,10 +837,14 @@
         // MigrationPlan (pure data — migration-core.js owns all rendering).
 
         function parseInput(yamlText) {
-            let findings = parseYamlAnnotations(yamlText);
+            // Split once, share with both passes. The shared splitter also
+            // normalizes CRLF/CR, so the line-by-line parsing downstream never
+            // trips on a trailing \r.
+            let docs = splitDocuments(yamlText).map(function(doc) { return doc.split('\n'); });
+            let findings = parseYamlAnnotations(docs);
             return {
                 findings: findings,
-                context: parseIngressSpec(yamlText),
+                context: parseIngressSpec(docs),
                 warnings: detectIngressSyntaxWarnings(yamlText),
                 foundCount: findings.length
             };

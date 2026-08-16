@@ -1,0 +1,11 @@
+# Better hunk headers for the two hand-edited pages. The migration tool has 66
+# lines over 400 characters (max 1,224), so a one-word change can produce a
+# diff the reviewer cannot read — which is exactly where an unrelated
+# collateral edit hides.
+*.html diff=html
+*.css  diff=css
+
+# Binary, so git never tries to diff or merge them.
+*.woff2 binary
+*.png   binary
+*.jpg   binary

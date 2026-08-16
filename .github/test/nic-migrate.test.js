@@ -22,6 +22,8 @@ const { splitDocuments, isIngress, describe: describeIngress } = require(path.jo
 const { detect, sortGaps } = require(path.join(TOOL, 'lib', 'gaps.js'));
 const { createEngine } = require(path.join(TOOL, 'lib', 'engine.js'));
 const { splitKubectlList, loadChecklist } = require(path.join(TOOL, 'nic-migrate.js'));
+const Y = require(path.join(TOOL, 'lib', 'yaml.js'));
+const { toModel, convert } = require(path.join(TOOL, 'lib', 'convert.js'));
 
 const engine = createEngine();
 const analyze = (yaml) => {
@@ -230,4 +232,179 @@ test('the checklist is read from the published page, not duplicated here', () =>
     const items = loadChecklist();
     assert.ok(items.length >= 20, 'expected the full checklist, got ' + items.length + ' items');
     assert.ok(items.every((t) => t.length > 0 && !/[<>]/.test(t)), 'items should be plain text');
+});
+
+/* ------------------------------------------------------------------- YAML */
+
+const roundTrip = (v) => Y.parse(Y.stringify({ k: v })).k;
+
+test('scalars round-trip through the emitter and parser', () => {
+    for (const v of ['a', '', 'a\n', 'a\n\n', 'a\nb\n', 'a\nb', '  indented\nlines\n',
+        'has "quotes" and \\ back', "it's", 'x: y', 'a #b', '~ ^/api(/|$)(.*)',
+        '0755', '1:30', '0x1f', '10m', '5r/s', '${binary_remote_addr}', 'true', 'null', '-3']) {
+        assert.equal(roundTrip(v), v, 'round-trip failed for ' + JSON.stringify(v));
+    }
+});
+
+test('a string that looks like a number survives as a string', () => {
+    /* "0755" emitted unquoted is the integer 493 to a YAML 1.1 reader, and
+       Kubernetes uses one. Port names, versions and modes all land here. */
+    const out = Y.stringify({ mode: '0755', port: '80', time: '1:30' });
+    assert.match(out, /mode: "0755"/);
+    assert.match(out, /port: "80"/);
+    assert.match(out, /time: "1:30"/);
+    const back = Y.parse(out);
+    assert.equal(back.mode, '0755');
+    assert.equal(back.port, '80');
+});
+
+test('a nested sequence is not read as a key named "- x"', () => {
+    // Regression: the key pattern matches "- k" out of "- - k: v".
+    // One outer item, itself a sequence of two — cross-checked against PyYAML.
+    const v = Y.parse('root:\n  - - k: 1\n    - - a\n');
+    assert.deepEqual(v, { root: [[{ k: 1 }, ['a']]] });
+});
+
+test('a quoted sequence item containing a colon is a scalar, not a mapping', () => {
+    // Regression: the key pattern backtracks into the quoted scalar.
+    assert.deepEqual(Y.parse('root:\n  - "x: y"\n'), { root: ['x: y'] });
+    assert.deepEqual(Y.parse('root:\n  "a: b": v\n'), { root: { 'a: b': 'v' } });
+});
+
+test('block scalar chomping is preserved in both directions', () => {
+    const doc = Y.parse('a: |\n  one\nb: |-\n  two\nc: >-\n  three\n  four\n');
+    assert.equal(doc.a, 'one\n');
+    assert.equal(doc.b, 'two');
+    assert.equal(doc.c, 'three four');
+    assert.deepEqual(Y.parse(Y.stringify(doc)), doc);
+});
+
+test('flow collections and multi-document streams parse', () => {
+    const docs = Y.parseAll('kind: A\nx: {a: 1, b: "c,d"}\ny: []\n---\nkind: B\nz: [1, 2]\n');
+    assert.equal(docs.length, 2);
+    assert.deepEqual(docs[0].x, { a: 1, b: 'c,d' });
+    assert.deepEqual(docs[0].y, []);
+    assert.deepEqual(docs[1].z, [1, 2]);
+});
+
+test('an anchor is refused rather than silently dropped', () => {
+    assert.throws(() => Y.parse('a: &anchor 1\nb: *anchor\n'), /anchors and aliases/);
+});
+
+/* --------------------------------------------------------------- converter */
+
+const INGRESS = {
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'Ingress',
+    metadata: {
+        name: 'shop',
+        namespace: 'prod',
+        annotations: {
+            'nginx.ingress.kubernetes.io/rewrite-target': '/$1',
+            'nginx.ingress.kubernetes.io/affinity': 'cookie',
+            'nginx.ingress.kubernetes.io/enable-cors': 'true'
+        }
+    },
+    spec: {
+        ingressClassName: 'nginx',
+        tls: [{ hosts: ['a.example.com'], secretName: 'a-tls' }],
+        rules: [
+            {
+                host: 'a.example.com',
+                http: {
+                    paths: [
+                        { path: '/api(/|$)(.*)', pathType: 'Prefix', backend: { service: { name: 'api-svc', port: { number: 8080 } } } },
+                        { path: '/', pathType: 'Prefix', backend: { service: { name: 'web-svc', port: { number: 80 } } } }
+                    ]
+                }
+            },
+            {
+                host: 'b.example.com',
+                http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'b-svc', port: { name: 'http' } } } }] }
+            }
+        ]
+    }
+};
+
+const runConvert = (doc, opts) => {
+    const model = toModel(doc);
+    const result = engine.analyze(Y.stringify(doc), (opts && opts.strategy) || 'crd');
+    return { model, out: convert(model, result, Object.assign({ target: 'virtualserver' }, opts)) };
+};
+
+test('every host becomes one VirtualServer carrying all of its routes', () => {
+    /* This is the difference from the page's output, which emits one
+       single-feature VirtualServer per annotation, all bound to the first
+       host, and drops every other path. */
+    const { out } = runConvert(INGRESS);
+    const vs = out.docs.filter((d) => d.kind === 'VirtualServer');
+    assert.equal(vs.length, 2);
+    assert.deepEqual(vs.map((v) => v.spec.host).sort(), ['a.example.com', 'b.example.com']);
+
+    const a = vs.find((v) => v.spec.host === 'a.example.com');
+    assert.equal(a.spec.routes.length, 2, 'both paths must be present');
+    assert.deepEqual(a.spec.upstreams.map((u) => u.service).sort(), ['api-svc', 'web-svc']);
+    assert.equal(a.metadata.namespace, 'prod');
+    assert.equal(a.spec.ingressClassName, 'nginx');
+    assert.equal(a.spec.tls.secret, 'a-tls');
+
+    const b = vs.find((v) => v.spec.host === 'b.example.com');
+    assert.equal(b.spec.tls, undefined, 'only the host with a TLS entry gets a tls block');
+    assert.equal(b.spec.upstreams[0].port, 'http', 'a named port stays a name');
+});
+
+test('generated Policies are wired into every VirtualServer and namespaced', () => {
+    const { out } = runConvert(INGRESS);
+    const policies = out.docs.filter((d) => d.kind === 'Policy');
+    assert.ok(policies.length > 0, 'expected at least one Policy');
+    assert.ok(policies.every((p) => p.metadata.namespace === 'prod'));
+    for (const vs of out.docs.filter((d) => d.kind === 'VirtualServer')) {
+        assert.deepEqual(vs.spec.policies.map((p) => p.name).sort(), policies.map((p) => p.metadata.name).sort());
+    }
+});
+
+test('an Ingress-scoped upstream setting reaches every upstream', () => {
+    const { out } = runConvert(INGRESS);
+    const a = out.docs.find((d) => d.kind === 'VirtualServer' && d.spec.host === 'a.example.com');
+    assert.ok(a.spec.upstreams.every((u) => u.sessionCookie && u.sessionCookie.enable === true),
+        'affinity: cookie is Ingress-scoped, so every upstream gets it');
+});
+
+test('a $n rewrite is not copied onto a path with no capture group', () => {
+    /* Copying "/$1" onto a plain "/" route rewrites every request to "/".
+       Faithful to the community annotation, and never what anyone meant. */
+    const { out } = runConvert(INGRESS);
+    const a = out.docs.find((d) => d.kind === 'VirtualServer' && d.spec.host === 'a.example.com');
+    const regexRoute = a.spec.routes.find((r) => r.path.startsWith('~'));
+    const plainRoute = a.spec.routes.find((r) => !r.path.startsWith('~'));
+    assert.equal(regexRoute.action.proxy.rewritePath, '/$1');
+    assert.ok(!plainRoute.action.proxy || !plainRoute.action.proxy.rewritePath);
+    assert.ok(out.notes.some((n) => /no capture group/.test(n)), 'the drop must be reported');
+});
+
+test('the ingress target keeps the Ingress and rewrites its annotations', () => {
+    const { out } = runConvert(INGRESS, { target: 'ingress', strategy: 'annotation' });
+    const ing = out.docs.find((d) => d.kind === 'Ingress');
+    assert.ok(ing, 'expected an Ingress');
+    const keys = Object.keys(ing.metadata.annotations);
+    assert.ok(keys.every((k) => !k.startsWith('nginx.ingress.kubernetes.io/')),
+        'no community annotation may survive: ' + keys.join(', '));
+    assert.ok(keys.some((k) => k.startsWith('nginx.org/')), 'expected nginx.org annotations');
+    // Every rule and path survives untouched.
+    assert.equal(ing.spec.rules.length, 2);
+    assert.equal(ing.spec.rules[0].http.paths.length, 2);
+    assert.deepEqual(ing.spec.tls, [{ hosts: ['a.example.com'], secretName: 'a-tls' }]);
+});
+
+test('--class overrides the source ingressClassName on every output', () => {
+    const { out } = runConvert(INGRESS, { ingressClass: 'nginx-nic' });
+    for (const vs of out.docs.filter((d) => d.kind === 'VirtualServer')) {
+        assert.equal(vs.spec.ingressClassName, 'nginx-nic');
+    }
+});
+
+test('converted output is emittable and re-parses to the same objects', () => {
+    const { out } = runConvert(INGRESS);
+    const text = Y.stringifyAll(out.docs);
+    assert.deepEqual(Y.parseAll(text), out.docs);
 });

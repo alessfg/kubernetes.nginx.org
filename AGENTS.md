@@ -109,6 +109,8 @@ python3 .github/scripts/check-all.py        # -v for every check's full output
 
 Nine checks, one command, no dependencies. It prints **how many ran**, which is the number that matters, and a missing script or interpreter is a failure rather than a skip.
 
+**Run them when asked, not after every change.** They are not a per-edit ritual: most edits here are prose or markup no check reads, and a nine-check run after each one is noise. The corollary is not optional — **if you have not run them, say so** and do not describe the work as verified. "I have not run the checks" is a complete and acceptable thing to report.
+
 **Never chain the checks on one shell line.** A mistyped construct reports "clean" for a check that never ran; that has happened seven times here, and `$?` after a pipe is `head`'s status, not the script's (zsh: `${pipestatus[1]}`).
 
 **None of the nine can see the rendered page.** A clean run means "nothing is structurally broken", not "it looks right" — the whole class of visual defect passes green. Render and look; the `verify-visually` skill is how.
@@ -125,7 +127,7 @@ The `repo-checks` skill has the rest: what each check asserts, the seven shell f
 - `preview/**` branches carry additional migration tools on the same engine. **`main` owns the shared engine and the checks** — `assets/js/shared.js`, `assets/js/migration-core.js`, `.github/scripts/`, `.github/test/` and this file. A branch behind `main` on those is graded by its own older checks, so CI warns about it. Merge `main` into the branch rather than porting fixes across.
 - To undo something on `main`: `git revert <sha>` and push. **Never** `push --force`, `reset --hard` or `clean` on a pushed branch — the deployed history is the record.
 
-Agent permissions, hooks and MCP servers are deliberately **not** checked in: they are a property of whoever is working, not of the project. To run the checks automatically before a turn ends, point a `Stop` hook at `.claude/hooks/verify-before-stop.sh` from your own settings — the script is tracked, its wiring is yours. It no-ops on a clean tree and honours `SKIP_REPO_VERIFY=1`.
+Agent permissions, hooks and MCP servers are deliberately **not** checked in: they are a property of whoever is working, not of the project. `.claude/hooks/verify-before-stop.sh` will run the checks before a turn ends if you point a `Stop` hook at it, but that is **off unless you wire it** — and wiring it overrides the rule above, since the hook fires whether or not anyone asked. The script is tracked, the wiring is yours. It no-ops on a clean tree and honours `SKIP_REPO_VERIFY=1`.
 
 ## Migration tool: the one rule that cannot wait
 

@@ -121,6 +121,7 @@ The `repo-checks` skill has the rest: what each check asserts, the seven shell f
 
 **Pushing to `main` is deploying.** Pages serves this branch; a push is live in roughly a minute, and CI finishes at about the same time, so a red run does not stop a bad commit reaching production. Verify before you push, not after.
 
+- Commit on the branch you are on. Do not create one unless asked.
 - `preview/**` branches carry additional migration tools on the same engine. **`main` owns the shared engine and the checks** — `assets/js/shared.js`, `assets/js/migration-core.js`, `.github/scripts/`, `.github/test/` and this file. A branch behind `main` on those is graded by its own older checks, so CI warns about it. Merge `main` into the branch rather than porting fixes across.
 - To undo something on `main`: `git revert <sha>` and push. **Never** `push --force`, `reset --hard` or `clean` on a pushed branch — the deployed history is the record.
 

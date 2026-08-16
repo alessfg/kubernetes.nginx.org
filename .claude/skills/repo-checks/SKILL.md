@@ -1,6 +1,6 @@
 ---
 name: repo-checks
-description: How this repository's checks work and how to add one — why the runner is Python rather than a shell line, the seven occasions a mistyped shell construct reported "clean" for a check that never ran, the fault-injection standard every new assertion must meet, and what each of the nine checks can and cannot see. Use when adding or changing a check under .github/scripts/, when a check fails and you need to know what it actually asserts, when writing CI, or when tempted to chain checks on one shell line.
+description: How the nine checks work and how to add one — why the runner is Python rather than shell, the seven times a mistyped construct reported clean for a check that never ran, and the fault-injection standard. Use when adding or changing a check, or when one fails.
 ---
 
 # The checks, and how to add one

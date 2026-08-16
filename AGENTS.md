@@ -90,7 +90,7 @@ The site follows the **F5 Design System (F5DS)**. Never blend it with the F5 **m
 - **CRD badges use F5DS's graph palette**, not the sentiment hues.
 - **Capitalization: sentence case, except buttons and tabs.** Headings, prose, navigation and anything that reads as content are sentence case; button and tab labels take Title Case, which is what F5DS specifies for them. A toggle is not a button — F5DS puts toggles in sentence case, which is why the migration strategy selector stays lowercase. Sidebar labels are the `<h2>` headings they link to and match them verbatim, except where a label would clip the 264px rail (see `f5ds-design`).
 
-**Documented deviations — do not "fix" these.** Each is listed with its reason in the `f5ds-design` skill: NGINX green leading rather than Dodger Blue, the hexagon lattice, no hover lift, the authored dark theme, two button vocabularies, `--mono` = SF Mono, the VS Code code palette, the 900/600px breakpoints, 48px gutters, `min-height: 44px` on mobile controls, `border-radius: 50%` on dots and spinners, and the hover scale on the checklist marker.
+**This site deviates from F5DS deliberately in about a dozen places — do not "fix" them.** Each is listed with its reason in the `f5ds-design` skill. Check there before calling anything a defect.
 
 ## Checks
 
@@ -172,10 +172,4 @@ Prefer GitHub MCP tools over WebFetch. NIC's prose docs are **not** in its code 
 
 ## Deeper references
 
-Claude Code skills, but plain markdown — any agent can read them directly.
-
-- **`.claude/skills/f5ds-design/SKILL.md`** — why the design decisions are what they are, every deviation with its justification, top-bar geometry, and what was already tried and reverted. Read before changing a design value.
-- **`.claude/skills/migration-tool/SKILL.md`** — authoring and verifying the migration tool: the engine split, row ordering, the Node verification recipe and its silent-failure gotcha, the four-point accuracy check.
-- **`.claude/skills/repo-checks/SKILL.md`** — what each check asserts, the fault-injection standard, and how to add one.
-- **`.claude/skills/release-update/SKILL.md`** — the checklist for an NIC, NGF or ingress2gateway release, including the three version formats a plain grep misses.
-- **`.claude/skills/verify-visually/SKILL.md`** — how to actually look at the site, and the four facts that make a correct render command look like it failed.
+`.claude/skills/*/SKILL.md` — plain markdown, readable by any agent. Claude Code loads them on demand from their own descriptions, so this list is for everyone else: **f5ds-design** (design values, and every deviation with its reason), **migration-tool** (mappings, generators, the accuracy check), **repo-checks** (what each check asserts, how to add one), **release-update** (version bumps), **verify-visually** (rendering and measuring).

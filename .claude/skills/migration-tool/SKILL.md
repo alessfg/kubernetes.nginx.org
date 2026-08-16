@@ -1,6 +1,6 @@
 ---
 name: migration-tool
-description: How to author and verify the ingress-nginx migration tool — how to navigate a 4,952-line page without reading it, the mapping schema and the order to edit in, the source-module/core engine split, the rule that analyzer mappings and reference tables must agree in both directions, row ordering and collapsed-cell conventions, and the four-point accuracy check for any documented annotation or CRD field. Use when editing ingress-nginx-migration.html, assets/js/migration-core.js or assets/js/migration-ingress-nginx.js, adding or changing an annotation mapping, or verifying that a documented construct matches the pinned NIC version.
+description: Authoring and verifying the migration tool — the engine split, the mapping schema, row ordering and cell conventions, the Node verification recipe and its silent-failure gotcha, and the four-point accuracy check. Use when editing annotation mappings, CRD generators or the reference tables.
 ---
 
 # The migration tool

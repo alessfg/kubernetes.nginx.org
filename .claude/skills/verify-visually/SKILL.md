@@ -1,6 +1,6 @@
 ---
 name: verify-visually
-description: How to actually look at this site after changing it — the screenshot and DOM-measurement recipe, and the four facts that make a correct command look like it failed (both pages are hash-routed SPAs so a plain screenshot shows the wrong view; headless Chrome renders the dark theme by default here; --screenshot captures the viewport not the page; widths under 500px are clamped on macOS). Use after any change to CSS, markup or layout, when a check passes but the page might still look wrong, when measuring whether a label fits, or when asked to confirm a change renders correctly.
+description: How to actually look at this site — shot.sh, DOM measurement, and the four facts that make a correct render command look like it failed (hash-routed SPAs, dark by default, viewport-not-page capture, the 500px macOS clamp). Use after any CSS, markup or layout change.
 ---
 
 # Rendering and looking

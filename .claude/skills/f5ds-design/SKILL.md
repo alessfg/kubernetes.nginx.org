@@ -1,6 +1,6 @@
 ---
 name: f5ds-design
-description: The reasoning behind this site's F5 Design System implementation — why NGINX green leads instead of Dodger Blue, which three published F5DS pairings fail WCAG AA and what replaced them, why the CRD badges use the graph palette, the full type scale, and every documented deviation with its justification. Use when editing any CSS under assets/css/, choosing or changing a colour/space/radius/type value, judging whether something is an intentional deviation or a defect, or when a design-system scanner flags this site.
+description: Why this site's F5 Design System choices are what they are — the accent split, the three F5DS pairings that fail WCAG AA and their replacements, the CRD badge palette, the type scale, top-bar geometry, and every deviation with its reason. Use before changing any colour, space, radius or type value, or when a scanner flags this site.
 ---
 
 # F5DS on kubernetes.nginx.org — the why

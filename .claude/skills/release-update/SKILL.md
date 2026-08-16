@@ -1,6 +1,6 @@
 ---
 name: release-update
-description: The complete checklist for updating this site after an NGINX Ingress Controller, NGINX Gateway Fabric or ingress2gateway release — every version string, Helm chart version, release-tag link and JS fallback that has to move, the three version formats a plain grep misses, plus the compatibility table and Kubernetes-version rules that are the steps most often missed. Use when bumping NIC, NGF or ingress2gateway to a new version, updating a compat table, or auditing whether the site's stated versions are current.
+description: Checklist for an NIC, NGF or ingress2gateway release — the three version formats a plain grep misses, the feature badges that must not be swept along, and the compatibility and Kubernetes-version rules most often missed. Use when bumping any product version.
 ---
 
 # Release update checklist

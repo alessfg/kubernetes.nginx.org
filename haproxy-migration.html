@@ -449,11 +449,7 @@ spec:
                         <tr><td>Data plane</td><td>HAProxy</td><td>NGINX (OSS or Plus)</td></tr>
                         <tr><td>Annotation prefix</td><td><code>haproxy.org/</code> (OSS) or <code>haproxy.com/</code> (Enterprise)</td><td><code>nginx.org/</code> or <code>nginx.com/</code> or <code>appprotect.f5.com/</code></td></tr>
                         <tr><td>ConfigMap name</td><td><code>haproxy-kubernetes-ingress</code></td><td><code>nginx-config</code></td></tr>
-                        <tr><td>CRD support</td><td><code>ingress.v3.haproxy.org</code>: Global, Defaults, Backend, TCP, Frontend, ValidationRules &mdash; plus the superseded <code>ingress.v1.haproxy.org</code>, without Frontend or ValidationRules</td><td>VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration</td></tr>
-                        <tr><td>Configuration model</td><td>Annotations at three scopes (default &lt; ConfigMap &lt; Ingress &lt; Service, highest wins) + CRDs that <em>replace</em> annotations when both are present</td><td>ConfigMap sets defaults that per-resource annotations/CRDs <em>override</em> &mdash; no Service-level annotation tier</td></tr>
-                        <tr><td>Canary / traffic splitting</td><td><code>route-acl</code> injects a raw <code>use_backend</code> ACL (first match wins, no weights)</td><td>VirtualServer <code>splits[]</code> (percentage) and <code>matches[].conditions[]</code> (header/cookie/argument/variable)</td></tr>
-                        <tr><td>TCP / UDP</td><td><code>tcp-services</code> ConfigMap or TCP CRD</td><td>GlobalConfiguration listeners + TransportServer</td></tr>
-                        <tr><td>TLS certificates</td><td>Multi-format Secrets; on-the-fly <code>generate-certificates</code> signing</td><td>One certificate per <code>kubernetes.io/tls</code> Secret + cert-manager integration (VirtualServer <code>tls.cert-manager</code>)</td></tr>
+                        <tr><td>CRD support</td><td>Global, Defaults, Backend, TCP, Frontend, ValidationRules (<code>ingress.v3.haproxy.org</code>)</td><td>VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration</td></tr>
                         <tr><td>Commercial edition</td><td>HAProxy Enterprise (Intelligent WAF, Global Profiling Engine, Bot Management)</td><td>NGINX Plus (App Protect WAF/DoS, JWT, OIDC, active health checks, zone sync)</td></tr>
                     </tbody>
                 </table>

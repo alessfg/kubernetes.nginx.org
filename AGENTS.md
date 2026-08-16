@@ -14,6 +14,8 @@ It covers four things: **NGINX Ingress Controller** (`nginx/kubernetes-ingress`)
 - `ingress-nginx-migration.html` — the live migration tool: YAML analyzer, 130+ annotation mappings, CRD examples, ConfigMap guidance.
 - Repo `nginx/kubernetes.nginx.org`; GitHub Pages serves `main` at https://kubernetes.nginx.org/.
 
+**Never touch `CHANGELOG.md` unless you are explicitly asked to.** Its entries are release-shaped and written by hand, and a released section can already be on `main` and serving production — so "helpfully" appending to one revises a shipped record. Make the code change, mention in your summary that the changelog is untouched, and let the maintainer decide whether the work warrants an entry and under which version.
+
 ## Directory layout
 
 ```

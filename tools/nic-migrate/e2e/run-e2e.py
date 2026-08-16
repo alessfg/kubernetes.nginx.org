@@ -48,6 +48,9 @@ COMMUNITY_NS = 'ingress-nginx'
 COMMUNITY_CLASS = 'nginx'
 NIC_NS = 'nginx-ingress'
 NIC_CLASS = 'nginx-nic'
+# --target ingress reuses the source Ingress's name, so applying the output
+# unsuffixed would overwrite the very resource this run is comparing against.
+NAME_SUFFIX = '-nic'
 
 # Pinned so a run is reproducible. The NIC chart matches what the site
 # documents; see .github/scripts/check-versions.py for the three formats.
@@ -203,10 +206,18 @@ def self_test():
     check('every case has a host', all(c.get('host') for c in CASES), True)
     check('every case has a path', all(c.get('path') for c in CASES), True)
 
-    cmd, scheme = curl_argv(dict(host='h', path='/', scheme='https', headers={'Origin': 'o'}))
+    cmd = curl_argv('svc.ns.svc', dict(host='h', path='/x', scheme='https', headers={'Origin': 'o'}))
     check('https adds -k', '-k' in cmd, True)
-    check('host header sent', 'Host: h' in cmd, True)
     check('extra header sent', 'Origin: o' in cmd, True)
+    # The URL must carry the real host so SNI matches; the Service name belongs
+    # only in --connect-to. Getting this backwards is what broke tls-terminates.
+    check('url uses the request host', cmd[-1], 'https://h:443/x')
+    check('connect-to redirects to the service', 'h:443:svc.ns.svc:443' in cmd, True)
+    check('no Host header override', not any(a.startswith('Host:') for a in cmd), True)
+
+    plain = curl_argv('svc.ns.svc', dict(host='h', path='/'))
+    check('http uses port 80', plain[-1], 'http://h:80/')
+    check('http omits -k', '-k' not in plain, True)
 
     failed = [c for c in checks if not c[1]]
     for name, ok, got, want in checks:
@@ -252,13 +263,25 @@ def install_controllers(args):
         cmd += ['--version', args.community_chart]
     helm(*cmd, timeout=900)
 
-    say('  installing F5 NGINX Ingress Controller (class %s)' % NIC_CLASS)
+    # NGINX OSS. The chart's default image is the OSS build, which is the scope
+    # of this pipeline: everything asserted has to be satisfiable without a
+    # subscription. Nothing currently asserted needs Plus — session affinity in
+    # particular works on OSS. A Plus run would set controller.nginxplus=true
+    # and an image pull secret, and could add cases for JWT, OIDC and WAF, which
+    # genuinely have no community equivalent.
+    say('  installing F5 NGINX Ingress Controller, OSS (class %s)' % NIC_CLASS)
     helm('upgrade', '--install', 'nic', NIC_CHART, '--version', NIC_CHART_VERSION,
          '-n', NIC_NS, '--create-namespace', '--wait', '--timeout', '10m',
          '--set', 'controller.service.type=ClusterIP',
          '--set', 'controller.enableCustomResources=true',
          '--set', 'controller.ingressClass.name=' + NIC_CLASS,
          '--set', 'controller.ingressClass.create=true',
+         # NIC ships with snippets off and REJECTS an Ingress that uses them,
+         # rather than ignoring the annotation. --target ingress converts CORS
+         # into nginx.org/server-snippets, so without this the converted
+         # Ingress is never programmed and every case 404s. Found by running
+         # this pipeline; nic-migrate now emits a note saying so.
+         '--set', 'controller.enableSnippets=true',
          timeout=900)
 
     versions = {}
@@ -331,7 +354,7 @@ def convert(args):
     cli = os.path.join(ROOT, 'tools', 'nic-migrate', 'nic-migrate.js')
     src = os.path.join(MANIFESTS, 'source-ingress.yaml')
     cmd = ['node', cli, 'convert', '-f', src, '--target', args.target,
-           '--class', NIC_CLASS, '--no-color']
+           '--class', NIC_CLASS, '--name-suffix', NAME_SUFFIX, '--no-color']
     proc = run(cmd, check=False)
     if proc.returncode != 0 and not proc.stdout.strip():
         raise Fail('nic-migrate convert failed:\n' + proc.stderr)
@@ -348,20 +371,43 @@ def convert(args):
     return out_path
 
 
+def clear_previous():
+    """Remove anything a previous run converted. Matters when reusing a cluster
+    (--skip-cluster, or --keep then re-run): a VirtualServer left over from a
+    --target virtualserver run would still be serving during a --target ingress
+    run, and the comparison would silently be against the wrong resource."""
+    kubectl('delete', 'virtualserver,policy,transportserver', '--all', '-n', NS,
+            '--ignore-not-found', check=False, quiet=True)
+    kubectl('delete', 'ingress', model_ingress_name(), '-n', NS,
+            '--ignore-not-found', check=False, quiet=True)
+
+
+def model_ingress_name():
+    return 'shop' + NAME_SUFFIX
+
+
 def apply_converted(args, path):
     phase('Apply converted manifests')
     with open(path) as fh:
         text = fh.read()
+    clear_previous()
     kubectl('apply', '-f', path)
 
     if 'kind: VirtualServer' in text:
         def valid():
+            # {end} is not optional: without it kubectl still exits 0 but emits
+            # a trailing bare "=", which parses into an empty-named resource
+            # whose state is "" — so `all(state == Valid)` is false forever and
+            # the wait times out against two perfectly Valid VirtualServers.
+            # Cost an entire e2e run to find. The empty-key filter below is the
+            # belt to that braces.
             out = kubectl('get', 'virtualserver', '-n', NS,
-                          '-o', 'jsonpath={range .items[*]}{.metadata.name}={.status.state} ',
+                          '-o', 'jsonpath={range .items[*]}{.metadata.name}={.status.state} {end}',
                           check=False).stdout.strip()
-            states = dict(p.split('=', 1) for p in out.split() if '=' in p)
+            states = {k: v for k, v in
+                      (p.split('=', 1) for p in out.split() if '=' in p) if k}
             if states and all(v == 'Valid' for v in states.values()):
-                return out
+                return ' '.join('%s=%s' % kv for kv in sorted(states.items()))
             return None
         say('  ' + wait_for('every VirtualServer to reach state Valid', valid, timeout=180))
     else:
@@ -389,8 +435,15 @@ CASES = [
     dict(name='cors-header-present', host='shop.example.com', path='/',
          headers={'Origin': 'https://shop.example.com'},
          compare=('status',), header_present='access-control-allow-origin'),
+    # Session affinity maps to VirtualServer upstreams[].sessionCookie, which
+    # works on NGINX OSS — this run asserts it and it passes. It is skipped on
+    # the Ingress target for a different reason: the mapping is
+    # VirtualServer-only and has no nginx.org annotation form, so there is
+    # nothing for the annotation strategy to emit. Not a Plus limitation.
     dict(name='affinity-cookie-present', host='shop.example.com', path='/api/x',
-         compare=('status',), header_present='set-cookie'),
+         compare=('status',), header_present='set-cookie',
+         skip_targets=('ingress',),
+         skip_reason='maps to VirtualServer sessionCookie, which has no Ingress annotation form'),
     dict(name='tls-terminates', host='shop.example.com', path='/', scheme='https',
          expect_status=200, expect_app='web'),
     dict(name='plain-http-not-redirected', host='shop.example.com', path='/',
@@ -398,17 +451,30 @@ CASES = [
 ]
 
 
-def curl_argv(case):
+def curl_argv(target, case):
     """The curl command for a case. Split out from http() so --self-test can
-    check it without a cluster."""
+    check it without a cluster.
+
+    --connect-to rather than a Host header: a Host header does not set SNI, so
+    over TLS the handshake carries the controller's Service DNS name as the
+    server name. ingress-nginx tolerates that and serves its default
+    certificate; NIC answers `tlsv1 unrecognized name` and drops the
+    connection. That is a difference between the two, but not one a real client
+    would ever hit — real clients send the name they dialled. Keeping the URL
+    as the real host and redirecting only the connection makes SNI and Host
+    correct together, which is what is actually under test.
+    """
     scheme = case.get('scheme', 'http')
+    port = 443 if scheme == 'https' else 80
+    host = case['host']
     cmd = ['curl', '-sS', '-i', '--max-time', '10']
     if scheme == 'https':
-        cmd += ['-k']
-    cmd += ['-H', 'Host: %s' % case['host']]
+        cmd += ['-k']  # the fixture cert is self-signed
+    cmd += ['--connect-to', '%s:%d:%s:%d' % (host, port, target, port)]
     for key, value in (case.get('headers') or {}).items():
         cmd += ['-H', '%s: %s' % (key, value)]
-    return cmd, scheme
+    cmd += ['%s://%s:%d%s' % (scheme, host, port, case['path'])]
+    return cmd
 
 
 def parse_response(raw):
@@ -453,10 +519,7 @@ def parse_response(raw):
 
 def http(target, case):
     """One request from inside the cluster."""
-    cmd, scheme = curl_argv(case)
-    port = 443 if scheme == 'https' else 80
-    cmd += ['%s://%s:%d%s' % (scheme, target, port, case['path'])]
-    proc = kubectl('exec', '-n', NS, 'probe', '--', *cmd, check=False)
+    proc = kubectl('exec', '-n', NS, 'probe', '--', *curl_argv(target, case), check=False)
     result = parse_response(proc.stdout)
     if result['status'] == 0 and proc.stderr.strip():
         result['error'] = proc.stderr.strip().splitlines()[-1][:120]
@@ -470,6 +533,14 @@ def compare(args, community_target, nic_target):
     rows = []
 
     for case in CASES:
+        # Skipped rather than silently dropped: a case that does not apply to
+        # this target still appears in the output, so the count never quietly
+        # shrinks. See "No silent caps" in the pipeline's own design.
+        if args.target in (case.get('skip_targets') or ()):
+            rows.append((case['name'], 'skip', True, None, None,
+                         ['not applicable to --target %s: %s'
+                          % (args.target, case.get('skip_reason', 'no equivalent on this target'))]))
+            continue
         before = http(community_target, case)
         after = http(nic_target, case)
         fields = case.get('compare', ('status', 'app', 'uri'))
@@ -487,17 +558,40 @@ def compare(args, community_target, nic_target):
             if needed not in after['headers']:
                 problems.append('NIC did not send %s' % needed)
 
-        ok = not problems
-        rows.append((case['name'], ok, before, after, problems))
+        # A difference already investigated and written down is not a failure —
+        # but a documented difference that has QUIETLY GONE AWAY is, because the
+        # note explaining it is now wrong and someone will read it. Both
+        # directions have to be checked or the declaration rots.
+        #
+        # Currently unused — no case declares one. Kept as the mechanism for
+        # divergences that are real and understood, as opposed to cases that
+        # simply do not apply to a target (skip_targets, above).
+        known = (case.get('known_difference') or {}).get(args.target)
+        if known and problems:
+            mark, ok = 'known', True
+            problems = ['expected difference on --target %s: %s' % (args.target, known)]
+        elif known and not problems:
+            mark, ok = 'STALE', False
+            problems = ['this case is declared as a known difference on --target %s, but the two '
+                        'controllers now agree. Remove the known_difference entry.' % args.target]
+        else:
+            mark, ok = ('ok  ' if not problems else 'FAIL'), not problems
+
+        rows.append((case['name'], mark, ok, before, after, problems))
         if not ok:
             failures.append(case['name'])
 
-    for name, ok, before, after, problems in rows:
-        mark = 'ok  ' if ok else 'FAIL'
-        say('  %s  %-*s  ingress-nginx=%s  nic=%s' % (
-            mark, width, name, summarise(before), summarise(after)))
+    for name, mark, ok, before, after, problems in rows:
+        if before is None:
+            say('  %-5s %-*s' % (mark, width, name))
+        else:
+            say('  %-5s %-*s  ingress-nginx=%s  nic=%s' % (
+                mark, width, name, summarise(before), summarise(after)))
         for p in problems:
             say('        %s' % p)
+    skipped = sum(1 for r in rows if r[1] == 'skip')
+    if skipped:
+        say('\n  %d case(s) not applicable to --target %s.' % (skipped, args.target))
     return failures
 
 

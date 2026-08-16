@@ -65,9 +65,13 @@ jobs:
       # verified against the Go checksum database, so the version pin is
       # actually enforced instead of being a URL we hope is unchanged. Go,
       # Docker, kubectl and helm are all preinstalled on the runner.
+      #
+      # This pin also decides the Kubernetes version: kind-cluster.yaml sets no
+      # node image, so each kind release uses the default it was tested with.
+      # Bumping this line is how the cluster's Kubernetes version moves.
       - name: Install kind
         run: |
-          go install sigs.k8s.io/kind@v0.25.0
+          go install sigs.k8s.io/kind@v0.32.0
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Verify the toolchain

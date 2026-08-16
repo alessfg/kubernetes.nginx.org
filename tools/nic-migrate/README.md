@@ -243,6 +243,35 @@ against drift without needing a cluster — a Service renamed in `workload.yaml`
 while `source-ingress.yaml` still points at the old name would otherwise surface
 as a 503 that looks like a migration bug.
 
+Scope is **NGINX OSS**. Everything asserted is satisfiable without a
+subscription. A case that has no equivalent on a target is printed as `skip`
+with its reason rather than dropped, so the count never quietly shrinks.
+
+### What the first real run found
+
+All three of these are now handled by `convert`, and none was predicted — they
+came from running it:
+
+- **NIC matches Ingress paths literally.** The community controller treats an
+  `ImplementationSpecific` path containing regex metacharacters as a regex; NIC
+  needs `nginx.org/path-regex`. Without it `/api(/|$)(.*)` matched nothing and
+  every `/api/...` request fell through to the catch-all `/` — returning `200`
+  from the *wrong backend*. A silent routing change is the worst shape a
+  migration bug can take, and no dry-run would have caught it.
+- **NIC rejects snippets by default.** `enableSnippets` is off, and an Ingress
+  using `nginx.org/server-snippets` is *rejected outright* rather than degraded:
+  `snippet specified but snippets feature is not enabled`. The annotation
+  strategy converts CORS into snippets, so `--target ingress` needs
+  `helm --set controller.enableSnippets=true`.
+- **Session affinity has no Ingress annotation form.** It maps to VirtualServer
+  `upstreams[].sessionCookie`, which works fine on OSS — but there is no
+  `nginx.org/*` equivalent, so `--target ingress` loses stickiness silently.
+
+And the question the pipeline existed to answer: **`rewritePath` handles `$2`
+captures identically to the community `rewrite-target`.** Both controllers
+return `/things/42` for `/api/things/42`. That was a guess before; it is a
+measurement now.
+
 ## What is still manual
 
 - **Canary and traffic splitting.** `splits`/`matches` need the *other* Ingress
@@ -250,7 +279,8 @@ as a 503 that looks like a migration bug.
 - **Snippets.** Carried across verbatim and never validated. Directives valid in
   the community controller may not be valid in the same context under NIC.
 - **NGINX Plus features** (JWT, OIDC, WAF) have no community equivalent to
-  convert *from* — they are additions, not migrations.
+  convert *from* — they are additions, not migrations. Note that session
+  affinity is *not* in this group: `sessionCookie` works on OSS.
 - **The controller install itself.** `checklist` prints the steps; installing
   CRDs and running both controllers side by side is a cluster operation this
   tool deliberately does not perform.

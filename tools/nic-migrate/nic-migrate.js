@@ -55,6 +55,11 @@ convert
       --class <name>       Set ingressClassName on the output (default: keep
                            the source's). Use a distinct class to run both
                            controllers side by side.
+      --name-suffix <s>    Append to the generated resource names. With
+                           --target ingress the output otherwise reuses the
+                           source's name, so applying it REPLACES the Ingress
+                           being migrated — right for a cutover, wrong for
+                           running both side by side.
       --validate           Check the output with kubectl apply --dry-run.
 
 report is advisory: it shows the analyzer's single-feature illustrations and
@@ -65,7 +70,7 @@ function parseArgs(argv) {
     const opts = {
         command: null, files: [], kubectl: false, namespace: null, strategy: null,
         out: null, json: false, colour: null, strict: false, help: false,
-        target: 'virtualserver', ingressClass: null, validate: false
+        target: 'virtualserver', ingressClass: null, validate: false, nameSuffix: ''
     };
     let i = 0;
     if (argv[i] && !argv[i].startsWith('-')) opts.command = argv[i++];
@@ -86,6 +91,7 @@ function parseArgs(argv) {
         else if (a === '--strict') opts.strict = true;
         else if (a === '-t' || a === '--target') opts.target = need(a);
         else if (a === '--class') opts.ingressClass = need(a);
+        else if (a === '--name-suffix') opts.nameSuffix = need(a);
         else if (a === '--validate') opts.validate = true;
         else if (a === '-h' || a === '--help') opts.help = true;
         else throw new Error('unknown option: ' + a);

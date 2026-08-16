@@ -230,8 +230,9 @@ function buildVirtualServers(model, gen, opts) {
            "shop-shop", and a.example.com / a.other.com must not both become
            "shop-a". */
         const label = hostEntry.host.split('.')[0];
-        let base = model.hosts.length === 1 || label === model.name ? model.name : model.name + '-' + label;
-        if (used.has(base)) base = model.name + '-' + hostEntry.host;
+        const stem = model.name + (opts.nameSuffix || '');
+        let base = model.hosts.length === 1 || label === model.name ? stem : stem + '-' + label;
+        if (used.has(base)) base = stem + '-' + hostEntry.host;
         let name = sanitiseName(base);
         for (let n = 2; used.has(name); n++) name = sanitiseName(base + '-' + n);
         used.add(name);
@@ -258,6 +259,36 @@ function buildIngress(model, gen, swaps, opts) {
     const policyNames = gen.policies.map((p) => (p.metadata || {}).name).filter(Boolean);
     if (policyNames.length) annotations['nginx.org/policies'] = policyNames.join(',');
 
+    /* The community controller treats an ImplementationSpecific path containing
+       regex metacharacters as a regex. NIC matches Ingress paths LITERALLY
+       unless told otherwise, so "/api(/|$)(.*)" matches nothing and every
+       request falls through to the catch-all "/" — a silent routing change,
+       which is the worst shape a migration bug can take. Caught by the e2e
+       pipeline: four cases returned the wrong backend with a 200.
+
+       The annotation is Ingress-wide, not per-path, so it is worth saying out
+       loud that it now governs every path on this resource. */
+    const regexPaths = model.hosts.flatMap((h) => h.paths).filter((p) => REGEX_CHARS.test(p.path));
+    if (regexPaths.length) {
+        annotations['nginx.org/path-regex'] = 'case_sensitive';
+        notes.push('added nginx.org/path-regex=case_sensitive because ' + regexPaths.length +
+            ' path(s) use a regex (' + regexPaths.map((p) => p.path).join(', ') + '). NIC matches ' +
+            'Ingress paths literally without it. The annotation applies to EVERY path on this Ingress.');
+    }
+
+    /* Session affinity maps to VirtualServer upstreams[].sessionCookie — see
+       the mapping in migration-ingress-nginx.js, type "virtualserver",
+       section "oss", plusRequired false. It works on NGINX OSS; what it does
+       not have is an Ingress annotation form, so the annotation strategy emits
+       nothing for it and stickiness is silently lost on this target. */
+    if (model.communityAnnotations.affinity &&
+        !Object.keys(annotations).some((k) => /sticky|session/.test(k))) {
+        notes.push('session affinity (affinity: ' + model.communityAnnotations.affinity + ') is NOT ' +
+            'represented on the Ingress target: it maps to VirtualServer upstreams[].sessionCookie, ' +
+            'which has no annotation equivalent. Use --target virtualserver (works on NGINX OSS), or ' +
+            'accept the loss of stickiness.');
+    }
+
     const spec = {};
     const cls = opts.ingressClass || model.ingressClassName;
     if (cls) spec.ingressClassName = cls;
@@ -281,9 +312,27 @@ function buildIngress(model, gen, swaps, opts) {
         }
     }));
 
-    const metadata = { name: model.name };
+    /* Without a suffix the converted Ingress carries the source's own name, so
+       applying it REPLACES the Ingress being migrated — which is right for a
+       cutover and wrong for running both controllers side by side, where the
+       original has to keep serving. The caller chooses. */
+    const metadata = { name: sanitiseName(model.name + (opts.nameSuffix || '')) };
     if (model.namespace) metadata.namespace = model.namespace;
     if (Object.keys(annotations).length) metadata.annotations = annotations;
+
+    /* NIC ships with snippets OFF, and rejects the whole Ingress rather than
+       ignoring the annotation:
+         annotations.nginx.org/server-snippets: Forbidden: snippet specified
+         but snippets feature is not enabled
+       The annotation strategy turns several features (CORS among them) into
+       snippets, so this is the difference between a migration that works and
+       an Ingress that is silently never programmed. Observed on a real
+       cluster, not inferred. */
+    if (Object.keys(annotations).some((k) => /^nginx\.org\/(server|location)-snippets$/.test(k))) {
+        notes.push('output uses snippet annotations, which NIC REJECTS unless the controller runs ' +
+            'with snippets enabled — helm --set controller.enableSnippets=true. Without it the ' +
+            'Ingress is rejected outright, not merely degraded.');
+    }
 
     /* Features with no annotation form are the reason this target is not always
        enough — say so rather than emitting an Ingress that quietly does less. */

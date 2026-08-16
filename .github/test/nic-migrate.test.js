@@ -396,6 +396,57 @@ test('the ingress target keeps the Ingress and rewrites its annotations', () => 
     assert.deepEqual(ing.spec.tls, [{ hosts: ['a.example.com'], secretName: 'a-tls' }]);
 });
 
+test('a regex path adds nginx.org/path-regex on the ingress target', () => {
+    /* Found by the e2e pipeline, not by reading: NIC matches Ingress paths
+       literally, so without this annotation "/api(/|$)(.*)" matches nothing and
+       every request falls through to the catch-all "/" — a 200 from the wrong
+       backend. */
+    const { out } = runConvert(INGRESS, { target: 'ingress', strategy: 'annotation' });
+    const ing = out.docs.find((d) => d.kind === 'Ingress');
+    assert.equal(ing.metadata.annotations['nginx.org/path-regex'], 'case_sensitive');
+    assert.ok(out.notes.some((n) => /path-regex/.test(n)), 'the annotation must be explained');
+});
+
+test('an Ingress with no regex path does not get path-regex', () => {
+    const plain = JSON.parse(JSON.stringify(INGRESS));
+    plain.spec.rules = [{
+        host: 'a.example.com',
+        http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'a-svc', port: { number: 80 } } } }] }
+    }];
+    const { out } = runConvert(plain, { target: 'ingress', strategy: 'annotation' });
+    const ing = out.docs.find((d) => d.kind === 'Ingress');
+    assert.equal(ing.metadata.annotations['nginx.org/path-regex'], undefined);
+});
+
+test('snippet output warns that NIC rejects snippets by default', () => {
+    /* NIC does not degrade here, it rejects the Ingress outright:
+       "snippet specified but snippets feature is not enabled". */
+    const { out } = runConvert(INGRESS, { target: 'ingress', strategy: 'annotation' });
+    const ing = out.docs.find((d) => d.kind === 'Ingress');
+    const hasSnippet = Object.keys(ing.metadata.annotations).some((k) => /-snippets$/.test(k));
+    assert.ok(hasSnippet, 'the fixture should produce snippets under the annotation strategy');
+    assert.ok(out.notes.some((n) => /enableSnippets/.test(n)), 'the rejection must be flagged');
+});
+
+test('session affinity loss is reported on the ingress target, without blaming Plus', () => {
+    /* affinity maps to VirtualServer upstreams[].sessionCookie — section "oss",
+       plusRequired false. It works on NGINX OSS; it simply has no annotation
+       form. Saying otherwise sends readers to buy a subscription they do not
+       need, so the wording is asserted, not just the presence of a note. */
+    const { out } = runConvert(INGRESS, { target: 'ingress', strategy: 'annotation' });
+    const note = out.notes.find((n) => /session affinity/i.test(n));
+    assert.ok(note, 'expected a note about affinity');
+    assert.match(note, /virtualserver/i);
+    assert.ok(!/plus/i.test(note), 'affinity is not a Plus feature: ' + note);
+});
+
+test('the virtualserver target keeps session affinity that the ingress target loses', () => {
+    const { out } = runConvert(INGRESS);
+    const vs = out.docs.filter((d) => d.kind === 'VirtualServer');
+    assert.ok(vs.every((v) => v.spec.upstreams.every((u) => u.sessionCookie)),
+        'every upstream should carry sessionCookie');
+});
+
 test('--class overrides the source ingressClassName on every output', () => {
     const { out } = runConvert(INGRESS, { ingressClass: 'nginx-nic' });
     for (const vs of out.docs.filter((d) => d.kind === 'VirtualServer')) {

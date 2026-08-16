@@ -146,9 +146,12 @@ function detect(desc, result) {
 
     /* 10. Snippets migrate as text; nothing validates the NGINX inside them. */
     if (/nginx\.org\/(server|location)-snippets:/.test(yaml)) {
-        add('snippet-passthrough', 'review',
-            'Snippet contents are carried across verbatim and not validated. Directives valid in the ' +
-            'community controller may not be valid in this context under NIC.');
+        add('snippet-passthrough', 'blocking',
+            'Output uses snippet annotations. NIC ships with snippets DISABLED and rejects the whole ' +
+            'Ingress ("snippet specified but snippets feature is not enabled") rather than ignoring ' +
+            'them — install with helm --set controller.enableSnippets=true. Contents are also carried ' +
+            'across verbatim and never validated, so directives valid in the community controller may ' +
+            'not be valid in this context under NIC.');
     }
 
     return gaps;

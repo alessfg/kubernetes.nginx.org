@@ -13,8 +13,13 @@ const { ROOT, loadAnalyzer } = require('./lib/load.js');
 /* One entry per migration tool the branch ships. Branches that add a second
    source module add a row here; nothing else in this file is source-specific. */
 const PAGES = [
-    { name: 'ingress-nginx', page: 'ingress-nginx-migration.html', module: 'assets/js/migration-ingress-nginx.js' },
-    { name: 'haproxy', page: 'haproxy-migration.html', module: 'assets/js/migration-haproxy.js' },
+    { name: 'ingress-nginx', page: 'ingress-nginx-migration.html', module: 'assets/js/migration-ingress-nginx.js',
+      // Predates the alphabetical-categories rule: four headings in #mappings sit
+      // beside their topic rather than at their letter, and #configmap-mappings is
+      // grouped by what a reader migrates first. Reordering it is its own change.
+      alphabeticalCategories: false },
+    { name: 'haproxy', page: 'haproxy-migration.html', module: 'assets/js/migration-haproxy.js',
+      alphabeticalCategories: true },
 ];
 
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -79,6 +84,23 @@ for (const p of PAGES) {
         const anchors = new Set([...mod.matchAll(/anchor: '([\w-]+)'/g)].map((m) => m[1]));
         const missingAnchors = [...anchors].filter((a) => !page.includes(`id="${a}"`));
         assert.deepEqual(missingAnchors, [], 'mapping anchors');
+    });
+
+    // Categories are alphabetical within their section, so the order a reader
+    // scrolls past matches the order the category filter offers. Appending a new
+    // category to the end is the easy mistake and is invisible on a long page.
+    test(`${p.name}: category headings are alphabetical within each section`, { skip: p.alphabeticalCategories ? false : 'predates the rule — see PAGES' }, () => {
+        const sections = [...page.matchAll(/<section id="([\w-]+)"([\s\S]*?)(?=<section id="|$)/g)];
+        let checked = 0;
+        for (const [, id, body] of sections) {
+            const headings = [...body.matchAll(/<h3 id="[\w-]+">([\s\S]*?)<\/h3>/g)]
+                .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim());
+            if (headings.length < 2) continue;
+            checked++;
+            const sorted = [...headings].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+            assert.deepEqual(headings, sorted, `#${id} categories out of order`);
+        }
+        assert.ok(checked >= 3, `expected several multi-category sections, checked ${checked}`);
     });
 
     // A mapping's category is the label the analyzer prints beside a finding, and

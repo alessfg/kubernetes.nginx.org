@@ -2665,7 +2665,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>kubernetes.io/ingress.class</code></td>
-                            <td>Ingress <code>spec.ingressClassName</code></td>
+                            <td><span class="badge badge-ingress">Ingress</span> <code>spec.ingressClassName</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2730,7 +2730,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>spec.defaultBackend</code></td>
-                            <td>Ingress <code>spec.defaultBackend</code> (honored 1:1)</td>
+                            <td><span class="badge badge-ingress">Ingress</span> <code>spec.defaultBackend</code> (honored 1:1)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2761,7 +2761,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td>Wildcard host <code>*.example.com</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.host</code> / Ingress rule host</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.host</code><span class="or-text">— or —</span><span class="badge badge-ingress">Ingress</span> <code>spec.rules[].host</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">

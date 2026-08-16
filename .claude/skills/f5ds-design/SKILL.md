@@ -58,7 +58,7 @@ The badges use **Graph Colors** instead: a shade/tint pair per family, the shade
 
 **Which family each badge gets is not an aesthetic choice.** Production already ships a badge identity for each of these and readers know them, so the assignment is a translation: take the production hue, give the badge the graph family nearest it on the hue circle. Production lands within 5° of a family for five of the eight. `tokens.css` carries the full hue table, the CIEDE2000 collision analysis behind ConfigMap taking family 2's *inner* tint, and the reasoning for GlobalConfiguration being the neutral — production gives it saturation 0.00, so there is no hue to match.
 
-Teal (family 5) is deliberately unspent rather than unusable: production styles a teal `.badge-annotation` that renders nowhere, so the family is reserved in case that badge is ever wanted. If it is, note that it needs a derived label — see the derivation rule above.
+Teal (family 5) is spent on `.badge-ingress` — the one badge naming a resource the reader already has rather than one to author. It took the derived label the rule above produces: Elm `#28837E` reaches only 4.01:1 on Light Cyan, deepened along its own hue to `#1D5E5A` it is 6.64:1. The family had been held for the teal `.badge-annotation` production styles, but that class has never rendered on any page; if an annotation badge is ever wanted, olive (6) and yellow (11) are what remain, and neither matches a colour production uses.
 
 ## F5DS publishes no accessibility guidance, and three of its pairings fail AA
 

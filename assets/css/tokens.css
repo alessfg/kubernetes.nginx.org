@@ -247,6 +247,12 @@
     --badge-cm-fg:     #6A0B6A;  --badge-cm-bg:     #F7BDED;  /* 2  Palatinate / Chantilly*/
     --badge-plus-fg:   #7E2B37;  --badge-plus-bg:   #F5DFE3;  /* 9  Nutmeg / Carousel Pink*/
     --badge-new-fg:    #135213;  --badge-new-bg:    #DAF7D5;  /* 7  Parsley / Romance     */
+    /* Ingress: the only badge naming a resource the reader already has rather
+       than one to author, so the field beside it is edited in place. Family 5
+       as reserved above, and the label is the derived value that section
+       works out: Elm #28837E manages only 4.01:1 on Light Cyan, deepened
+       along its own hue to #1D5E5A it is 6.64:1. Derived, not quotable F5DS. */
+    --badge-ingress-fg: #1D5E5A; --badge-ingress-bg: #D0F9F9;  /* 5  Elm derived / Light Cyan */
     /* The one neutral, and production agrees: GlobalConfiguration is grey. */
     --badge-gc-fg:     var(--n600);  --badge-gc-bg: var(--n200);
 
@@ -520,6 +526,7 @@
         --badge-cm-fg:     #F7BDED;  --badge-cm-bg:     rgba(247, 189, 237, 0.16);
         --badge-plus-fg:   #F5DFE3;  --badge-plus-bg:   rgba(245, 223, 227, 0.16);
         --badge-new-fg:    #DAF7D5;  --badge-new-bg:    rgba(218, 247, 213, 0.16);
+        --badge-ingress-fg: #D0F9F9; --badge-ingress-bg: rgba(208, 249, 249, 0.16);
         --badge-gc-fg:     var(--n200);  --badge-gc-bg: rgba(230, 233, 243, 0.16);
 
         /* The code surface is its own world and does not follow the theme —

@@ -161,6 +161,7 @@ function sanitiseName(s) {
 function buildVirtualServers(model, gen, opts) {
     const docs = [];
     const notes = [];
+    const used = new Set();
     const policyNames = gen.policies.map((p) => (p.metadata || {}).name).filter(Boolean);
     const hasRewrite = Boolean(gen.proxyExtras.rewritePath);
 
@@ -223,11 +224,19 @@ function buildVirtualServers(model, gen, opts) {
         spec.upstreams = upstreams;
         spec.routes = routes;
 
-        /* One host keeps the Ingress's own name, so the common case round-trips
-           to something recognisable; several hosts need a per-host suffix
-           because a VirtualServer binds exactly one host. */
-        const suffix = model.hosts.length > 1 ? '-' + hostEntry.host.split('.')[0] : '';
-        const metadata = { name: sanitiseName(model.name + suffix) };
+        /* A VirtualServer binds exactly one host, so several hosts need
+           distinct names. Prefer the Ingress's own name, then its first label,
+           then the whole host — "shop" + host shop.example.com must not become
+           "shop-shop", and a.example.com / a.other.com must not both become
+           "shop-a". */
+        const label = hostEntry.host.split('.')[0];
+        let base = model.hosts.length === 1 || label === model.name ? model.name : model.name + '-' + label;
+        if (used.has(base)) base = model.name + '-' + hostEntry.host;
+        let name = sanitiseName(base);
+        for (let n = 2; used.has(name); n++) name = sanitiseName(base + '-' + n);
+        used.add(name);
+        used.add(base);
+        const metadata = { name };
         if (model.namespace) metadata.namespace = model.namespace;
 
         docs.push({ apiVersion: NIC_API, kind: 'VirtualServer', metadata, spec });
@@ -332,14 +341,22 @@ function convert(model, result, opts) {
     for (const doc of docs) extractTodos(doc, doc.kind, todos);
     for (const t of todos) notes.push('unresolved placeholder at ' + t + ' — the analyzer could not infer this value');
 
-    if (opts.target !== 'ingress' && Object.keys(swaps).length) {
-        /* VirtualServer has native fields for most of these, but not all; the
-           ones with no field are the reason an Ingress target still exists. */
-        notes.push('annotation swaps not represented on the VirtualServer: ' + Object.keys(swaps).join(', ') +
-            ' — review against the VirtualServer reference, or use --target ingress');
+    if (opts.target !== 'ingress') {
+        /* Some swaps are already represented natively — ssl-redirect becomes
+           tls.redirect on the VirtualServer, so listing it as "not represented"
+           sends the reader looking for a problem that was handled. Only the
+           genuinely unrepresented ones are worth a note. */
+        const consumed = new Set(['nginx.org/ssl-redirect', 'nginx.org/http-redirect-code']);
+        const unrepresented = Object.keys(swaps).filter((k) => !consumed.has(k));
+        if (unrepresented.length) {
+            notes.push('annotation swaps not represented on the VirtualServer: ' + unrepresented.join(', ') +
+                ' — review against the VirtualServer reference, or use --target ingress');
+        }
     }
 
-    return { docs, notes, policies: gen.policies.length, swaps };
+    /* Two hosts sharing a path shape produce the same note twice; the reader
+       needs to know it happened, not how many times. */
+    return { docs, notes: [...new Set(notes)], policies: gen.policies.length, swaps };
 }
 
 module.exports = { toModel, convert, readGenerated, readSwaps, toVsPath, sanitiseName };

@@ -186,6 +186,63 @@ One emitter rule is worth knowing: any scalar starting with a digit, `+`, `-` or
 `0755` read by a YAML 1.1 parser, which is what Kubernetes uses, is the integer
 493.
 
+## End-to-end test
+
+`e2e/run-e2e.py` proves the conversion on a real cluster: it builds a kind
+cluster, installs **both** controllers side by side on distinct IngressClasses
+(`nginx` and `nginx-nic`), deploys a real annotated Ingress, runs `convert`,
+applies the output, and sends the same requests to both.
+
+```bash
+# Needs nothing — no cluster, no Docker. Checks the runner's own logic.
+python3 tools/nic-migrate/e2e/run-e2e.py --self-test
+
+# Build a throwaway kind cluster, run everything, delete it
+python3 tools/nic-migrate/e2e/run-e2e.py
+python3 tools/nic-migrate/e2e/run-e2e.py --keep            # ...but leave it up to poke at
+
+# Use a cluster you already have (minikube, k3d, Docker Desktop, remote)
+python3 tools/nic-migrate/e2e/run-e2e.py --skip-cluster
+python3 tools/nic-migrate/e2e/run-e2e.py --skip-cluster --target ingress
+```
+
+### Same runner locally and in CI
+
+`.github/workflows/e2e.yml` does not orchestrate anything — it installs `kind`
+and calls the identical script. There is no CI-only path to drift out of sync
+with the local one, which is why the workflow does *not* use a
+cluster-provisioning action to create the cluster on its behalf.
+
+Needs `kubectl`, `helm`, `node` and `openssl`, plus `kind` and `docker` unless
+you pass `--skip-cluster`. Preflight names anything missing before doing any
+work, and if you already have a reachable cluster it says so and points at
+`--skip-cluster` rather than telling you to install kind.
+
+CI runs it on changes to this tool or the engine, on demand, and weekly to catch
+upstream drift in ingress-nginx or NIC rather than in our own code.
+
+**The assertion is equivalence, not a hardcoded expectation.** Each case goes to
+both controllers and the answers are compared. Asserting "NIC returns
+`/things/42`" would bake in today's belief about how `rewritePath` handles a
+capture group; asserting "NIC returns whatever ingress-nginx returned" is what a
+migration actually promises. When they differ, **the difference is the finding**.
+
+The backends are `nginx:alpine` with a ConfigMap that echoes the URI the backend
+received — a rewrite is only observable from the backend's side, so that echo is
+what makes the most important case checkable at all. Requests come from a pod
+inside the cluster aimed at each controller's ClusterIP Service, which is what
+lets both controllers run at once with no hostPort or NodePort collision.
+
+Cases cover host routing, path routing, the rewrite, the second host, an unknown
+host, the CORS header, the affinity cookie, TLS termination, and that plain HTTP
+is *not* redirected (the fixture sets `ssl-redirect: "false"`, so the converter
+must not add `tls.redirect`).
+
+Three unit tests in `.github/test/nic-migrate.test.js` guard the fixtures
+against drift without needing a cluster — a Service renamed in `workload.yaml`
+while `source-ingress.yaml` still points at the old name would otherwise surface
+as a 503 that looks like a migration bug.
+
 ## What is still manual
 
 - **Canary and traffic splitting.** `splits`/`matches` need the *other* Ingress

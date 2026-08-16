@@ -188,18 +188,36 @@ One emitter rule is worth knowing: any scalar starting with a digit, `+`, `-` or
 
 ## End-to-end test
 
-`e2e/run-e2e.py` proves the conversion on a real cluster: it builds a kind
-cluster, installs **both** controllers side by side on distinct IngressClasses
-(`nginx` and `nginx-nic`), deploys a real annotated Ingress, runs `convert`,
-applies the output, and sends the same requests to both.
+`e2e/run-e2e.py` proves the conversion on a real cluster, in **four stages**.
+Each isolates a different failure mode, so a red run tells you which layer broke
+rather than only that something did:
+
+| Stage | What it establishes |
+|---|---|
+| `baseline` | ingress-nginx alone serves the fixture. Every case checked against its own expectations — if this fails, it's the fixture or ingress-nginx, and nothing downstream means anything. |
+| `nic-installed` | NIC is deployed and answering *before any converted resource exists*: CRDs present, controller returns 404 from its default server. Separates an install problem from a conversion problem. |
+| `converted` | Both controllers serve at once. NIC matches the recorded baseline — **and ingress-nginx is re-checked**, because a migration must not disturb what is still live. |
+| `cutover` | The community Ingress is deleted and ingress-nginx is uninstalled. The run proves the old controller no longer answers at all, then asserts NIC alone still matches the stage-1 baseline. |
+
+`--until <stage>` stops after any of them and leaves the cluster up, which is
+the debugging entry point.
+
+Every stage after the first compares against the **recorded** stage-1 baseline,
+not against literals — so what is asserted is "NIC does what ingress-nginx was
+observed to do", which is the thing a migration promises.
 
 ```bash
 # Needs nothing — no cluster, no Docker. Checks the runner's own logic.
 python3 tools/nic-migrate/e2e/run-e2e.py --self-test
 
-# Build a throwaway kind cluster, run everything, delete it
+# Build a throwaway kind cluster, run all four stages, delete it
 python3 tools/nic-migrate/e2e/run-e2e.py
 python3 tools/nic-migrate/e2e/run-e2e.py --keep            # ...but leave it up to poke at
+
+# Stop at a checkpoint to debug (implies --keep)
+python3 tools/nic-migrate/e2e/run-e2e.py --until baseline       # is the fixture sane?
+python3 tools/nic-migrate/e2e/run-e2e.py --until nic-installed  # did NIC come up?
+python3 tools/nic-migrate/e2e/run-e2e.py --until converted      # skip the cutover
 
 # Use a cluster you already have (minikube, k3d, Docker Desktop, remote)
 python3 tools/nic-migrate/e2e/run-e2e.py --skip-cluster

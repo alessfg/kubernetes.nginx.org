@@ -68,6 +68,15 @@ class Fail(Exception):
 # Whether this run created the cluster, and so owns deleting it.
 CREATED = {'cluster': False}
 
+# The four checkpoints, in order. Each isolates a different failure mode, so a
+# red run says which layer broke instead of only that something did:
+#   baseline       the fixture and ingress-nginx work at all
+#   nic-installed  NIC is deployed and answering, before any converted resource
+#   converted      both controllers serve, and NIC matches the baseline
+#   cutover        ingress-nginx is gone and NIC alone still matches
+# --until stops after any of them and leaves the cluster up to poke at.
+STAGES = ['baseline', 'nic-installed', 'converted', 'cutover']
+
 
 def run(argv, *, input_=None, check=True, quiet=False, timeout=600):
     """One command, one exit code, never chained through a pipe."""
@@ -246,8 +255,17 @@ def create_cluster(args):
     kubectl('config', 'use-context', 'kind-' + CLUSTER)
 
 
-def install_controllers(args):
-    phase('Controllers')
+COMMUNITY_SELECTOR = 'app.kubernetes.io/name=ingress-nginx'
+NIC_SELECTOR = 'app.kubernetes.io/instance=nic'
+
+
+def running_image(ns, selector):
+    out = kubectl('get', 'pods', '-n', ns, '-l', selector,
+                  '-o', 'jsonpath={.items[0].spec.containers[0].image}', check=False).stdout.strip()
+    return out or '(unknown)'
+
+
+def install_community(args):
     say('  installing community ingress-nginx (class %s)' % COMMUNITY_CLASS)
     helm('repo', 'add', 'ingress-nginx', COMMUNITY_REPO, check=False, quiet=True)
     helm('repo', 'update', 'ingress-nginx', quiet=True)
@@ -262,7 +280,10 @@ def install_controllers(args):
     if args.community_chart:
         cmd += ['--version', args.community_chart]
     helm(*cmd, timeout=900)
+    return running_image(COMMUNITY_NS, COMMUNITY_SELECTOR)
 
+
+def install_nic(args):
     # NGINX OSS. The chart's default image is the OSS build, which is the scope
     # of this pipeline: everything asserted has to be satisfiable without a
     # subscription. Nothing currently asserted needs Plus — session affinity in
@@ -283,15 +304,23 @@ def install_controllers(args):
          # this pipeline; nic-migrate now emits a note saying so.
          '--set', 'controller.enableSnippets=true',
          timeout=900)
+    return running_image(NIC_NS, NIC_SELECTOR)
 
-    versions = {}
-    for label, ns, selector in (('ingress-nginx', COMMUNITY_NS, 'app.kubernetes.io/name=ingress-nginx'),
-                                ('NIC', NIC_NS, 'app.kubernetes.io/instance=nic')):
-        out = kubectl('get', 'pods', '-n', ns, '-l', selector,
-                      '-o', 'jsonpath={.items[0].spec.containers[0].image}', check=False).stdout.strip()
-        versions[label] = out or '(unknown)'
-        say('  %-14s %s' % (label, versions[label]))
-    return versions
+
+def uninstall_community():
+    """The cutover. Order matters and mirrors a real one: stop serving the old
+    resource first, then remove the controller. Uninstalling first would delete
+    IngressClass nginx out from under a live Ingress."""
+    kubectl('delete', 'ingress', 'shop', '-n', NS, '--ignore-not-found', check=False)
+    helm('uninstall', 'ingress-nginx', '-n', COMMUNITY_NS, '--wait', '--timeout', '5m',
+         check=False, timeout=600)
+    # Helm returns as soon as the release is gone; the pods can outlive it
+    # briefly, and a controller still answering would make "NIC serves this"
+    # unprovable.
+    wait_for('the community controller pods to disappear',
+             lambda: kubectl('get', 'pods', '-n', COMMUNITY_NS, '-l', COMMUNITY_SELECTOR,
+                             '-o', 'name', check=False).stdout.strip() == '' or None,
+             timeout=180)
 
 
 def controller_service(ns, selector):
@@ -418,30 +447,37 @@ def apply_converted(args, path):
 
 # ------------------------------------------------------------------ probes
 
+# Every case carries absolute expectations so stage 1 can validate itself: a
+# baseline that asserted nothing would make "ingress-nginx works" vacuous, and
+# every later stage compares against it. The later stages still compare against
+# the RECORDED baseline rather than against these literals, so the equivalence
+# property is kept — the absolutes only prove the fixture does what it claims.
 CASES = [
-    # name, host, path, scheme, extra headers, absolute expectations
     dict(name='root-routes-to-web', host='shop.example.com', path='/',
          expect_status=200, expect_app='web'),
     dict(name='api-path-routes-to-api', host='shop.example.com', path='/api/things/42',
          expect_status=200, expect_app='api'),
+    # rewrite-target /$2 against /api(/|$)(.*) strips the prefix. Asserted here
+    # because a fixture that stopped rewriting would otherwise still "match".
     dict(name='api-rewrite-strips-prefix', host='shop.example.com', path='/api/things/42',
-         compare=('status', 'uri', 'app')),
+         compare=('status', 'uri', 'app'),
+         expect_status=200, expect_app='api', expect_uri='/things/42'),
     dict(name='api-bare-prefix', host='shop.example.com', path='/api',
          expect_status=200, expect_app='api'),
     dict(name='second-host-routes-to-web2', host='b.example.com', path='/',
          expect_status=200, expect_app='web2'),
     dict(name='unknown-host-is-refused', host='nope.example.com', path='/',
-         compare=('status',)),
+         compare=('status',), expect_status=404),
     dict(name='cors-header-present', host='shop.example.com', path='/',
          headers={'Origin': 'https://shop.example.com'},
-         compare=('status',), header_present='access-control-allow-origin'),
+         compare=('status',), expect_status=200, header_present='access-control-allow-origin'),
     # Session affinity maps to VirtualServer upstreams[].sessionCookie, which
     # works on NGINX OSS — this run asserts it and it passes. It is skipped on
     # the Ingress target for a different reason: the mapping is
     # VirtualServer-only and has no nginx.org annotation form, so there is
     # nothing for the annotation strategy to emit. Not a Plus limitation.
     dict(name='affinity-cookie-present', host='shop.example.com', path='/api/x',
-         compare=('status',), header_present='set-cookie',
+         compare=('status',), expect_status=200, header_present='set-cookie',
          skip_targets=('ingress',),
          skip_reason='maps to VirtualServer sessionCookie, which has no Ingress annotation form'),
     dict(name='tls-terminates', host='shop.example.com', path='/', scheme='https',
@@ -519,44 +555,94 @@ def parse_response(raw):
 
 def http(target, case):
     """One request from inside the cluster."""
-    proc = kubectl('exec', '-n', NS, 'probe', '--', *curl_argv(target, case), check=False)
+    # quiet: a failed probe is data, not an incident. Stage 4 deliberately
+    # probes a controller that has just been uninstalled, and curl's "could not
+    # resolve host" on stderr would read like an error in the run.
+    proc = kubectl('exec', '-n', NS, 'probe', '--', *curl_argv(target, case),
+                   check=False, quiet=True)
     result = parse_response(proc.stdout)
     if result['status'] == 0 and proc.stderr.strip():
         result['error'] = proc.stderr.strip().splitlines()[-1][:120]
     return result
 
 
-def compare(args, community_target, nic_target):
-    phase('Compare')
-    width = max(len(c['name']) for c in CASES)
+WIDTH = max(len(c['name']) for c in CASES)
+
+
+def applicable(args, case):
+    return args.target not in (case.get('skip_targets') or ())
+
+
+def absolute_problems(case, r):
+    """Does this response match what the case says it should be, on its own
+    terms? Used by the stages that have no other side to compare against."""
+    problems = []
+    if 'expect_status' in case and r['status'] != case['expect_status']:
+        problems.append('status %s, expected %d' % (r['status'], case['expect_status']))
+    if 'expect_app' in case and r['app'] != case['expect_app']:
+        problems.append('served by %s, expected %s' % (r['app'], case['expect_app']))
+    if 'expect_uri' in case and r['uri'] != case['expect_uri']:
+        problems.append('backend saw %s, expected %s' % (r['uri'], case['expect_uri']))
+    needed = case.get('header_present')
+    if needed and needed not in r['headers']:
+        problems.append('no %s header' % needed)
+    return problems
+
+
+def row(mark, name, problems, left=None, right=None, left_label='', right_label=''):
+    if left is None:
+        say('  %-5s %-*s' % (mark, WIDTH, name))
+    elif right is None:
+        say('  %-5s %-*s  %s=%s' % (mark, WIDTH, name, left_label, summarise(left)))
+    else:
+        say('  %-5s %-*s  %s=%s  %s=%s' % (mark, WIDTH, name, left_label, summarise(left),
+                                           right_label, summarise(right)))
+    for p in problems:
+        say('        %s' % p)
+
+
+def probe_absolute(args, target, label):
+    """Run every applicable case against one controller and check it against the
+    case's own expectations. Returns (results_by_name, failures)."""
+    results = {}
     failures = []
-    rows = []
-
+    skipped = 0
     for case in CASES:
-        # Skipped rather than silently dropped: a case that does not apply to
-        # this target still appears in the output, so the count never quietly
-        # shrinks. See "No silent caps" in the pipeline's own design.
-        if args.target in (case.get('skip_targets') or ()):
-            rows.append((case['name'], 'skip', True, None, None,
-                         ['not applicable to --target %s: %s'
-                          % (args.target, case.get('skip_reason', 'no equivalent on this target'))]))
+        if not applicable(args, case):
+            skipped += 1
+            row('skip', case['name'],
+                ['not applicable to --target %s: %s'
+                 % (args.target, case.get('skip_reason', 'no equivalent on this target'))])
             continue
-        before = http(community_target, case)
-        after = http(nic_target, case)
-        fields = case.get('compare', ('status', 'app', 'uri'))
-        diffs = [f for f in fields if before.get(f) != after.get(f)]
+        r = http(target, case)
+        results[case['name']] = r
+        problems = absolute_problems(case, r)
+        row('ok  ' if not problems else 'FAIL', case['name'], problems, r, None, label)
+        if problems:
+            failures.append(case['name'])
+    if skipped:
+        say('  (%d case(s) not applicable to --target %s)' % (skipped, args.target))
+    return results, failures
 
-        problems = list(diffs)
-        if 'expect_status' in case and after['status'] != case['expect_status']:
-            problems.append('status!=%d' % case['expect_status'])
-        if 'expect_app' in case and after['app'] != case['expect_app']:
-            problems.append('app!=%s' % case['expect_app'])
+
+def probe_against(args, target, baseline, label):
+    """Run every applicable case and compare to a previously recorded baseline.
+    This is the equivalence assertion: not "NIC returns /things/42" but "NIC
+    returns what ingress-nginx returned when it was serving this."""
+    failures = []
+    for case in CASES:
+        if not applicable(args, case):
+            continue
+        before = baseline.get(case['name'])
+        if before is None:
+            continue
+        after = http(target, case)
+        fields = case.get('compare', ('status', 'app', 'uri'))
+        problems = ['%s: %r -> %r' % (f, before.get(f), after.get(f))
+                    for f in fields if before.get(f) != after.get(f)]
         needed = case.get('header_present')
-        if needed:
-            if needed not in before['headers']:
-                problems.append('ingress-nginx did not send %s' % needed)
-            if needed not in after['headers']:
-                problems.append('NIC did not send %s' % needed)
+        if needed and (needed in before['headers']) != (needed in after['headers']):
+            problems.append('%s header %s' % (needed, 'lost' if needed in before['headers'] else 'appeared'))
 
         # A difference already investigated and written down is not a failure —
         # but a documented difference that has QUIETLY GONE AWAY is, because the
@@ -568,30 +654,17 @@ def compare(args, community_target, nic_target):
         # simply do not apply to a target (skip_targets, above).
         known = (case.get('known_difference') or {}).get(args.target)
         if known and problems:
-            mark, ok = 'known', True
-            problems = ['expected difference on --target %s: %s' % (args.target, known)]
+            mark, ok, problems = 'known', True, ['expected: %s' % known]
         elif known and not problems:
             mark, ok = 'STALE', False
-            problems = ['this case is declared as a known difference on --target %s, but the two '
-                        'controllers now agree. Remove the known_difference entry.' % args.target]
+            problems = ['declared as a known difference on --target %s, but they now agree. '
+                        'Remove the known_difference entry.' % args.target]
         else:
             mark, ok = ('ok  ' if not problems else 'FAIL'), not problems
 
-        rows.append((case['name'], mark, ok, before, after, problems))
+        row(mark, case['name'], problems, before, after, 'was', 'now')
         if not ok:
             failures.append(case['name'])
-
-    for name, mark, ok, before, after, problems in rows:
-        if before is None:
-            say('  %-5s %-*s' % (mark, width, name))
-        else:
-            say('  %-5s %-*s  ingress-nginx=%s  nic=%s' % (
-                mark, width, name, summarise(before), summarise(after)))
-        for p in problems:
-            say('        %s' % p)
-    skipped = sum(1 for r in rows if r[1] == 'skip')
-    if skipped:
-        say('\n  %d case(s) not applicable to --target %s.' % (skipped, args.target))
     return failures
 
 
@@ -635,32 +708,82 @@ def main():
     ap.add_argument('--workdir', default=os.path.join(E2E, '.work'))
     ap.add_argument('--self-test', action='store_true',
                     help='check the runner\'s own logic; needs no cluster and no Docker')
+    ap.add_argument('--until', default=STAGES[-1], choices=STAGES,
+                    help='stop after this stage, for debugging (implies --keep)')
     args = ap.parse_args()
 
     if args.self_test:
         phase('Self-test')
         return self_test()
+    if args.until != STAGES[-1]:
+        args.keep = True
 
     started = time.time()
+    stages_run = []
+    versions = {}
     try:
         preflight(args)
         create_cluster(args)
         deploy_workload(args)
-        versions = install_controllers(args)
+
+        # ---- Stage 1: ingress-nginx, alone, works -------------------------
+        phase('Stage 1 — ingress-nginx serves the original')
+        versions['ingress-nginx'] = install_community(args)
         apply_source(args)
-        converted = convert(args)
-        apply_converted(args, converted)
-
-        community_target = controller_service(COMMUNITY_NS, 'app.kubernetes.io/name=ingress-nginx')
-        nic_target = controller_service(NIC_NS, 'app.kubernetes.io/instance=nic')
-
-        # Both controllers need to have actually programmed their config.
+        community_target = controller_service(COMMUNITY_NS, COMMUNITY_SELECTOR)
         wait_for('the community controller to serve the Ingress',
                  lambda: http(community_target, CASES[0])['status'] == 200, timeout=180)
+        baseline, failures = probe_absolute(args, community_target, 'ingress-nginx')
+        stages_run.append('baseline')
+        if failures:
+            raise Fail('the baseline itself does not work (%s). Nothing downstream is meaningful '
+                       '— this is the fixture or ingress-nginx, not the migration.'
+                       % ', '.join(failures))
+        if args.until == 'baseline':
+            return finish(args, started, stages_run, versions, [])
+
+        # ---- Stage 2: NIC installs and answers ----------------------------
+        phase('Stage 2 — NIC is installed and healthy')
+        versions['NIC'] = install_nic(args)
+        nic_target = controller_service(NIC_NS, NIC_SELECTOR)
+        check_nic_ready(nic_target)
+        stages_run.append('nic-installed')
+        if args.until == 'nic-installed':
+            return finish(args, started, stages_run, versions, [])
+
+        # ---- Stage 3: converted, both serving side by side ----------------
+        phase('Stage 3 — converted, both controllers serving')
+        converted = convert(args)
+        apply_converted(args, converted)
         wait_for('NIC to serve the converted resources',
                  lambda: http(nic_target, CASES[0])['status'] in (200, 301, 308), timeout=180)
 
-        failures = compare(args, community_target, nic_target)
+        say('\n  ingress-nginx, still serving the original:')
+        _, regressions = probe_absolute(args, community_target, 'ingress-nginx')
+        if regressions:
+            raise Fail('applying the converted resources disturbed the incumbent controller (%s). '
+                       'A migration must not affect what is still live.' % ', '.join(regressions))
+
+        say('\n  NIC, serving the converted resources (vs the stage 1 baseline):')
+        failures = probe_against(args, nic_target, baseline, 'nic')
+        stages_run.append('converted')
+        if failures:
+            return finish(args, started, stages_run, versions, failures)
+        if args.until == 'converted':
+            return finish(args, started, stages_run, versions, [])
+
+        # ---- Stage 4: ingress-nginx gone, NIC alone -----------------------
+        phase('Stage 4 — ingress-nginx removed, NIC alone')
+        uninstall_community()
+        # Prove the old side is really gone, or "NIC serves this" proves nothing.
+        gone = http(community_target, CASES[0])
+        if gone['status'] != 0:
+            raise Fail('the community controller still answered with HTTP %s after uninstall, so '
+                       'nothing below would prove NIC is serving.' % gone['status'])
+        say('  ok    ingress-nginx no longer answers')
+        say('\n  NIC alone (vs the stage 1 baseline):')
+        failures = probe_against(args, nic_target, baseline, 'nic')
+        stages_run.append('cutover')
     except Fail as err:
         say('\nFAILED: %s' % err)
         teardown(args)
@@ -670,17 +793,46 @@ def main():
         teardown(args)
         return 1
 
+    return finish(args, started, stages_run, versions, failures)
+
+
+def check_nic_ready(nic_target):
+    """NIC is up and answering, before any converted resource exists. Separating
+    this from stage 3 is the point of the tiering: an install problem and a
+    conversion problem look identical at the HTTP layer otherwise."""
+    crds = kubectl('get', 'crd', '-o', 'name', check=False).stdout
+    for kind in ('virtualservers.k8s.nginx.org', 'policies.k8s.nginx.org',
+                 'transportservers.k8s.nginx.org'):
+        if kind not in crds:
+            raise Fail('CRD %s is not installed — NIC cannot serve VirtualServers' % kind)
+    say('  ok    CRDs installed (VirtualServer, Policy, TransportServer)')
+
+    # With no resource for this host yet, a healthy NIC answers 404 from its
+    # default server. A connection error means the controller is not serving at
+    # all, which is a different problem entirely.
+    probe = wait_for('NIC to answer on its Service',
+                     lambda: http(nic_target, CASES[0]) or None, timeout=120)
+    if probe['status'] == 0:
+        raise Fail('NIC did not answer on %s (%s)' % (nic_target, probe.get('error')))
+    say('  ok    controller answers on its Service (HTTP %d, no resources yet)' % probe['status'])
+
+
+def finish(args, started, stages_run, versions, failures):
     phase('Result')
     say('  target        %s' % args.target)
     for label, image in versions.items():
         say('  %-13s %s' % (label, image))
+    say('  stages        %s' % ' -> '.join(stages_run))
     say('  elapsed       %ds' % (time.time() - started))
     if failures:
-        say('\n  %d of %d cases did not match: %s' % (len(failures), len(CASES), ', '.join(failures)))
-        say('  A mismatch is a real difference between the two controllers — read the rows above.')
+        say('\n  %d case(s) did not match the baseline: %s' % (len(failures), ', '.join(failures)))
+        say('  A mismatch is a real behavioural difference — read the rows above.')
         teardown(args)
         return 1
-    say('\n  all %d cases behave identically through both controllers.' % len(CASES))
+    if 'cutover' in stages_run:
+        say('\n  ingress-nginx removed; NIC alone serves every case exactly as ingress-nginx did.')
+    else:
+        say('\n  stopped after "%s" as requested; cluster left running.' % args.until)
     teardown(args)
     return 0
 

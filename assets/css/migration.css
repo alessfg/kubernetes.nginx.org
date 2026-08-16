@@ -455,9 +455,9 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
    matches `git log -S` finds are the CSS rule itself, from back when the
    styles lived inside the HTML. It was restyled twice by people who assumed
    it showed up on the page. check-classes.py now reports it; it used to skip
-   every class starting with `badge-`. Teal, which this comment used to offer
-   it, is now spent on `.badge-ingress`; olive (6) and yellow (11) are what is
-   left, and neither matches anything production styles today. */
+   every class starting with `badge-`. If an annotation badge is ever wanted,
+   teal (5) and yellow (11) are what is left. Teal is still free — the Ingress badge took olive instead, because
+   teal read as a third blue beside VirtualServer and VirtualServerRoute. */
 /* The one neutral, and production agrees — GlobalConfiguration is grey there,
    at zero saturation, so it is the only badge with no nearest graph family.
    It is also the right one to leave uncoloured: GlobalConfiguration is

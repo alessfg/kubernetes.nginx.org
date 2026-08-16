@@ -36,6 +36,15 @@ It **exits 1 when it finds nothing** rather than returning empty, because "no hi
 
 Then `Read` with `offset`/`limit`. Resolving one annotation costs ~3.5k tokens this way against ~126k for reading both files whole.
 
+The general habits matter as much as the big files:
+
+- **`wc -c` before reading anything unfamiliar.** Several files here are over 30KB, and `cat`-ing a handful blind is how a session doubles in size.
+- **`Edit`, not `Write`, on a file that already exists.** Rewriting a 17KB file to change six lines costs 17KB of output.
+- **`grep -c` or `-l`** when you need a count or existence rather than the matching lines.
+- **Batch independent commands into one call**, and don't re-read a file already in context.
+- **One `check-all.py` per logical change**, not per step.
+- **`git log --oneline`.** Bodies here are long by design; ask for them only when you need the reasoning.
+
 ## Directory layout
 
 ```
@@ -112,7 +121,6 @@ The `repo-checks` skill has the rest: what each check asserts, the seven shell f
 
 **Pushing to `main` is deploying.** Pages serves this branch; a push is live in roughly a minute, and CI finishes at about the same time, so a red run does not stop a bad commit reaching production. Verify before you push, not after.
 
-- Routine work goes straight to `main`. Large or risky efforts get a branch by explicit request.
 - `preview/**` branches carry additional migration tools on the same engine. **`main` owns the shared engine and the checks** — `assets/js/shared.js`, `assets/js/migration-core.js`, `.github/scripts/`, `.github/test/` and this file. A branch behind `main` on those is graded by its own older checks, so CI warns about it. Merge `main` into the branch rather than porting fixes across.
 - To undo something on `main`: `git revert <sha>` and push. **Never** `push --force`, `reset --hard` or `clean` on a pushed branch — the deployed history is the record.
 

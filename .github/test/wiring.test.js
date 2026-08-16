@@ -20,6 +20,8 @@ const PAGES = [
       alphabeticalCategories: false },
     { name: 'haproxy', page: 'haproxy-migration.html', module: 'assets/js/migration-haproxy.js',
       alphabeticalCategories: true },
+    { name: 'traefik', page: 'traefik-migration.html', module: 'assets/js/migration-traefik.js',
+      alphabeticalCategories: true },
 ];
 
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');

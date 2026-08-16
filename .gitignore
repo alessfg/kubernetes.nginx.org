@@ -28,3 +28,12 @@ Thumbs.db
 # Logs #
 ########
 *.log
+
+###########################################
+# Render artefact from .github/scripts/   #
+###########################################
+# shot.sh copies the page it is about to render to .shot-tmp.html in the repo
+# root and removes it on exit. A killed render leaves it behind, where it
+# dirties `git status` — the signal used to prove a temporary edit was
+# reverted — and check-classes.py skips it for the same reason.
+.shot-tmp.html

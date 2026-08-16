@@ -15,6 +15,7 @@ const { ROOT, loadAnalyzer, idsQueriedBy } = require('./lib/load.js');
 const PAGES = [
     { name: 'ingress-nginx', page: 'ingress-nginx-migration.html', module: 'assets/js/migration-ingress-nginx.js' },
     { name: 'haproxy', page: 'haproxy-migration.html', module: 'assets/js/migration-haproxy.js' },
+    { name: 'traefik', page: 'traefik-migration.html', module: 'assets/js/migration-traefik.js' },
 ];
 
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');

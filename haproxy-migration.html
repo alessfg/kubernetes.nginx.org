@@ -568,33 +568,6 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> Policy CRDs attach to Ingress resources via <code>nginx.org/policies</code> since v5.4.0 (requires the controller flag <code>-enable-custom-resources</code>), or to VirtualServer/VirtualServerRoute <code>spec.policies</code>. <code>accessControl</code> matches on <code>$remote_addr</code> — behind another proxy, set the real-ip ConfigMap keys (<code>set-real-ip-from</code>, <code>real-ip-header</code>, <code>real-ip-recursive</code>) so the real client IP is evaluated. When a value starts with <code>patterns/</code> it references a ConfigMap pattern file — inline those CIDRs into the Policy by hand. On mergeable Ingresses the annotation must sit on the master.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/blacklist</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.deny</code> (deprecated alias)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-  annotations:
-    haproxy.org/blacklist: "203.0.113.0/24"  # deprecated alias of deny-list</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: Policy
-metadata:
-  name: access-control-deny
-spec:
-  accessControl:
-    deny:  # blacklist (deprecated alias)
-      - 203.0.113.0/24
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "access-control-deny"</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>blacklist</code> is a <strong>deprecated</strong> HAProxy alias of <code>deny-list</code> (it logs a deprecation warning) — migrate it exactly as <code>deny-list</code> to a single <code>accessControl.deny</code> Policy.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
                             <td><code>haproxy.org/deny-list</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.deny</code><span class="or-text">— or —</span><code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span></td>
                         </tr>
@@ -674,7 +647,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/forwarded-for</code></td>
-                            <td>Automatic (<code>X-Forwarded-For</code> always sent)</td>
+                            <td>Not needed — sent automatically</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -722,33 +695,6 @@ data:
   real-ip-recursive: "True"</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Real-IP settings are controller-global in NIC (ConfigMap), not per-Ingress — one header applies to all applications. NIC ignores <code>real-ip-header</code> unless the connecting peer matches <code>set-real-ip-from</code>, so that key is required.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>haproxy.org/whitelist</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.allow</code> (deprecated alias)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-  annotations:
-    haproxy.org/whitelist: "10.0.0.0/8"  # deprecated alias of allow-list</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: Policy
-metadata:
-  name: access-control-allow
-spec:
-  accessControl:
-    allow:  # whitelist (deprecated alias)
-      - 10.0.0.0/8
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "access-control-allow"</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>whitelist</code> is a <strong>deprecated</strong> HAProxy alias of <code>allow-list</code> (it logs a deprecation warning) — migrate it exactly as <code>allow-list</code> to a single <code>accessControl.allow</code> Policy.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -917,7 +863,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/auth-type</code></td>
-                            <td>Enable only — no separate field</td>
+                            <td>No direct equivalent (use <code>basicAuth</code>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1012,7 +958,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/server-proto</code></td>
-                            <td><code>nginx.org/grpc-services</code> (gRPC only)</td>
+                            <td><code>nginx.org/grpc-services</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1091,7 +1037,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/send-proxy-protocol</code></td>
-                            <td>No direct equivalent (HTTP)</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1128,7 +1074,7 @@ spec:
                 <table class="mapping-table" aria-labelledby="client-mtls"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>haproxy.org/client-ca</code></td>
+                            <td><code>client-ca</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS.clientCertSecret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -1169,7 +1115,7 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> Scope shift — HAProxy configures client mTLS controller-wide (ConfigMap); NIC's <code>ingressMTLS</code> attaches per VirtualServer (<code>spec.policies</code>) or per Ingress (<code>nginx.org/policies</code>, since v5.5.0), so apply the Policy to every host that needs it. On mergeable Ingresses it must sit on the master.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/client-crt-optional</code></td>
+                            <td><code>client-crt-optional</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS.verifyClient</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -1193,8 +1139,8 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> Polarity — HAProxy's default (<code>false</code>) enforces the certificate, so map <code>false</code> → <code>verifyClient: "on"</code> (the NIC default) and <code>true</code> → <code>"optional"</code>. Do <strong>not</strong> use <code>optional_no_ca</code>: it skips CA verification, whereas HAProxy still verifies an optional certificate against <code>client-ca</code>. <code>verifyDepth</code> defaults to <code>1</code> on both sides. Requires the <code>client-ca</code> Policy above.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/client-strict-sni</code></td>
-                            <td><code>-default-server-tls-secret</code> (controller flag, inverse)</td>
+                            <td><code>client-strict-sni</code></td>
+                            <td><code>-default-server-tls-secret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1225,12 +1171,17 @@ data:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/rate-limit-period</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>rateLimit.rate</code> denominator</td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>rateLimit.rate</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>haproxy.org/rate-limit-requests: "10"
-haproxy.org/rate-limit-period: "1s"</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/rate-limit-requests: "10"
+    haproxy.org/rate-limit-period: "1s"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No standalone period field — it folds into the rate denominator:
 #   period 1s → rate: 10r/s
 #   period 1m → rate: 10r/m</code></pre></div>
@@ -1308,7 +1259,12 @@ metadata:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>haproxy.org/rate-limit-size: "100k"  # tracked IP entries (default 100k)</code></pre></div>
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/rate-limit-size: "100k"  # tracked IP entries (default 100k)</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
@@ -1322,7 +1278,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>haproxy.org/rate-limit-size: "100k"  # tracked IP entries (default 100k)</code></pre></div>
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/rate-limit-size: "100k"  # tracked IP entries (default 100k)</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -1345,7 +1306,12 @@ metadata:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>haproxy.org/rate-limit-status-code: "429"  # default 403</code></pre></div>
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/rate-limit-status-code: "429"  # default 403</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
@@ -1359,7 +1325,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>haproxy.org/rate-limit-status-code: "429"  # default 403</code></pre></div>
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/rate-limit-status-code: "429"  # default 403</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -2132,7 +2103,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>timeout-client</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code> (escape hatch)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2185,7 +2156,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>timeout-http-request</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code> (escape hatch)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2567,6 +2538,70 @@ spec:
                 </table>
             </div>
 
+            <!-- Deprecated -->
+            <h3 id="deprecated">Deprecated</h3>
+            <div class="info-box note"><strong>Deprecated by HAProxy:</strong> these annotations still work at v3.2.12 but log a deprecation warning. Each migrates exactly as its current-name equivalent under <a href="#access-control">Access control</a> — there is no separate NIC construct for the alias.</div>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="deprecated"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>haproxy.org/blacklist</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.deny</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/blacklist: "203.0.113.0/24"  # deprecated alias of deny-list</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: access-control-deny
+spec:
+  accessControl:
+    deny:  # blacklist (deprecated alias)
+      - 203.0.113.0/24
+
+# Attach via VirtualServer spec.policies, or on Ingress via:
+#   annotations:
+#     nginx.org/policies: "access-control-deny"</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>blacklist</code> is a <strong>deprecated</strong> HAProxy alias of <code>deny-list</code> (it logs a deprecation warning) — migrate it exactly as <code>deny-list</code> to a single <code>accessControl.deny</code> Policy.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>haproxy.org/whitelist</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.allow</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/whitelist: "10.0.0.0/8"  # deprecated alias of allow-list</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: access-control-allow
+spec:
+  accessControl:
+    allow:  # whitelist (deprecated alias)
+      - 10.0.0.0/8
+
+# Attach via VirtualServer spec.policies, or on Ingress via:
+#   annotations:
+#     nginx.org/policies: "access-control-allow"</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>whitelist</code> is a <strong>deprecated</strong> HAProxy alias of <code>allow-list</code> (it logs a deprecation warning) — migrate it exactly as <code>allow-list</code> to a single <code>accessControl.allow</code> Policy.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
             <h3 id="global-settings">Global settings</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="global-settings"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -2658,9 +2693,16 @@ metadata:
   name: my-app
   annotations:
     haproxy.org/abortonclose: "true"
-    haproxy.org/clean-certs: "true"
     haproxy.org/scale-server-slots: "42"
-    haproxy.org/standalone-backend: "true"</code></pre></div>
+    haproxy.org/standalone-backend: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  clean-certs: "true"  # ConfigMap-scoped only</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Not applicable — remove all four; the F5 NGINX Ingress Controller
 # architecture makes them unnecessary:
 #   abortonclose       → NGINX already aborts the upstream request on
@@ -2683,7 +2725,7 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>log-format</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>log-format</code> (hand-translated)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>log-format</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3621,7 +3663,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>timeout-client</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code> (no client-timeout key)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3691,7 +3733,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>timeout-http-request</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code> (no whole-request key)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3809,8 +3851,8 @@ data:
                 <table class="mapping-table" aria-labelledby="static-connection-handling"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>haproxy.org/http-connection-mode</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>keepalive</code> (upstream) + <code>keepalive-timeout</code> (client)</td>
+                            <td><code>http-connection-mode</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>keepalive</code> + <code>keepalive-timeout</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3833,48 +3875,8 @@ data:
                             <div class="info-box note"><strong>Note:</strong> No single toggle — the mode splits into upstream keep-alive (the <code>keepalive</code> <em>count</em>, off by default) and client keep-alive (<code>keepalive-timeout</code>, on by default). <code>http-server-close</code> already matches the NGINX default (emit nothing); <code>httpclose</code> maps to <code>keepalive-timeout: "0"</code>.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/http-keep-alive</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>keepalive</code> (deprecated alias)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-  namespace: haproxy-controller
-data:
-  http-keep-alive: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  keepalive: "64"  # positive upstream keep-alive count</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>http-keep-alive</code> is a <strong>deprecated</strong> HAProxy alias of <code>http-connection-mode</code> (it logs a deprecation warning). Upstream keep-alive is a connection count, off by default in NGINX.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>haproxy.org/http-server-close</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> matches the NGINX default (no key)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-  namespace: haproxy-controller
-data:
-  http-server-close: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Nothing to emit — client keep-alive on, no upstream
-# keep-alive IS the NGINX default. Remove the annotation.</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>http-server-close</code> is a <strong>deprecated</strong> HAProxy alias of <code>http-connection-mode</code>. Its effect (client keep-alive on, no upstream keep-alive) is already the NGINX default — nothing to configure.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>haproxy.org/maxconn</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-connections</code> (approximate)</td>
+                            <td><code>maxconn</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-connections</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3895,8 +3897,8 @@ data:
                             <div class="info-box note"><strong>Approximate:</strong> HAProxy <code>maxconn</code> is process-wide; NGINX <code>worker-connections</code> is per-worker and counts client + upstream + internal connections. Effective capacity ≈ <code>worker-connections</code> × <code>worker-processes</code> — divide accordingly.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/nbthread</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-processes</code> (approximate)</td>
+                            <td><code>nbthread</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-processes</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3926,8 +3928,8 @@ data:
                 <table class="mapping-table" aria-labelledby="logging"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>haproxy.org/log-format</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>log-format</code> (hand-translated)</td>
+                            <td><code>log-format</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>log-format</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3951,8 +3953,8 @@ data:
                             <div class="info-box warning"><strong>Hand-translation required:</strong> HAProxy <code>%</code>-tokens are a different DSL from NGINX <code>$</code>-variables (<code>%ci</code>≈<code>$remote_addr</code>, <code>%ST</code>≈<code>$status</code>, <code>%Tr</code>≈<code>$upstream_response_time</code>) — never copy them verbatim. Several HAProxy timers (<code>%Tw</code>/<code>%Tc</code>/<code>%Ta</code>) have no NGINX variable. <code>log-format</code> is <strong>global</strong> (one HTTP format).</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/log-format-tcp</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>stream-log-format</code> (hand-translated)</td>
+                            <td><code>log-format-tcp</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>stream-log-format</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3976,7 +3978,7 @@ data:
                             <div class="info-box warning"><strong>Hand-translation required:</strong> tcplog tokens become NGINX stream <code>$</code>-variables (<code>%ci:%cp</code>≈<code>$remote_addr:$remote_port</code>, <code>%B</code>≈<code>$bytes_sent</code>). <code>stream-log-format</code> applies globally to <strong>all</strong> TransportServer traffic (not per TCP service).</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/syslog-server</code></td>
+                            <td><code>syslog-server</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log</code> (<code>syslog:</code> destination)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3998,7 +4000,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> Access log only — there is no ConfigMap key to send the NGINX <em>error</em> log to syslog (only <code>error-log-level</code> controls its verbosity). Single destination (no multi-server fan-out); HAProxy <code>format</code>/<code>length</code>/<code>minlevel</code> fields have no equivalent. NIC ignores any <code>access-log</code> value that does not start with <code>syslog:</code>. If HAProxy logged to <code>stdout</code>, that is already the NIC default — leave it unset.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/dontlognull</code></td>
+                            <td><code>dontlognull</code></td>
                             <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4017,7 +4019,7 @@ data:
                             <div class="info-box warning"><strong>No direct equivalent:</strong> there is no <code>option dontlognull</code> analogue, but it is generally moot — NGINX logs completed requests only. Remove the annotation.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/logasap</code></td>
+                            <td><code>logasap</code></td>
                             <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4046,8 +4048,8 @@ data:
                 <table class="mapping-table" aria-labelledby="static-configuration-snippets"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>haproxy.org/frontend-config-snippet</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>server-snippets</code> (rewritten)</td>
+                            <td><code>frontend-config-snippet</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>server-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4073,7 +4075,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> HAProxy frontend <code>http-request</code>/<code>http-response</code> rules and ACLs have no 1:1 server-context equivalent — re-express each as native NIC constructs (Policies, VirtualServer matches) where possible before falling back to a snippet.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/global-config-snippet</code></td>
+                            <td><code>global-config-snippet</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>main-snippets</code> / <code>http-snippets</code> (native <code>ssl-*</code> keys preferred)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4099,7 +4101,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> Route <code>ssl-default-bind-*</code> directives to native ConfigMap keys — <code>ssl-ciphers</code>, <code>ssl-protocols</code>, <code>ssl-prefer-server-ciphers</code>, <code>ssl-dhparam-file</code> — and reserve <code>main-snippets</code> / <code>http-snippets</code> for directives with no native key (<code>tune.*</code>, <code>ssl_ecdh_curve</code>, and similar).</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/stats-config-snippet</code></td>
+                            <td><code>stats-config-snippet</code></td>
                             <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4131,7 +4133,7 @@ data:
                 <table class="mapping-table" aria-labelledby="client-mtls-proxy"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>haproxy.org/client-ca</code></td>
+                            <td><code>client-ca</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS.clientCertSecret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4161,12 +4163,18 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> HAProxy <code>client-ca</code> Secrets carry the CA under <code>tls.crt</code>; NIC needs a Secret of type <code>nginx.org/ca</code> with the bundle under <code>ca.crt</code> (optional CRL under <code>ca.crl</code>) — recreate it, do not just reference it. Requires TLS termination on the host (NIC ignores ingressMTLS for a TLS-disabled host). Verification failures return <strong>HTTP 400</strong> (not 500). On mergeable Ingress it must sit on the master. Ingress-attachable since v5.5.0.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/client-crt-optional</code></td>
+                            <td><code>client-crt-optional</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS.verifyClient</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>haproxy.org/client-crt-optional: "true"  # request but do not enforce</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  client-crt-optional: "true"  # request but do not enforce</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>spec:
   ingressMTLS:
     clientCertSecret: ca-secret
@@ -4176,13 +4184,19 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> Polarity — HAProxy defaults to enforced (<code>false</code>). Map <code>false</code> → <code>verifyClient: "on"</code>, <code>true</code> → <code>verifyClient: "optional"</code>. Do <strong>not</strong> use <code>optional_no_ca</code> (it skips CA verification; HAProxy still verifies against <code>client-ca</code> when optional). <code>verifyDepth</code> defaults to 1 on both sides.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/proxy-protocol</code></td>
+                            <td><code>proxy-protocol</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>proxy-protocol</code> + <code>real-ip-header</code> + <code>set-real-ip-from</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># per-source-CIDR PROXY accept-list
-haproxy.org/proxy-protocol: "10.0.0.0/8,192.168.0.0/16"</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  # per-source-CIDR PROXY accept-list
+  proxy-protocol: "10.0.0.0/8,192.168.0.0/16"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -4204,7 +4218,7 @@ data:
                 <table class="mapping-table" aria-labelledby="global-lifecycle"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>haproxy.org/hard-stop-after</code></td>
+                            <td><code>hard-stop-after</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-shutdown-timeout</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4354,6 +4368,56 @@ spec:
                 </table>
             </div>
 
+            <!-- Deprecated -->
+            <h3 id="static-deprecated">Deprecated</h3>
+            <div class="info-box note"><strong>Deprecated by HAProxy:</strong> both keys are aliases of <code>http-connection-mode</code> and log a deprecation warning at v3.2.12. Migrate them as that key does, under <a href="#static-connection-handling">Connection handling</a>.</div>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="static-deprecated"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>http-keep-alive</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>keepalive</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  http-keep-alive: "true"</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  keepalive: "64"  # positive upstream keep-alive count</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>http-keep-alive</code> is a <strong>deprecated</strong> HAProxy alias of <code>http-connection-mode</code> (it logs a deprecation warning). Upstream keep-alive is a connection count, off by default in NGINX.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>http-server-close</code></td>
+                            <td>Not needed — already the NGINX default</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  http-server-close: "true"</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Nothing to emit — client keep-alive on, no upstream
+# keep-alive IS the NGINX default. Remove the annotation.</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>http-server-close</code> is a <strong>deprecated</strong> HAProxy alias of <code>http-connection-mode</code>. Its effect (client keep-alive on, no upstream keep-alive) is already the NGINX default — nothing to configure.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
         </section>
 
         <section id="crd-mappings">
@@ -4379,7 +4443,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>cpu_maps</code> / <code>cpu_set</code> / <code>cpu_policy</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-cpu-affinity</code> (approximate)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-cpu-affinity</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4408,7 +4472,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>hard_stop_after</code> / <code>grace</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-shutdown-timeout</code> (approximate)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-shutdown-timeout</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4458,7 +4522,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>maxconn</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-connections</code> (approximate)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-connections</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4493,7 +4557,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nbthread</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-processes</code> (approximate)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-processes</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4836,7 +4900,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>client_timeout</code> / <code>http_request_timeout</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code> (no first-class key)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4862,7 +4926,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>forwardfor</code></td>
-                            <td>Automatic — NIC always sends X-Forwarded-For</td>
+                            <td>Not needed — sent automatically</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4909,7 +4973,7 @@ spec:                    # v1 wraps under spec.config
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>redispatch</code></td>
-                            <td><code>nginx.org/proxy-next-upstream</code> (per-resource)</td>
+                            <td><code>nginx.org/proxy-next-upstream</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4932,7 +4996,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>retries</code></td>
-                            <td><code>nginx.org/proxy-next-upstream-tries</code> (per-resource)</td>
+                            <td><code>nginx.org/proxy-next-upstream-tries</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5470,7 +5534,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>http_request</code> / <code>http_response</code> rules</td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>server-snippets</code> (rewritten)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>server-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5672,7 +5736,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--disable-ingress-status-update</code></td>
-                            <td>Inverse of <code>-report-ingress-status</code> (off by default)</td>
+                            <td>Not needed — already the NIC default</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5808,7 +5872,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--disable-service-external-name</code></td>
-                            <td><span class="badge badge-plus">NGINX Plus</span> ExternalName upstream (off unless used)</td>
+                            <td>Not needed — already the OSS default</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5824,7 +5888,7 @@ args:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--empty-ingress-class</code></td>
-                            <td>No flag — behavior differs by resource type</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5865,7 +5929,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--namespace-blacklist</code></td>
-                            <td>No exclusion flag — invert to <code>-watch-namespace</code> / <code>-watch-namespace-label</code></td>
+                            <td>No direct equivalent (use <code>-watch-namespace</code>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">

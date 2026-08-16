@@ -1635,7 +1635,12 @@
                             out.configMap.push({ fromLabel: label + ' ssl_default_bind_options', to: 'ssl-protocols', value: '# TODO: derive from "' + cmt(v) + '" (e.g. TLSv1.2 TLSv1.3)', note: 'HAProxy bind options mix protocol floors and flags — map protocols here, ssl-prefer-server-ciphers separately' });
                             break;
                         case 'ssl-dh-param-file':
-                            out.configMap.push({ fromLabel: label + ' ssl_dh_param_file', to: 'ssl-dhparam-file', value: String(v), note: null });
+                            // Despite the key name, NIC's ssl-dhparam-file holds the DH
+                            // parameters themselves (MainServerSSLDHParamFileContent):
+                            // the controller writes the file and points ssl_dhparam at
+                            // it. A HAProxy path carries no meaning here, so emit the
+                            // PEM envelope with the path named in the TODO.
+                            out.configMap.push({ fromLabel: label + ' ssl_dh_param_file', to: 'ssl-dhparam-file', value: '-----BEGIN DH PARAMETERS-----\n# TODO: paste the contents of ' + cmt(v) + '\n-----END DH PARAMETERS-----', note: 'the key takes the PEM content, not a path' });
                             break;
                         case 'cpu-maps':
                         case 'cpu-set':

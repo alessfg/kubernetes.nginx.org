@@ -154,6 +154,22 @@ test('rate-limit: requests/period convert to r/s or r/m and rejectCode stays exp
     assert.match(perMinute, /rejectCode: 403/, 'unset status-code must emit the HAProxy 403 default');
 });
 
+// NIC stores this key's value as MainServerSSLDHParamFileContent and writes
+// the file itself (configurator AddOrUpdateDHParam), so the key holds the DH
+// parameters, not a path. Passing HAProxy's path straight through looks right
+// and breaks the reload.
+test('ssl_dh_param_file emits PEM content, never the HAProxy path', () => {
+    const { source } = load();
+    const cr = [
+        'apiVersion: ingress.v3.haproxy.org/v3', 'kind: Global', 'metadata:', '  name: haproxy-global',
+        'spec:', '  ssl_options:', '    dh_param_file: /etc/ssl/dhparam.pem',
+    ].join('\n');
+    const { text } = analyze(source, cr, 'crd');
+    assert.match(text, /ssl-dhparam-file: \|/, 'must be a block scalar, not a quoted scalar');
+    assert.match(text, /-----BEGIN DH PARAMETERS-----/);
+    assert.ok(!/ssl-dhparam-file: "/.test(text), 'must not emit the path as the value');
+});
+
 test('load-balance: verified value map incl. no-equivalent fallbacks', () => {
     const { source } = load();
     const lb = (v) => analyze(source, ingressWith({ 'haproxy.org/load-balance': v }), 'annotation');

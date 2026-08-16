@@ -86,6 +86,24 @@ for (const p of PAGES) {
         assert.deepEqual(missingAnchors, [], 'mapping anchors');
     });
 
+    // A cell that offers two ways — "— or —", or a slash between two named
+    // targets — promises both below it. The panel delivers that with approach
+    // tabs. Naming an alternative and then showing one form is the drift this
+    // catches: ingress-nginx has 42 such cells and 42 tabbed panels.
+    test(`${p.name}: every alternative offered in a cell has an example`, () => {
+        const rows = [...page.matchAll(/<tr class="expandable">\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)];
+        const unbacked = [];
+        for (const [, head, panel] of rows) {
+            const cells = [...head.matchAll(/<td>([\s\S]*?)<\/td>/g)].map((m) => m[1]);
+            if (cells.length !== 2) continue;
+            const offersAlternative = cells[1].includes('or-text') || /<\/code>\s*\/\s*(<span|[A-Za-z])/.test(cells[1]);
+            if (offersAlternative && !panel.includes('approach-tab')) {
+                unbacked.push(cells[0].replace(/<[^>]+>/g, '').trim().slice(0, 40));
+            }
+        }
+        assert.deepEqual(unbacked, [], 'cells offering an alternative with no tabbed example');
+    });
+
     // Categories are alphabetical within their section, so the order a reader
     // scrolls past matches the order the category filter offers. Appending a new
     // category to the end is the easy mistake and is invisible on a long page.

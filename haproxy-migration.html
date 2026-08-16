@@ -1701,7 +1701,7 @@ data:
                     <tbody>
                         <tr class="expandable">
                             <td><code>Backend</code> CRD</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code><span class="or-text">— or —</span><code>nginx.org/*</code> annotations</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="info-box note"><strong>Note:</strong> Per-backend settings (load balancing, timeouts, health checks, cookie persistence, backend TLS) become VirtualServer <code>upstreams[]</code> fields or the matching <code>nginx.org/*</code> annotations. TCP-mode Backends convert to a TransportServer instead. See the <a href="#crd-backend">HAProxy Backend CRD</a> field-mapping table for the full breakdown.</div>
@@ -2764,20 +2764,45 @@ spec:
                             <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.host</code> / Ingress rule host</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="ingress">Ingress Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                            </div>
+                            <div class="approach-content active" data-approach="ingress">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
 spec:
   rules:
     - host: "*.example.com"  # leading-label wildcard</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  ingressClassName: nginx  # the only edit — the host carries over as written
+  rules:
+    - host: "*.example.com"</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  rules:
+    - host: "*.example.com"  # leading-label wildcard</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: my-app
 spec:
   host: "*.example.com"  # passes through unchanged (leading-label only)</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Leading-label wildcards (<code>*.example.com</code>) port unchanged. NIC, like HAProxy, does not support mid-label or bare-suffix wildcards, and <code>spec.host</code> must be single and unique across Ingress and VirtualServer resources.</div>
                         </div></td></tr>
@@ -5782,7 +5807,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--default-ssl-certificate</code></td>
-                            <td><code>-default-server-tls-secret &lt;ns&gt;/&lt;name&gt;</code><span class="or-text">— or —</span><code>-wildcard-tls-secret &lt;ns&gt;/&lt;name&gt;</code></td>
+                            <td><code>-default-server-tls-secret &lt;ns&gt;/&lt;name&gt;</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5908,14 +5933,34 @@ spec:
                             <td><code>-watch-namespace &lt;a,b&gt;</code><span class="or-text">— or —</span><code>-watch-namespace-label</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="watch-name">By Name</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="watch-label">By Label</button>
+                            </div>
+                            <div class="approach-content active" data-approach="watch-name">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --namespace-whitelist=team-a
   - --namespace-whitelist=team-b  # repeat the flag per namespace</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>args:
-  - -watch-namespace=team-a,team-b  # one flag, comma-separated
-  # ...or select by namespace label instead (not both):
-  # - -watch-namespace-label=nginx-watch=true</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>args:
+  - -watch-namespace=team-a,team-b  # one flag, comma-separated</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="watch-label">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
+  - --namespace-whitelist=team-a
+  - --namespace-whitelist=team-b  # repeat the flag per namespace</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>args:
+  - -watch-namespace-label=nginx-watch=true
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+  labels:
+    nginx-watch: "true"  # every watched namespace carries the label</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Collapse repeated flags into one comma list. <code>-watch-namespace</code> XOR <code>-watch-namespace-label</code>. Secrets: <code>-watch-secret-namespace</code>.</div>
                         </div></td></tr>

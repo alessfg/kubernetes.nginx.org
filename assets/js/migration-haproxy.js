@@ -267,12 +267,12 @@
         // `route-acl` carries one raw HAProxy ACL expression (use_backend condition).
         // Translate the small set of portable primitives; everything else is
         // reported untranslatable. Handled shapes:
-        //   rand(100) lt 25                      → percentage split
+        //   rand(100) lt 25                     → percentage split
         //   cookie(NAME) -m str V / req.cook(..) → cookie condition
-        //   hdr(NAME) -m str V / req.hdr(..)     → header condition
-        //   urlp(NAME) -m str V / url_param(..)  → query-argument condition
-        //   method GET / method(GET)             → $request_method condition
-        //   src 10.0.0.0/8 192.168.0.0/16        → CIDR list (accessControl Policy)
+        //   hdr(NAME) -m str V / req.hdr(..)    → header condition
+        //   urlp(NAME) -m str V / url_param(..) → query-argument condition
+        //   method GET / method(GET)            → $request_method condition
+        //   src 10.0.0.0/8 192.168.0.0/16       → CIDR list (accessControl Policy)
         function parseRouteACL(value) {
             let s = String(value == null ? '' : value).trim().replace(/\s+/g, ' ');
             let m;
@@ -1004,7 +1004,7 @@
                     fromLabel: f.label,
                     to: isTcp ? 'stream-log-format' : 'log-format',
                     value: isTcp ? '$remote_addr [$time_local] $protocol $status $bytes_sent $bytes_received $session_time  # TODO: hand-translate your HAProxy tcplog tokens' : '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"  # TODO: hand-translate your HAProxy log-format tokens',
-                    note: 'HAProxy %-tokens are a different DSL — rewrite by hand ($remote_addr≈%ci, $status≈%ST, $upstream_response_time≈%Tr); several HAProxy timers (%Tw/%Tc/%Ta) have no nginx variable'
+                    note: 'HAProxy %-tokens are a different DSL — rewrite by hand ($remote_addr → %ci, $status → %ST, $upstream_response_time → %Tr); several HAProxy timers (%Tw/%Tc/%Ta) have no nginx variable'
                 });
                 out.notes.push({ code: f.label, message: 'The ' + (isTcp ? 'stream-log-format applies to ALL TransportServer traffic' : 'log-format applies to ALL HTTP traffic') + ' (global, not per-resource).' });
                 return out;

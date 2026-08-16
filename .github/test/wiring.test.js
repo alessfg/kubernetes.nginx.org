@@ -10,6 +10,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { ROOT, loadAnalyzer } = require('./lib/load.js');
 
+/* One entry per migration tool the branch ships. Branches that add a second
+   source module add a row here; nothing else in this file is source-specific. */
 const PAGES = [
     { name: 'ingress-nginx', page: 'ingress-nginx-migration.html', module: 'assets/js/migration-ingress-nginx.js' },
     { name: 'haproxy', page: 'haproxy-migration.html', module: 'assets/js/migration-haproxy.js' },
@@ -83,11 +85,7 @@ for (const p of PAGES) {
     // the reader then looks for that heading in the reference tables. Nothing
     // renders them together, so drift is invisible until someone hunts for a
     // heading that does not exist — "Access Control" against "Access control".
-    //
-    // haproxy only: main owns ingress-nginx-migration.html and its module, and
-    // fixed their casing after this branch forked. Asserting it here would fail
-    // on a pair the branch must not edit — merge main instead, then widen this.
-    test(`${p.name}: every mapping category is a heading on the page, verbatim`, { skip: p.name === 'haproxy' ? false : 'main owns this pair; its copy here predates the sentence-case pass' }, () => {
+    test(`${p.name}: every mapping category is a heading on the page, verbatim`, () => {
         const headings = new Set([...page.matchAll(/<h3 id="[\w-]+">(.*?)<\/h3>/g)]
             .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim()));
         const categories = new Set([...mod.matchAll(/category: ['"]([^'"]+)['"]/g)].map((m) => m[1])

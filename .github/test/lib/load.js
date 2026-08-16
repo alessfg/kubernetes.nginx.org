@@ -8,13 +8,16 @@
    `warnings` collects console.warn/console.error output — buildPlan swallows
    generator exceptions with console.warn, so a broken generator silently
    drops its resource; asserting warnings.length is the only way to catch it
-   (see "Verifying analyzer changes" in .claude/CLAUDE.md). */
+   (see "Verifying analyzer changes" in .claude/skills/migration-tool/SKILL.md). */
 
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const ROOT = path.join(__dirname, '..', '..');
+// This file lives at <root>/.github/test/lib/, so three levels up. Under
+// .github/ for the same reason the check scripts are: GitHub Pages publishes
+// this branch verbatim, and a top-level test/ would be served to the public.
+const ROOT = path.join(__dirname, '..', '..', '..');
 
 // Chainable no-op element: every method returns another stub element so
 // engine code that touches the DOM during load is inert.

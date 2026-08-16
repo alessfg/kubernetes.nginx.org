@@ -316,25 +316,33 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 .comparison-block.old h4 { background: var(--pomegranate-tint); color: var(--text); }
 .comparison-block.new h4 { background: var(--green-tint); color: var(--text); }
 .comparison-block pre { margin: 0; border: 0; border-radius: 0; }
-.comparison-copy-btn {
+/* Shared geometry for the two copy buttons the analyzer and the comparison
+   blocks build at runtime. They differ only in placement and rest colours;
+   everything below was written out twice, and the .copied state a third time
+   in a rule for a .copy-btn the migration page never renders. */
+.comparison-copy-btn, .analyzer-copy-btn {
     padding: 0 var(--space-base);
-    min-height: 20px;
-    background: var(--surface);
-    border: 1px solid var(--border-control);
+    border: 1px solid;
     border-radius: var(--radius);
-    color: var(--text-secondary);
     font-family: var(--font);
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
     cursor: pointer;
     transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
 }
-.comparison-copy-btn:hover { background: var(--surface-sunken); color: var(--text); }
-.comparison-copy-btn.copied {
+.comparison-copy-btn.copied, .analyzer-copy-btn.copied {
     background: var(--green-text);
     border-color: var(--green-text);
     color: var(--n0);
 }
+
+.comparison-copy-btn {
+    min-height: 20px;
+    background: var(--surface);
+    border-color: var(--border-control);
+    color: var(--text-secondary);
+}
+.comparison-copy-btn:hover { background: var(--surface-sunken); color: var(--text); }
 
 
 /* ── Approach tabs ────────────────────────────────────────────────────────
@@ -672,28 +680,6 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 .checklist li.checked span { color: var(--text-secondary); text-decoration: line-through; }
 
 
-/* ── Copy button (on comparison YAML) ─────────────────────────────────────
-   Distinct from shared.css's .copy-btn: this one floats inside a scrolling
-   <pre>, so it is sticky rather than absolutely positioned. */
-.copy-btn {
-    position: sticky;
-    right: var(--space-base);
-    float: right;
-    z-index: 2;
-    padding: 0 var(--space-base);
-    min-height: 20px;
-    background: var(--on-code);
-    border: 1px solid var(--on-code-strong);
-    border-radius: var(--radius);
-    color: var(--n300);
-    font-size: var(--fs-caption);
-    line-height: var(--lh-caption);
-    cursor: pointer;
-}
-.copy-btn:hover { background: var(--on-code-strong); color: var(--n0); }
-.copy-btn.copied { background: var(--green-text); border-color: var(--green-text); color: var(--n0); }
-
-
 /* ── YAML editor ──────────────────────────────────────────────────────────── */
 
 .yaml-editor { position: relative; }
@@ -949,20 +935,12 @@ button.analyzer-pill { font-family: var(--font); }
     top: var(--space-base);
     right: var(--space-base);
     z-index: 1;
-    padding: 0 var(--space-base);
     min-height: 24px;
     background: var(--on-code);
-    border: 1px solid var(--on-code-strong);
-    border-radius: var(--radius);
+    border-color: var(--on-code-strong);
     color: var(--n300);
-    font-family: var(--font);
-    font-size: var(--fs-caption);
-    line-height: var(--lh-caption);
-    cursor: pointer;
-    transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
 }
 .analyzer-copy-btn:hover { background: var(--on-code-strong); color: var(--n0); }
-.analyzer-copy-btn.copied { background: var(--green-text); border-color: var(--green-text); color: var(--n0); }
 
 
 .analyzer-crd-group {
@@ -1135,7 +1113,35 @@ button.analyzer-pill { font-family: var(--font); }
     cursor: pointer;
     transition: background var(--dur-colour) linear;
 }
+/* Spacing for the nodes the analyzer builds at runtime. These used to be
+   inline cssText inside migration-core.js, carrying raw 10px / 6px / 8px /
+   16px — off the 4px grid and invisible to check-tokens.py, which does not
+   read JS inline styles. Resolved onto the scale: 10 → 8, 6 → 8, 4 → 4. */
+.analyzer-note-card { margin: var(--space-base) 0; }
+.analyzer-note-body { margin-top: var(--space-base); font-size: var(--fs-body); line-height: var(--lh-body); }
+.analyzer-note-link {
+    display: inline-block;
+    margin-top: var(--space-small);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+}
+.analyzer-install-note { margin: 0 0 var(--space-2x); }
+.analyzer-crd-kind-badge { margin-right: var(--space-base); }
+.analyzer-crd-category {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-base);
+    margin-bottom: var(--space-small);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-secondary);
+}
+
 .analyzer-copy-all { margin-top: var(--space-2hx); background: var(--green-text); border-color: var(--green-text); color: var(--n0); }
+/* The export row lays the two buttons out itself, so the standalone
+   margin-top above would double the gap. Was an inline style="margin-top:0". */
+.analyzer-export-actions .analyzer-copy-all { margin-top: 0; }
 .analyzer-copy-all:hover, .analyzer-copy-all.copied { background: var(--green-deep); border-color: var(--green-deep); }
 .analyzer-copy-all svg, .analyzer-download-btn svg { flex-shrink: 0; }
 .analyzer-download-btn { background: var(--surface); border-color: var(--border-control); color: var(--text); }
@@ -1333,7 +1339,6 @@ button.analyzer-pill { font-family: var(--font); }
 :is(html, body).dark-mode .analyzer-step-number { color: var(--n700); }
 :is(html, body).dark-mode .analyzer-copy-all { color: var(--n700); }
 :is(html, body).dark-mode .comparison-copy-btn.copied,
-:is(html, body).dark-mode .copy-btn.copied,
 :is(html, body).dark-mode .analyzer-copy-btn.copied { color: var(--n700); }
 :is(html, body).dark-mode .checklist li.checked::before { background-color: var(--green); border-color: var(--green); }
 :is(html, body).dark-mode .scroll-to-top { color: var(--n700); }
@@ -1357,9 +1362,6 @@ button.analyzer-pill { font-family: var(--font); }
     .info-box { padding: var(--space-2x) var(--space-2x) var(--space-2x) var(--space-5x); }
     /* .feature-grid is flex on this page (unlike index.css's grid) — stack via the cards. */
     .feature-card { flex: 1 1 100%; }
-    .key-details { padding: var(--space-2x); }
-    .details-grid { grid-template-columns: 1fr; }
-    .preview-stats { gap: var(--space-2x); }
 }
 
 @media (max-width: 600px) {
@@ -1414,8 +1416,6 @@ button.analyzer-pill { font-family: var(--font); }
     pre { font-size: var(--fs-caption); line-height: var(--lh-caption); padding: var(--space-2x); }
     #yamlInput, .yaml-highlight-layer { min-height: 200px; }
     .doc-list { padding-left: var(--space-3x); }
-    .cta-row { flex-direction: column; }
-    .cta { justify-content: center; width: 100%; }
 }
 
 

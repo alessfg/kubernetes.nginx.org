@@ -147,9 +147,9 @@
     /* Darker companions, for the rare case where a status hue must carry text
        or a 3:1 mark. Emerald and Amber deliberately have none — see the note
        under Status marks below. */
-    --pomegranate-text: #C21F05;  /* 5.09:1 on N0 */
-    --java-text:        #00726A;  /* 4.72:1 on N0 */
-    --purple-text:      #5B49B5;  /* 5.61:1 on N0 */
+    --pomegranate-text: #C21F05;  /* 6.01:1 on N0 */
+    --java-text:        #00726A;  /* 5.81:1 on N0 */
+    --purple-text:      #5B49B5;  /* 6.85:1 on N0 */
 
     /* F5 Brand Red #E4002B is deliberately absent. F5DS restricts it to the
        logo, illustrations and pictograms, and forbids it as a CTA, link,
@@ -301,6 +301,15 @@
        over the dark surface it lifts rather than muddies, so the chip needs no
        dark override at all. Body text on it: 13.21:1 light, 9.99:1 dark. */
     --code-chip-bg: rgba(158, 167, 184, 0.22);
+
+    /* The accessible foreground for anything sitting on --blue-tint: the
+       blue-washed inline-code chip, and the ingress2gateway version pill.
+       The foreground cannot be --blue — Dodger Blue on its own 10% tint is
+       3.56:1, fine for a mark and short of the bar for text, and both of
+       these are text. --blue-text clears it at 5.70:1. Dark needs its own
+       value because --blue and --blue-text collapse to the same #7893FF
+       there (4.25:1 on the tint); --blue-deep is 5.37:1. */
+    --on-blue-tint: var(--blue-text);
 
     /* ── Border radius ─────────────────────────────────────────────────────
        F5DS publishes four values and one rule: 4px for all components and UI
@@ -477,6 +486,11 @@
         --blue-deep: #93A9FF;
         --blue-tint: rgba(120, 147, 255, 0.16);
 
+        /* --blue-text collapses onto --blue here, and #7893FF on its own 16%
+           tint is 4.25:1 — below the text bar. --blue-deep is the next step up
+           and clears it at 5.37:1 on the card, 6.05:1 on the page. */
+        --on-blue-tint: var(--blue-deep);
+
         /* The wash has to invert: on a dark page the tint is lifted above the
            background, so softening it means darkening toward N700, not lightening
            toward white. A white wash here would brighten the very edges it is
@@ -490,9 +504,9 @@
         --pomegranate-tint: rgba(249, 70, 39, 0.16);
         --purple-tint:      rgba(135, 119, 217, 0.18);
         --java-tint:        rgba(26, 203, 154, 0.14);
-        --pomegranate-text: #FF8A70;   /* 6.05:1 on N600 */
-        --java-text:        #4FE0BC;   /* 8.94:1 on N600 */
-        --purple-text:      #B3A6F0;   /* 7.03:1 on N600 */
+        --pomegranate-text: #FF8A70;   /* 6.79:1 on N600 */
+        --java-text:        #4FE0BC;   /* 9.47:1 on N600 */
+        --purple-text:      #B3A6F0;   /* 7.17:1 on N600 */
 
         /* Badges invert: the graph family's tint becomes the label, and the fill
            is that same tint at 16% over the surface. One value per family drives

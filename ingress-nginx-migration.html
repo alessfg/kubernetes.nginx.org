@@ -121,7 +121,7 @@
                         <ul class="sidebar-subnav open" id="subnav-getting-started">
                             <li><button class="sidebar-link" data-section="overview"><span class="dot"></span><span class="sidebar-link-name">Overview</span></button></li>
                             <li><button class="sidebar-link" data-section="why-migrate"><span class="dot"></span><span class="sidebar-link-name">Why migrate?</span></button></li>
-                            <li><button class="sidebar-link" data-section="phased-migration"><span class="dot"></span><span class="sidebar-link-name">Phased migration</span></button></li>
+                            <li><button class="sidebar-link" data-section="phased-migration"><span class="dot"></span><span class="sidebar-link-name">Phased migration strategy</span></button></li>
                             <li><button class="sidebar-link" data-section="features"><span class="dot"></span><span class="sidebar-link-name">CRDs summary</span></button></li>
                             <li><button class="sidebar-link" data-section="installation"><span class="dot"></span><span class="sidebar-link-name">Installing CRDs</span></button></li>
                             <li><button class="sidebar-link" data-section="checklist"><span class="dot"></span><span class="sidebar-link-name">Migration checklist</span></button></li>
@@ -189,7 +189,7 @@
 
         <div class="tool-page active" id="page-getting-started">
         <div class="info-box warning eol-warning" style="margin: 0 0 var(--space-2x);"><strong>Warning:</strong> The community-maintained <code>kubernetes/ingress-nginx</code> project has <a href="https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/" target="_blank" rel="noopener">reached end of maintenance</a>. <strong><span data-ingress-nginx-version>v1.15.1</span> (March 19, 2026) is the final release</strong> — it will receive no further releases, bugfixes, or security patches. The F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>) is actively maintained and is the recommended migration target.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Kubernetes Ingress NGINX (Ingress-NGINX) <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Kubernetes Ingress NGINX (Ingress-NGINX) <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.4" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.4</span></a>.</div>
 
         <section id="overview">
             <h2 id="migration-overview">Overview</h2>
@@ -304,15 +304,15 @@
         <!-- Installation -->
         <section id="installation">
             <h2 id="installing-crds">Installing CRDs</h2>
-            <p>CRDs can be installed via Helm or manually using manifests, depending on your deployment method. See the <a href="https://docs.nginx.com/nginx-ingress-controller/installation/" target="_blank" rel="noopener">F5 NGINX Ingress Controller installation docs</a> for full instructions.</p>
+            <p>CRDs can be installed via Helm or manually using manifests, depending on your deployment method. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/" target="_blank" rel="noopener">F5 NGINX Ingress Controller installation docs</a> for full instructions.</p>
             <div class="install-box"><h3>Helm (example)</h3>
                 <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">If you install the F5 NGINX Ingress Controller via Helm, CRDs are included automatically. To ensure they are enabled:</p>
-                <pre><code data-nic-helm-install>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version 2.6.1 --set controller.enableCustomResources=true</code></pre>
+                <pre><code data-nic-helm-install>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version 2.6.4 --set controller.enableCustomResources=true</code></pre>
                 <p style="margin: var(--space-2x) 0 0; font-size: var(--fs-caption); line-height: var(--lh-caption); opacity: 0.8;">The <code>controller.enableCustomResources</code> flag is <code>true</code> by default. If you previously disabled it, re-enable it to use CRD resources. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/helm/" target="_blank" rel="noopener">Helm installation guide</a> for details.</p>
             </div>
             <div class="install-box"><h3>Manifests (example)</h3>
                 <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">If you deploy using manifests, install CRDs manually before deploying the controller:</p>
-                <pre><code data-nic-crd-install>kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/v5.5.1/deploy/crds.yaml</code></pre>
+                <pre><code data-nic-crd-install>kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/v5.5.4/deploy/crds.yaml</code></pre>
                 <p style="margin: var(--space-2x) 0 0; font-size: var(--fs-caption); line-height: var(--lh-caption); opacity: 0.8;">Replace the version number with your target controller version. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/manifests/" target="_blank" rel="noopener">manifest installation guide</a> for the full step-by-step process.</p>
             </div>
             <div class="info-box note"><strong>Note:</strong> The <code>crds.yaml</code> file contains all CRDs (VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration) in a single manifest.</div>
@@ -353,7 +353,6 @@
             </ul>
         </section>
 
-        <!-- Phased Migration Strategy -->
         <!-- Resources -->
         <section id="resources">
             <h2 id="additional-resources">Additional resources</h2>
@@ -370,7 +369,7 @@
 
         <div class="tool-page" id="page-analyzer" hidden="until-found">
         <div class="info-box warning eol-warning" style="margin: 0 0 var(--space-2x);"><strong>Warning:</strong> The community-maintained <code>kubernetes/ingress-nginx</code> project has <a href="https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/" target="_blank" rel="noopener">reached end of maintenance</a>. <strong><span data-ingress-nginx-version>v1.15.1</span> (March 19, 2026) is the final release</strong> — it will receive no further releases, bugfixes, or security patches. The F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>) is actively maintained and is the recommended migration target.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Kubernetes Ingress NGINX (Ingress-NGINX) <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Kubernetes Ingress NGINX (Ingress-NGINX) <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.4" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.4</span></a>.</div>
         <!-- YAML Migration Analyzer -->
         <section id="analyzer">
             <h2 id="yaml-analyzer">Ingress NGINX config analyzer</h2>
@@ -433,7 +432,7 @@ spec:
 
         <div class="tool-page" id="page-reference" hidden="until-found">
         <div class="info-box warning eol-warning" style="margin: 0 0 var(--space-2x);"><strong>Warning:</strong> The community-maintained <code>kubernetes/ingress-nginx</code> project has <a href="https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/" target="_blank" rel="noopener">reached end of maintenance</a>. <strong><span data-ingress-nginx-version>v1.15.1</span> (March 19, 2026) is the final release</strong> — it will receive no further releases, bugfixes, or security patches. The F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>) is actively maintained and is the recommended migration target.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Kubernetes Ingress NGINX (Ingress-NGINX) <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.1" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.1</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Kubernetes Ingress NGINX (Ingress-NGINX) <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.4" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.4</span></a>.</div>
         <!-- Key Differences -->
         <section id="differences">
             <h2 id="key-differences">Key differences</h2>
@@ -487,7 +486,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/denylist-source-range</code><br><code>nginx.ingress.kubernetes.io/whitelist-source-range</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>accessControl</code> + <span class="badge badge-virtualserver">VirtualServer</span> <code>policies[]</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.allow</code> / <code>accessControl.deny</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>accessControl.allow</code> / <code>accessControl.deny</code> + <span class="badge badge-virtualserver">VirtualServer</span> <code>policies[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -496,9 +495,13 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="ingress-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/denylist-source-range: "192.168.1.100"
-  nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/denylist-source-range: "192.168.1.100"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create two AccessControl Policies — NIC requires exactly one of
 #    allow or deny per Policy, so they become two separate Policies.
 apiVersion: k8s.nginx.org/v1
@@ -525,16 +528,19 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    nginx.org/policies: "access-control-allow,access-control-deny"
-# ... rest of Ingress spec</code></pre></div>
+    nginx.org/policies: "access-control-allow,access-control-deny"</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.4.0:</strong> AccessControl policies can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/denylist-source-range: "192.168.1.100"
-  nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/denylist-source-range: "192.168.1.100"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create two AccessControl Policies (allow and deny — NIC requires
 #    exactly one of allow or deny per Policy)
 apiVersion: k8s.nginx.org/v1
@@ -580,7 +586,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/satisfy</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -589,8 +595,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/satisfy: "any"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/satisfy: "any"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # satisfy
     satisfy any;  # satisfy</code></pre></div>
@@ -598,8 +608,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/satisfy: "any"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/satisfy: "any"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -630,7 +644,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-realm</code><br><code>nginx.ingress.kubernetes.io/auth-secret</code><br><code>nginx.ingress.kubernetes.io/auth-secret-type</code><br><code>nginx.ingress.kubernetes.io/auth-type: "basic"</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>basicAuth</code><span class="or-text">— or —</span><code>nginx.org/basic-auth-realm</code><br><code>nginx.org/basic-auth-secret</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>basicAuth.secret</code> / <code>basicAuth.realm</code><span class="or-text">— or —</span><code>nginx.org/basic-auth-realm</code><br><code>nginx.org/basic-auth-secret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -639,11 +653,15 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-realm: "Protected Area"
-  nginx.ingress.kubernetes.io/auth-secret: "basic-auth"
-  nginx.ingress.kubernetes.io/auth-secret-type: "auth-file"
-  nginx.ingress.kubernetes.io/auth-type: "basic"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-realm: "Protected Area"
+    nginx.ingress.kubernetes.io/auth-secret: "basic-auth"
+    nginx.ingress.kubernetes.io/auth-secret-type: "auth-file"
+    nginx.ingress.kubernetes.io/auth-type: "basic"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># auth-secret-type → Secret type
 apiVersion: v1
 kind: Secret
@@ -660,11 +678,15 @@ annotations:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-realm: "Protected Area"
-  nginx.ingress.kubernetes.io/auth-secret: "basic-auth"
-  nginx.ingress.kubernetes.io/auth-secret-type: "auth-file"
-  nginx.ingress.kubernetes.io/auth-type: "basic"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-realm: "Protected Area"
+    nginx.ingress.kubernetes.io/auth-secret: "basic-auth"
+    nginx.ingress.kubernetes.io/auth-secret-type: "auth-file"
+    nginx.ingress.kubernetes.io/auth-type: "basic"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: Secret
 metadata:
@@ -704,7 +726,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-always-set-cookie</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -713,9 +735,13 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-always-set-cookie: "true"
-  nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-always-set-cookie: "true"
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Use snippets to propagate cookies from auth responses
 annotations:
   nginx.org/location-snippets: |  # auth-always-set-cookie
@@ -726,9 +752,13 @@ annotations:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-always-set-cookie: "true"
-  nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-always-set-cookie: "true"
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -753,7 +783,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-cache-duration</code><br><code>nginx.ingress.kubernetes.io/auth-cache-key</code><br><code>nginx.ingress.kubernetes.io/auth-method</code><br><code>nginx.ingress.kubernetes.io/auth-proxy-set-headers</code><br><code>nginx.ingress.kubernetes.io/auth-request-redirect</code><br><code>nginx.ingress.kubernetes.io/auth-response-headers</code><br><code>nginx.ingress.kubernetes.io/auth-signin</code><br><code>nginx.ingress.kubernetes.io/auth-signin-redirect-param</code><br><code>nginx.ingress.kubernetes.io/auth-snippet</code><br><code>nginx.ingress.kubernetes.io/auth-url</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>externalAuth</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.5.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>externalAuth</code> + <span class="badge badge-virtualserver">VirtualServer</span> <code>policies[]</code> <span class="badge badge-new">New v5.5.0</span></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>externalAuth.*</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.5.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>externalAuth.*</code> + <span class="badge badge-virtualserver">VirtualServer</span> <code>policies[]</code> <span class="badge badge-new">New v5.5.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -762,12 +792,16 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="ingress-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-url: "http://auth-svc.default.svc.cluster.local/auth"
-  nginx.ingress.kubernetes.io/auth-method: "GET"
-  nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/login"
-  nginx.ingress.kubernetes.io/auth-snippet: |
-    proxy_set_header X-Original-URI $request_uri;</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-url: "http://auth-svc.default.svc.cluster.local/auth"
+    nginx.ingress.kubernetes.io/auth-method: "GET"
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/login"
+    nginx.ingress.kubernetes.io/auth-snippet: |
+      proxy_set_header X-Original-URI $request_uri;</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create the ExternalAuth Policy
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -787,19 +821,22 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "external-auth"
-# ... rest of Ingress spec</code></pre></div>
+    nginx.org/policies: "external-auth"</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>externalAuth</code> Policy CRD can be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. <code>auth-url</code> is split into <code>authURI</code> (path) and <code>authServiceName</code> (<code>&lt;namespace&gt;/&lt;service&gt;</code>). The community's <code>auth-method</code>, <code>auth-response-headers</code>, <code>auth-cache-duration</code>, <code>auth-cache-key</code>, <code>auth-proxy-set-headers</code>, <code>auth-request-redirect</code>, and <code>auth-signin-redirect-param</code> annotations have no dedicated Policy fields — express these through <code>authSnippets</code> when needed. If you are not adopting a Policy, place the same directives directly in <code>nginx.org/location-snippets</code> alongside the <code>auth_request</code> directive instead. NIC's <code>authSigninURI</code> is a <em>relative</em> URI (validated <code>^/.*$</code>): a full <code>auth-signin</code> URL is reduced to its path, and a sign-in page on a different host cannot be expressed by this field.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-url: "http://auth-svc.default.svc.cluster.local/auth"
-  nginx.ingress.kubernetes.io/auth-method: "GET"
-  nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/login"
-  nginx.ingress.kubernetes.io/auth-snippet: |
-    proxy_set_header X-Original-URI $request_uri;</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-url: "http://auth-svc.default.svc.cluster.local/auth"
+    nginx.ingress.kubernetes.io/auth-method: "GET"
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/login"
+    nginx.ingress.kubernetes.io/auth-snippet: |
+      proxy_set_header X-Original-URI $request_uri;</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create the ExternalAuth Policy
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -836,7 +873,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-keepalive</code><br><code>nginx.ingress.kubernetes.io/auth-keepalive-requests</code><br><code>nginx.ingress.kubernetes.io/auth-keepalive-share-vars</code><br><code>nginx.ingress.kubernetes.io/auth-keepalive-timeout</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -845,12 +882,16 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-keepalive: "10"
-  nginx.ingress.kubernetes.io/auth-keepalive-requests: "100"
-  nginx.ingress.kubernetes.io/auth-keepalive-share-vars: "true"
-  nginx.ingress.kubernetes.io/auth-keepalive-timeout: "60"
-  nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-keepalive: "10"
+    nginx.ingress.kubernetes.io/auth-keepalive-requests: "100"
+    nginx.ingress.kubernetes.io/auth-keepalive-share-vars: "true"
+    nginx.ingress.kubernetes.io/auth-keepalive-timeout: "60"
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct auth-keepalive annotations; use snippets
 # for auth_request subrequest customization.
 annotations:
@@ -862,12 +903,16 @@ annotations:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-keepalive: "10"
-  nginx.ingress.kubernetes.io/auth-keepalive-requests: "100"
-  nginx.ingress.kubernetes.io/auth-keepalive-share-vars: "true"
-  nginx.ingress.kubernetes.io/auth-keepalive-timeout: "60"
-  nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-keepalive: "10"
+    nginx.ingress.kubernetes.io/auth-keepalive-requests: "100"
+    nginx.ingress.kubernetes.io/auth-keepalive-share-vars: "true"
+    nginx.ingress.kubernetes.io/auth-keepalive-timeout: "60"
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -917,7 +962,7 @@ annotations:
                     <tbody>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>apiKey</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>apiKey.suppliedIn</code> / <code>apiKey.clientSecret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -964,16 +1009,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/client-body-buffer-size: "16k"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "16k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/client-body-buffer-size: "16k"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/client-body-buffer-size: "16k"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "16k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -996,16 +1049,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-body-size: "10m"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/client-max-body-size: "10m"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-body-size: "10m"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1028,16 +1089,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-buffer-size: "8k"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1060,16 +1129,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-buffering: "on"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-buffering: "on"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-buffering: "on"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1092,8 +1169,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-buffers-number: "4"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-buffers: "4 8k"</code></pre></div>
                                 </div>
@@ -1101,8 +1182,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-buffers-number: "4"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1127,16 +1212,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "16k"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "16k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-busy-buffers-size: "16k"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "16k"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "16k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1154,15 +1247,19 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-max-temp-file-size: "1024m"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-max-temp-file-size: "1024m"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-max-temp-file-size: "1024m"</code></pre></div>
                             </div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-request-buffering</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -1171,8 +1268,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-request-buffering: "off"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # proxy-request-buffering
     proxy_request_buffering off;  # proxy-request-buffering</code></pre></div>
@@ -1180,8 +1281,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-request-buffering: "off"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -1272,7 +1377,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/configuration-snippet</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -1281,9 +1386,13 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/configuration-snippet: |
-    add_header X-Custom "value";</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Custom "value";</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # configuration-snippet
     add_header X-Custom "value";</code></pre></div>
@@ -1291,9 +1400,13 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/configuration-snippet: |
-    add_header X-Custom "value";</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Custom "value";</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -1315,7 +1428,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/server-snippet</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>server-snippets</code><span class="or-text">— or —</span><code>nginx.org/server-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.server-snippets</code><span class="or-text">— or —</span><code>nginx.org/server-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -1324,9 +1437,13 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/server-snippet: |
-    location /health { return 200; }</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /health { return 200; }</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/server-snippets: |  # server-snippet
     location /health { return 200; }</code></pre></div>
@@ -1334,9 +1451,13 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/server-snippet: |
-    location /health { return 200; }</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /health { return 200; }</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -1362,9 +1483,13 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/stream-snippet: |
-    server { listen 3306; proxy_pass mysql; }</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/stream-snippet: |
+      server { listen 3306; proxy_pass mysql; }</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># stream-snippet → GlobalConfiguration + TransportServer CRD
 apiVersion: k8s.nginx.org/v1
 kind: GlobalConfiguration
@@ -1404,7 +1529,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/cors-allow-credentials</code><br><code>nginx.ingress.kubernetes.io/cors-allow-headers</code><br><code>nginx.ingress.kubernetes.io/cors-allow-methods</code><br><code>nginx.ingress.kubernetes.io/cors-allow-origin</code><br><code>nginx.ingress.kubernetes.io/cors-expose-headers</code><br><code>nginx.ingress.kubernetes.io/cors-max-age</code><br><code>nginx.ingress.kubernetes.io/enable-cors</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>cors</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>responseHeaders</code><span class="or-text">— or —</span><code>nginx.org/server-snippets</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>cors.*</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].action.proxy.responseHeaders</code><span class="or-text">— or —</span><code>nginx.org/server-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -1414,14 +1539,18 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
-  nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
-  nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
-  nginx.ingress.kubernetes.io/cors-allow-origin: "https://frontend.example.com"
-  nginx.ingress.kubernetes.io/cors-expose-headers: "X-Request-ID, X-Custom-Header"
-  nginx.ingress.kubernetes.io/cors-max-age: "86400"
-  nginx.ingress.kubernetes.io/enable-cors: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://frontend.example.com"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "X-Request-ID, X-Custom-Header"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+    nginx.ingress.kubernetes.io/enable-cors: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/server-snippets: |  # enable-cors + cors-*
     set $cors_origin "";
@@ -1441,14 +1570,18 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/enable-cors: "true"
-  nginx.ingress.kubernetes.io/cors-allow-origin: "https://frontend.example.com"
-  nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
-  nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
-  nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
-  nginx.ingress.kubernetes.io/cors-expose-headers: "X-Request-ID"
-  nginx.ingress.kubernetes.io/cors-max-age: "3600"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://frontend.example.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "X-Request-ID"
+    nginx.ingress.kubernetes.io/cors-max-age: "3600"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller &mdash; Policy CRD</h4><pre><code># 1. Create the CORS Policy
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -1478,7 +1611,6 @@ kind: Ingress
 metadata:
   annotations:
     nginx.org/policies: "cors-policy"
-# ... rest of Ingress spec
 
 # Or reference from VirtualServer:
 # spec:
@@ -1489,14 +1621,18 @@ metadata:
                             </div>
                             <div class="approach-content" data-approach="crd-headers">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
-  nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
-  nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
-  nginx.ingress.kubernetes.io/cors-allow-origin: "https://frontend.example.com"
-  nginx.ingress.kubernetes.io/cors-expose-headers: "X-Request-ID, X-Custom-Header"
-  nginx.ingress.kubernetes.io/cors-max-age: "86400"
-  nginx.ingress.kubernetes.io/enable-cors: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://frontend.example.com"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "X-Request-ID, X-Custom-Header"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+    nginx.ingress.kubernetes.io/enable-cors: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -1551,8 +1687,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/http2-push-preload: "true"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/http2-push-preload: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Not supported — HTTP/2 Server Push was deprecated
 # by major browsers and removed from NGINX 1.25.1.
 # No migration action needed.</code></pre></div>
@@ -1574,9 +1714,13 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/custom-http-errors: "404,500,502"
-  nginx.ingress.kubernetes.io/default-backend: "error-svc"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/custom-http-errors: "404,500,502"
+    nginx.ingress.kubernetes.io/default-backend: "error-svc"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1616,8 +1760,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # connection-proxy-header
     proxy_set_header Connection "keep-alive";  # connection-proxy-header</code></pre></div>
@@ -1625,8 +1773,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1648,8 +1800,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/custom-headers: "default/custom-headers-configmap"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/custom-headers: "default/custom-headers-configmap"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1690,9 +1846,13 @@ data:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/upstream-vhost: "backend.internal"
-  nginx.ingress.kubernetes.io/x-forwarded-prefix: "/api"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/upstream-vhost: "backend.internal"
+    nginx.ingress.kubernetes.io/x-forwarded-prefix: "/api"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1836,16 +1996,24 @@ annotations:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/load-balance: "ewma"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/load-balance: "ewma"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/lb-method: "least_conn"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/load-balance: "ewma"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/load-balance: "ewma"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1869,16 +2037,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/service-upstream: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/service-upstream: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/use-cluster-ip: "true"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/service-upstream: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/service-upstream: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1901,18 +2077,26 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/lb-method: "hash $request_uri consistent"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
-  nginx.ingress.kubernetes.io/upstream-hash-by-subset: "true"
-  nginx.ingress.kubernetes.io/upstream-hash-by-subset-size: "3"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    nginx.ingress.kubernetes.io/upstream-hash-by-subset: "true"
+    nginx.ingress.kubernetes.io/upstream-hash-by-subset-size: "3"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1940,8 +2124,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/enable-access-log: "false"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/enable-access-log: "false"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Set via ConfigMap
 apiVersion: v1
 kind: ConfigMap
@@ -1954,7 +2142,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/enable-rewrite-log</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -1963,8 +2151,12 @@ data:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/enable-rewrite-log: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/enable-rewrite-log: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # enable-rewrite-log
     rewrite_log on;  # enable-rewrite-log</code></pre></div>
@@ -1972,8 +2164,12 @@ data:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/enable-rewrite-log: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/enable-rewrite-log: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -2005,7 +2201,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/mirror-host</code><br><code>nginx.ingress.kubernetes.io/mirror-request-body</code><br><code>nginx.ingress.kubernetes.io/mirror-target</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code> / <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>server-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code><br><code>nginx.org/server-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code> / <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.server-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code><br><code>nginx.org/server-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2014,10 +2210,14 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/mirror-host: "mirror.example.com"
-  nginx.ingress.kubernetes.io/mirror-request-body: "on"
-  nginx.ingress.kubernetes.io/mirror-target: "https://mirror.example.com$request_uri"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/mirror-host: "mirror.example.com"
+    nginx.ingress.kubernetes.io/mirror-request-body: "on"
+    nginx.ingress.kubernetes.io/mirror-target: "https://mirror.example.com$request_uri"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # mirror-target + mirror-request-body
     mirror /mirror;  # mirror-target
@@ -2032,10 +2232,14 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/mirror-host: "mirror.example.com"
-  nginx.ingress.kubernetes.io/mirror-request-body: "on"
-  nginx.ingress.kubernetes.io/mirror-target: "https://mirror.example.com$request_uri"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/mirror-host: "mirror.example.com"
+    nginx.ingress.kubernetes.io/mirror-request-body: "on"
+    nginx.ingress.kubernetes.io/mirror-target: "https://mirror.example.com$request_uri"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -2073,7 +2277,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-tls-error-page</code><br><code>nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream</code><br><code>nginx.ingress.kubernetes.io/auth-tls-secret</code><br><code>nginx.ingress.kubernetes.io/auth-tls-verify-client</code><br><code>nginx.ingress.kubernetes.io/auth-tls-verify-depth</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.5.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS</code> + <span class="badge badge-virtualserver">VirtualServer</span> <code>policies[]</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS.*</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.5.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS.*</code> + <span class="badge badge-virtualserver">VirtualServer</span> <code>policies[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2082,12 +2286,16 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="ingress-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-tls-error-page: "https://example.com/cert-error"
-  nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "true"
-  nginx.ingress.kubernetes.io/auth-tls-secret: "ns/ca-secret"
-  nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
-  nginx.ingress.kubernetes.io/auth-tls-verify-depth: "2"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-tls-error-page: "https://example.com/cert-error"
+    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "true"
+    nginx.ingress.kubernetes.io/auth-tls-secret: "ns/ca-secret"
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "2"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create the IngressMTLS Policy
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -2110,19 +2318,22 @@ metadata:
     nginx.org/location-snippets: |  # auth-tls-pass-certificate-to-upstream
       proxy_set_header ssl-client-cert $ssl_client_escaped_cert;
     nginx.org/server-snippets: |  # auth-tls-error-page
-      error_page 495 496 = https://example.com/cert-error;
-# ... rest of Ingress spec</code></pre></div>
+      error_page 495 496 = https://example.com/cert-error;</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>ingressMTLS</code> Policy CRD can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-tls-error-page: "https://example.com/cert-error"
-  nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "true"
-  nginx.ingress.kubernetes.io/auth-tls-secret: "ns/ca-secret"
-  nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
-  nginx.ingress.kubernetes.io/auth-tls-verify-depth: "2"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-tls-error-page: "https://example.com/cert-error"
+    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "true"
+    nginx.ingress.kubernetes.io/auth-tls-secret: "ns/ca-secret"
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "2"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create the IngressMTLS Policy
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -2161,7 +2372,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-tls-match-cn</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2170,8 +2381,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-tls-match-cn: "CN=client-[0-9]+"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-tls-match-cn: "CN=client-[0-9]+"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # auth-tls-match-cn
     if ($ssl_client_s_dn !~ "CN=client-[0-9]+") {  # auth-tls-match-cn
@@ -2181,8 +2396,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-tls-match-cn: "CN=client-[0-9]+"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-tls-match-cn: "CN=client-[0-9]+"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -2216,7 +2435,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-ssl-ciphers</code><br><code>nginx.ingress.kubernetes.io/proxy-ssl-name</code><br><code>nginx.ingress.kubernetes.io/proxy-ssl-protocols</code><br><code>nginx.ingress.kubernetes.io/proxy-ssl-secret</code><br><code>nginx.ingress.kubernetes.io/proxy-ssl-server-name</code><br><code>nginx.ingress.kubernetes.io/proxy-ssl-verify</code><br><code>nginx.ingress.kubernetes.io/proxy-ssl-verify-depth</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>egressMTLS</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.5.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>egressMTLS</code> + <span class="badge badge-virtualserver">VirtualServer</span> <code>policies[]</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>egressMTLS.*</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.5.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>egressMTLS.*</code> + <span class="badge badge-virtualserver">VirtualServer</span> <code>policies[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2225,14 +2444,18 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="ingress-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-ssl-ciphers: "HIGH:!aNULL:!MD5"
-  nginx.ingress.kubernetes.io/proxy-ssl-name: "backend.example.com"
-  nginx.ingress.kubernetes.io/proxy-ssl-protocols: "TLSv1.2 TLSv1.3"
-  nginx.ingress.kubernetes.io/proxy-ssl-secret: "ns/client-cert"
-  nginx.ingress.kubernetes.io/proxy-ssl-server-name: "on"
-  nginx.ingress.kubernetes.io/proxy-ssl-verify: "on"
-  nginx.ingress.kubernetes.io/proxy-ssl-verify-depth: "2"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-ssl-ciphers: "HIGH:!aNULL:!MD5"
+    nginx.ingress.kubernetes.io/proxy-ssl-name: "backend.example.com"
+    nginx.ingress.kubernetes.io/proxy-ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/proxy-ssl-secret: "ns/client-cert"
+    nginx.ingress.kubernetes.io/proxy-ssl-server-name: "on"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "on"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify-depth: "2"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create the EgressMTLS Policy
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -2255,21 +2478,24 @@ kind: Ingress
 metadata:
   annotations:
     nginx.org/policies: "egress-mtls"
-    nginx.org/ssl-services: "secure-app"  # opt-in upstream(s) to TLS
-# ... rest of Ingress spec</code></pre></div>
+    nginx.org/ssl-services: "secure-app"  # opt-in upstream(s) to TLS</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>egressMTLS</code> Policy CRD can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. Combine with <code>nginx.org/ssl-services</code> to identify which backend services should use TLS.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-ssl-ciphers: "HIGH:!aNULL:!MD5"
-  nginx.ingress.kubernetes.io/proxy-ssl-name: "backend.example.com"
-  nginx.ingress.kubernetes.io/proxy-ssl-protocols: "TLSv1.2 TLSv1.3"
-  nginx.ingress.kubernetes.io/proxy-ssl-secret: "ns/client-cert"
-  nginx.ingress.kubernetes.io/proxy-ssl-server-name: "on"
-  nginx.ingress.kubernetes.io/proxy-ssl-verify: "on"
-  nginx.ingress.kubernetes.io/proxy-ssl-verify-depth: "2"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-ssl-ciphers: "HIGH:!aNULL:!MD5"
+    nginx.ingress.kubernetes.io/proxy-ssl-name: "backend.example.com"
+    nginx.ingress.kubernetes.io/proxy-ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/proxy-ssl-secret: "ns/client-cert"
+    nginx.ingress.kubernetes.io/proxy-ssl-server-name: "on"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "on"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify-depth: "2"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create the EgressMTLS Policy
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -2324,13 +2550,17 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/enable-modsecurity: "true"
-  nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
-  nginx.ingress.kubernetes.io/modsecurity-snippet: |
-    SecRuleEngine On
-    SecRule ARGS "@contains &lt;script&gt;" "id:1,deny,status:403"
-  nginx.ingress.kubernetes.io/modsecurity-transaction-id: "$request_id"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
+    nginx.ingress.kubernetes.io/modsecurity-snippet: |
+      SecRuleEngine On
+      SecRule ARGS "@contains &lt;script&gt;" "id:1,deny,status:403"
+    nginx.ingress.kubernetes.io/modsecurity-transaction-id: "$request_id"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct OSS replacement
 # For WAF capabilities, see the Plus WAF section
 # which uses the F5 WAF for NGINX (App Protect)</code></pre></div>
@@ -2354,8 +2584,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/enable-opentelemetry: "true"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/enable-opentelemetry: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Global ConfigMap configuration (applies to all routes)
 apiVersion: v1
 kind: ConfigMap
@@ -2374,8 +2608,12 @@ data:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span: "true"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No per-Ingress equivalent. NIC does not set otel_trace_context,
 # so the ngx_otel_module default applies and incoming trace
 # context is NOT propagated by default (community default: trust).
@@ -2472,7 +2710,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-http-version</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2481,8 +2719,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-http-version: "1.1"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # proxy-http-version
     proxy_http_version 1.1;  # proxy-http-version</code></pre></div>
@@ -2490,8 +2732,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-http-version: "1.1"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -2523,10 +2769,14 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout"
-  nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "30"
-  nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-next-upstream: "error timeout"
   nginx.org/proxy-next-upstream-timeout: "30s"
@@ -2535,10 +2785,14 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout"
-  nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "30"
-  nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -2564,7 +2818,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/limit-burst-multiplier</code><br><code>nginx.ingress.kubernetes.io/limit-connections</code><br><code>nginx.ingress.kubernetes.io/limit-rate</code><br><code>nginx.ingress.kubernetes.io/limit-rate-after</code><br><code>nginx.ingress.kubernetes.io/limit-rpm</code><br><code>nginx.ingress.kubernetes.io/limit-rps</code><br><code>nginx.ingress.kubernetes.io/limit-whitelist</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>rateLimit</code><span class="or-text">— or —</span><code>nginx.org/limit-req-burst</code><br><code>nginx.org/limit-req-rate</code><br><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>rateLimit.*</code><span class="or-text">— or —</span><code>nginx.org/limit-req-burst</code><br><code>nginx.org/limit-req-rate</code><br><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2573,14 +2827,18 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
-  nginx.ingress.kubernetes.io/limit-connections: "5"
-  nginx.ingress.kubernetes.io/limit-rate: "100"
-  nginx.ingress.kubernetes.io/limit-rate-after: "1024"
-  nginx.ingress.kubernetes.io/limit-rpm: "300"
-  nginx.ingress.kubernetes.io/limit-rps: "10"
-  nginx.ingress.kubernetes.io/limit-whitelist: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+    nginx.ingress.kubernetes.io/limit-rate: "100"
+    nginx.ingress.kubernetes.io/limit-rate-after: "1024"
+    nginx.ingress.kubernetes.io/limit-rpm: "300"
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-whitelist: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/limit-req-burst: "50"  # limit-burst-multiplier (limit-rps × multiplier)
   nginx.org/limit-req-rate: "10r/s"  # limit-rps (also covers limit-rpm)
@@ -2595,14 +2853,18 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
-  nginx.ingress.kubernetes.io/limit-connections: "5"
-  nginx.ingress.kubernetes.io/limit-rate: "100"
-  nginx.ingress.kubernetes.io/limit-rate-after: "1024"
-  nginx.ingress.kubernetes.io/limit-rpm: "300"
-  nginx.ingress.kubernetes.io/limit-rps: "10"
-  nginx.ingress.kubernetes.io/limit-whitelist: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+    nginx.ingress.kubernetes.io/limit-rate: "100"
+    nginx.ingress.kubernetes.io/limit-rate-after: "1024"
+    nginx.ingress.kubernetes.io/limit-rpm: "300"
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-whitelist: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
@@ -2668,14 +2930,18 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/permanent-redirect: "https://new.example.com"
-  nginx.ingress.kubernetes.io/permanent-redirect-code: "308"
-  # Or for temporary redirects:
-  # nginx.ingress.kubernetes.io/temporal-redirect: "https://maintenance.example.com"
-  # nginx.ingress.kubernetes.io/temporal-redirect-code: "307"
-  # Or for www redirect:
-  # nginx.ingress.kubernetes.io/from-to-www-redirect: "true"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://new.example.com"
+    nginx.ingress.kubernetes.io/permanent-redirect-code: "308"
+    # Or for temporary redirects:
+    # nginx.ingress.kubernetes.io/temporal-redirect: "https://maintenance.example.com"
+    # nginx.ingress.kubernetes.io/temporal-redirect-code: "307"
+    # Or for www redirect:
+    # nginx.ingress.kubernetes.io/from-to-www-redirect: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -2708,7 +2974,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/app-root</code><br><code>nginx.ingress.kubernetes.io/rewrite-target</code><br><code>nginx.ingress.kubernetes.io/use-regex</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>rewritePath</code><span class="or-text">— or —</span><code>nginx.org/app-root</code> <span class="badge badge-new">New v5.4.0</span><br><code>nginx.org/path-regex</code><br><code>nginx.org/rewrite-target</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].action.proxy.rewritePath</code><span class="or-text">— or —</span><code>nginx.org/app-root</code> <span class="badge badge-new">New v5.4.0</span><br><code>nginx.org/path-regex</code><br><code>nginx.org/rewrite-target</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2717,10 +2983,14 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/app-root: "/dashboard"
-  nginx.ingress.kubernetes.io/rewrite-target: /$2
-  nginx.ingress.kubernetes.io/use-regex: "true"
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/app-root: "/dashboard"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
 # Used with Ingress path: /api(/|$)(.*)</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/app-root: "/dashboard"
@@ -2730,10 +3000,14 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/app-root: "/dashboard"
-  nginx.ingress.kubernetes.io/rewrite-target: /$2
-  nginx.ingress.kubernetes.io/use-regex: "true"
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/app-root: "/dashboard"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
 # Used with Ingress path: /api(/|$)(.*)</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
@@ -2755,7 +3029,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-cookie-domain</code><br><code>nginx.ingress.kubernetes.io/proxy-cookie-path</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2764,9 +3038,13 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-cookie-domain: "internal.example.com external.example.com"
-  nginx.ingress.kubernetes.io/proxy-cookie-path: "/internal/ /external/"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-cookie-domain: "internal.example.com external.example.com"
+    nginx.ingress.kubernetes.io/proxy-cookie-path: "/internal/ /external/"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/location-snippets: |  # proxy-cookie-domain / proxy-cookie-path
     proxy_cookie_domain internal.example.com external.example.com;  # proxy-cookie-domain
@@ -2775,9 +3053,13 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-cookie-domain: "internal.example.com external.example.com"
-  nginx.ingress.kubernetes.io/proxy-cookie-path: "/internal/ /external/"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-cookie-domain: "internal.example.com external.example.com"
+    nginx.ingress.kubernetes.io/proxy-cookie-path: "/internal/ /external/"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -2805,9 +3087,13 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-redirect-from: "http://internal/"
-  nginx.ingress.kubernetes.io/proxy-redirect-to: "https://external/"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-redirect-from: "http://internal/"
+    nginx.ingress.kubernetes.io/proxy-redirect-to: "https://external/"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-redirect-from: "http://internal/"  # proxy-redirect-from
   nginx.org/proxy-redirect-to: "https://external/"  # proxy-redirect-to</code></pre></div>
@@ -2848,8 +3134,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/server-alias: "alias.example.com"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/server-alias: "alias.example.com"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/server-snippets: |  # server-alias
     server_name alias.example.com;  # server-alias</code></pre></div>
@@ -2857,8 +3147,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/server-alias: "alias.example.com"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/server-alias: "alias.example.com"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># server-alias → separate VirtualServer per host
 apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
@@ -2932,7 +3226,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/affinity: "cookie"</code><br><code>nginx.ingress.kubernetes.io/affinity-mode</code><br><code>nginx.ingress.kubernetes.io/session-cookie-change-on-failure</code><br><code>nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none</code><br><code>nginx.ingress.kubernetes.io/session-cookie-domain</code><br><code>nginx.ingress.kubernetes.io/session-cookie-expires</code><br><code>nginx.ingress.kubernetes.io/session-cookie-max-age</code><br><code>nginx.ingress.kubernetes.io/session-cookie-name</code><br><code>nginx.ingress.kubernetes.io/session-cookie-path</code><br><code>nginx.ingress.kubernetes.io/session-cookie-samesite</code><br><code>nginx.ingress.kubernetes.io/session-cookie-secure</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>sessionCookie</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><code>nginx.org/sticky-cookie-services</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].sessionCookie</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><code>nginx.org/sticky-cookie-services</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2941,12 +3235,16 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/affinity: "cookie"
-  nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
-  nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
-  nginx.ingress.kubernetes.io/session-cookie-name: "SERVERID"
-  nginx.ingress.kubernetes.io/session-cookie-path: "/"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-name: "SERVERID"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/sticky-cookie-services: "serviceName=my-service srv_id expires=48h path=/"</code></pre></div>
                                 </div>
@@ -2954,18 +3252,22 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/affinity: "cookie"
-  nginx.ingress.kubernetes.io/affinity-mode: "balanced"
-  nginx.ingress.kubernetes.io/session-cookie-change-on-failure: "true"
-  nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none: "true"
-  nginx.ingress.kubernetes.io/session-cookie-domain: ".example.com"
-  nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
-  nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
-  nginx.ingress.kubernetes.io/session-cookie-name: "SERVERID"
-  nginx.ingress.kubernetes.io/session-cookie-path: "/"
-  nginx.ingress.kubernetes.io/session-cookie-samesite: "Strict"
-  nginx.ingress.kubernetes.io/session-cookie-secure: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "balanced"
+    nginx.ingress.kubernetes.io/session-cookie-change-on-failure: "true"
+    nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none: "true"
+    nginx.ingress.kubernetes.io/session-cookie-domain: ".example.com"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-name: "SERVERID"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Strict"
+    nginx.ingress.kubernetes.io/session-cookie-secure: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -3049,8 +3351,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/ssl-services: "my-service"</code></pre></div>
                                 </div>
@@ -3058,8 +3364,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -3079,8 +3389,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/force-ssl-redirect: "true"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/redirect-to-https: "true"</code></pre></div>
                             </div>
@@ -3092,8 +3406,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/preserve-trailing-slash: "true"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/preserve-trailing-slash: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No annotation needed — the F5 NGINX Ingress
 # Controller preserves trailing slashes by default.</code></pre></div>
                             </div>
@@ -3105,8 +3423,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/ssl-ciphers: "HIGH:!aNULL:!MD5"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-ciphers: "HIGH:!aNULL:!MD5"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/ssl-ciphers: "HIGH:!aNULL:!MD5"</code></pre></div>
                             </div>
@@ -3117,8 +3439,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/ssl-passthrough: "true"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># ssl-passthrough → TransportServer with built-in tls-passthrough listener
 apiVersion: k8s.nginx.org/v1
 kind: TransportServer
@@ -3143,8 +3469,12 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers: "true"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/ssl-prefer-server-ciphers: "true"</code></pre></div>
                             </div>
@@ -3160,8 +3490,12 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/ssl-redirect: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   # Match the community controller's 308 default
   # (preserves request method and body)
@@ -3174,8 +3508,12 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/ssl-redirect: "true"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -3293,16 +3631,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-connect-timeout: "10s"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -3325,16 +3671,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-read-timeout: "60"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-read-timeout: "60s"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-read-timeout: "60"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -3357,16 +3711,24 @@ spec:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-send-timeout: "60"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/proxy-send-timeout: "60s"</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/proxy-send-timeout: "60"</code></pre></div>
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -3582,16 +3944,20 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>annotations:
-  nginx.ingress.kubernetes.io/auth-cache-duration: "200 10m, 401 1m"
-  nginx.ingress.kubernetes.io/auth-cache-key: "$remote_addr"
-  nginx.ingress.kubernetes.io/auth-method: "GET"
-  nginx.ingress.kubernetes.io/auth-proxy-set-headers: "default/auth-headers"
-  nginx.ingress.kubernetes.io/auth-request-redirect: "https://app.example.com/callback"
-  nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-User"
-  nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/oauth2/start"
-  nginx.ingress.kubernetes.io/auth-signin-redirect-param: "rd"
-  nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/oauth2/auth"</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-cache-duration: "200 10m, 401 1m"
+    nginx.ingress.kubernetes.io/auth-cache-key: "$remote_addr"
+    nginx.ingress.kubernetes.io/auth-method: "GET"
+    nginx.ingress.kubernetes.io/auth-proxy-set-headers: "default/auth-headers"
+    nginx.ingress.kubernetes.io/auth-request-redirect: "https://app.example.com/callback"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-User"
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/oauth2/start"
+    nginx.ingress.kubernetes.io/auth-signin-redirect-param: "rd"
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/oauth2/auth"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller (Plus)</h4><pre><code>apiVersion: v1
 kind: Secret
 metadata:
@@ -3655,8 +4021,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.com/policies: "waf-policy"
-# ... rest of Ingress spec</code></pre>
+    nginx.com/policies: "waf-policy"</code></pre>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>waf</code> Policy CRD can now be referenced directly from Ingress resources using the <code>nginx.com/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. Previously, WAF Policies were VirtualServer-only.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">

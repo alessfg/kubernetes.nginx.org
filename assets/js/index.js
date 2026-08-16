@@ -18,9 +18,9 @@
 
         /* ── Auto-Fetch Versions ── */
         let VERSION_CONFIG = {
-            nic: { repo: 'nginx/kubernetes-ingress',        chartPath: 'charts/nginx-ingress',        fallback: { release: 'v5.5.1', helm: 'v2.6.1' } },
-            ngf: { repo: 'nginx/nginx-gateway-fabric',      chartPath: 'charts/nginx-gateway-fabric', fallback: { release: 'v2.6.6', helm: 'v2.6.6' } },
-            i2g: { repo: 'kubernetes-sigs/ingress2gateway',  fallback: { release: 'v1.1.0' } }
+            nic: { repo: 'nginx/kubernetes-ingress',        chartPath: 'charts/nginx-ingress',        fallback: { release: 'v5.5.4', helm: 'v2.6.4' } },
+            ngf: { repo: 'nginx/nginx-gateway-fabric',      chartPath: 'charts/nginx-gateway-fabric', fallback: { release: 'v2.6.7', helm: 'v2.6.7' } },
+            i2g: { repo: 'kubernetes-sigs/ingress2gateway',  fallback: { release: 'v1.2.0' } }
         };
         // Bump the cache key suffix when VERSION_CONFIG shape or applyVersions logic changes
         // so users don't apply stale payloads from previous schemas.

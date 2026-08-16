@@ -1,11 +1,25 @@
 ---
 name: release-update
-description: The complete checklist for updating this site after an NGINX Ingress Controller or NGINX Gateway Fabric release — every version string, Helm chart version, release-tag link and JS fallback that has to move, plus the compatibility table and Kubernetes-version rules that are the steps most often missed. Use when bumping NIC or NGF to a new version, updating a compat table, or auditing whether the site's stated versions are current.
+description: Checklist for an NIC, NGF or ingress2gateway release — the three version formats a plain grep misses, the feature badges that must not be swept along, and the compatibility and Kubernetes-version rules most often missed. Use when bumping any product version.
 ---
 
 # Release update checklist
 
 Update **all** of the following. The version numbers are scattered across spans, badges, install commands and JS fallbacks, and updating the obvious ones *feels* like finishing the job.
+
+**Run `python3 .github/scripts/check-versions.py` first and last.** It parses `VERSION_CONFIG` and `MigrationTool.NIC` and asserts every copy on the site agrees with them, so it tells you what a bump still has left to do — and, run first, it tells you whether the site was already consistent before you started. It does *not* know what the correct upstream version is; that judgement is yours.
+
+Note the asymmetry that makes a half-finished bump hard to notice by eye: `index.js` fetches live releases, so the landing page renders current versions in a browser regardless of what the file says. The migration tool has no fetch path. So the page that *looks* right is the one that self-heals, and the one nobody notices is the one readers copy install commands from.
+
+## The three version formats
+
+A `v`-prefixed grep misses two of them. The format is set per call site by `data-version-format`:
+
+| Format | Renders | Where |
+|---|---|---|
+| *(default)* | `v5.5.4` | release tags, hero badges, sidebar |
+| `bare` | `2.6.4` | Helm `--version` flags, which reject a leading `v` |
+| `atv` | `@v1.2.0` | the `go install` module suffix |
 
 ## The two steps that get missed
 
@@ -32,6 +46,21 @@ For `<nic|ngf>`, whichever shipped:
 - **Supported Resources** tag list — review against `apis/v1alpha1` and `apis/v1alpha2` at the release tag to catch new CRDs (`WAFPolicy` arrived in v2.6.0). Keep tags alphabetical within the NGF custom-resources block.
 - **Gateway API version** in the "Fully Conformant Gateway API" pill and the feature-card copy — update if the release bumps the conformant Gateway API version. It appears twice in `index.html`; as of this writing both read `v1.5.1`, so grep the current value rather than trusting that.
 
+## ingress2gateway only
+
+It has no Helm chart and no compatibility table, which is exactly why it is the product that goes stale: nothing about it looks like the NIC/NGF checklist above, so following that checklist skips it entirely. Four places:
+
+- `VERSION_CONFIG.i2g.fallback.release` in `assets/js/index.js`.
+- The sidebar `data-version="i2g.release"` span.
+- The hero badge — both its text and its `releases/tag/` href.
+- The `go install` line, which is `data-version-format="atv"` and so renders `@v1.2.0`.
+
+## Feature badges are not version pins
+
+The migration tool carries 22 `badge badge-new` spans (11× `New v5.4.0`, 11× `New v5.5.0`). They state **which release introduced a construct** and must never be swept along with a bump — moving one turns a true statement into a false one. They are unmanaged: when a release adds a construct, add its badge by hand against that release's notes, and leave every existing badge alone. `check-versions.py` deliberately ignores them.
+
+The same applies to `INGRESS_NGINX_VERSION`: `kubernetes/ingress-nginx` is archived and `controller-v1.15.1` is its final release, so it is a constant rather than a pin.
+
 ## NIC only — the migration tool
 
 The tool does not reference NGF at all, so an NGF release never touches it.
@@ -42,11 +71,16 @@ The tool does not reference NGF at all, so an NGF release never touches it.
 
 ## After
 
-Run all four checks, each on its own line, then render the changed pages and look at them — none of them can see a rendered page.
+Run all seven, each on its own line, then render the changed pages and look at them — none of them can see a rendered page.
 
 ```bash
+for f in assets/js/*.js; do node --check "$f" || break; done
 python3 .github/scripts/check-tokens.py
 python3 .github/scripts/check-contrast.py
 python3 .github/scripts/check-classes.py
+python3 .github/scripts/check-versions.py
 node    .github/scripts/test-analyzer.js
+node --test .github/test/*.test.js
 ```
+
+Also update the compat cells, which carry `data-compat="nginx"` and `data-compat="kubernetes"` so they can be found per product rather than by matching a bare number that appears elsewhere on the page. Nothing derives them, so they remain the one part of a release that only a human can confirm.

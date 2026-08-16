@@ -1,6 +1,6 @@
 ---
 name: f5ds-design
-description: The reasoning behind this site's F5 Design System implementation — why NGINX green leads instead of Dodger Blue, which three published F5DS pairings fail WCAG AA and what replaced them, why the CRD badges use the graph palette, the full type scale, and every documented deviation with its justification. Use when editing any CSS under assets/css/, choosing or changing a colour/space/radius/type value, judging whether something is an intentional deviation or a defect, or when a design-system scanner flags this site.
+description: Why this site's F5 Design System choices are what they are — the accent split, the three F5DS pairings that fail WCAG AA and their replacements, the CRD badge palette, the type scale, top-bar geometry, and every deviation with its reason. Use before changing any colour, space, radius or type value, or when a scanner flags this site.
 ---
 
 # F5DS on kubernetes.nginx.org — the why
@@ -133,12 +133,54 @@ Do not let a scanner or a tidying pass "fix" these.
 | **Hover scale on the checklist marker and scroll-to-top** | Kept by explicit decision — the checklist marker's scale is that row's only hover feedback. |
 | **`--topbar-h` 52px** | F5DS publishes no top-bar height. 52px matches the bar the site already shipped; 64px was tried and read as loose. |
 
+## The top bar and sidebar: geometry, and what was already tried
+
+`--topbar-h` is 52px. The logo is left-aligned at the start of the bar, then a
+short centred rule (`.topbar-brand::after`, 32px tall) rather than a full-height
+border, then the heading. GitHub link and dark-mode toggle sit at the right.
+
+The heading is **one line, and which line depends on width.** Above 900px
+`.topbar-eyebrow` carries the site/tool label and `.mobile-breadcrumb` is
+hidden; at or below 900px they swap, because the drawer hides the sidebar's
+active-item marker. `index.js` and `migration-core.js` both keep it in step with
+the active view via `getElementById('mobileBreadcrumb')`, so renaming that **id**
+means touching both files. The `.mobile-breadcrumb` *class* is styling only and
+appears in neither script.
+
+`shared.css` writes a few structural literals that are deliberately not tokens —
+the 44px mobile touch target, the 32px brand rule, the 3px nav rail, the 1px
+hairlines — and carries a second `:root` block of `--icon-*` and `--pattern-hex`
+values that `tokens.css` does not contain.
+
+**Tried and reverted. Do not re-propose:**
+
+- Pinning the branding block to `--sidebar-w` with the logo centred inside it —
+  it spends 264px on a 99px logo, and a label like "Networking for Kubernetes"
+  truncated when it sat inside.
+- A `.topbar::after` bottom rule starting at `--sidebar-w`.
+- A stacked eyebrow-over-title heading.
+- A 64px bar.
+
+### Sidebar labels are the headings they link to
+
+The sidebar labels *are* the `<h2>` headings they link to, so they match those
+headings verbatim — with one measured exception. `.sidebar-link-name` is
+`white-space: nowrap` inside a 264px rail (~226px usable), so a heading that
+would clip is shortened instead. Today that is "Config analyzer" for "Ingress
+NGINX config analyzer", which measures ~285px.
+
+**Measure rather than assume**, with `shot.sh --measure '.sidebar-link-name'`:
+"Phased migration strategy" is 150.5px and fits, which is why it is spelled out
+in full. Shorten only when something actually clips.
+
 ## Inferred, not published
 
 Say so when touching these — F5DS does not specify them: table cell padding (there is **no** table component), info-box internal padding, which elevation level a dropdown gets (only Toast=L1 is stated), and any spacing above 40px.
 
 ## What the checks can and cannot see
 
-`check-tokens.py` reads literals, `check-contrast.py` asserts a fixed list of pairings, `check-classes.py` resolves class usage. **None of them can see the rendered page**, and `check-contrast.py` only checks pairings that someone remembered to add — which is how the badge palette drifted for months. After any visual change, render and look.
+`check-tokens.py` reads literals, `check-classes.py` resolves class usage, and `check-contrast.py` both asserts a hand-written list of pairings *and* derives pairings from the stylesheets — so a new coloured surface is measured without anyone remembering to add it. Two limits remain: it only sees pairs declared through tokens in the same rule (or a dark override of one), and it cannot know which text is large enough for the 3:1 bar, so it holds everything to 4.5:1. **None of them can see the rendered page.** After any visual change, render and look.
 
 An automated design-system scanner is **not** a sufficient gate either. Scanners generally cannot resolve `var()`, so a correct `var(--space-2x)` is invisible to them while a literal `16px` counts as on-token — a site that uses tokens properly scores *worse*. Read `tokens.css` instead.
+
+`tokens.css` is 32KB, so read it whole only when you need the reasoning in its comments. To find a value, `python3 .github/scripts/where.py --list <needle>` prints matching tokens with their light and dark values (`-s` adds the measured-ratio comments), and `where.py --<token-name>` gives one token's definition, its dark override and every file that uses it.

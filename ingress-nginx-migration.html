@@ -544,6 +544,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: my-app
   annotations:
     nginx.org/policies: "access-control-allow,access-control-deny"</code></pre></div>
                                 </div>
@@ -959,8 +960,12 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># Opt out of global external auth for this Ingress
-annotations:
-  nginx.ingress.kubernetes.io/enable-global-auth: "false"</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/enable-global-auth: "false"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># The F5 NGINX Ingress Controller does not have a global external
 # auth feature. Authentication is configured per-resource
 # via Policy CRDs or annotations.
@@ -1340,14 +1345,18 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># Canary Ingress
-annotations:
-  nginx.ingress.kubernetes.io/canary: "true"
-  nginx.ingress.kubernetes.io/canary-by-cookie: "canary"
-  nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"
-  nginx.ingress.kubernetes.io/canary-by-header-pattern: "^(test|staging)$"
-  nginx.ingress.kubernetes.io/canary-by-header-value: "always"
-  nginx.ingress.kubernetes.io/canary-weight: "20"
-  nginx.ingress.kubernetes.io/canary-weight-total: "100"</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-cookie: "canary"
+    nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"
+    nginx.ingress.kubernetes.io/canary-by-header-pattern: "^(test|staging)$"
+    nginx.ingress.kubernetes.io/canary-by-header-value: "always"
+    nginx.ingress.kubernetes.io/canary-weight: "20"
+    nginx.ingress.kubernetes.io/canary-weight-total: "100"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1626,6 +1635,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: my-app
   annotations:
     nginx.org/policies: "cors-policy"
 
@@ -1892,10 +1902,14 @@ spec:
                                 <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># No equivalent per-Ingress annotation.
 # Community users typically inject add_header
 # directives via configuration-snippet:
-annotations:
-  nginx.ingress.kubernetes.io/configuration-snippet: |
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN";
+      add_header X-Content-Type-Options "nosniff";</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/add-header: "X-Frame-Options: SAMEORIGIN, X-Content-Type-Options: nosniff"
   nginx.org/add-header-inherit: "merge"  # on | off | merge</code></pre></div>
@@ -2330,6 +2344,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: my-app
   annotations:
     nginx.org/policies: "ingress-mtls"
     nginx.org/location-snippets: |  # auth-tls-pass-certificate-to-upstream
@@ -2493,6 +2508,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: my-app
   annotations:
     nginx.org/policies: "egress-mtls"
     nginx.org/ssl-services: "secure-app"  # opt-in upstream(s) to TLS</code></pre></div>
@@ -3312,11 +3328,15 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># Canary with session affinity behavior
-annotations:
-  nginx.ingress.kubernetes.io/affinity: "cookie"
-  nginx.ingress.kubernetes.io/affinity-canary-behavior: "sticky"
-  nginx.ingress.kubernetes.io/canary: "true"
-  nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-canary-behavior: "sticky"
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:

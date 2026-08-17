@@ -459,3 +459,77 @@ test('converted output is emittable and re-parses to the same objects', () => {
     const text = Y.stringifyAll(out.docs);
     assert.deepEqual(Y.parseAll(text), out.docs);
 });
+
+/* --------------------------------------------------------------- e2e fixtures
+
+   The e2e pipeline needs a cluster and cannot run here, but its fixtures can
+   drift without one: renaming a Service in workload.yaml while source-ingress
+   still points at the old name produces a 503 that looks like a migration bug
+   and is not. These assertions cost nothing and fail on the actual cause. */
+
+const fs = require('node:fs');
+const E2E = path.join(ROOT, 'tools', 'nic-migrate', 'e2e', 'manifests');
+const readE2E = (f) => fs.readFileSync(path.join(E2E, f), 'utf8');
+
+test('every backend the e2e Ingress routes to exists in the e2e workload', () => {
+    const workload = Y.parseAll(readE2E('workload.yaml'));
+    const ingress = Y.parse(readE2E('source-ingress.yaml'));
+
+    const services = new Map(workload.filter((d) => d.kind === 'Service')
+        .map((s) => [s.metadata.name, s.spec.ports.map((p) => p.port)]));
+    const namespaces = new Set(workload.filter((d) => d.metadata && d.metadata.namespace)
+        .map((d) => d.metadata.namespace));
+
+    assert.ok(namespaces.has(ingress.metadata.namespace),
+        'the Ingress namespace must be one the workload creates');
+
+    for (const rule of ingress.spec.rules) {
+        for (const p of rule.http.paths) {
+            const svc = p.backend.service;
+            assert.ok(services.has(svc.name), 'no Service named ' + svc.name + ' in workload.yaml');
+            assert.ok(services.get(svc.name).includes(svc.port.number),
+                svc.name + ' does not listen on port ' + svc.port.number);
+        }
+    }
+});
+
+test('the e2e Ingress converts cleanly and covers every host and path', () => {
+    const ingress = Y.parse(readE2E('source-ingress.yaml'));
+    const model = toModel(ingress);
+    const result = engine.analyze(Y.stringify(ingress), 'crd');
+    assert.deepEqual(result.warnings, [], 'a generator failed on the e2e fixture');
+
+    const out = convert(model, result, { target: 'virtualserver', ingressClass: 'nginx-nic' });
+    const vs = out.docs.filter((d) => d.kind === 'VirtualServer');
+    assert.equal(vs.length, ingress.spec.rules.length, 'one VirtualServer per host');
+
+    const names = vs.map((v) => v.metadata.name);
+    assert.equal(new Set(names).size, names.length, 'VirtualServer names must be unique: ' + names.join(', '));
+
+    const totalPaths = ingress.spec.rules.reduce((n, r) => n + r.http.paths.length, 0);
+    const totalRoutes = vs.reduce((n, v) => n + v.spec.routes.length, 0);
+    assert.equal(totalRoutes, totalPaths, 'every path must become a route');
+
+    // The TLS secret the pipeline creates must be the one the output references.
+    const withTls = vs.find((v) => v.spec.tls);
+    assert.equal(withTls.spec.tls.secret, ingress.spec.tls[0].secretName);
+    // ssl-redirect is "false" in the fixture, so the converter must NOT add one:
+    // the pipeline asserts plain HTTP is served, and a redirect would break it.
+    assert.equal(withTls.spec.tls.redirect, undefined);
+});
+
+test('the e2e workload and runner agree on names', () => {
+    const runner = fs.readFileSync(path.join(ROOT, 'tools', 'nic-migrate', 'e2e', 'run-e2e.py'), 'utf8');
+    const workload = Y.parseAll(readE2E('workload.yaml'));
+    const ns = (runner.match(/^NS = '([^']+)'/m) || [])[1];
+    assert.ok(ns, 'could not read NS from run-e2e.py');
+    assert.ok(workload.some((d) => d.kind === 'Namespace' && d.metadata.name === ns),
+        'run-e2e.py uses namespace ' + ns + ', which workload.yaml does not create');
+    assert.ok(workload.some((d) => d.kind === 'Pod' && d.metadata.name === 'probe'),
+        'the runner execs into a pod named probe');
+    // The deployments the runner waits on must be the ones that exist.
+    for (const dep of ['api', 'web', 'web2']) {
+        assert.ok(workload.some((d) => d.kind === 'Deployment' && d.metadata.name === dep),
+            'run-e2e.py waits for deploy/' + dep);
+    }
+});

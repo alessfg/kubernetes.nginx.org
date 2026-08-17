@@ -49,3 +49,6 @@ __pycache__/
 .claude/settings.json
 .claude/settings.local.json
 .mcp.json
+
+# e2e scratch: converted manifests and cluster artefacts from run-e2e.py
+tools/nic-migrate/e2e/.work/

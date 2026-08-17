@@ -38,8 +38,13 @@ CHECKS = [
     ('version strings', [sys.executable, '.github/scripts/check-versions.py']),
     ('markup structure', [sys.executable, '.github/scripts/check-markup.py']),
     ('migration analyzer', ['node', '.github/scripts/test-analyzer.js']),
+    # Listed by name rather than globbed: CI runs `node --test
+    # .github/test/*.test.js`, and a file that only the glob knows about would
+    # be absent here without anything reporting a smaller suite. Add new test
+    # files to BOTH.
     ('wiring suite', ['node', '--test', '.github/test/index.test.js',
-                      '.github/test/wiring.test.js']),
+                      '.github/test/wiring.test.js',
+                      '.github/test/nic-migrate.test.js']),
     ('locator', [sys.executable, '.github/scripts/where.py', '--self-test']),
 ]
 

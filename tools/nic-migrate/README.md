@@ -7,7 +7,7 @@
 > is named. That is the part to rely on while the rest settles.
 
 Batch the migration tool's analyzer over real manifests, from a terminal —
-ingress-nginx by default, or HAProxy with `--source haproxy`.
+ingress-nginx by default, or HAProxy or Traefik with `--source`.
 
 The web tool at [kubernetes.nginx.org/ingress-nginx-migration.html](https://kubernetes.nginx.org/ingress-nginx-migration.html)
 analyzes one paste at a time. This runs the *same* engine — same 57 mapping
@@ -23,6 +23,7 @@ so it cannot drift from the published page. Run it from a checkout.
 # What would change, and what the analyzer cannot do on its own
 node tools/nic-migrate/nic-migrate.js report -f ./manifests
 node tools/nic-migrate/nic-migrate.js report --source haproxy -f ./manifests
+node tools/nic-migrate/nic-migrate.js report --source traefik --whole-input -f ./crs
 node tools/nic-migrate/nic-migrate.js report --kubectl -n prod
 
 # Merged, applyable manifests
@@ -103,7 +104,9 @@ Input (both commands; defaults to stdin)
   -k, --kubectl            Read live Ingresses with kubectl.
   -n, --namespace <ns>     Namespace for --kubectl (default: all namespaces).
   -s, --strategy <name>    crd | annotation
-      --source <name>      ingress-nginx | haproxy   (default: ingress-nginx)
+      --source <name>      ingress-nginx | haproxy | traefik  (default: ingress-nginx)
+      --whole-input        Analyze all input as one unit (report only), so
+                           cross-document references resolve.
   -o, --out <dir>          Write per-Ingress files instead of stdout.
       --json               Emit JSON.
       --no-color           Disable ANSI colour (also honours NO_COLOR).
@@ -126,17 +129,41 @@ checklist                  Print the 22-item migration checklist, read live
 transforms and generators all come from `assets/js/`, so the CLI reports exactly
 what the matching page reports.
 
-| | ingress-nginx | haproxy |
-|---|---|---|
-| module | `assets/js/migration-ingress-nginx.js` | `assets/js/migration-haproxy.js` |
-| annotation prefixes | `nginx.ingress.kubernetes.io/` | `haproxy.org/`, `haproxy.com/`, `ingress.kubernetes.io/` |
-| kinds read | Ingress | Ingress, Service, ConfigMap, and the Global / Defaults / Backend / Frontend / TCP CRs |
+| | ingress-nginx | haproxy | traefik |
+|---|---|---|---|
+| module | `migration-ingress-nginx.js` | `migration-haproxy.js` | `migration-traefik.js` |
+| annotation prefixes | `nginx.ingress.kubernetes.io/` | `haproxy.org/`, `haproxy.com/`, `ingress.kubernetes.io/` | `traefik.ingress.kubernetes.io/` |
+| kinds read | Ingress | Ingress, Service, ConfigMap, Global, Defaults, Backend, Frontend, TCP | Ingress, IngressRoute(+TCP/UDP), Middleware(+TCP), TraefikService, TLSOption, TLSStore, ServersTransport(+TCP) |
 
-The kinds column is the substantive difference. ingress-nginx keeps every
-setting on the Ingress, so an Ingress-only scan sees all of it. HAProxy spreads
-the same job across annotated Ingress **and Service** objects, its controller
-ConfigMap and five CRs — a scan that only looked at Ingresses would report
-"nothing found" on a real HAProxy deployment.
+The kinds column is the substantive difference, and the three sources sit at
+different points on it. ingress-nginx keeps every setting on the Ingress, so an
+Ingress-only scan sees all of it. HAProxy spreads the same job across annotated
+Ingress **and Service** objects, its controller ConfigMap and five CRs. Traefik
+inverts that: one annotation prefix, and almost everything real in CRs. A scan
+that only looked at Ingresses would report "nothing found" on either.
+
+Traefik's static configuration is deliberately not in that list: it is CLI flags
+or a `traefik.yml`, not a Kubernetes object, so there is no kind to gate on. The
+page documents it; the CLI cannot read it.
+
+### `--whole-input`, and when you need it
+
+By default each document is analyzed on its own. That is right for
+ingress-nginx, where an Ingress is self-contained, and it keeps the report
+per-object.
+
+It is wrong for a Traefik `IngressRoute`, which references `Middleware` objects
+that are separate documents by design. Analyzed alone, every one of those
+references is reported as unresolved and the migration is understated — the
+middlewares contribute nothing. `--whole-input` analyzes everything as one unit,
+the way the web tool treats a paste, and the references resolve: a rate-limit
+Middleware becomes a `rateLimit` Policy, a headers Middleware becomes the HSTS
+annotations.
+
+The cost is the engine's single-context model — one host, one service, one path
+across the whole input — so the gaps then report the rest as dropped. That is
+the honest trade, and it is why the flag is opt-in rather than the default. The
+same applies to a HAProxy Ingress that points at a `Backend` CR.
 
 `report` covers all of those kinds. `convert` builds from the Ingress, so for a
 HAProxy input it names the Service objects, ConfigMap and CRs it did not

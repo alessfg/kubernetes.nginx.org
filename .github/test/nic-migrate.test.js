@@ -20,6 +20,7 @@ const TOOL = path.join(ROOT, 'tools', 'nic-migrate');
 
 const { splitDocuments, isIngress, isAnalyzable: isAnalyzableDoc, describe: describeIngress } = require(path.join(TOOL, 'lib', 'ingress.js'));
 const { detect, sortGaps } = require(path.join(TOOL, 'lib', 'gaps.js'));
+const { renderReport } = require(path.join(TOOL, 'lib', 'render.js'));
 const { createEngine } = require(path.join(TOOL, 'lib', 'engine.js'));
 const { splitKubectlList, loadChecklist } = require(path.join(TOOL, 'nic-migrate.js'));
 const Y = require(path.join(TOOL, 'lib', 'yaml.js'));
@@ -629,4 +630,73 @@ test('convert: the source controller class is omitted with a note, --class overr
     const kept = convert(same, empty, { target: 'virtualserver' });
     assert.equal(kept.docs[0].spec.ingressClassName, 'nginx');
     assert.ok(!kept.notes.some((n) => /selects the source controller/.test(n)));
+});
+
+/* ── Traefik ───────────────────────────────────────────────────────────────
+   Traefik inverts HAProxy's shape: one annotation prefix, but almost all real
+   configuration lives in CRs. Two things follow, and both were bugs before
+   this source existed.
+
+   The renderer used to return early when a document carried no annotations,
+   which is true of every IngressRoute and Middleware, so their resources,
+   notes and gaps were computed and then thrown away — the --json output showed
+   them while the text report did not.
+
+   And a Middleware is a separate document from the IngressRoute that
+   references it, so per-document analysis reports every reference as
+   unresolved. --whole-input is the answer, matching how the web tool treats a
+   paste. */
+
+test('traefik: the source is registered with the kinds its analyzer switches on', () => {
+    const t = resolveSource('traefik');
+    assert.equal(t.module, 'assets/js/migration-traefik.js');
+    assert.deepEqual(t.prefixes, ['traefik.ingress.kubernetes.io/']);
+    for (const k of ['IngressRoute', 'Middleware', 'TraefikService', 'TLSOption', 'ServersTransport']) {
+        assert.ok(t.kinds.indexOf(k) !== -1, 'missing kind ' + k);
+    }
+    // Static config is CLI flags or traefik.yml, not an object — nothing to gate on.
+    assert.equal(t.kinds.indexOf('ConfigMap'), -1);
+});
+
+const TFK_ROUTE = [
+    'apiVersion: traefik.io/v1alpha1', 'kind: IngressRoute', 'metadata:', '  name: web-route',
+    '  namespace: default', 'spec:', '  entryPoints:', '    - websecure', '  routes:',
+    '    - match: Host(`app.example.com`) && PathPrefix(`/api`)', '      kind: Rule',
+    '      middlewares:', '        - name: rate-limit', '      services:',
+    '        - name: api-svc', '          port: 80',
+].join('\n');
+const TFK_MW = [
+    'apiVersion: traefik.io/v1alpha1', 'kind: Middleware', 'metadata:', '  name: rate-limit',
+    '  namespace: default', 'spec:', '  rateLimit:', '    average: 100', '    burst: 50',
+].join('\n');
+
+test('traefik: an IngressRoute reports its resources despite carrying no annotations', () => {
+    const eng = createEngine('traefik');
+    const desc = describeIngress(TFK_ROUTE, resolveSource('traefik').prefixes);
+    assert.equal(desc.kind, 'IngressRoute');
+    assert.deepEqual(desc.annotations, [], 'an IngressRoute has no annotations by design');
+
+    const result = eng.analyze(TFK_ROUTE, 'crd');
+    assert.equal(result.error, null);
+    assert.deepEqual(result.warnings, []);
+    assert.ok(result.parts.length > 0, 'the analyzer produced resources');
+
+    // The regression: text output must not be empty just because annotations are.
+    const text = renderReport([{ desc, result, sourceFile: 'x.yaml', gaps: [] }],
+        { strategy: 'crd', colour: false, wrap: false, unit: 'resource' });
+    assert.match(text, /VirtualServer/, 'resources were computed but not rendered');
+});
+
+test('traefik: --whole-input resolves a Middleware reference that per-document cannot', () => {
+    const eng = createEngine('traefik');
+    const alone = eng.analyze(TFK_ROUTE, 'crd');
+    const notes = (alone.plan && alone.plan.infoNotes) || [];
+    assert.ok(notes.some((n) => /rate-limit.*not present|not present.*rate-limit/.test(n.message)),
+        'analyzed alone, the Middleware reference should report as unresolved');
+
+    const together = eng.analyze(TFK_ROUTE + '\n---\n' + TFK_MW, 'crd');
+    const notes2 = (together.plan && together.plan.infoNotes) || [];
+    assert.ok(!notes2.some((n) => /not present/.test(n.message)),
+        'analyzed together, the reference resolves');
+    assert.match(together.yaml, /rateLimit/, 'the Middleware became a rateLimit Policy');
 });

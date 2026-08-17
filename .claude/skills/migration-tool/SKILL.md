@@ -145,6 +145,24 @@ Two techniques worth knowing beyond running it:
 
 Also sanity-check generated `k8s.nginx.org/v1` field names against the `json:` tags in `nginx/kubernetes-ingress/pkg/apis/configuration/v1/types.go` to catch invalid CRD fields.
 
+## Which section a row goes in
+
+A source construct is documented **once**, in exactly one reference section, and which one is not a judgement call:
+
+1. **NIC tier first.** If the NIC equivalent requires NGINX Plus, the row goes in `#plus-mappings` — whatever surface it came from. An annotation, a ConfigMap key and a CRD field whose only NIC answer is Plus all land there.
+2. **Then the source surface.** Annotations → `#mappings`. ConfigMap keys → `#configmap-mappings`. CR/CRD fields → `#crd-mappings`. Controller flags → `#flag-mappings`.
+
+Two corollaries, both load-bearing:
+
+- **A row placed outside the section its surface implies must name that surface in its left cell** — `timeout-queue` ConfigMap key, `ConfigMap hsts`, `check` / `httpchk_params` (Backend CRD). The section heading is otherwise the reader's only clue what a bare key is, and a ConfigMap-only key sitting unlabelled in the annotation tables tells them an annotation exists that does not. This is what makes a deliberate cross-listing legal and an accidental one a defect.
+- **The category the row leaves carries an "Elsewhere" note** pointing at the new home, because a reader looks a key up where its siblings are. `haproxy.org/check` stays in Health checks and its note points at Active health checks.
+
+Emptying a category by moving its last row out means **deleting the `<h3>`** — an empty table renders as a heading with nothing under it, and the category filter offers a value that matches nothing. Update the mapping's `category`/`anchor` to the new heading in the same edit, or the wiring suite's verbatim-category assertion fails.
+
+`section` in the mapping index names the reference section that holds the row, and the analyzer's "See Reference Guide" link resolves through it. Sources with more than the two `oss`/`plus` sections must map all of them (`sectionIdFor` in `migration-haproxy.js`); a two-way `=== 'plus' ? … : 'mappings'` ternary silently sends every ConfigMap, CRD and flag finding to `#mappings`.
+
+The wiring suite asserts placement per page from the rendered rows, so this holds for every tool the branch ships. It reads the source side of each comparison to decide the surface — which is why a ConfigMap example must actually show `kind: ConfigMap` rather than an annotated Ingress.
+
 ## Ordering and structure rules
 
 - **Badge the resource, always.** A cell that names a field says which resource it sits on, and it says it with a badge — never bare text. Use `badge-ingress` when the field is on the Ingress the reader already has (`spec.ingressClassName`, `spec.defaultBackend`, `spec.rules[].host`): every other badge means "author this", that one means "edit what you have". A cell with no badge at all is an annotation, which names its own resource.

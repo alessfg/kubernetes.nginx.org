@@ -41,11 +41,14 @@ Input (choose one; defaults to stdin)
 
 Common
   -s, --strategy <name>    crd | annotation
-      --source <name>      ingress-nginx | haproxy   (default: ingress-nginx)
+      --source <name>      ingress-nginx | haproxy | traefik  (default: ingress-nginx)
                            Which migration tool's analyzer to run. HAProxy also
                            reads Service annotations, the controller ConfigMap
                            and its CRs; convert builds from the Ingress and
-                           names the rest rather than dropping it.            (default: crd)
+                           names the rest rather than dropping it.
+      --whole-input        Analyze all input as one unit instead of per
+                           document, so cross-document references resolve
+                           (Traefik IngressRoute -> Middleware). report only.            (default: crd)
   -o, --out <dir>          Write per-Ingress YAML files instead of stdout.
       --json               Emit JSON instead of the text report.
       --no-color           Disable ANSI colour (also honours NO_COLOR).
@@ -77,7 +80,7 @@ Beta: flags and generated output may still change. Review before you apply.`;
 function parseArgs(argv) {
     const opts = {
         command: null, files: [], kubectl: false, namespace: null, strategy: null,
-        source: DEFAULT_SOURCE,
+        source: DEFAULT_SOURCE, wholeInput: false,
         out: null, json: false, colour: null, strict: false, help: false,
         target: 'virtualserver', ingressClass: null, validate: false, nameSuffix: ''
     };
@@ -95,6 +98,7 @@ function parseArgs(argv) {
         else if (a === '-n' || a === '--namespace') opts.namespace = need(a);
         else if (a === '-s' || a === '--strategy') opts.strategy = need(a);
         else if (a === '--source') opts.source = need(a);
+        else if (a === '--whole-input') opts.wholeInput = true;
         else if (a === '-o' || a === '--out') opts.out = need(a);
         else if (a === '--json') opts.json = true;
         else if (a === '--no-color' || a === '--no-colour') opts.colour = false;
@@ -468,13 +472,57 @@ function main() {
 
     const items = [];
     let skipped = 0;
-    for (const src of sources) {
-        const docs = src.isList ? splitKubectlList(src.text) : splitDocuments(src.text);
-        for (const doc of docs) {
-            if (!isAnalyzable(doc, srcInfo.kinds)) { if (kindOf(doc)) skipped++; continue; }
-            const desc = describe(doc, srcInfo.prefixes);
-            const result = engine.analyze(doc, strategy);
-            items.push({ desc, result, sourceFile: src.file, gaps: sortGaps(detect(desc, result)) });
+    if (opts.wholeInput) {
+        /* One analysis over everything, the way the web tool treats a paste.
+           Per-document is right for ingress-nginx — each Ingress is
+           self-contained — but a Traefik IngressRoute references Middlewares
+           that are separate documents by design, and a HAProxy Ingress
+           references a Backend CR the same way. Analyzed alone, every one of
+           those references reports as unresolved, which understates the
+           migration. The cost is the engine's single-context model: one host,
+           one service, one path across the whole input, which the gaps then
+           report as dropped. */
+        const text = sources.map((src) => src.isList
+            ? splitKubectlList(src.text).join('\n---\n')
+            : src.text).join('\n---\n');
+        const analyzable = [];
+        for (const src of sources) {
+            const docs = src.isList ? splitKubectlList(src.text) : splitDocuments(src.text);
+            for (const doc of docs) {
+                if (isAnalyzable(doc, srcInfo.kinds)) analyzable.push(doc);
+                else if (kindOf(doc)) skipped++;
+            }
+        }
+        if (analyzable.length) {
+            // A synthesised description: the union of what every document carries.
+            const descs = analyzable.map((d) => describe(d, srcInfo.prefixes));
+            const union = (key) => [...new Set(descs.flatMap((d) => d[key] || []))];
+            const desc = {
+                kind: 'Input',
+                name: '(whole input, ' + analyzable.length + ' document' + (analyzable.length !== 1 ? 's' : '') + ')',
+                namespace: null,
+                ingressClassName: descs.map((d) => d.ingressClassName).find(Boolean) || null,
+                classAnnotation: null,
+                hosts: union('hosts'),
+                paths: descs.reduce((n, d) => n + (d.paths || 0), 0),
+                services: union('services'),
+                hasTls: descs.some((d) => d.hasTls),
+                tlsSecrets: union('tlsSecrets'),
+                annotations: union('annotations')
+            };
+            const result = engine.analyze(text, strategy);
+            items.push({ desc, result, sourceFile: sources.map((s) => s.file).join(', '),
+                         gaps: sortGaps(detect(desc, result)) });
+        }
+    } else {
+        for (const src of sources) {
+            const docs = src.isList ? splitKubectlList(src.text) : splitDocuments(src.text);
+            for (const doc of docs) {
+                if (!isAnalyzable(doc, srcInfo.kinds)) { if (kindOf(doc)) skipped++; continue; }
+                const desc = describe(doc, srcInfo.prefixes);
+                const result = engine.analyze(doc, strategy);
+                items.push({ desc, result, sourceFile: src.file, gaps: sortGaps(detect(desc, result)) });
+            }
         }
     }
 

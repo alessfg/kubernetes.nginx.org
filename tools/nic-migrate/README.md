@@ -186,6 +186,110 @@ One emitter rule is worth knowing: any scalar starting with a digit, `+`, `-` or
 `0755` read by a YAML 1.1 parser, which is what Kubernetes uses, is the integer
 493.
 
+## End-to-end test
+
+`e2e/run-e2e.py` proves the conversion on a real cluster, in **four stages**.
+Each isolates a different failure mode, so a red run tells you which layer broke
+rather than only that something did:
+
+| Stage | What it establishes |
+|---|---|
+| `baseline` | ingress-nginx alone serves the fixture. Every case checked against its own expectations — if this fails, it's the fixture or ingress-nginx, and nothing downstream means anything. |
+| `nic-installed` | NIC is deployed and answering *before any converted resource exists*: CRDs present, controller returns 404 from its default server. Separates an install problem from a conversion problem. |
+| `converted` | Both controllers serve at once. NIC matches the recorded baseline — **and ingress-nginx is re-checked**, because a migration must not disturb what is still live. |
+| `cutover` | The community Ingress is deleted and ingress-nginx is uninstalled. The run proves the old controller no longer answers at all, then asserts NIC alone still matches the stage-1 baseline. |
+
+`--until <stage>` stops after any of them and leaves the cluster up, which is
+the debugging entry point.
+
+Every stage after the first compares against the **recorded** stage-1 baseline,
+not against literals — so what is asserted is "NIC does what ingress-nginx was
+observed to do", which is the thing a migration promises.
+
+```bash
+# Needs nothing — no cluster, no Docker. Checks the runner's own logic.
+python3 tools/nic-migrate/e2e/run-e2e.py --self-test
+
+# Build a throwaway kind cluster, run all four stages, delete it
+python3 tools/nic-migrate/e2e/run-e2e.py
+python3 tools/nic-migrate/e2e/run-e2e.py --keep            # ...but leave it up to poke at
+
+# Stop at a checkpoint to debug (implies --keep)
+python3 tools/nic-migrate/e2e/run-e2e.py --until baseline       # is the fixture sane?
+python3 tools/nic-migrate/e2e/run-e2e.py --until nic-installed  # did NIC come up?
+python3 tools/nic-migrate/e2e/run-e2e.py --until converted      # skip the cutover
+
+# Use a cluster you already have (minikube, k3d, Docker Desktop, remote)
+python3 tools/nic-migrate/e2e/run-e2e.py --skip-cluster
+python3 tools/nic-migrate/e2e/run-e2e.py --skip-cluster --target ingress
+```
+
+### Same runner locally and in CI
+
+`.github/workflows/e2e.yml` does not orchestrate anything — it installs `kind`
+and calls the identical script. There is no CI-only path to drift out of sync
+with the local one, which is why the workflow does *not* use a
+cluster-provisioning action to create the cluster on its behalf.
+
+Needs `kubectl`, `helm`, `node` and `openssl`, plus `kind` and `docker` unless
+you pass `--skip-cluster`. Preflight names anything missing before doing any
+work, and if you already have a reachable cluster it says so and points at
+`--skip-cluster` rather than telling you to install kind.
+
+CI runs it on changes to this tool or the engine, on demand, and weekly to catch
+upstream drift in ingress-nginx or NIC rather than in our own code.
+
+**The assertion is equivalence, not a hardcoded expectation.** Each case goes to
+both controllers and the answers are compared. Asserting "NIC returns
+`/things/42`" would bake in today's belief about how `rewritePath` handles a
+capture group; asserting "NIC returns whatever ingress-nginx returned" is what a
+migration actually promises. When they differ, **the difference is the finding**.
+
+The backends are `nginx:alpine` with a ConfigMap that echoes the URI the backend
+received — a rewrite is only observable from the backend's side, so that echo is
+what makes the most important case checkable at all. Requests come from a pod
+inside the cluster aimed at each controller's ClusterIP Service, which is what
+lets both controllers run at once with no hostPort or NodePort collision.
+
+Cases cover host routing, path routing, the rewrite, the second host, an unknown
+host, the CORS header, the affinity cookie, TLS termination, and that plain HTTP
+is *not* redirected (the fixture sets `ssl-redirect: "false"`, so the converter
+must not add `tls.redirect`).
+
+Three unit tests in `.github/test/nic-migrate.test.js` guard the fixtures
+against drift without needing a cluster — a Service renamed in `workload.yaml`
+while `source-ingress.yaml` still points at the old name would otherwise surface
+as a 503 that looks like a migration bug.
+
+Scope is **NGINX OSS**. Everything asserted is satisfiable without a
+subscription. A case that has no equivalent on a target is printed as `skip`
+with its reason rather than dropped, so the count never quietly shrinks.
+
+### What the first real run found
+
+All three of these are now handled by `convert`, and none was predicted — they
+came from running it:
+
+- **NIC matches Ingress paths literally.** The community controller treats an
+  `ImplementationSpecific` path containing regex metacharacters as a regex; NIC
+  needs `nginx.org/path-regex`. Without it `/api(/|$)(.*)` matched nothing and
+  every `/api/...` request fell through to the catch-all `/` — returning `200`
+  from the *wrong backend*. A silent routing change is the worst shape a
+  migration bug can take, and no dry-run would have caught it.
+- **NIC rejects snippets by default.** `enableSnippets` is off, and an Ingress
+  using `nginx.org/server-snippets` is *rejected outright* rather than degraded:
+  `snippet specified but snippets feature is not enabled`. The annotation
+  strategy converts CORS into snippets, so `--target ingress` needs
+  `helm --set controller.enableSnippets=true`.
+- **Session affinity has no Ingress annotation form.** It maps to VirtualServer
+  `upstreams[].sessionCookie`, which works fine on OSS — but there is no
+  `nginx.org/*` equivalent, so `--target ingress` loses stickiness silently.
+
+And the question the pipeline existed to answer: **`rewritePath` handles `$2`
+captures identically to the community `rewrite-target`.** Both controllers
+return `/things/42` for `/api/things/42`. That was a guess before; it is a
+measurement now.
+
 ## What is still manual
 
 - **Canary and traffic splitting.** `splits`/`matches` need the *other* Ingress

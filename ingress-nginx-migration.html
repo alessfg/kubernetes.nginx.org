@@ -125,6 +125,7 @@
                             <li><button class="sidebar-link" data-section="features"><span class="dot"></span><span class="sidebar-link-name">CRDs summary</span></button></li>
                             <li><button class="sidebar-link" data-section="installation"><span class="dot"></span><span class="sidebar-link-name">Installing CRDs</span></button></li>
                             <li><button class="sidebar-link" data-section="checklist"><span class="dot"></span><span class="sidebar-link-name">Migration checklist</span></button></li>
+                            <li><button class="sidebar-link" data-section="cli"><span class="dot"></span><span class="sidebar-link-name">Command line tool</span></button></li>
                             <li><button class="sidebar-link" data-section="resources"><span class="dot"></span><span class="sidebar-link-name">Additional resources</span></button></li>
                         </ul>
                     </li>
@@ -353,6 +354,22 @@
             </ul>
         </section>
 
+        <!-- Command line tool -->
+        <section id="cli">
+            <h2 id="command-line-tool">Command line tool</h2>
+            <div class="info-box warning"><strong>Beta:</strong> <code>nic-migrate</code> is new and under active development. Review its output before applying anything to a cluster — command names, flags, and the manifests it generates may still change.</div>
+            <p>The analyzer on this page works on one manifest at a time. <code>nic-migrate</code> runs the same engine from a terminal, across every Ingress in a directory or read straight from a running cluster. It loads the mapping database out of this site's own source rather than keeping a second copy, so it cannot drift from the tables in the reference guide. It is not distributed as a download — clone the <a href="https://github.com/nginx/kubernetes.nginx.org/tree/main/tools/nic-migrate" target="_blank" rel="noopener noreferrer">repository for this site</a> and run it with Node 18 or newer, with nothing to install.</p>
+            <div class="install-box"><h3>Review what would change</h3>
+                <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">Prints a summary per Ingress: annotation swaps, the Policies and CRDs required, and anything the analyzer cannot express on its own, graded blocking, review, or note.</p>
+                <pre><code>node tools/nic-migrate/nic-migrate.js report -f ./manifests</code></pre>
+            </div>
+            <div class="install-box"><h3>Generate manifests</h3>
+                <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">Merges those results into resources you can apply: one VirtualServer per host carrying every route and backend, with Policies referenced, TLS preserved, and the namespace kept. <code>--target ingress</code> instead keeps your Ingress resources and rewrites their annotations.</p>
+                <pre><code>node tools/nic-migrate/nic-migrate.js convert -f ./manifests --validate</code></pre>
+            </div>
+            <p>Neither command drops anything silently: where a construct has no equivalent on the target you choose, it is named rather than omitted. Read the notes each run prints, keep <code>--validate</code> on so the output is checked against a live cluster with <code>kubectl apply --dry-run=server</code>, and see the <a href="https://github.com/nginx/kubernetes.nginx.org/blob/main/tools/nic-migrate/README.md" target="_blank" rel="noopener noreferrer">full option reference and known limitations</a>.</p>
+        </section>
+
         <!-- Resources -->
         <section id="resources">
             <h2 id="additional-resources">Additional resources</h2>
@@ -527,6 +544,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: my-app
   annotations:
     nginx.org/policies: "access-control-allow,access-control-deny"</code></pre></div>
                                 </div>
@@ -942,8 +960,12 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># Opt out of global external auth for this Ingress
-annotations:
-  nginx.ingress.kubernetes.io/enable-global-auth: "false"</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/enable-global-auth: "false"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># The F5 NGINX Ingress Controller does not have a global external
 # auth feature. Authentication is configured per-resource
 # via Policy CRDs or annotations.
@@ -1323,14 +1345,18 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># Canary Ingress
-annotations:
-  nginx.ingress.kubernetes.io/canary: "true"
-  nginx.ingress.kubernetes.io/canary-by-cookie: "canary"
-  nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"
-  nginx.ingress.kubernetes.io/canary-by-header-pattern: "^(test|staging)$"
-  nginx.ingress.kubernetes.io/canary-by-header-value: "always"
-  nginx.ingress.kubernetes.io/canary-weight: "20"
-  nginx.ingress.kubernetes.io/canary-weight-total: "100"</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-cookie: "canary"
+    nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"
+    nginx.ingress.kubernetes.io/canary-by-header-pattern: "^(test|staging)$"
+    nginx.ingress.kubernetes.io/canary-by-header-value: "always"
+    nginx.ingress.kubernetes.io/canary-weight: "20"
+    nginx.ingress.kubernetes.io/canary-weight-total: "100"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:
@@ -1609,6 +1635,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: my-app
   annotations:
     nginx.org/policies: "cors-policy"
 
@@ -1875,10 +1902,14 @@ spec:
                                 <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># No equivalent per-Ingress annotation.
 # Community users typically inject add_header
 # directives via configuration-snippet:
-annotations:
-  nginx.ingress.kubernetes.io/configuration-snippet: |
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN";
+      add_header X-Content-Type-Options "nosniff";</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
   nginx.org/add-header: "X-Frame-Options: SAMEORIGIN, X-Content-Type-Options: nosniff"
   nginx.org/add-header-inherit: "merge"  # on | off | merge</code></pre></div>
@@ -2313,6 +2344,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: my-app
   annotations:
     nginx.org/policies: "ingress-mtls"
     nginx.org/location-snippets: |  # auth-tls-pass-certificate-to-upstream
@@ -2476,6 +2508,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: my-app
   annotations:
     nginx.org/policies: "egress-mtls"
     nginx.org/ssl-services: "secure-app"  # opt-in upstream(s) to TLS</code></pre></div>
@@ -3295,11 +3328,15 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># Canary with session affinity behavior
-annotations:
-  nginx.ingress.kubernetes.io/affinity: "cookie"
-  nginx.ingress.kubernetes.io/affinity-canary-behavior: "sticky"
-  nginx.ingress.kubernetes.io/canary: "true"
-  nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-canary-behavior: "sticky"
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 spec:

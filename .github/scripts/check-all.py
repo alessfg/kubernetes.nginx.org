@@ -24,22 +24,12 @@ silently disappears is the exact thing this file exists to prevent.
 Usage:  python3 .github/scripts/check-all.py
 Exit:   the highest exit code of any check.
 """
-import glob
 import os
 import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Discovered rather than listed, and asserted non-empty. A preview branch that
-# ships a second migration tool adds suites to .github/test/; an explicit pair
-# of filenames would run neither while still printing "wiring suite PASS",
-# which is the failure mode this whole file exists to prevent. The workflow
-# globs for the same reason.
-TEST_FILES = sorted(os.path.relpath(p, ROOT) for p in
-                    glob.glob(os.path.join(ROOT, '.github', 'test', '*.test.js')))
-if not TEST_FILES:
-    sys.exit('check-all: no .github/test/*.test.js found — `node --test` would pass vacuously.')
 
 CHECKS = [
     ('js syntax', [sys.executable, '.github/scripts/check-syntax.py']),
@@ -49,7 +39,15 @@ CHECKS = [
     ('version strings', [sys.executable, '.github/scripts/check-versions.py']),
     ('markup structure', [sys.executable, '.github/scripts/check-markup.py']),
     ('migration analyzer', ['node', '.github/scripts/test-analyzer.js']),
-    ('wiring suite', ['node', '--test'] + TEST_FILES),
+    # Listed by name rather than globbed: CI runs `node --test
+    # .github/test/*.test.js`, and a file that only the glob knows about would
+    # be absent here without anything reporting a smaller suite. Add new test
+    # files to BOTH.
+    ('wiring suite', ['node', '--test', '.github/test/index.test.js',
+                      '.github/test/wiring.test.js',
+                      '.github/test/nic-migrate.test.js',
+                      '.github/test/analyzer.test.js',
+                      '.github/test/conversions.test.js']),
     ('locator', [sys.executable, '.github/scripts/where.py', '--self-test']),
 ]
 

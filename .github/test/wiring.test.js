@@ -114,6 +114,55 @@ for (const p of PAGES) {
         assert.deepEqual(tabs, panes, 'approach tab/pane pairing');
     });
 
+    // A reference row belongs to exactly one section, and which one is not a
+    // judgement call: NIC tier first (a Plus-only target goes to #plus-mappings
+    // whatever surface it came from), then the source surface — annotations to
+    // #mappings, ConfigMap keys to #configmap-mappings, CR fields to
+    // #crd-mappings, controller flags to #flag-mappings. A row may still be
+    // cross-listed outside its surface's section, but only if its left cell NAMES
+    // the surface ("timeout-queue ConfigMap key", "ConfigMap hsts"), because the
+    // section heading is otherwise the reader's only clue about what a bare key is.
+    // Drift here is invisible: the page renders perfectly and quietly tells the
+    // reader an Ingress annotation exists where only a ConfigMap key does.
+    test(`${p.name}: every mapping row sits in the section its surface implies`, () => {
+        const rows = [...page.matchAll(
+            /<section id="([\w-]+)"|<tr class="expandable">\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)];
+        const strip = (s) => s.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+        const REFERENCE = new Set(['mappings', 'plus-mappings', 'configmap-mappings',
+            'crd-mappings', 'flag-mappings']);
+        const misplaced = [];
+        let section = '';
+        for (const m of rows) {
+            if (m[1]) { section = m[1]; continue; }
+            if (!REFERENCE.has(section)) continue;
+            const cells = [...m[2].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((c) => c[1]);
+            if (cells.length !== 2) continue;
+            const [src, nic] = cells;
+            // The source side of the comparison — what the reader is migrating FROM.
+            const old = (m[3].match(/comparison-block old([\s\S]*?)(?=comparison-block new|$)/) || ['', ''])[1];
+            const kind = (old.match(/^\s*kind:\s*([A-Za-z]+)/m) || [])[1];
+            const apiVersion = (old.match(/^\s*apiVersion:\s*(\S+)/m) || [])[1] || '';
+            // A vendor CR: not a core/Kubernetes group, and not one of the built-in
+            // kinds a ConfigMap-key or annotation example ships alongside.
+            const vendorCr = kind && !/^(ConfigMap|Secret|Service|Ingress|Deployment|DaemonSet)$/.test(kind)
+                && /\./.test(apiVersion) && !/^networking\.k8s\.io\//.test(apiVersion);
+
+            let want;
+            if (/badge-plus/.test(nic)) want = 'plus-mappings';
+            else if (/ConfigMap|CRD?\b|controller flag|\bflag\b/.test(strip(src))) want = section;
+            else if (/annotations:/.test(old)) want = 'mappings';
+            else if (strip(src).startsWith('--')) want = 'flag-mappings';
+            else if (vendorCr) want = 'crd-mappings';
+            else if (kind === 'ConfigMap') want = 'configmap-mappings';
+            else want = section;              // spec fields, gap rows: no surface to key off
+            // Only hold a page to a section it actually ships.
+            if (want !== section && page.includes(`<section id="${want}"`)) {
+                misplaced.push(`[${section} -> ${want}] ${strip(src).slice(0, 48)}`);
+            }
+        }
+        assert.deepEqual(misplaced, [], 'rows in the wrong reference section');
+    });
+
     test(`${p.name}: page loads the three scripts in source-before-core order`, () => {
         const scripts = [...page.matchAll(/<script[^>]+src="(assets\/js\/[\w.-]+\.js)"/g)].map((m) => m[1]);
         assert.deepEqual(scripts, ['assets/js/shared.js', p.module, 'assets/js/migration-core.js']);

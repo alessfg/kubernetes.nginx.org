@@ -18,7 +18,7 @@ const path = require('node:path');
 const { ROOT } = require('./lib/load.js');
 const TOOL = path.join(ROOT, 'tools', 'nic-migrate');
 
-const { splitDocuments, isIngress, describe: describeIngress } = require(path.join(TOOL, 'lib', 'ingress.js'));
+const { splitDocuments, isIngress, isAnalyzable: isAnalyzableDoc, describe: describeIngress } = require(path.join(TOOL, 'lib', 'ingress.js'));
 const { detect, sortGaps } = require(path.join(TOOL, 'lib', 'gaps.js'));
 const { createEngine } = require(path.join(TOOL, 'lib', 'engine.js'));
 const { splitKubectlList, loadChecklist } = require(path.join(TOOL, 'nic-migrate.js'));
@@ -532,4 +532,101 @@ test('the e2e workload and runner agree on names', () => {
         assert.ok(workload.some((d) => d.kind === 'Deployment' && d.metadata.name === dep),
             'run-e2e.py waits for deploy/' + dep);
     }
+});
+
+/* ── Multi-source support ──────────────────────────────────────────────────
+   The CLI grew a --source flag so it can batch any migration tool the site
+   ships, not just ingress-nginx. Three things have to hold for a new source:
+   its module boots, the scanner counts ITS annotation prefixes, and the input
+   gate accepts the kinds that source keeps config on. HAProxy is the first
+   source where that last one matters — its settings live on Service objects,
+   a controller ConfigMap and five CRs as well as on the Ingress, so an
+   Ingress-only gate reports "nothing found" on a real deployment. */
+
+const { SOURCES, DEFAULT_SOURCE, resolveSource } = require(path.join(TOOL, 'lib', 'sources.js'));
+
+test('sources: every entry names a module that exists and boots an analyzer', () => {
+    for (const id of Object.keys(SOURCES)) {
+        const src = resolveSource(id);
+        assert.ok(fs.existsSync(path.join(ROOT, src.module)), id + ': ' + src.module + ' missing');
+        const e = createEngine(id);
+        assert.ok(e.source && e.source.analyzer, id + ': no analyzer');
+        assert.equal(e.sourceInfo.id, id);
+        assert.ok(src.prefixes.length > 0 && src.kinds.length > 0, id + ': empty prefixes/kinds');
+        assert.ok(src.kinds.indexOf('Ingress') !== -1, id + ': Ingress must be analyzable');
+    }
+});
+
+test('sources: an unknown source is refused by name, not defaulted', () => {
+    assert.throws(() => resolveSource('nope'), /unknown source "nope"/);
+    // Absent means default, which is what the pre-flag callers and tests rely on.
+    assert.equal(resolveSource(undefined).id, DEFAULT_SOURCE);
+    assert.equal(resolveSource(null).id, DEFAULT_SOURCE);
+});
+
+test('haproxy: the scanner reads Service annotations, which ingress-nginx has no tier for', () => {
+    const svc = [
+        'apiVersion: v1', 'kind: Service', 'metadata:', '  name: app-svc', '  namespace: default',
+        '  annotations:',
+        '    haproxy.org/check: "true"',
+        '    ingress.kubernetes.io/cookie-persistence: JSESSIONID',
+        'spec:', '  ports:', '    - port: 80',
+    ].join('\n');
+    const hap = resolveSource('haproxy');
+    const desc = describeIngress(svc, hap.prefixes);
+    assert.equal(desc.kind, 'Service');
+    assert.deepEqual(desc.annotations.sort(), ['check', 'cookie-persistence']);
+    // The gate: analyzable for haproxy, skipped for ingress-nginx.
+    assert.equal(isAnalyzableDoc(svc, hap.kinds), true);
+    assert.equal(isAnalyzableDoc(svc, resolveSource('ingress-nginx').kinds), false);
+});
+
+test('haproxy: the analyzer produces a plan for an annotated Ingress', () => {
+    const hapEngine = createEngine('haproxy');
+    const ing = [
+        'apiVersion: networking.k8s.io/v1', 'kind: Ingress', 'metadata:', '  name: web-app',
+        '  annotations:',
+        '    haproxy.org/load-balance: leastconn',
+        '    haproxy.org/ssl-redirect: "true"',
+        'spec:', '  rules:', '    - host: app.example.com', '      http:', '        paths:',
+        '          - path: /', '            pathType: Prefix', '            backend:',
+        '              service:', '                name: app-svc', '                port:',
+        '                  number: 80',
+    ].join('\n');
+    const r = hapEngine.analyze(ing, 'crd');
+    assert.equal(r.error, null);
+    assert.deepEqual(r.warnings, [], 'a generator failed and dropped its resource');
+    assert.match(r.yaml, /lb-method: "?least_conn/);
+});
+
+/* A foreign class is the one field that is actively wrong to carry: NIC matches
+   its own -ingress-class, and an unmatched class is not an error — the resource
+   is simply ignored. So the converter must omit it and say so. */
+test('convert: the source controller class is omitted with a note, --class overrides', () => {
+    const ing = {
+        apiVersion: 'networking.k8s.io/v1', kind: 'Ingress',
+        metadata: { name: 'web', namespace: 'default' },
+        spec: {
+            ingressClassName: 'haproxy',
+            rules: [{ host: 'a.example.com', http: { paths: [{ path: '/', pathType: 'Prefix',
+                backend: { service: { name: 'svc', port: { number: 80 } } } }] } }]
+        }
+    };
+    const model = toModel(ing);
+    const empty = { parts: [], yaml: '', parsed: null, warnings: [] };
+
+    const omitted = convert(model, empty, { target: 'virtualserver' });
+    assert.equal(omitted.docs[0].spec.ingressClassName, undefined);
+    assert.ok(omitted.notes.some((n) => /selects the source controller/.test(n)),
+        'omitting the class must be reported, not silent');
+
+    const forced = convert(model, empty, { target: 'virtualserver', ingressClass: 'nginx' });
+    assert.equal(forced.docs[0].spec.ingressClassName, 'nginx');
+
+    // The community class is usually literally "nginx", which is NIC's default,
+    // so it carries over and needs no note.
+    const same = toModel(Object.assign({}, ing, { spec: Object.assign({}, ing.spec, { ingressClassName: 'nginx' }) }));
+    const kept = convert(same, empty, { target: 'virtualserver' });
+    assert.equal(kept.docs[0].spec.ingressClassName, 'nginx');
+    assert.ok(!kept.notes.some((n) => /selects the source controller/.test(n)));
 });

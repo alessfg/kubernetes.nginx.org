@@ -65,6 +65,16 @@ function isIngress(doc) {
     return kindOf(doc) === 'Ingress';
 }
 
+/* True when the analyzer for this source has anything to say about the kind.
+   ingress-nginx keeps everything on the Ingress; HAProxy also uses Service
+   annotations, its controller ConfigMap and five CRs, so gating on Ingress
+   alone would skip most of a real deployment and report "nothing found". */
+function isAnalyzable(doc, kinds) {
+    const k = kindOf(doc);
+    if (!k) return false;
+    return (kinds || ['Ingress']).indexOf(k) !== -1;
+}
+
 /* Pull the scalar for a top-level-ish key at a given indent, e.g. name under
    metadata:. Returns null when absent. */
 function valueAt(scanned, key, indent) {
@@ -85,7 +95,7 @@ function unquote(v) {
 }
 
 /* Describe one Ingress document: everything the gap checks need. */
-function describe(doc) {
+function describe(doc, prefixes) {
     const scanned = scanLines(doc);
     const body = scanned.filter((s) => !s.inBlock && !s.isComment);
 
@@ -130,7 +140,9 @@ function describe(doc) {
     }
 
     const annotations = [];
-    const re = new RegExp('^\\s*(?:' + COMMUNITY_PREFIX.replace(/[.\/]/g, '\\$&') + ')([A-Za-z0-9._-]+):');
+    const list = (prefixes && prefixes.length ? prefixes : [COMMUNITY_PREFIX])
+        .map((p) => p.replace(/[.\/]/g, '\\$&')).join('|');
+    const re = new RegExp('^\\s*(?:' + list + ')([A-Za-z0-9._-]+):');
     for (const s of scanned) {
         if (s.inBlock || s.isComment) continue;
         const m = s.line.match(re);
@@ -138,6 +150,7 @@ function describe(doc) {
     }
 
     return {
+        kind: kindOf(doc) || 'Ingress',
         name: valueAt(scanned, 'name', 2) || '(unnamed)',
         namespace: valueAt(scanned, 'namespace', 2),
         ingressClassName: valueAt(scanned, 'ingressClassName', 2),
@@ -154,4 +167,4 @@ function describe(doc) {
     };
 }
 
-module.exports = { splitDocuments, isIngress, kindOf, describe, COMMUNITY_PREFIX };
+module.exports = { splitDocuments, isIngress, isAnalyzable, kindOf, describe, COMMUNITY_PREFIX };

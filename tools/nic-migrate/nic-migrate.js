@@ -20,13 +20,14 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const { createEngine, ROOT, SOURCE_MODULE } = require('./lib/engine');
-const { splitDocuments, isIngress, kindOf, describe } = require('./lib/ingress');
+const { SOURCES, DEFAULT_SOURCE, resolveSource } = require('./lib/sources');
+const { splitDocuments, isIngress, isAnalyzable, kindOf, describe } = require('./lib/ingress');
 const { detect, sortGaps } = require('./lib/gaps');
 const { renderReport, toJson, fileHeader, makeStyle } = require('./lib/render');
 const yaml = require('./lib/yaml');
 const { toModel, convert } = require('./lib/convert');
 
-const USAGE = `nic-migrate — ingress-nginx -> F5 NGINX Ingress Controller  (beta)
+const USAGE = `nic-migrate — ingress-nginx | HAProxy -> F5 NGINX Ingress Controller  (beta)
 
   node tools/nic-migrate/nic-migrate.js report [options]     what would change, and what the analyzer cannot do
   node tools/nic-migrate/nic-migrate.js convert [options]    merged, applyable manifests
@@ -39,7 +40,12 @@ Input (choose one; defaults to stdin)
   -n, --namespace <ns>     Namespace for --kubectl (default: all namespaces).
 
 Common
-  -s, --strategy <name>    crd | annotation            (default: crd)
+  -s, --strategy <name>    crd | annotation
+      --source <name>      ingress-nginx | haproxy   (default: ingress-nginx)
+                           Which migration tool's analyzer to run. HAProxy also
+                           reads Service annotations, the controller ConfigMap
+                           and its CRs; convert builds from the Ingress and
+                           names the rest rather than dropping it.            (default: crd)
   -o, --out <dir>          Write per-Ingress YAML files instead of stdout.
       --json               Emit JSON instead of the text report.
       --no-color           Disable ANSI colour (also honours NO_COLOR).
@@ -71,6 +77,7 @@ Beta: flags and generated output may still change. Review before you apply.`;
 function parseArgs(argv) {
     const opts = {
         command: null, files: [], kubectl: false, namespace: null, strategy: null,
+        source: DEFAULT_SOURCE,
         out: null, json: false, colour: null, strict: false, help: false,
         target: 'virtualserver', ingressClass: null, validate: false, nameSuffix: ''
     };
@@ -87,6 +94,7 @@ function parseArgs(argv) {
         else if (a === '-k' || a === '--kubectl') opts.kubectl = true;
         else if (a === '-n' || a === '--namespace') opts.namespace = need(a);
         else if (a === '-s' || a === '--strategy') opts.strategy = need(a);
+        else if (a === '--source') opts.source = need(a);
         else if (a === '-o' || a === '--out') opts.out = need(a);
         else if (a === '--json') opts.json = true;
         else if (a === '--no-color' || a === '--no-colour') opts.colour = false;
@@ -98,6 +106,10 @@ function parseArgs(argv) {
         else if (a === '-h' || a === '--help') opts.help = true;
         else throw new Error('unknown option: ' + a);
     }
+    /* Resolve here, not at engine construction: main() reads stdin before it
+       builds the engine, so a bad --source would block on a pipe that never
+       closes instead of failing. resolveSource throws with the valid names. */
+    resolveSource(opts.source);
     return opts;
 }
 
@@ -181,8 +193,9 @@ function loadChecklist() {
 /* Expand every input source into Ingress objects. Unlike report, this parses
    properly, so a kubectl List is just a document with an items array — no
    string surgery. */
-function collectIngresses(sources) {
+function collectIngresses(sources, analyzableKinds) {
     const out = [];
+    const others = [];
     let skipped = 0;
     for (const src of sources) {
         let docs;
@@ -198,11 +211,24 @@ function collectIngresses(sources) {
         }
         for (const doc of flat) {
             if (!doc || typeof doc !== 'object') continue;
-            if (doc.kind !== 'Ingress') { if (doc.kind) skipped++; continue; }
+            if (doc.kind !== 'Ingress') {
+                if (doc.kind) {
+                    skipped++;
+                    // Analyzable but not an Ingress: a HAProxy Service, the
+                    // controller ConfigMap, or a CR. convert() models an
+                    // Ingress, so these are reported rather than silently lost.
+                    if (analyzableKinds && analyzableKinds.indexOf(doc.kind) !== -1) {
+                        others.push({ kind: doc.kind, name: (doc.metadata && doc.metadata.name) || '(unnamed)',
+                                      namespace: (doc.metadata && doc.metadata.namespace) || null,
+                                      sourceFile: src.file });
+                    }
+                }
+                continue;
+            }
             out.push({ doc, sourceFile: src.file });
         }
     }
-    return { ingresses: out, skipped };
+    return { ingresses: out, skipped, others };
 }
 
 /* An unreachable or non-discoverable cluster, as distinct from a manifest the
@@ -259,16 +285,17 @@ function validateWithKubectl(text, docs) {
     };
 }
 
-function runConvert(sources, engine, strategy, opts) {
+function runConvert(sources, engine, strategy, opts, srcInfo) {
     if (opts.target !== 'virtualserver' && opts.target !== 'ingress') {
         process.stderr.write('error: unknown target "' + opts.target + '" (expected: virtualserver, ingress)\n');
         return 2;
     }
 
-    const { ingresses, skipped } = collectIngresses(sources);
+    const { ingresses, skipped, others } = collectIngresses(sources, srcInfo.kinds);
     if (!ingresses.length) {
-        process.stderr.write('error: no Ingress documents found' +
-            (skipped ? ' (' + skipped + ' non-Ingress document' + (skipped !== 1 ? 's' : '') + ' skipped)' : '') + '\n');
+        process.stderr.write('error: no ' + srcInfo.unit + ' documents found' +
+            (skipped ? ' (' + skipped + ' document' + (skipped !== 1 ? 's' : '') +
+                ' of another kind skipped)' : '') + '\n');
         return 1;
     }
 
@@ -327,6 +354,21 @@ function runConvert(sources, engine, strategy, opts) {
         for (const n of r.converted.notes) {
             process.stderr.write(style.yellow('· ' + label + ': ' + n) + '\n');
         }
+    }
+
+    /* convert() models an Ingress. A source whose config also lives on Service
+       objects, a controller ConfigMap or CRs (HAProxy, Traefik) leaves those
+       unrepresented here, and the tool's promise is that nothing is dropped in
+       silence — so name them and where to see them. */
+    if (others && others.length) {
+        const byKind = {};
+        for (const o of others) (byKind[o.kind] = byKind[o.kind] || []).push(
+            (o.namespace ? o.namespace + '/' : '') + o.name);
+        const summary = Object.keys(byKind).sort()
+            .map((k) => k + ' (' + byKind[k].join(', ') + ')').join(', ');
+        process.stderr.write(style.yellow(
+            '· not converted: ' + summary + '. This target builds from the Ingress; ' +
+            'run `report --source ' + srcInfo.id + '` to see what these carry.') + '\n');
     }
 
     if (opts.validate) {
@@ -407,7 +449,8 @@ function main() {
         sources.push({ file: '(stdin)', text });
     }
 
-    const engine = createEngine();
+    const engine = createEngine(opts.source);
+    const srcInfo = engine.sourceInfo;
     /* Target and strategy are coupled: asking for an Ingress and then running
        the CRD-first strategy produces CRD fragments the Ingress target cannot
        carry, and every one becomes a note about something missing. The
@@ -421,15 +464,15 @@ function main() {
         return 2;
     }
 
-    if (opts.command === 'convert') return runConvert(sources, engine, strategy, opts);
+    if (opts.command === 'convert') return runConvert(sources, engine, strategy, opts, srcInfo);
 
     const items = [];
     let skipped = 0;
     for (const src of sources) {
         const docs = src.isList ? splitKubectlList(src.text) : splitDocuments(src.text);
         for (const doc of docs) {
-            if (!isIngress(doc)) { if (kindOf(doc)) skipped++; continue; }
-            const desc = describe(doc);
+            if (!isAnalyzable(doc, srcInfo.kinds)) { if (kindOf(doc)) skipped++; continue; }
+            const desc = describe(doc, srcInfo.prefixes);
             const result = engine.analyze(doc, strategy);
             items.push({ desc, result, sourceFile: src.file, gaps: sortGaps(detect(desc, result)) });
         }
@@ -442,7 +485,11 @@ function main() {
     }
 
     const colour = opts.colour === false || process.env.NO_COLOR ? false : process.stdout.isTTY === true;
-    const renderOpts = { strategy, colour, wrap: true };
+    const renderOpts = {
+        strategy, colour, wrap: true,
+        unit: srcInfo.unit,
+        annotationLabel: srcInfo.id === 'ingress-nginx' ? 'community annotations' : srcInfo.label + ' annotations'
+    };
 
     if (opts.json) {
         process.stdout.write(JSON.stringify(toJson(items, renderOpts), null, 2) + '\n');

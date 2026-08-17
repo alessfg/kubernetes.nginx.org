@@ -555,6 +555,14 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
         padding: var(--space-base) 0;
         margin: calc(var(--space-base) * -1) 0 var(--space-2hx);
     }
+    /* The bar is opaque and pulled up 8px, so whatever sits directly above it
+       loses its last 8px behind that background. The global reset zeroes every
+       margin, so a section intro paragraph had none to give up and its final
+       line was painted over — legibly enough to look like a rendering glitch
+       rather than a bug. Clearance goes here rather than on `.controls`,
+       because the negative margin is what keeps the bar flush with the fixed
+       header once it sticks. */
+    .main-inner section > p:has(+ .controls) { margin-bottom: var(--space-2x); }
     /* Headings below the sticky bar need clearance for the fixed header plus the bar. */
     #mappings h3[id], #plus-mappings h3[id], #configmap-mappings h3[id] {
         scroll-margin-top: calc(var(--fixed-top-h) + var(--space-8x) + var(--space-2x));

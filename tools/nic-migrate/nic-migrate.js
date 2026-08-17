@@ -26,7 +26,7 @@ const { renderReport, toJson, fileHeader, makeStyle } = require('./lib/render');
 const yaml = require('./lib/yaml');
 const { toModel, convert } = require('./lib/convert');
 
-const USAGE = `nic-migrate — ingress-nginx -> F5 NGINX Ingress Controller
+const USAGE = `nic-migrate — ingress-nginx -> F5 NGINX Ingress Controller  (beta)
 
   node tools/nic-migrate/nic-migrate.js report [options]     what would change, and what the analyzer cannot do
   node tools/nic-migrate/nic-migrate.js convert [options]    merged, applyable manifests
@@ -64,7 +64,9 @@ convert
 
 report is advisory: it shows the analyzer's single-feature illustrations and
 names what they leave out. convert merges those into manifests you can apply —
-read its notes, and always --validate before you trust it.`;
+read its notes, and always --validate before you trust it.
+
+Beta: flags and generated output may still change. Review before you apply.`;
 
 function parseArgs(argv) {
     const opts = {

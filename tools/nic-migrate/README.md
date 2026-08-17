@@ -1,5 +1,11 @@
 # nic-migrate
 
+> **Beta.** New and under active development. Review its output before applying
+> anything to a cluster — command names, flags, and the manifests it generates
+> may still change. What it *does* report, it reports honestly: nothing is
+> dropped silently, and every construct it cannot express on the chosen target
+> is named. That is the part to rely on while the rest settles.
+
 Batch the migration tool's analyzer over real Ingress manifests, from a terminal.
 
 The web tool at [kubernetes.nginx.org/ingress-nginx-migration.html](https://kubernetes.nginx.org/ingress-nginx-migration.html)

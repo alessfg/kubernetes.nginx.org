@@ -41,10 +41,13 @@ Input (choose one; defaults to stdin)
 
 Common
   -s, --strategy <name>    crd | annotation            (default: crd)
-      --source <name>      ingress-nginx | haproxy     (default: ingress-nginx)
-                           Which migration tool's analyzer to run. HAProxy also
-                           reads Service annotations, the controller ConfigMap
-                           and its CRs. convert supports ingress-nginx only.
+      --source <name>      ingress-nginx | haproxy | traefik  (default: ingress-nginx)
+                           Which migration tool's analyzer to run. HAProxy and
+                           Traefik also read Services, ConfigMaps and their CRs.
+                           convert supports ingress-nginx only.
+      --whole-input        Analyze all input as one unit instead of per
+                           document, so cross-document references resolve
+                           (Traefik IngressRoute -> Middleware). report only.
   -o, --out <dir>          Write per-Ingress YAML files instead of stdout.
       --json               Emit JSON instead of the text report.
       --no-color           Disable ANSI colour (also honours NO_COLOR).
@@ -76,7 +79,7 @@ Beta: flags and generated output may still change. Review before you apply.`;
 function parseArgs(argv) {
     const opts = {
         command: null, files: [], kubectl: false, namespace: null, strategy: null,
-        source: DEFAULT_SOURCE,
+        source: DEFAULT_SOURCE, wholeInput: false,
         out: null, json: false, colour: null, strict: false, help: false,
         target: 'virtualserver', ingressClass: null, validate: false, nameSuffix: ''
     };
@@ -94,6 +97,7 @@ function parseArgs(argv) {
         else if (a === '-n' || a === '--namespace') opts.namespace = need(a);
         else if (a === '-s' || a === '--strategy') opts.strategy = need(a);
         else if (a === '--source') opts.source = need(a);
+        else if (a === '--whole-input') opts.wholeInput = true;
         else if (a === '-o' || a === '--out') opts.out = need(a);
         else if (a === '--json') opts.json = true;
         else if (a === '--no-color' || a === '--no-colour') opts.colour = false;
@@ -448,13 +452,48 @@ function main() {
     if (opts.command === 'convert') return runConvert(sources, engine, strategy, opts, srcInfo);
 
     const { ingresses, skipped } = collectIngresses(sources, srcInfo.kinds);
-    const items = ingresses.map(({ doc, sourceFile }) => {
-        const desc = describe(doc, srcInfo.prefixes);
-        // The engine analyzes the parsed object, re-emitted: what it reads is
-        // exactly what was parsed, whatever the input's form.
-        const result = engine.analyze(yaml.stringify(doc), strategy);
-        return { desc, result, sourceFile, gaps: sortGaps(detect(desc, result)) };
-    });
+    let items;
+    if (opts.wholeInput) {
+        /* One analysis over everything, the way the web tool treats a paste.
+           Per-document is right for ingress-nginx — each Ingress is
+           self-contained — but a Traefik IngressRoute references Middlewares
+           that are separate documents by design, and a HAProxy Ingress
+           references a Backend CR the same way. Analyzed alone, every one of
+           those references reports as unresolved, which understates the
+           migration. The cost is the engine's single-context model: one host,
+           one service, one path across the whole input, which the gaps then
+           report as dropped. */
+        items = [];
+        if (ingresses.length) {
+            // A synthesised description: the union of what every document carries.
+            const descs = ingresses.map(({ doc }) => describe(doc, srcInfo.prefixes));
+            const union = (key) => [...new Set(descs.flatMap((d) => d[key] || []))];
+            const desc = {
+                kind: 'Input',
+                name: '(whole input, ' + ingresses.length + ' document' + (ingresses.length !== 1 ? 's' : '') + ')',
+                namespace: null,
+                ingressClassName: descs.map((d) => d.ingressClassName).find(Boolean) || null,
+                classAnnotation: null,
+                hosts: union('hosts'),
+                paths: descs.reduce((n, d) => n + (d.paths || 0), 0),
+                services: union('services'),
+                hasTls: descs.some((d) => d.hasTls),
+                tlsSecrets: union('tlsSecrets'),
+                annotations: union('annotations')
+            };
+            const result = engine.analyze(ingresses.map(({ doc }) => yaml.stringify(doc)).join('\n---\n'), strategy);
+            items.push({ desc, result, sourceFile: sources.map((src) => src.file).join(', '),
+                         gaps: sortGaps(detect(desc, result)) });
+        }
+    } else {
+        items = ingresses.map(({ doc, sourceFile }) => {
+            const desc = describe(doc, srcInfo.prefixes);
+            // The engine analyzes the parsed object, re-emitted: what it reads is
+            // exactly what was parsed, whatever the input's form.
+            const result = engine.analyze(yaml.stringify(doc), strategy);
+            return { desc, result, sourceFile, gaps: sortGaps(detect(desc, result)) };
+        });
+    }
 
     if (!items.length) {
         process.stderr.write('error: no ' + srcInfo.unit + ' documents found' + skippedText(skipped) + '\n');

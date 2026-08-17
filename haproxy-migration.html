@@ -1090,101 +1090,6 @@ spec:
             </div>
 
             <!-- Client mTLS -->
-            <h3 id="client-mtls">Client mTLS</h3>
-            <div class="table-wrapper">
-                <table class="mapping-table" aria-labelledby="client-mtls"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                    <tbody>
-                        <tr class="expandable">
-                            <td><code>client-ca</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS.clientCertSecret</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: Secret
-metadata:
-  name: client-ca
-type: Opaque
-data:
-  tls.crt: LS0tLS1CRUdJTi4uLg==  # client CA bundle under tls.crt
----
-# controller ConfigMap (HAProxy client mTLS is global)
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  client-ca: default/client-ca</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: Policy
-metadata:
-  name: client-mtls-policy
-spec:
-  ingressMTLS:
-    clientCertSecret: client-ca  # client-ca (re-create as type nginx.org/ca with the CA under key "ca.crt")
-    verifyClient: "on"  # client-crt-optional: false (default — cert enforced)
-    verifyDepth: 1
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "client-mtls-policy"
-# HAProxy client-ca Secrets carry the CA under tls.crt — NIC needs a Secret of
-# type nginx.org/ca with the bundle under ca.crt (optional CRL under ca.crl).
-# Requires TLS termination on the host; failed verification returns HTTP 400.</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>Secret type and key both change:</strong> HAProxy's <code>client-ca</code> Secret carries the CA under <code>tls.crt</code>; NIC's <code>ingressMTLS</code> needs a Secret of <code>type: nginx.org/ca</code> with the bundle under <code>ca.crt</code> (optional CRL under <code>ca.crl</code>) — re-create it, do not reference the original. <code>ingressMTLS</code> requires TLS termination on the host: NIC ignores the Policy for a host with TLS disabled, and a missing or invalid client certificate returns HTTP <strong>400</strong> (not 500).</div>
-                            <div class="info-box note"><strong>Note:</strong> Scope shift — HAProxy configures client mTLS controller-wide (ConfigMap); NIC's <code>ingressMTLS</code> attaches per VirtualServer (<code>spec.policies</code>) or per Ingress (<code>nginx.org/policies</code>, since v5.5.0), so apply the Policy to every host that needs it. On mergeable Ingresses it must sit on the master.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>client-crt-optional</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>ingressMTLS.verifyClient</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  client-crt-optional: "true"  # request but do not require the client cert</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: Policy
-metadata:
-  name: client-mtls-policy
-spec:
-  ingressMTLS:
-    clientCertSecret: client-ca
-    verifyClient: "optional"  # client-crt-optional: true → optional (default "on" = enforced)
-    verifyDepth: 1</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> Polarity — HAProxy's default (<code>false</code>) enforces the certificate, so map <code>false</code> → <code>verifyClient: "on"</code> (the NIC default) and <code>true</code> → <code>"optional"</code>. Do <strong>not</strong> use <code>optional_no_ca</code>: it skips CA verification, whereas HAProxy still verifies an optional certificate against <code>client-ca</code>. <code>verifyDepth</code> defaults to <code>1</code> on both sides. Requires the <code>client-ca</code> Policy above.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>client-strict-sni</code></td>
-                            <td><code>-default-server-tls-secret</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  client-strict-sni: "true"  # reject connections with an unknown SNI</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No per-resource toggle — strict SNI is a side effect of NOT deploying a
-# default server certificate. Leave the controller flag unset:
-#   (omit) -default-server-tls-secret=&lt;ns&gt;/&lt;secret&gt;
-# NGINX then answers unknown SNI with ssl_reject_handshake.
-#
-# To serve a fallback certificate instead (client-strict-sni: false), set
-# -default-server-tls-secret to a Secret of type kubernetes.io/tls.</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> There is no user-facing strict-SNI toggle in the F5 NGINX Ingress Controller — rejecting unknown SNI follows from the <em>absence</em> of a default server certificate, and it is controller-global (not per-Ingress).</div>
-                        </div></td></tr>
-                    </tbody>
-                </table>
-            </div>
-
             <h3 id="configuration-snippets">Configuration snippets</h3>
             <div class="info-box note"><strong>Key difference:</strong> HAProxy snippet annotations inject raw <strong>HAProxy</strong> configuration; the F5 NGINX Ingress Controller injects raw <strong>NGINX</strong> configuration. Snippet <em>content</em> is never copyable — every directive must be rewritten by hand. Resource snippets (<code>nginx.org/*-snippets</code>, VirtualServer/TransportServer snippet fields) require the controller flag <code>-enable-snippets</code>; ConfigMap snippet keys are always available.</div>
             <div class="table-wrapper">
@@ -1242,100 +1147,6 @@ data:
                             <div class="info-box warning"><strong>Snippet content is not portable:</strong> HAProxy directives are not NGINX directives — the generator wraps each original line in a <code># TODO rewrite as NGINX:</code> comment, and you must translate every one. The F5 NGINX Ingress Controller does <strong>not</strong> read snippet annotations from Service objects, so a Service-scoped <code>backend-config-snippet</code> must move onto the Ingress (or a VirtualServer route's <code>location-snippets</code> field).</div>
                             <div class="info-box note"><strong>Note:</strong> There is no per-upstream snippet context. Stick-table session persistence expressed in a backend snippet should become a VirtualServer <code>upstreams[].sessionCookie</code> instead of a snippet.</div>
                         </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>frontend-config-snippet</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>server-snippets</code> + <code>http-snippets</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  frontend-config-snippet: |
-    http-request deny if { path_beg /admin }</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  # applies inside EVERY server block; per-app scoping →
-  # nginx.org/server-snippets on the Ingress (-enable-snippets)
-  server-snippets: |  # frontend-config-snippet
-    # TODO rewrite as NGINX: http-request deny if { path_beg /admin }</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>Snippet content is not portable:</strong> HAProxy frontend directives (http-request/http-response rules, ACLs) have no 1:1 server-context equivalents — re-express each rule as NGINX config or as NIC constructs (Policies, VirtualServer matches). The ConfigMap key applies to every server block; scope it per-application with <code>nginx.org/server-snippets</code>.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>global-config-snippet</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>main-snippets</code> + <code>http-snippets</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  global-config-snippet: |
-    ssl-default-bind-ciphers ECDHE-ECDSA-AES256-GCM-SHA384
-    tune.ssl.cachesize 100000</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384"  # native key — prefer over a snippet
-  # only directives with no native key fall back to a snippet:
-  main-snippets: |  # global-config-snippet
-    # TODO rewrite as NGINX: tune.ssl.cachesize 100000</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>Snippet content is not portable:</strong> HAProxy global directives must be rewritten as NGINX main/http-context directives.</div>
-                            <div class="info-box note"><strong>Note:</strong> Prefer native ConfigMap keys where they exist — <code>ssl-default-bind-ciphers</code> → <code>ssl-ciphers</code>, <code>ssl-default-bind-options</code> → <code>ssl-protocols</code> (+ <code>ssl-prefer-server-ciphers</code>), <code>ssl-dh-param-file</code> → <code>ssl-dhparam-file</code>. Reserve <code>main-snippets</code>/<code>http-snippets</code> for directives with no native key (<code>tune.*</code>, <code>ssl_ecdh_curve</code>).</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>stats-config-snippet</code></td>
-                            <td>No direct equivalent</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  stats-config-snippet: |
-    stats auth admin:password
-    stats refresh 10s</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — there is no stats-frontend config-injection
-# point on the F5 NGINX Ingress Controller, and no HAProxy-style stats
-# page. Scrape Prometheus metrics into Grafana instead:
-args:
-  - -enable-prometheus-metrics       # serves /metrics (port 9113)
-# The live activity dashboard is an NGINX Plus feature.</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NIC OSS has no stats-frontend snippet context and no equivalent of the HAProxy stats page (<code>stats auth ...</code> does not port). Use the Prometheus <code>/metrics</code> endpoint (<code>-enable-prometheus-metrics</code>, port 9113) with Grafana; the live dashboard is NGINX Plus only.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>ValidationRules</code> CRD</td>
-                            <td>No direct equivalent</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
-kind: ValidationRules
-metadata:
-  name: custom-annotations
-# Defines a prefix plus CEL-validated, Go-templated custom
-# annotations that render into HAProxy config snippets.</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — NIC has a fixed annotation vocabulary and no
-# CEL/template custom-annotation framework. Re-express the intent with
-# native constructs (Policies, VirtualServer fields) or hand-written
-# snippets; the validation/templating layer is lost.</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> the <code>ValidationRules</code> CRD (and its <code>--custom-validation-rules</code> / <code>--enable-custom-annotations-on-ingress</code> flags) has no analog — the closest escape hatch is <code>-enable-snippets</code>, not a new annotation vocabulary.</div>
-                        </div></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1344,53 +1155,6 @@ metadata:
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="connection-handling"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
-                        <tr class="expandable">
-                            <td><code>http-connection-mode</code><br>(aliases <code>http-keep-alive</code>, <code>http-server-close</code>)</td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>keepalive</code> + <code>keepalive-timeout</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  http-connection-mode: http-keep-alive</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  # http-connection-mode: http-keep-alive
-  keepalive: "64"  # UPSTREAM idle-connection COUNT (off by default) — 64 is a starting point
-  # client keep-alive is already on (keepalive-timeout defaults to 75s)
-  # httpclose instead → keepalive-timeout: "0"</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> There is no single connection-mode toggle. NGINX splits it into <strong>upstream</strong> keep-alive (<code>keepalive</code>, a connection count that is off by default) and <strong>client</strong> keep-alive (<code>keepalive-timeout</code>, on by default at 75s). Reproducing HAProxy's default <code>http-keep-alive</code> needs an explicit positive <code>keepalive</code> count. <code>http-keep-alive</code> and <code>http-server-close</code> are deprecated HAProxy aliases of <code>http-connection-mode</code>; <code>http-server-close</code> already matches the NGINX default (nothing to emit).</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>maxconn</code><br><code>nbthread</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-connections</code> / <code>worker-processes</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  maxconn: "2000"
-  nbthread: "4"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  worker-connections: "2000"  # maxconn — PER-WORKER (divide by worker-processes; counts client + upstream + internal)
-  worker-processes: "4"  # nbthread — NGINX scales with processes, not threads</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> Both mappings are <strong>approximate</strong> — HAProxy <code>maxconn</code> is a process-wide cap while <code>worker-connections</code> is per-worker (effective →  <code>worker-connections</code> × <code>worker-processes</code>), and HAProxy runs threads in one process while NGINX runs multiple worker processes. The counts transfer; the models differ.</div>
-                        </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/pod-maxconn</code></td>
                             <td><code>nginx.org/max-conns</code></td>
@@ -1411,35 +1175,6 @@ metadata:
     nginx.org/max-conns: "100"  # pod-maxconn — per-server max connections (VirtualServer: upstreams[].max-conns)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> HAProxy divides <code>pod-maxconn</code> by the controller instance count automatically; the F5 NGINX Ingress Controller does not — divide by your replica count yourself.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td>No direct equivalent</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].queue</code> <span class="badge badge-plus">NGINX Plus</span></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Kubernetes Ingress Controller OSS exposes no request-queue
-# annotation (HAProxy timeout queue is not surfaced as an annotation).</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: VirtualServer
-metadata:
-  name: queued-app
-spec:
-  host: app.example.com
-  upstreams:
-    - name: backend
-      service: backend-svc
-      port: 80
-      max-conns: 50  # cap concurrent connections per server
-      queue:
-        size: 100    # requests held when every server is at max-conns
-        timeout: 60s  # NGINX Plus default 60s (HAProxy timeout queue default 5s)
-  routes:
-    - path: /
-      action:
-        pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>NGINX Plus capability:</strong> the <code>queue</code> directive bounds how long a request waits when all upstream servers are at <code>max-conns</code> — the direct analogue of HAProxy's <code>timeout queue</code>. It requires NGINX Plus; on OSS there is no request queue and saturated requests fail fast instead.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -1680,82 +1415,6 @@ spec:
                 </table>
             </div>
 
-            <h3 id="global-settings">Global settings</h3>
-            <div class="table-wrapper">
-                <table class="mapping-table" aria-labelledby="global-settings"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                    <tbody>
-                        <tr class="expandable">
-                            <td><code>hard-stop-after</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-shutdown-timeout</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  hard-stop-after: "30m"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  worker-shutdown-timeout: "30m"  # hard-stop-after — caps how long an OLD worker drains after a reload</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> Semantic delta — HAProxy <code>hard-stop-after</code> caps the whole-process soft-stop, while <code>worker-shutdown-timeout</code> caps the per-worker drain of an <em>old</em> NGINX worker after a reload. It is a reload/drain analogue, not a request timeout. NIC has no default here (nginx default is 0 = indefinite), so carry the value explicitly.</div>
-                        </div></td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-
-            <!-- HAProxy CRDs -->
-            <h3 id="haproxy-crds">HAProxy CRDs</h3>
-            <div class="info-box note"><strong>Write v3:</strong> current CRs use <code>ingress.v3.haproxy.org/v3</code> &mdash; Global, Defaults, Backend, TCP, plus Frontend and ValidationRules. The older <code>ingress.v1.haproxy.org/v1</code> group is superseded: v3.2.12 still serves it and this tool still reads it, but write no new ones. Both fold into NIC's global <code>nginx-config</code> ConfigMap, per-app VirtualServer fields, or the GlobalConfiguration CRD. Full per-field conversions live in the <a href="#crd-global">CRD field-mapping tables</a> in the ConfigMap, CRD &amp; Flag section; the analyzer emits complete YAML for a pasted CR.</div>
-            <div class="table-wrapper">
-                <table class="mapping-table" aria-labelledby="haproxy-crds"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
-                    <tbody>
-                        <tr class="expandable">
-                            <td><code>Backend</code> CRD</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> Per-backend settings (load balancing, timeouts, health checks, cookie persistence, backend TLS) become VirtualServer <code>upstreams[]</code> fields or the matching <code>nginx.org/*</code> annotations. TCP-mode Backends convert to a TransportServer instead. See the <a href="#crd-backend">HAProxy Backend CRD</a> field-mapping table for the full breakdown.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>cr-backend</code> (CR pointer)</td>
-                            <td>Not applicable (migrate the CR's content)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> NIC has no CR-reference indirection &mdash; drop the <code>cr-backend</code> annotation (and the <code>cr-global</code>/<code>cr-defaults</code>/<code>cr-frontend-*</code> ConfigMap pointer keys) and migrate the referenced CR's <em>content</em> instead. If the pointer was ConfigMap-scoped, replicate the settings per application.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>Defaults</code> CRD</td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> proxy / keepalive / log keys</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> Cluster-wide defaults (timeouts, logging, connection handling) fold into the global <code>nginx-config</code> ConfigMap. See the <a href="#crd-defaults">HAProxy Defaults CRD</a> field-mapping table.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>Frontend</code> CRD<br>(v3-only)</td>
-                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> listeners + <span class="badge badge-configmap">ConfigMap</span> keys + <code>server-snippets</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> There is no single NIC analogue &mdash; listener binds map to GlobalConfiguration listeners and controller flags, protocol/TLS defaults to ConfigMap keys, and any raw directives to <code>server-snippets</code>. See the <a href="#crd-frontend">HAProxy Frontend CRD</a> field-mapping table.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>Global</code> CRD</td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> global keys (<code>worker-*</code>, <code>ssl-*</code>)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> Process- and TLS-level settings become global <code>nginx-config</code> ConfigMap keys (<code>worker-processes</code>, <code>worker-connections</code>, <code>ssl-protocols</code>, and related). See the <a href="#crd-global">HAProxy Global CRD</a> field-mapping table.</div>
-                        </div></td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Headers -->
             <h3 id="headers">Headers</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="headers"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -1914,7 +1573,7 @@ spec:
 
             <!-- Health Checks -->
             <h3 id="health-checks">Health checks</h3>
-            <div class="info-box note"><strong>Note:</strong> HAProxy runs <strong>active</strong> TCP/HTTP probes. NGINX OSS supports only <strong>passive</strong> health (a server is ejected after failed client requests); true active probes (<code>upstreams[].healthCheck</code>) require NGINX Plus — see the <a href="#plus-mappings">NGINX Plus mappings</a>.</div>
+            <div class="info-box note"><strong>Note:</strong> HAProxy runs <strong>active</strong> TCP/HTTP probes. NGINX OSS supports only <strong>passive</strong> health (a server is ejected after failed client requests); true active probes (<code>upstreams[].healthCheck</code>) require NGINX Plus, so <code>check-http</code>, <code>check-interval</code> and <code>timeout-check</code> are mapped under <a href="#active-health-checks">Active health checks</a> in the NGINX Plus section.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="health-checks"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -1935,75 +1594,7 @@ metadata:
   nginx.org/max-fails: "1"      # eject after N failed client requests
   nginx.org/fail-timeout: "10s" # window + ejection time for passive failures</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Passive vs active:</strong> HAProxy <code>check</code> runs active TCP probes; the NIC OSS equivalent is <em>passive</em> — a server is ejected only after real client requests fail (idle backends are never probed). For a true active probe, use the NGINX Plus <code>upstreams[].healthCheck</code> shown in the rows below.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>haproxy.org/check-http</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>upstreams[].healthCheck</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-  annotations:
-    haproxy.org/check-http: "GET /healthz HTTP/1.1"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: VirtualServer
-metadata:
-  name: health-check-app
-spec:
-  host: app.example.com
-  upstreams:
-    - name: backend
-      service: backend-svc
-      port: 80
-      healthCheck:
-        enable: true  # NGINX Plus only
-        path: /healthz  # check-http
-  routes:
-    - path: /
-      action:
-        pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>NGINX Plus only:</strong> the active HTTP probe maps to <code>upstreams[].healthCheck</code>, which requires NGINX Plus. Only the URI ports — the request <strong>method</strong> (probes are GET-only) and any <code>HTTP/x.y</code> version token are dropped. On OSS there is no HTTP-status probe; fall back to the passive <code>check</code> row.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>haproxy.org/check-interval</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>healthCheck.interval</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-  annotations:
-    haproxy.org/check-interval: "10s"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>      healthCheck:  # NGINX Plus only
-        enable: true
-        interval: 10s  # check-interval</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>interval</code> (default <code>5s</code>) is meaningful only for the active (Plus) probe. It sets how often the probe fires — distinct from <code>fail-timeout</code>, which governs passive ejection.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>haproxy.org/timeout-check</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>healthCheck.read-timeout</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-  annotations:
-    haproxy.org/timeout-check: "5s"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>      healthCheck:  # NGINX Plus only
-        enable: true
-        read-timeout: 5s  # timeout-check</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> HAProxy's post-connect <code>timeout check</code> maps to the active probe's <code>read-timeout</code> (Plus). There is no OSS equivalent — passive health has no probe timeout.</div>
+                            <div class="info-box note"><strong>Passive vs active:</strong> HAProxy <code>check</code> runs active TCP probes; the NIC OSS equivalent is <em>passive</em> — a server is ejected only after real client requests fail (idle backends are never probed). For a true active probe, use the NGINX Plus <code>upstreams[].healthCheck</code> in <a href="#active-health-checks">Active health checks</a>.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2118,52 +1709,6 @@ data:
                 <table class="mapping-table" aria-labelledby="observability"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>log-format</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>log-format</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  log-format: "%ci:%cp [%tr] %ft %b/%s %ST %B %{+Q}r"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  # HAProxy %-tokens are a different DSL — rewrite by hand
-  # ($remote_addr → %ci, $status → %ST, $upstream_response_time → %Tr)
-  log-format: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'
-  log-format-escaping: json</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>log-format</code> is <strong>global</strong> — one HTTP access-log format for all traffic. Several HAProxy timers (<code>%Tw</code>/<code>%Tc</code>/<code>%Ta</code>) have no nginx variable, so they cannot be reproduced.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>log-format-tcp</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>stream-log-format</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  log-format-tcp: "%ci:%cp [%t] %ft %b/%s %Tw/%Tc/%Tt %B %ts"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  # tcplog tokens → nginx stream $-vars (hand-rewrite)
-  stream-log-format: "$remote_addr [$time_local] $protocol $status $bytes_sent $bytes_received $session_time"  # log-format-tcp</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>stream-log-format</code> applies to <strong>all</strong> TransportServer (TCP/UDP) traffic — it is global, not per-TCP-service. Pair it with the TransportServer resources in <a href="#tcp-services">TCP services</a>.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
                             <td><code>request-capture</code><br>(<code>request-capture-len</code>)</td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>log-format</code> with <code>$http_*</code> / <code>$cookie_*</code></td>
                         </tr>
@@ -2188,49 +1733,6 @@ data:
   log-format-escaping: json</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> nginx has no per-route capture slots — captured headers/cookies become <code>$http_*</code>/<code>$cookie_*</code> variables appended to the single global <code>log-format</code>. There is no per-field length cap (<code>request-capture-len</code> has no equivalent — the full value is logged), and the <code>req.fhdr</code> vs <code>hdr</code> distinction is lost (<code>$http_&lt;name&gt;</code> is the full value). Set <code>log-format-escaping: json</code> for safe quoting.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>syslog-server</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log</code> (<code>syslog:</code> destination)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  syslog-server: "address:10.0.0.1, port:514, facility:local0, level:info"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info"  # syslog-server</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> Only the <strong>access</strong> log can go to syslog, and only to a single destination — there is no error-log-to-syslog key (the nginx error log stays on stderr, with <code>error-log-level</code> controlling verbosity) and no multi-server fan-out. HAProxy's <code>format</code>/<code>length</code>/<code>minlevel</code> fields have no equivalent. NIC ignores any <code>access-log</code> value that does not start with <code>syslog:</code>; a value of <code>address:stdout</code> is already the NIC default (<code>/dev/stdout</code>), so no key is needed.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>dontlognull</code><br><code>logasap</code></td>
-                            <td>No direct equivalent</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  dontlognull: "true"
-  logasap: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — both are generally moot on NGINX:
-#   dontlognull → the HTTP access log records completed requests only,
-#                 so bodyless connection probes are not logged anyway
-#   logasap    → NGINX writes the access-log entry at request completion
-#                 (long transfers log late); there is no early-log toggle
-# Remove both.</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> there is no <code>option dontlognull</code> or <code>option logasap</code> analogue — both are generally a no-op on NGINX, so remove them.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2951,101 +2453,6 @@ spec:
                 <table class="mapping-table" aria-labelledby="tcp-services"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>TCP</code> CRD<br>(<code>ingress.v3.haproxy.org/v3</code>)</td>
-                            <td><span class="badge badge-transportserver">TransportServer CRD</span> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
-kind: TCP
-metadata:
-  name: mqtt-tcp
-spec:
-  - name: mqtt
-    frontend:
-      name: mqtt
-      binds:
-        mqtt:
-          name: mqtt
-          port: 1883
-    service:
-      name: mqtt-svc
-      port: 1883</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Declare the listener once per cluster
-apiVersion: k8s.nginx.org/v1
-kind: GlobalConfiguration
-metadata:
-  name: nginx-configuration
-  namespace: nginx-ingress
-spec:
-  listeners:
-    - name: mqtt-tcp
-      port: 1883
-      protocol: TCP
----
-# 2. TransportServer routes to the backend
-apiVersion: k8s.nginx.org/v1
-kind: TransportServer
-metadata:
-  name: mqtt
-spec:
-  listener:
-    name: mqtt-tcp
-    protocol: TCP
-  upstreams:
-    - name: backend
-      service: mqtt-svc
-      port: 1883
-  action:
-    pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent for L4 rules:</strong> TransportServer has no ACL / content-switching / tcp-request fields (<code>acl_list</code>, <code>backend_switching_rule_list</code>, <code>tcp_request_rule_list</code>, <code>capture_list</code>, <code>filter_list</code>) — the only escape hatch is <code>spec.streamSnippets</code> (<code>-enable-snippets</code>). Extra <code>services[]</code> on one entry have no routing mechanism; each backend needs its own listener + TransportServer.</div>
-                            <div class="info-box note"><strong>Note:</strong> The GlobalConfiguration port must be exposed on the controller Service. For SSL offload (a bind with <code>ssl: true</code>), add <code>spec.tls.secret</code> (a <code>kubernetes.io/tls</code> Secret in the TransportServer namespace) — NIC terminates TLS over TCP from the Secret alone, so <code>spec.host</code> is <strong>not</strong> required (add an SNI <code>spec.host</code> only to differentiate multiple TransportServers sharing one listener). Per-service TCP logs collapse into the global <code>stream-log-format</code>.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>--configmap-tcp-services</code></td>
-                            <td><span class="badge badge-transportserver">TransportServer CRD</span> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> (per entry)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress-tcp-services
-  namespace: haproxy-controller
-data:
-  # &lt;listenPort&gt;: &lt;namespace&gt;/&lt;service&gt;:&lt;servicePort&gt;[:ssl]
-  "1883": default/mqtt-svc:1883</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: GlobalConfiguration
-metadata:
-  name: nginx-configuration
-  namespace: nginx-ingress
-spec:
-  listeners:
-    - name: mqtt-svc-1883-tcp
-      port: 1883
-      protocol: TCP
----
-apiVersion: k8s.nginx.org/v1
-kind: TransportServer
-metadata:
-  name: mqtt-svc-1883
-  namespace: default
-spec:
-  listener:
-    name: mqtt-svc-1883-tcp
-    protocol: TCP
-  upstreams:
-    - name: backend
-      service: mqtt-svc
-      port: 1883
-  action:
-    pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> Each ConfigMap entry becomes one GlobalConfiguration listener + one TransportServer. A trailing <code>:ssl</code> (SSL offload) is hostless in HAProxy — NIC reproduces it from <code>spec.tls.secret</code> alone, with no <code>spec.host</code> required. Assign an SNI <code>spec.host</code> only to differentiate multiple TransportServers sharing one listener.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
                             <td>No direct equivalent</td>
                             <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>protocol: UDP</code> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
                         </tr>
@@ -3092,114 +2499,10 @@ spec:
             <!-- Timeouts -->
             <h3 id="timeouts">Timeouts</h3>
             <div class="info-box note"><strong>Time-unit rule:</strong> unit-bearing HAProxy values (<code>us</code>/<code>ms</code>/<code>s</code>/<code>m</code>/<code>h</code>/<code>d</code>) pass through; bare HAProxy integers are <strong>milliseconds</strong> and are converted to an NGINX time string (e.g. <code>5000</code> → <code>5s</code>).</div>
+            <div class="info-box note"><strong>Elsewhere:</strong> <code>timeout-queue</code> is mapped under <a href="#request-queueing">Request queueing</a>, because its only NIC equivalent (<code>upstreams[].queue</code>) requires NGINX Plus.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="timeouts"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
-                        <tr class="expandable">
-                            <td><code>timeout-client</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  timeout-client: "50s"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No first-class NIC key for client-side timeouts — raw directives
-# (ConfigMap snippets are always enabled)
-http-snippets: |
-  client_body_timeout 50s;
-  client_header_timeout 50s;
-  send_timeout 50s;</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NIC has no ConfigMap key for client-side inactivity timeouts — the <code>http-snippets</code> escape hatch above (ConfigMap snippets are always on) approximates it with <code>client_body_timeout</code>, <code>client_header_timeout</code>, and <code>send_timeout</code>.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>timeout-connect</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>proxy-connect-timeout</code> + <code>nginx.org/proxy-connect-timeout</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>connect-timeout</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  timeout-connect: "5s"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>proxy-connect-timeout: 5s</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> Direct equivalent, but the defaults differ — HAProxy <code>timeout-connect</code> defaults to <strong>5s</strong> while NGINX <code>proxy_connect_timeout</code> defaults to <strong>60s</strong>, so emit the value explicitly. It is a global ConfigMap key with a per-resource override (<code>nginx.org/proxy-connect-timeout</code> / VirtualServer <code>connect-timeout</code>).</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>timeout-http-keep-alive</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>keepalive-timeout</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  timeout-http-keep-alive: "1m"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>keepalive-timeout: 1m  # client keep-alive idle timeout (NIC default 75s); upstream keep-alive is the separate "keepalive" count</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> This governs <strong>client-side</strong> keep-alive idle time only (NIC default 75s). It does <em>not</em> control upstream keep-alive — that is the separate <code>keepalive</code> count.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>timeout-http-request</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-snippets</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  timeout-http-request: "10s"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No first-class NIC key — closest analogue via the http-snippets
-# escape hatch (ConfigMap snippets are always enabled)
-http-snippets: |
-  client_header_timeout 10s;</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NIC has no single "whole request" timeout key. <code>client_header_timeout</code> via <code>http-snippets</code> is the closest analogue (NGINX default 60s) — an approximation, not an exact match.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>timeout-queue</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>upstreams[].queue</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  timeout-queue: "5s"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: VirtualServer
-metadata:
-  name: queue-app
-spec:
-  host: app.example.com
-  upstreams:
-    - name: backend
-      service: backend-svc
-      port: 80
-      max-conns: 100  # queue only fills once all servers are at max-conns
-      queue:  # NGINX Plus only
-        size: 50
-        timeout: 5s  # timeout-queue (HAProxy default 5s; NIC queue default 60s)
-  routes:
-    - path: /
-      action:
-        pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>NGINX Plus only:</strong> request queueing when every server is at <code>max-conns</code> exists only in NGINX Plus — VirtualServer <code>upstreams[].queue</code> (<code>{size, timeout}</code>, timeout default <strong>60s</strong> vs HAProxy's <strong>5s</strong>), paired with <code>max-conns</code>. NGINX OSS has no request queue — excess requests fail fast instead.</div>
-                        </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/timeout-server</code></td>
                             <td><code>nginx.org/proxy-read-timeout</code> + <code>nginx.org/proxy-send-timeout</code></td>
@@ -3218,59 +2521,6 @@ metadata:
                             </div>
                             <div class="info-box note"><strong>Note:</strong> One HAProxy <code>timeout-server</code> governs both directions; NGINX splits it into <code>proxy_read_timeout</code> and <code>proxy_send_timeout</code> (each default 60s). Set <strong>both</strong> — mapping only one silently leaves the other at 60s. ConfigMap and VirtualServer twins are available.</div>
                         </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>timeout-tunnel</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>proxy-read-timeout</code> + <code>proxy-send-timeout</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  timeout-tunnel: "1h"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>proxy-read-timeout: 1h  # no dedicated tunnel timeout — raising proxy timeouts affects ALL upstream traffic
-proxy-send-timeout: 1h</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> NIC has no dedicated tunnel timeout — raising the proxy read/send timeouts governs WebSocket and other long-lived connections but affects <strong>all</strong> upstream traffic. WebSocket is automatic on a VirtualServer; a plain Ingress additionally needs <code>nginx.org/websocket-services</code> naming the Service.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>timeout-client-fin</code></td>
-                            <td>No direct equivalent</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  timeout-client-fin: "10s"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent
-# NGINX has no half-closed (FIN_WAIT) client-side connection
-# timeout knob. Remove.</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX has no knob for a half-closed (FIN_WAIT) client-side connection timeout — remove the annotation.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>timeout-server-fin</code></td>
-                            <td>No direct equivalent</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  timeout-server-fin: "10s"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent
-# NGINX has no half-closed (FIN_WAIT) server-side connection
-# timeout knob. Remove.</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX has no knob for a half-closed (FIN_WAIT) server-side connection timeout — remove the annotation.</div>
-                        </div></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -3279,26 +2529,6 @@ data:
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="tls-certificates"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
-                        <tr class="expandable">
-                            <td><code>ssl-certificate</code></td>
-                            <td><code>-default-server-tls-secret</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  ssl-certificate: "default/wildcard-tls"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># The cluster-wide default cert is a controller flag, not an annotation:
-args:
-  - -default-server-tls-secret=default/wildcard-tls   # unmatched-SNI default server
-  # optionally: -wildcard-tls-secret=default/wildcard-tls  # per-host fallback cert
-# Per-app certs stay on Ingress spec.tls / VirtualServer spec.tls.secret.</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> The cluster default certificate is a deployment flag, not a per-object annotation. Multi-algorithm Secrets (<code>rsa.*</code>/<code>ecdsa.*</code>/<code>dsa.*</code> keys) are not supported — use one <code>kubernetes.io/tls</code> certificate per Secret.</div>
-                        </div></td></tr>
                         <tr class="expandable">
                             <td><code>ssl-passthrough</code></td>
                             <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>protocol: TLS_PASSTHROUGH</code></td>
@@ -3342,64 +2572,6 @@ spec:
     pass: backend</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> TLS passthrough becomes a separate <code>TransportServer</code> (SNI-routed, <code>spec.host</code> required, <code>spec.tls</code> forbidden) — the HTTP-mode annotations on the original Ingress no longer apply to this traffic. There is no <code>HostSNI(*)</code> catch-all; enable the feature with <code>-enable-tls-passthrough</code> (port via <code>-tls-passthrough-port</code>).</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>tls-alpn</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http2</code> (HTTP/2 on/off only)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  tls-alpn: "h2,http/1.1"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  http2: True  # h2 in the ALPN list → enable HTTP/2 (OFF by default in NIC)
-  # NIC exposes no general ALPN-advertisement control — only HTTP/2 on/off maps</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> Only the HTTP/2 dimension maps, via the global <code>http2</code> ConfigMap key (SSL servers only). Note the polarity flip: HAProxy advertises <code>h2</code> by default, NIC HTTP/2 is off by default. Arbitrary ALPN protocol lists cannot be reproduced.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>generate-certificates-signer</code></td>
-                            <td>No direct equivalent</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  generate-certificates-signer: my-ca   # ConfigMap-only</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — NIC has no on-the-fly per-connection certificate
-# signing. Pre-issue certificates instead (cert-manager provisions real
-# Secrets):
-#   VirtualServer spec.tls.cert-manager.cluster-issuer: &lt;issuer&gt;</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> HAProxy's on-the-fly per-connection certificate signing has no NIC analogue — cert-manager provisions <em>pre-issued</em> Secrets, not a per-connection signer. (New in HAProxy 3.2.)</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>quic-alt-svc-max-age</code></td>
-                            <td>No direct equivalent</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-data:
-  quic-alt-svc-max-age: "86400"   # ConfigMap-only</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — the F5 NGINX Ingress Controller v5.5.4 has no
-# QUIC / HTTP-3 support. Remove this annotation.</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NIC v5.5.4 has zero QUIC/HTTP-3 support — drop the annotation.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -3509,7 +2681,7 @@ spec:
         <!-- Plus Mappings -->
         <section id="plus-mappings">
             <h2>NGINX Plus mappings</h2>
-            <p>HAProxy's commercial tier (<strong>HAProxy Enterprise</strong>) adds WAF, the Global Profiling Engine, and Bot Management — a commercial-to-commercial comparison. These map to <strong>NGINX Plus</strong> policies in the F5 NGINX Ingress Controller (App Protect WAF/DoS, distributed rate limiting via zone-sync). Some HAProxy <em>OSS</em> features also land here because their true equivalent requires NGINX Plus: active health checks, request queuing, and least-time load balancing.</p>
+            <p>HAProxy's commercial tier (<strong>HAProxy Enterprise</strong>) adds WAF, the Global Profiling Engine, and Bot Management — a commercial-to-commercial comparison. These map to <strong>NGINX Plus</strong> policies in the F5 NGINX Ingress Controller (App Protect WAF/DoS, distributed rate limiting via zone-sync). Some HAProxy <em>OSS</em> features also land here, because a row belongs to this section whenever its NIC equivalent needs NGINX Plus — whatever surface it came from. Active health checks and request queueing are both that case, so their annotation, ConfigMap and CRD rows are mapped below rather than in the OSS sections, which cross-reference them. (The one Plus-only <em>value</em> rather than construct, <code>least_time</code> load balancing, stays with <code>load-balance</code> under <a href="#load-balancing">Load balancing</a>.)</p>
 
             <div class="controls">
                 <input type="search" id="searchInputPlus" placeholder="Search Enterprise features..." data-filter-source="plus" aria-label="Search Plus mappings">
@@ -3519,6 +2691,130 @@ spec:
                 <span id="searchCountPlus" class="search-count" aria-live="polite"></span>
                 <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
                 <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
+            </div>
+
+            <h3 id="active-health-checks">Active health checks</h3>
+            <div class="info-box note"><strong>Note:</strong> HAProxy probes backends actively in both editions. NGINX OSS has only <strong>passive</strong> health — a server is ejected after real client requests fail — so every active-probe construct maps to NGINX Plus. The OSS fallback (<code>haproxy.org/check</code> → <code>max-fails</code> + <code>fail-timeout</code>) is mapped under <a href="#health-checks">Health checks</a>.</div>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="active-health-checks"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>check</code> / <code>httpchk_params</code> (Backend CRD)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>upstreams[].healthCheck</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
+kind: Backend
+metadata:
+  name: haproxy-backend
+  namespace: haproxy-controller
+spec:                    # v1 wraps under spec.config
+  adv_check: httpchk
+  httpchk_params:
+    method: GET
+    uri: /healthz
+    version: HTTP/1.1
+  default_server:
+    check: enabled
+    inter: 2000          # int64 ms
+    rise: 2
+    fall: 3</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: backend-tuned-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: app-svc
+      port: 80
+      healthCheck:       # NGINX Plus only
+        enable: true
+        path: /healthz   # httpchk_params.uri
+        interval: 2s     # default_server.inter
+        passes: 2        # rise
+        fails: 3         # fall
+      max-fails: 3       # OSS fallback: passive ejection
+      fail-timeout: 10s
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                            </div>
+                            <div class="info-box warning"><strong>NGINX Plus:</strong> active backend probes (<code>check</code>/<code>httpchk</code>) require NGINX Plus — VirtualServer <code>upstreams[].healthCheck</code>. On OSS, use passive ejection via <code>max-fails</code> + <code>fail-timeout</code>. The two are not equivalent: passive ejection only reacts to real traffic failing, so a dead backend stays in rotation until a request hits it.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>haproxy.org/check-http</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>upstreams[].healthCheck</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/check-http: "GET /healthz HTTP/1.1"</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: health-check-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+      healthCheck:
+        enable: true  # NGINX Plus only
+        path: /healthz  # check-http
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>NGINX Plus only:</strong> the active HTTP probe maps to <code>upstreams[].healthCheck</code>, which requires NGINX Plus. Only the URI ports — the request <strong>method</strong> (probes are GET-only) and any <code>HTTP/x.y</code> version token are dropped. On OSS there is no HTTP-status probe; fall back to the passive <code>haproxy.org/check</code> row under <a href="#health-checks">Health checks</a>.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>haproxy.org/check-interval</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>healthCheck.interval</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/check-interval: "10s"</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>      healthCheck:  # NGINX Plus only
+        enable: true
+        interval: 10s  # check-interval</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>interval</code> (default <code>5s</code>) is meaningful only for the active (Plus) probe. It sets how often the probe fires — distinct from <code>fail-timeout</code>, which governs passive ejection.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>haproxy.org/timeout-check</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>healthCheck.read-timeout</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/timeout-check: "5s"</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>      healthCheck:  # NGINX Plus only
+        enable: true
+        read-timeout: 5s  # timeout-check</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> HAProxy's post-connect <code>timeout check</code> maps to the active probe's <code>read-timeout</code> (Plus). There is no OSS equivalent — passive health has no probe timeout.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
             </div>
 
             <h3 id="enterprise">Enterprise features</h3>
@@ -3711,6 +3007,49 @@ spec:
                     </tbody>
                 </table>
             </div>
+            <h3 id="request-queueing">Request queueing</h3>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="request-queueing"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>timeout-queue</code> ConfigMap key</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>upstreams[].queue</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  timeout-queue: "5s"  # HAProxy default 5s
+  pod-maxconn: "100"   # the queue only fills once servers are at their cap</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: queue-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+      max-conns: 100  # queue only fills once all servers are at max-conns
+      queue:  # NGINX Plus only
+        size: 50
+        timeout: 5s  # timeout-queue (HAProxy default 5s; NIC queue default 60s)
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>NGINX Plus only:</strong> request queueing when every server is at <code>max-conns</code> exists only in NGINX Plus — VirtualServer <code>upstreams[].queue</code> (<code>{size, timeout}</code>, timeout default <strong>60s</strong> vs HAProxy's <strong>5s</strong>), paired with <code>max-conns</code>. NGINX OSS has no request queue — excess requests fail fast instead. The queue is a per-upstream VirtualServer field, so a single global HAProxy <code>timeout-queue</code> becomes one <code>queue</code> block per upstream that needs it.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
             <h3 id="waf">WAF</h3>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="waf"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
@@ -3810,6 +3149,8 @@ spec:
 #     nginx.org/policies: "client-mtls-policy"</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> HAProxy <code>client-ca</code> Secrets carry the CA under <code>tls.crt</code>; NIC needs a Secret of type <code>nginx.org/ca</code> with the bundle under <code>ca.crt</code> (optional CRL under <code>ca.crl</code>) — recreate it, do not just reference it. Requires TLS termination on the host (NIC ignores ingressMTLS for a TLS-disabled host). Verification failures return <strong>HTTP 400</strong> (not 500). On mergeable Ingress it must sit on the master. Ingress-attachable since v5.5.0.</div>
+                        
+                            <div class="info-box note"><strong>Note:</strong> Scope shift — HAProxy configures client mTLS controller-wide (ConfigMap); NIC's <code>ingressMTLS</code> attaches per VirtualServer (<code>spec.policies</code>) or per Ingress (<code>nginx.org/policies</code>, since v5.5.0), so apply the Policy to every host that needs it. On mergeable Ingresses it must sit on the master.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>client-crt-optional</code></td>
@@ -3831,6 +3172,28 @@ data:
     verifyDepth: 1            # false → verifyClient: "on" (enforced)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Polarity — HAProxy defaults to enforced (<code>false</code>). Map <code>false</code> → <code>verifyClient: "on"</code>, <code>true</code> → <code>verifyClient: "optional"</code>. Do <strong>not</strong> use <code>optional_no_ca</code> (it skips CA verification; HAProxy still verifies against <code>client-ca</code> when optional). <code>verifyDepth</code> defaults to 1 on both sides.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>client-strict-sni</code></td>
+                            <td><code>-default-server-tls-secret</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+data:
+  client-strict-sni: "true"  # reject connections with an unknown SNI</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No per-resource toggle — strict SNI is a side effect of NOT deploying a
+# default server certificate. Leave the controller flag unset:
+#   (omit) -default-server-tls-secret=&lt;ns&gt;/&lt;secret&gt;
+# NGINX then answers unknown SNI with ssl_reject_handshake.
+#
+# To serve a fallback certificate instead (client-strict-sni: false), set
+# -default-server-tls-secret to a Secret of type kubernetes.io/tls.</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> There is no user-facing strict-SNI toggle in the F5 NGINX Ingress Controller — rejecting unknown SNI follows from the <em>absence</em> of a default server certificate, and it is controller-global (not per-Ingress).</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>proxy-protocol</code></td>
@@ -3869,7 +3232,7 @@ data:
                     <tbody>
                         <tr class="expandable">
                             <td><code>frontend-config-snippet</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>server-snippets</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>server-snippets</code> + <code>http-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4225,100 +3588,10 @@ data:
             <!-- TCP Services -->
             <h3 id="static-tcp-services">TCP services</h3>
             <div class="info-box note"><strong>L4 model:</strong> HAProxy's TCP CRD and the legacy <code>tcp-services</code> ConfigMap both become a GlobalConfiguration TCP listener plus a TransportServer per entry. The listener port must be pre-declared in the single GlobalConfiguration (<code>-global-configuration &lt;ns&gt;/&lt;name&gt;</code>) and exposed on the controller Service. L4 content-switching/ACL rules do not port (streamSnippets only).</div>
+            <div class="info-box note"><strong>Elsewhere:</strong> the CR that replaces this ConfigMap is mapped under <a href="#crd-tcp">HAProxy TCP CRD</a>, and the <code>--configmap-tcp-services</code> flag that names it under <a href="#controller-flags">Controller CLI flags</a>.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="static-tcp-services"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
-                        <tr class="expandable">
-                            <td><code>TCP</code> CRD (v1 &amp; v3)</td>
-                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> + <span class="badge badge-transportserver">TransportServer CRD</span></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
-kind: TCP
-metadata:
-  name: redis-tcp
-spec:
-  - name: redis
-    frontend:
-      name: redis-fe
-      binds:
-        redis:
-          name: redis
-          port: 6379
-    service:
-      name: redis
-      port: 6379</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: GlobalConfiguration
-metadata:
-  name: nginx-configuration
-  namespace: nginx-ingress
-spec:
-  listeners:
-    - name: redis-tcp
-      port: 6379
-      protocol: TCP
----
-apiVersion: k8s.nginx.org/v1
-kind: TransportServer
-metadata:
-  name: redis
-spec:
-  listener:
-    name: redis-tcp
-    protocol: TCP
-  upstreams:
-    - name: backend
-      service: redis
-      port: 6379
-  action:
-    pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>L4 rules lost:</strong> TransportServer has no ACL / content-switching / <code>tcp-request</code> fields — <code>acl_list</code>, <code>backend_switching_rule_list</code>, <code>tcp_request_rule_list</code>, <code>capture_list</code>, and <code>filter_list</code> have no equivalent (streamSnippets only, <code>-enable-snippets</code>). Extra <code>services[]</code> on one entry cannot be routed between (each backend needs its own listener + TransportServer).</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>--configmap-tcp-services</code></td>
-                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> + <span class="badge badge-transportserver">TransportServer CRD</span></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># legacy tcp-services ConfigMap
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-tcp-services
-data:
-  "6379": default/redis:6379  # &lt;listenPort&gt;: &lt;ns&gt;/&lt;svc&gt;:&lt;svcPort&gt;[:ssl]</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: GlobalConfiguration
-metadata:
-  name: nginx-configuration
-  namespace: nginx-ingress
-spec:
-  listeners:
-    - name: redis-6379-tcp
-      port: 6379
-      protocol: TCP
----
-apiVersion: k8s.nginx.org/v1
-kind: TransportServer
-metadata:
-  name: redis-6379
-  namespace: default
-spec:
-  listener:
-    name: redis-6379-tcp
-    protocol: TCP
-  upstreams:
-    - name: backend
-      service: redis
-      port: 6379
-  action:
-    pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> One GlobalConfiguration listener + TransportServer per data entry. There is no NIC flag analogous to <code>--configmap-tcp-services</code> — the resources replace it.</div>
-                        </div></td></tr>
                         <tr class="expandable">
                             <td>TCP bind SSL offloading (<code>:ssl</code> / <code>ssl_certificate</code>)</td>
                             <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.tls.secret</code></td>
@@ -4350,6 +3623,7 @@ spec:
             <!-- Timeouts -->
             <h3 id="static-timeouts">Timeouts</h3>
             <div class="info-box note"><strong>Time-unit rule:</strong> HAProxy config annotations and CRD timeout fields treat bare integers as <strong>milliseconds</strong>; NGINX time strings default to <strong>seconds</strong>. Pass unit-bearing values through unchanged and append <code>s</code> to bare millisecond counts (<code>5000</code> → <code>5s</code>).</div>
+            <div class="info-box note"><strong>Elsewhere:</strong> <code>timeout-queue</code> is mapped under <a href="#request-queueing">Request queueing</a> in the NGINX Plus section — <code>upstreams[].queue</code> has no OSS equivalent.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="static-timeouts"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -4447,34 +3721,6 @@ data:
                             <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX has no single "whole request" timeout directive. <code>client_header_timeout</code> (via <code>http-snippets</code>) is the closest analogue — approximate, not exact.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>timeout-queue</code></td>
-                            <td><span class="badge badge-plus">NGINX Plus</span> <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].queue</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-  namespace: haproxy-controller
-data:
-  timeout-queue: "5s"  # HAProxy default 5s
-  pod-maxconn: "100"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: VirtualServer
-spec:
-  upstreams:
-    - name: backend
-      service: app-svc
-      port: 80
-      max-conns: 100
-      queue:            # NGINX Plus only
-        size: 50
-        timeout: 60s    # timeout queue (HAProxy default 5s, Plus default 60s)</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Note:</strong> The Plus <code>queue</code> directive is the direct analogue of HAProxy <code>timeout queue</code> — it queues a request when every upstream server is already at <code>max-conns</code>. OSS has no request queue (requests fail fast instead).</div>
-                        </div></td></tr>
-                        <tr class="expandable">
                             <td><code>timeout-tunnel</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>proxy-read-timeout</code> + <code>proxy-send-timeout</code></td>
                         </tr>
@@ -4538,6 +3784,93 @@ data:
             </div>
 
 
+            <h3 id="static-tls-certificates">TLS &amp; certificates</h3>
+            <div class="info-box note"><strong>Note:</strong> these are the TLS keys the controller ConfigMap owns. Per-application certificates are unchanged by the migration — they stay on Ingress <code>spec.tls</code> or VirtualServer <code>spec.tls.secret</code>.</div>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="static-tls-certificates"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>generate-certificates-signer</code></td>
+                            <td>No direct equivalent</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+data:
+  generate-certificates-signer: my-ca   # ConfigMap-only</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — NIC has no on-the-fly per-connection certificate
+# signing. Pre-issue certificates instead (cert-manager provisions real
+# Secrets):
+#   VirtualServer spec.tls.cert-manager.cluster-issuer: &lt;issuer&gt;</code></pre></div>
+                            </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> HAProxy's on-the-fly per-connection certificate signing has no NIC analogue — cert-manager provisions <em>pre-issued</em> Secrets, not a per-connection signer. (New in HAProxy 3.2.)</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>quic-alt-svc-max-age</code></td>
+                            <td>No direct equivalent</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+data:
+  quic-alt-svc-max-age: "86400"   # ConfigMap-only</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — the F5 NGINX Ingress Controller v5.5.4 has no
+# QUIC / HTTP-3 support. Remove this annotation.</code></pre></div>
+                            </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> NIC v5.5.4 has zero QUIC/HTTP-3 support — drop the annotation.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>ssl-certificate</code></td>
+                            <td><code>-default-server-tls-secret</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+data:
+  ssl-certificate: "default/wildcard-tls"</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># The cluster-wide default cert is a controller flag, not an annotation:
+args:
+  - -default-server-tls-secret=default/wildcard-tls   # unmatched-SNI default server
+  # optionally: -wildcard-tls-secret=default/wildcard-tls  # per-host fallback cert
+# Per-app certs stay on Ingress spec.tls / VirtualServer spec.tls.secret.</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> The cluster default certificate is a deployment flag, not a per-object annotation. Multi-algorithm Secrets (<code>rsa.*</code>/<code>ecdsa.*</code>/<code>dsa.*</code> keys) are not supported — use one <code>kubernetes.io/tls</code> certificate per Secret.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>tls-alpn</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http2</code> (HTTP/2 on/off only)</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+data:
+  tls-alpn: "h2,http/1.1"</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  http2: True  # h2 in the ALPN list → enable HTTP/2 (OFF by default in NIC)
+  # NIC exposes no general ALPN-advertisement control — only HTTP/2 on/off maps</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> Only the HTTP/2 dimension maps, via the global <code>http2</code> ConfigMap key (SSL servers only). Note the polarity flip: HAProxy advertises <code>h2</code> by default, NIC HTTP/2 is off by default. Arbitrary ALPN protocol lists cannot be reproduced.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
         </section>
 
         <section id="crd-mappings">
@@ -4554,10 +3887,70 @@ data:
                 <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
             </div>
 
-            <!-- HAProxy Backend CRD -->
+            <!-- CRD overview -->
+            <h3 id="crd-overview">CRD overview</h3>
+            <div class="info-box note"><strong>Write v3:</strong> current CRs use <code>ingress.v3.haproxy.org/v3</code> &mdash; Global, Defaults, Backend, TCP, plus Frontend and ValidationRules. The older <code>ingress.v1.haproxy.org/v1</code> group is superseded: v3.2.12 still serves it and this tool still reads it, but write no new ones. Both fold into NIC's global <code>nginx-config</code> ConfigMap, per-app VirtualServer fields, or the GlobalConfiguration CRD. Each row below names where that CR lands; the per-field tables that follow give every field, and the analyzer emits complete YAML for a pasted CR.</div>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="crd-overview"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>Backend</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="info-box note"><strong>Note:</strong> Per-backend settings (load balancing, timeouts, health checks, cookie persistence, backend TLS) become VirtualServer <code>upstreams[]</code> fields or the matching <code>nginx.org/*</code> annotations. TCP-mode Backends convert to a TransportServer instead. See the <a href="#crd-backend">HAProxy Backend CRD</a> field-mapping table for the full breakdown.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>cr-backend</code> (CR pointer)</td>
+                            <td>Not applicable (migrate the CR's content)</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="info-box note"><strong>Note:</strong> NIC has no CR-reference indirection &mdash; drop the <code>cr-backend</code> annotation (and the <code>cr-global</code>/<code>cr-defaults</code>/<code>cr-frontend-*</code> ConfigMap pointer keys) and migrate the referenced CR's <em>content</em> instead. If the pointer was ConfigMap-scoped, replicate the settings per application.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>Defaults</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> proxy / keepalive / log keys</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="info-box note"><strong>Note:</strong> Cluster-wide defaults (timeouts, logging, connection handling) fold into the global <code>nginx-config</code> ConfigMap. See the <a href="#crd-defaults">HAProxy Defaults CRD</a> field-mapping table.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>Frontend</code><br>(v3-only)</td>
+                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> listeners + <span class="badge badge-configmap">ConfigMap</span> keys + <code>server-snippets</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="info-box note"><strong>Note:</strong> There is no single NIC analogue &mdash; listener binds map to GlobalConfiguration listeners and controller flags, protocol/TLS defaults to ConfigMap keys, and any raw directives to <code>server-snippets</code>. See the <a href="#crd-frontend">HAProxy Frontend CRD</a> field-mapping table.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>Global</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> global keys (<code>worker-*</code>, <code>ssl-*</code>)</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="info-box note"><strong>Note:</strong> Process- and TLS-level settings become global <code>nginx-config</code> ConfigMap keys (<code>worker-processes</code>, <code>worker-connections</code>, <code>ssl-protocols</code>, and related). See the <a href="#crd-global">HAProxy Global CRD</a> field-mapping table.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>TCP</code></td>
+                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> listener + <span class="badge badge-transportserver">TransportServer CRD</span></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="info-box note"><strong>Note:</strong> One GlobalConfiguration listener per port plus one TransportServer per entry. L4 ACLs and content switching do not port. See the <a href="#crd-tcp">HAProxy TCP CRD</a> field-mapping table.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>ValidationRules</code></td>
+                            <td>No direct equivalent</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="info-box note"><strong>Note:</strong> Custom annotation vocabularies have no NIC analogue &mdash; re-express the intent natively or fall back to snippets. See the <a href="#crd-validationrules">HAProxy ValidationRules CRD</a> field-mapping table.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+                        <!-- HAProxy Backend CRD -->
             <h3 id="crd-backend">HAProxy Backend CRD</h3>
             <div class="info-box warning"><strong>CR xor annotations:</strong> mirror HAProxy's no-mixing rule — a migrated backend uses VirtualServer <code>upstreams[]</code> fields <strong>or</strong> <code>nginx.org/*</code> annotations, not both. Drop the <code>cr-backend</code> annotation/pointer; if it was ConfigMap-scoped, replicate the settings per application.</div>
             <div class="info-box note"><strong>Field paths below are v3:</strong> v3 inlines under <code>spec</code>; on the superseded v1 group they sit under <code>spec.config</code>, with <code>spec.acls</code> and <code>spec.http-requests</code> alongside. TCP-mode Backends migrate to a TransportServer (see <a href="#tcp-services">TCP services</a>).</div>
+            <div class="info-box note"><strong>Elsewhere:</strong> <code>adv_check</code>, <code>httpchk_params</code> and <code>default_server.check</code>/<code>inter</code>/<code>rise</code>/<code>fall</code> are mapped under <a href="#active-health-checks">Active health checks</a> — active probes require NGINX Plus.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="crd-backend"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -4606,52 +3999,6 @@ spec:
         pass: backend</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> <code>first</code> and <code>rdp-cookie</code> have no NIC equivalent (drop + warn); <code>least_time</code> requires NGINX Plus.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>check</code> / <code>httpchk_params</code></td>
-                            <td><span class="badge badge-plus">NGINX Plus</span> <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].healthCheck</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
-kind: Backend
-metadata:
-  name: haproxy-backend
-spec:                    # v1 wraps under spec.config
-  adv_check: httpchk
-  httpchk_params:
-    method: GET
-    uri: /healthz
-    version: HTTP/1.1
-  default_server:
-    check: enabled
-    inter: 2000          # int64 ms
-    rise: 2
-    fall: 3</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: VirtualServer
-metadata:
-  name: backend-tuned-app
-spec:
-  host: app.example.com
-  upstreams:
-    - name: backend
-      service: app-svc
-      port: 80
-      healthCheck:       # NGINX Plus only
-        enable: true
-        path: /healthz   # httpchk_params.uri
-        interval: 2s     # default_server.inter
-        passes: 2        # rise
-        fails: 3         # fall
-      max-fails: 3       # OSS fallback: passive ejection
-      fail-timeout: 10s
-  routes:
-    - path: /
-      action:
-        pass: backend</code></pre></div>
-                            </div>
-                            <div class="info-box warning"><strong>NGINX Plus:</strong> active backend probes (<code>check</code>/<code>httpchk</code>) require NGINX Plus — VirtualServer <code>upstreams[].healthCheck</code>. On OSS, use passive ejection via <code>max-fails</code> + <code>fail-timeout</code>. The two are not equivalent: passive ejection only reacts to real traffic failing, so a dead backend stays in rotation until a request hits it.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>connect_timeout</code> / <code>server_timeout</code></td>
@@ -5724,6 +5071,95 @@ spec:
                 </table>
             </div>
 
+
+            <h3 id="crd-tcp">HAProxy TCP CRD</h3>
+            <div class="info-box note"><strong>Note:</strong> Each <code>spec[]</code> entry is a listener plus a backend, so it splits in two: the listener is declared once per cluster on the GlobalConfiguration, and each entry becomes its own TransportServer.</div>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="crd-tcp"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>spec[]</code> (one entry per listener)</td>
+                            <td><span class="badge badge-transportserver">TransportServer CRD</span> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
+kind: TCP
+metadata:
+  name: mqtt-tcp
+spec:
+  - name: mqtt
+    frontend:
+      name: mqtt
+      binds:
+        mqtt:
+          name: mqtt
+          port: 1883
+    service:
+      name: mqtt-svc
+      port: 1883</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Declare the listener once per cluster
+apiVersion: k8s.nginx.org/v1
+kind: GlobalConfiguration
+metadata:
+  name: nginx-configuration
+  namespace: nginx-ingress
+spec:
+  listeners:
+    - name: mqtt-tcp
+      port: 1883
+      protocol: TCP
+---
+# 2. TransportServer routes to the backend
+apiVersion: k8s.nginx.org/v1
+kind: TransportServer
+metadata:
+  name: mqtt
+spec:
+  listener:
+    name: mqtt-tcp
+    protocol: TCP
+  upstreams:
+    - name: backend
+      service: mqtt-svc
+      port: 1883
+  action:
+    pass: backend</code></pre></div>
+                            </div>
+                            <div class="info-box warning"><strong>No direct equivalent for L4 rules:</strong> TransportServer has no ACL / content-switching / tcp-request fields (<code>acl_list</code>, <code>backend_switching_rule_list</code>, <code>tcp_request_rule_list</code>, <code>capture_list</code>, <code>filter_list</code>) — the only escape hatch is <code>spec.streamSnippets</code> (<code>-enable-snippets</code>). Extra <code>services[]</code> on one entry have no routing mechanism; each backend needs its own listener + TransportServer.</div>
+                            <div class="info-box note"><strong>Note:</strong> The GlobalConfiguration port must be exposed on the controller Service. For SSL offload (a bind with <code>ssl: true</code>), add <code>spec.tls.secret</code> (a <code>kubernetes.io/tls</code> Secret in the TransportServer namespace) — NIC terminates TLS over TCP from the Secret alone, so <code>spec.host</code> is <strong>not</strong> required (add an SNI <code>spec.host</code> only to differentiate multiple TransportServers sharing one listener). Per-service TCP logs collapse into the global <code>stream-log-format</code>.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 id="crd-validationrules">HAProxy ValidationRules CRD</h3>
+            <div class="info-box note"><strong>Note:</strong> HAProxy 3.2 added this CR to define custom annotations. NIC has a fixed annotation vocabulary, so there is nothing to migrate it to.</div>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="crd-validationrules"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>spec</code> (whole CR)</td>
+                            <td>No direct equivalent</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: ingress.v3.haproxy.org/v3
+kind: ValidationRules
+metadata:
+  name: custom-annotations
+# Defines a prefix plus CEL-validated, Go-templated custom
+# annotations that render into HAProxy config snippets.</code></pre></div>
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — NIC has a fixed annotation vocabulary and no
+# CEL/template custom-annotation framework. Re-express the intent with
+# native constructs (Policies, VirtualServer fields) or hand-written
+# snippets; the validation/templating layer is lost.</code></pre></div>
+                            </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> the <code>ValidationRules</code> CRD (and its <code>--custom-validation-rules</code> / <code>--enable-custom-annotations-on-ingress</code> flags) has no analog — the closest escape hatch is <code>-enable-snippets</code>, not a new annotation vocabulary.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
 
         </section>
 

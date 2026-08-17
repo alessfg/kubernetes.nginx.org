@@ -22,6 +22,16 @@
         function stripInlineComment(s) { return MigrationTool.util.stripInlineComment(s); }
         function formatYamlKV(indent, key, value) { return MigrationTool.util.formatYamlKV(indent, key, value); }
 
+        // A mapping's `section` names which reference table holds its row, and the
+        // "See Reference Guide" link has to open that section in the sidebar. The
+        // five ids below are the reference sections declared in SOURCE.reference;
+        // anything unrecognised falls back to the OSS table rather than silently
+        // producing a dead data-section selector.
+        const SECTION_IDS = { oss: 'mappings', plus: 'plus-mappings', configmap: 'configmap-mappings', crd: 'crd-mappings', flags: 'flag-mappings' };
+        function sectionIdFor(mapping) {
+            return SECTION_IDS[mapping && mapping.section] || 'mappings';
+        }
+
         // --- Minimal YAML subset parser ---------------------------------------
         // HAProxy input mixes annotated Ingress/Service objects, the controller
         // ConfigMap, and structured CRDs (Global/Defaults/Backend/Frontend/TCP),
@@ -330,7 +340,9 @@
          'dontlognull', 'logasap', 'timeout-client', 'timeout-connect', 'timeout-http-keep-alive',
          'timeout-http-request', 'timeout-queue', 'timeout-tunnel', 'timeout-client-fin', 'timeout-server-fin',
          'http-connection-mode', 'http-keep-alive', 'http-server-close', 'maxconn', 'nbthread', 'hard-stop-after',
-         'global-config-snippet', 'frontend-config-snippet', 'stats-config-snippet'
+         'global-config-snippet', 'frontend-config-snippet', 'stats-config-snippet',
+         'client-strict-sni', 'ssl-certificate', 'tls-alpn', 'generate-certificates-signer',
+         'quic-alt-svc-max-age'
         ].forEach(function(n) { CONFIGMAP_CANONICAL[n] = true; });
 
         function canonicalKey(name) {
@@ -1895,16 +1907,16 @@
             // Access control & real IP
             { keys: ['annotation:allow-list', 'annotation:deny-list', 'annotation:blacklist', 'annotation:whitelist'], source: 'allow-list / deny-list (+ deprecated blacklist/whitelist)', nic: 'Policy CRD accessControl allow[]/deny[] (+ nginx.org/policies on Ingress)', type: 'policy', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'generateAccessControl' },
             { keys: ['annotation:src-ip-header'], source: 'src-ip-header', nic: 'ConfigMap real-ip-header + set-real-ip-from + real-ip-recursive (global)', type: 'configmap', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'generateSrcIpHeader' },
-            { keys: ['configmap:proxy-protocol'], source: 'proxy-protocol (inbound)', nic: 'ConfigMap proxy-protocol + set-real-ip-from + real-ip-header: proxy_protocol', type: 'configmap', category: 'Access control', anchor: 'client-mtls-proxy', section: 'oss', grouped: true, generator: 'generateProxyProtocol' },
-            { keys: ['annotation:send-proxy-protocol'], source: 'send-proxy-protocol', nic: 'No direct equivalent — PROXY-to-backend does not exist for HTTP upstreams; TCP/UDP only via TransportServer streamSnippets (proxy_protocol on; sends PROXY v1 only, requires -enable-snippets)', type: 'unsupported', category: 'Access control', anchor: 'backend-tls', section: 'oss', grouped: true },
+            { keys: ['configmap:proxy-protocol'], source: 'proxy-protocol (inbound)', nic: 'ConfigMap proxy-protocol + set-real-ip-from + real-ip-header: proxy_protocol', type: 'configmap', category: 'Client mTLS & PROXY protocol', anchor: 'client-mtls-proxy', section: 'configmap', grouped: true, generator: 'generateProxyProtocol' },
+            { keys: ['annotation:send-proxy-protocol'], source: 'send-proxy-protocol', nic: 'No direct equivalent — PROXY-to-backend does not exist for HTTP upstreams; TCP/UDP only via TransportServer streamSnippets (proxy_protocol on; sends PROXY v1 only, requires -enable-snippets)', type: 'unsupported', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true },
             { keys: ['annotation:forwarded-for'], source: 'forwarded-for', nic: 'Automatic — NIC always sends X-Forwarded-For', type: 'annotation', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'generateForwardedFor' },
 
             // Authentication
             { keys: ['annotation:auth-type', 'annotation:auth-secret', 'annotation:auth-realm'], source: 'auth-type / auth-secret / auth-realm', nic: 'Policy CRD basicAuth — or — nginx.org/basic-auth-secret + nginx.org/basic-auth-realm (Ingress)', type: 'policy', category: 'Authentication', anchor: 'authentication', section: 'oss', grouped: true, dualApproach: true, generator: 'generateBasicAuth' },
 
             // Client mTLS
-            { keys: ['configmap:client-ca', 'configmap:client-crt-optional'], source: 'client-ca / client-crt-optional', nic: 'Policy CRD ingressMTLS (clientCertSecret + verifyClient)', type: 'policy', category: 'Client mTLS', anchor: 'client-mtls', section: 'oss', grouped: true, generator: 'generateClientMTLS' },
-            { keys: ['annotation:client-strict-sni'], source: 'client-strict-sni', nic: 'Side effect of the -default-server-tls-secret flag (unset = reject unknown SNI)', type: 'annotation', category: 'Client mTLS', anchor: 'client-mtls', section: 'oss', grouped: true, generator: 'generateClientStrictSni' },
+            { keys: ['configmap:client-ca', 'configmap:client-crt-optional'], source: 'client-ca / client-crt-optional', nic: 'Policy CRD ingressMTLS (clientCertSecret + verifyClient)', type: 'policy', category: 'Client mTLS & PROXY protocol', anchor: 'client-mtls-proxy', section: 'configmap', grouped: true, generator: 'generateClientMTLS' },
+            { keys: ['configmap:client-strict-sni'], source: 'client-strict-sni', nic: 'Side effect of the -default-server-tls-secret flag (unset = reject unknown SNI)', type: 'annotation', category: 'Client mTLS & PROXY protocol', anchor: 'client-mtls-proxy', section: 'configmap', grouped: true, generator: 'generateClientStrictSni' },
 
             // Backend TLS
             { keys: ['annotation:server-ca', 'annotation:server-crt'], source: 'server-ca / server-crt', nic: 'Policy CRD egressMTLS (trustedCertSecret + verifyServer / tlsSecret) + nginx.org/ssl-services', type: 'policy', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true, generator: 'generateBackendMTLS' },
@@ -1927,14 +1939,14 @@
 
             // Observability
             { keys: ['annotation:request-capture', 'annotation:request-capture-len'], source: 'request-capture (+ -len)', nic: 'ConfigMap log-format with $http_* / $cookie_* variables (global)', type: 'configmap', category: 'Observability', anchor: 'observability', section: 'oss', grouped: true, generator: 'generateRequestCapture' },
-            { keys: ['configmap:syslog-server'], source: 'syslog-server', nic: 'ConfigMap access-log (syslog: destination)', type: 'configmap', category: 'Observability', anchor: 'observability', section: 'oss', grouped: true, generator: 'generateSyslogServer' },
-            { keys: ['configmap:log-format'], source: 'log-format', nic: 'ConfigMap log-format (hand-translated)', type: 'configmap', category: 'Observability', anchor: 'observability', section: 'oss', grouped: true, generator: 'generateLogFormat' },
-            { keys: ['configmap:log-format-tcp'], source: 'log-format-tcp', nic: 'ConfigMap stream-log-format (hand-translated)', type: 'configmap', category: 'Observability', anchor: 'observability', section: 'oss', grouped: true, generator: 'generateLogFormat' },
-            { keys: ['configmap:dontlognull', 'configmap:logasap'], source: 'dontlognull / logasap', nic: 'No direct equivalent (generally moot — see notes)', type: 'configmap', category: 'Observability', anchor: 'observability', section: 'oss', grouped: true, generator: 'generateLogNoise' },
+            { keys: ['configmap:syslog-server'], source: 'syslog-server', nic: 'ConfigMap access-log (syslog: destination)', type: 'configmap', category: 'Logging', anchor: 'logging', section: 'configmap', grouped: true, generator: 'generateSyslogServer' },
+            { keys: ['configmap:log-format'], source: 'log-format', nic: 'ConfigMap log-format (hand-translated)', type: 'configmap', category: 'Logging', anchor: 'logging', section: 'configmap', grouped: true, generator: 'generateLogFormat' },
+            { keys: ['configmap:log-format-tcp'], source: 'log-format-tcp', nic: 'ConfigMap stream-log-format (hand-translated)', type: 'configmap', category: 'Logging', anchor: 'logging', section: 'configmap', grouped: true, generator: 'generateLogFormat' },
+            { keys: ['configmap:dontlognull', 'configmap:logasap'], source: 'dontlognull / logasap', nic: 'No direct equivalent (generally moot — see notes)', type: 'configmap', category: 'Logging', anchor: 'logging', section: 'configmap', grouped: true, generator: 'generateLogNoise' },
 
             // Health checks
             { keys: ['annotation:check'], source: 'check', nic: 'nginx.org/max-fails + nginx.org/fail-timeout (OSS passive) — active probes are NGINX Plus', type: 'annotation', category: 'Health checks', anchor: 'health-checks', section: 'oss', grouped: true, generator: 'generateCheck' },
-            { keys: ['annotation:check-http', 'annotation:check-interval', 'annotation:timeout-check'], source: 'check-http / check-interval / timeout-check', nic: 'VirtualServer upstreams[].healthCheck (NGINX Plus)', type: 'virtualserver', category: 'Health checks', anchor: 'health-checks', section: 'oss', grouped: true, plusRequired: true, generator: 'generateActiveHealthCheck' },
+            { keys: ['annotation:check-http', 'annotation:check-interval', 'annotation:timeout-check'], source: 'check-http / check-interval / timeout-check', nic: 'VirtualServer upstreams[].healthCheck (NGINX Plus)', type: 'virtualserver', category: 'Active health checks', anchor: 'active-health-checks', section: 'plus', grouped: true, plusRequired: true, generator: 'generateActiveHealthCheck' },
 
             // Load balancing
             { keys: ['annotation:load-balance'], source: 'load-balance', nic: 'nginx.org/lb-method / ConfigMap lb-method / VirtualServer upstreams[].lb-method', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'generateLoadBalance' },
@@ -1949,18 +1961,18 @@
             { keys: ['annotation:ssl-redirect-port'], source: 'ssl-redirect-port', nic: 'No direct equivalent — NIC redirects to its own HTTPS listener port; bake a custom port into a VirtualServer redirect URL', type: 'annotation', category: 'Redirects', anchor: 'redirects', section: 'oss', grouped: true, generator: 'generateSSLRedirectPort' },
 
             // Timeouts & connection handling
-            { keys: ['configmap:timeout-connect', 'configmap:timeout-http-keep-alive', 'annotation:timeout-server', 'configmap:timeout-tunnel', 'configmap:timeout-client', 'configmap:timeout-http-request', 'configmap:timeout-queue'], source: 'timeout-*', nic: 'proxy-connect/read/send-timeout + keepalive-timeout keys/annotations (client-side timeouts: http-snippets; queue: NGINX Plus)', type: 'annotation', category: 'Timeouts', anchor: 'timeouts', section: 'oss', grouped: true, generator: 'generateTimeout' },
-            { keys: ['configmap:timeout-client-fin', 'configmap:timeout-server-fin'], source: 'timeout-client-fin / timeout-server-fin', nic: 'No direct equivalent — NGINX has no half-closed (FIN_WAIT) timeout knobs', type: 'unsupported', category: 'Timeouts', anchor: 'timeouts', section: 'oss', grouped: true },
-            { keys: ['configmap:http-connection-mode', 'configmap:http-keep-alive', 'configmap:http-server-close'], source: 'http-connection-mode (+ deprecated aliases)', nic: 'Split: ConfigMap keepalive (upstream count) + keepalive-timeout (client)', type: 'configmap', category: 'Connection handling', anchor: 'connection-handling', section: 'oss', grouped: true, generator: 'generateConnectionMode' },
-            { keys: ['configmap:maxconn', 'configmap:nbthread'], source: 'maxconn / nbthread', nic: 'ConfigMap worker-connections / worker-processes (approximate — model differs)', type: 'configmap', category: 'Connection handling', anchor: 'connection-handling', section: 'oss', grouped: true, generator: 'generateWorkerTuning' },
+            { keys: ['configmap:timeout-connect', 'configmap:timeout-http-keep-alive', 'annotation:timeout-server', 'configmap:timeout-tunnel', 'configmap:timeout-client', 'configmap:timeout-http-request', 'configmap:timeout-queue'], source: 'timeout-*', nic: 'proxy-connect/read/send-timeout + keepalive-timeout keys/annotations (client-side timeouts: http-snippets; queue: NGINX Plus)', type: 'annotation', category: 'Timeouts', anchor: 'static-timeouts', section: 'configmap', grouped: true, generator: 'generateTimeout' },
+            { keys: ['configmap:timeout-client-fin', 'configmap:timeout-server-fin'], source: 'timeout-client-fin / timeout-server-fin', nic: 'No direct equivalent — NGINX has no half-closed (FIN_WAIT) timeout knobs', type: 'unsupported', category: 'Timeouts', anchor: 'static-timeouts', section: 'configmap', grouped: true },
+            { keys: ['configmap:http-connection-mode', 'configmap:http-keep-alive', 'configmap:http-server-close'], source: 'http-connection-mode (+ deprecated aliases)', nic: 'Split: ConfigMap keepalive (upstream count) + keepalive-timeout (client)', type: 'configmap', category: 'Connection handling', anchor: 'static-connection-handling', section: 'configmap', grouped: true, generator: 'generateConnectionMode' },
+            { keys: ['configmap:maxconn', 'configmap:nbthread'], source: 'maxconn / nbthread', nic: 'ConfigMap worker-connections / worker-processes (approximate — model differs)', type: 'configmap', category: 'Connection handling', anchor: 'static-connection-handling', section: 'configmap', grouped: true, generator: 'generateWorkerTuning' },
             { keys: ['annotation:pod-maxconn'], source: 'pod-maxconn', nic: 'nginx.org/max-conns (VirtualServer upstreams[].max-conns)', type: 'annotation', category: 'Connection handling', anchor: 'connection-handling', section: 'oss', grouped: true, generator: 'generatePodMaxconn' },
 
             // TLS & certificates
-            { keys: ['annotation:ssl-certificate'], source: 'ssl-certificate', nic: '-default-server-tls-secret deployment flag (+ per-app spec.tls)', type: 'annotation', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', grouped: true, generator: 'generateSSLCertificate' },
+            { keys: ['configmap:ssl-certificate'], source: 'ssl-certificate', nic: '-default-server-tls-secret deployment flag (+ per-app spec.tls)', type: 'annotation', category: 'TLS & certificates', anchor: 'static-tls-certificates', section: 'configmap', grouped: true, generator: 'generateSSLCertificate' },
             { keys: ['annotation:ssl-passthrough'], source: 'ssl-passthrough', nic: 'TransportServer TLS_PASSTHROUGH (+ -enable-tls-passthrough flag)', type: 'transportserver', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', grouped: true, generator: 'generateSSLPassthrough' },
-            { keys: ['annotation:tls-alpn'], source: 'tls-alpn', nic: 'ConfigMap http2 (HTTP/2 on/off only — no general ALPN control)', type: 'configmap', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', grouped: true, generator: 'generateTlsAlpn' },
-            { keys: ['annotation:generate-certificates-signer'], source: 'generate-certificates-signer', nic: 'No direct equivalent — NIC has no on-the-fly certificate signing; pre-issue certificates via cert-manager', type: 'unsupported', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', grouped: true },
-            { keys: ['annotation:quic-alt-svc-max-age'], source: 'quic-alt-svc-max-age', nic: 'No direct equivalent — NIC v5.5.1 has no QUIC/HTTP-3 support', type: 'unsupported', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', grouped: true },
+            { keys: ['configmap:tls-alpn'], source: 'tls-alpn', nic: 'ConfigMap http2 (HTTP/2 on/off only — no general ALPN control)', type: 'configmap', category: 'TLS & certificates', anchor: 'static-tls-certificates', section: 'configmap', grouped: true, generator: 'generateTlsAlpn' },
+            { keys: ['configmap:generate-certificates-signer'], source: 'generate-certificates-signer', nic: 'No direct equivalent — NIC has no on-the-fly certificate signing; pre-issue certificates via cert-manager', type: 'unsupported', category: 'TLS & certificates', anchor: 'static-tls-certificates', section: 'configmap', grouped: true },
+            { keys: ['configmap:quic-alt-svc-max-age'], source: 'quic-alt-svc-max-age', nic: 'No direct equivalent — NIC v5.5.4 has no QUIC/HTTP-3 support', type: 'unsupported', category: 'TLS & certificates', anchor: 'static-tls-certificates', section: 'configmap', grouped: true },
 
             // Routing
             { keys: ['annotation:ingress.class'], source: 'ingress.class (deprecated annotation)', nic: 'Ingress spec.ingressClassName (exact match to -ingress-class; the IngressClass must exist)', type: 'annotation', category: 'Routing', anchor: 'routing', section: 'oss', grouped: true, generator: 'generateIngressClass' },
@@ -1971,21 +1983,21 @@
 
             // Configuration snippets
             { keys: ['annotation:backend-config-snippet'], source: 'backend-config-snippet', nic: 'nginx.org/location-snippets (content must be rewritten as NGINX directives; -enable-snippets)', type: 'annotation', category: 'Configuration snippets', anchor: 'configuration-snippets', section: 'oss', grouped: true, generator: 'generateBackendSnippet' },
-            { keys: ['configmap:frontend-config-snippet'], source: 'frontend-config-snippet', nic: 'ConfigMap server-snippets (rewritten as NGINX directives)', type: 'configmap', category: 'Configuration snippets', anchor: 'configuration-snippets', section: 'oss', grouped: true, generator: 'generateFrontendSnippet' },
-            { keys: ['configmap:global-config-snippet'], source: 'global-config-snippet', nic: 'ConfigMap main-snippets / http-snippets (native ssl-* keys preferred where they exist)', type: 'configmap', category: 'Configuration snippets', anchor: 'configuration-snippets', section: 'oss', grouped: true, generator: 'generateGlobalSnippet' },
-            { keys: ['configmap:stats-config-snippet'], source: 'stats-config-snippet', nic: 'No stats frontend on NIC — Prometheus /metrics + Grafana instead', type: 'configmap', category: 'Configuration snippets', anchor: 'configuration-snippets', section: 'oss', grouped: true, generator: 'generateStatsSnippet' },
-            { keys: ['kind:ValidationRules'], source: 'ValidationRules CRD (custom annotations)', nic: 'No direct equivalent — NIC has a fixed annotation vocabulary (no CEL/template custom-annotation framework); re-express the intent via native constructs or snippets', type: 'unsupported', category: 'Configuration snippets', anchor: 'configuration-snippets', section: 'oss' },
+            { keys: ['configmap:frontend-config-snippet'], source: 'frontend-config-snippet', nic: 'ConfigMap server-snippets (rewritten as NGINX directives)', type: 'configmap', category: 'Configuration snippets', anchor: 'static-configuration-snippets', section: 'configmap', grouped: true, generator: 'generateFrontendSnippet' },
+            { keys: ['configmap:global-config-snippet'], source: 'global-config-snippet', nic: 'ConfigMap main-snippets / http-snippets (native ssl-* keys preferred where they exist)', type: 'configmap', category: 'Configuration snippets', anchor: 'static-configuration-snippets', section: 'configmap', grouped: true, generator: 'generateGlobalSnippet' },
+            { keys: ['configmap:stats-config-snippet'], source: 'stats-config-snippet', nic: 'No stats frontend on NIC — Prometheus /metrics + Grafana instead', type: 'configmap', category: 'Configuration snippets', anchor: 'static-configuration-snippets', section: 'configmap', grouped: true, generator: 'generateStatsSnippet' },
+            { keys: ['kind:ValidationRules'], source: 'ValidationRules CRD (custom annotations)', nic: 'No direct equivalent — NIC has a fixed annotation vocabulary (no CEL/template custom-annotation framework); re-express the intent via native constructs or snippets', type: 'unsupported', category: 'HAProxy ValidationRules CRD', anchor: 'crd-validationrules', section: 'crd' },
 
             // Global / lifecycle
-            { keys: ['configmap:hard-stop-after'], source: 'hard-stop-after', nic: 'ConfigMap worker-shutdown-timeout', type: 'configmap', category: 'Global settings', anchor: 'global-settings', section: 'oss', grouped: true, generator: 'generateHardStopAfter' },
+            { keys: ['configmap:hard-stop-after'], source: 'hard-stop-after', nic: 'ConfigMap worker-shutdown-timeout', type: 'configmap', category: 'Global & lifecycle', anchor: 'global-lifecycle', section: 'configmap', grouped: true, generator: 'generateHardStopAfter' },
 
             // HAProxy CRDs
-            { keys: ['annotation:cr-backend'], source: 'cr-backend (CR pointer)', nic: 'Not applicable — NIC has no CR indirection; migrate the referenced Backend CR\'s content', type: 'annotation', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', grouped: true, generator: 'generateCrBackendRef' },
-            { keys: ['kind:Global'], source: 'Global CRD', nic: 'NIC ConfigMap global keys (worker-*, ssl-*)', type: 'configmap', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', generator: 'generateGlobalCRD' },
-            { keys: ['kind:Defaults'], source: 'Defaults CRD', nic: 'NIC ConfigMap proxy/keepalive/log keys', type: 'configmap', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', generator: 'generateDefaultsCRD' },
-            { keys: ['kind:Backend'], source: 'Backend CRD', nic: 'VirtualServer upstreams[] fields / nginx.org/* annotations', type: 'virtualserver', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', generator: 'generateBackendCRD' },
-            { keys: ['kind:Frontend'], source: 'Frontend CRD (v3-only)', nic: 'Split: listener flags/GlobalConfiguration + ConfigMap keys + server-snippets', type: 'globalconfiguration', category: 'HAProxy CRDs', anchor: 'haproxy-crds', section: 'oss', generator: 'generateFrontendCRD' },
-            { keys: ['kind:TCP'], source: 'TCP CRD', nic: 'GlobalConfiguration TCP listener + TransportServer per entry', type: 'transportserver', category: 'TCP services', anchor: 'tcp-services', section: 'oss', generator: 'generateTCPCRD' },
+            { keys: ['annotation:cr-backend'], source: 'cr-backend (CR pointer)', nic: 'Not applicable — NIC has no CR indirection; migrate the referenced Backend CR\'s content', type: 'annotation', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', grouped: true, generator: 'generateCrBackendRef' },
+            { keys: ['kind:Global'], source: 'Global CRD', nic: 'NIC ConfigMap global keys (worker-*, ssl-*)', type: 'configmap', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', generator: 'generateGlobalCRD' },
+            { keys: ['kind:Defaults'], source: 'Defaults CRD', nic: 'NIC ConfigMap proxy/keepalive/log keys', type: 'configmap', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', generator: 'generateDefaultsCRD' },
+            { keys: ['kind:Backend'], source: 'Backend CRD', nic: 'VirtualServer upstreams[] fields / nginx.org/* annotations', type: 'virtualserver', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', generator: 'generateBackendCRD' },
+            { keys: ['kind:Frontend'], source: 'Frontend CRD (v3-only)', nic: 'Split: listener flags/GlobalConfiguration + ConfigMap keys + server-snippets', type: 'globalconfiguration', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', generator: 'generateFrontendCRD' },
+            { keys: ['kind:TCP'], source: 'TCP CRD', nic: 'GlobalConfiguration TCP listener + TransportServer per entry', type: 'transportserver', category: 'HAProxy TCP CRD', anchor: 'crd-tcp', section: 'crd', generator: 'generateTCPCRD' },
             { keys: ['configmap:tcp-services'], source: 'tcp-services ConfigMap', nic: 'GlobalConfiguration TCP listener + TransportServer per entry', type: 'transportserver', category: 'TCP services', anchor: 'tcp-services', section: 'oss', generator: 'generateTcpServicesCM' },
 
             // Enterprise → Plus
@@ -2267,7 +2279,7 @@
                             code: entry.findings.map(function(f) { return f.label; }).join(', '),
                             desc: entry.mapping.nic,
                             anchor: entry.mapping.anchor || null,
-                            sidebarSection: entry.mapping.section === 'plus' ? 'plus-mappings' : 'mappings'
+                            sidebarSection: sectionIdFor(entry.mapping)
                         };
                     })
                 };

@@ -2641,7 +2641,7 @@
                     { id: 'flag-mappings', filterSource: 'flags', search: 'searchInputFlags', category: 'categoryFilterFlags', count: 'searchCountFlags' }
                 ],
                 sectionPageMap: {
-                    overview: 'getting-started', 'why-migrate': 'getting-started', features: 'getting-started', installation: 'getting-started', checklist: 'getting-started', 'phased-migration': 'getting-started', resources: 'getting-started',
+                    overview: 'getting-started', 'why-migrate': 'getting-started', features: 'getting-started', installation: 'getting-started', checklist: 'getting-started', 'phased-migration': 'getting-started', cli: 'getting-started', resources: 'getting-started',
                     differences: 'reference', 'mappings': 'reference', 'plus-mappings': 'reference', 'configmap-mappings': 'reference', 'crd-mappings': 'reference', 'flag-mappings': 'reference'
                 },
                 defaultPage: 'getting-started',

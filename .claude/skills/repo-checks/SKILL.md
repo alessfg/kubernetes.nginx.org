@@ -130,3 +130,18 @@ Five things to know:
 4. Add a step to `.github/workflows/tests.yml`.
 5. Fault-inject it, per the standard above, and write what you planted into the
    commit body.
+
+## Adding a test file
+
+Not the same as adding a check — a new `.github/test/*.test.js` joins the
+existing "wiring suite" entry rather than becoming a tenth check. Register it in
+**both** places or it runs in only one of them:
+
+- `.github/workflows/tests.yml` globs `.github/test/*.test.js`, so CI picks a new
+  file up on its own.
+- `check-all.py` lists the files by name, so a local run silently uses the
+  smaller suite until the name is added there too.
+
+The asymmetry is deliberate — the glob is guarded against matching nothing, and
+a literal list is what keeps `check-all.py` honest about how many things ran —
+but it means the two can disagree without anything saying so.

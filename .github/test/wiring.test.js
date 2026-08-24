@@ -185,6 +185,14 @@ for (const p of PAGES) {
     // args block below belongs to. Wrapping each of them in nine lines of
     // Deployment scaffolding would add over a thousand lines to the page to
     // repeat that one sentence, against a stated size budget.
+    //
+    // And so is a block that opens by naming a static configuration file
+    // ("# traefik.yml"). Traefik's static configuration is not a Kubernetes
+    // object at all — it is a file or CLI flags, read at startup and not from
+    // the API server — so there is no kind to declare and no manifest to make
+    // complete. The two sides of those rows are genuinely different shapes, and
+    // that difference IS the migration fact the row exists to teach. The NIC
+    // side of each is still held to the rule.
     test(`${p.name}: every comparison example is a complete manifest`, () => {
         const fragments = [];
         const blocks = page.matchAll(
@@ -192,10 +200,12 @@ for (const p of PAGES) {
         for (const b of blocks) {
             const line = page.slice(0, b.index).split('\n').length;
             for (const doc of b[1].split(/^---$/m)) {
+                const raw = doc.split('\n').filter((l) => l.trim());
                 const content = doc.split('\n')
                     .filter((l) => l.trim() && !l.trimStart().startsWith('#'));
                 if (!content.length) continue;
                 if (content[0].trim() === 'args:') continue;
+                if (raw.length && /^#\s*\S+\.ya?ml\b/.test(raw[0].trim())) continue;
                 if (!/^\s*kind:\s/m.test(doc)) {
                     fragments.push(`${p.page}:${line} ${content[0].trim().slice(0, 40)}`);
                 }
@@ -211,8 +221,15 @@ for (const p of PAGES) {
     // commented in one approach tab and bare in another. That is the drift that
     // let 70 lines sit uncommented — the CRD tab named the source, the Annotation
     // tab beside it did not, and nothing compared them.
+    //
+    // Position is part of a line's identity, or the comparison is not
+    // like-for-like: a Policy's own `  name: office-ips-policy` is scaffolding
+    // and stays bare, while the `    - name: office-ips-policy` that references
+    // it from spec.policies names the middleware it replaces. Same key, same
+    // value, different lines — keying on text alone read that as drift and
+    // would have been "fixed" by commenting a metadata name.
     test(`${p.name}: mapping comments agree across a row's approach tabs`, () => {
-        const LINE = /^\s*(?:-\s*)?([\w.\-/]+):(\s*)(\S.*?)(?:\s\s#\s*(.*))?$/;
+        const LINE = /^(\s*)(-\s*)?([\w.\-/]+):(\s*)(\S.*?)(?:\s\s#\s*(.*))?$/;
         const drift = [];
         const rows = page.matchAll(
             /<tr class="expandable">\s*[\s\S]*?\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g);
@@ -225,9 +242,9 @@ for (const p of PAGES) {
                 for (const line of b[1].split('\n')) {
                     const m = LINE.exec(line);
                     if (!m) continue;
-                    const k = `${m[1]}=${m[3]}`;
+                    const k = `${m[1].length}${m[2] ? '-' : ''}${m[3]}=${m[5]}`;
                     if (!seen.has(k)) seen.set(k, new Set());
-                    seen.get(k).add(m[4] || '');
+                    seen.get(k).add(m[6] || '');
                 }
             }
             for (const [k, comments] of seen) {

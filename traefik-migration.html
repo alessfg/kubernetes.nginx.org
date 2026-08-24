@@ -77,8 +77,7 @@
                 <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
             </button>
             <a class="topbar-brand" href="index.html">
-                <img class="brand-logo brand-logo-light" src="assets/img/nginx-logo.svg" alt="NGINX, sponsored by F5" width="106" height="30">
-                <img class="brand-logo brand-logo-dark" src="assets/img/nginx-logo-dark.svg" alt="NGINX, sponsored by F5" width="106" height="30">
+                <svg class="brand-logo" viewBox="0 0 644.5965344 182.2748198" width="99" height="28" role="img" aria-label="NGINX, sponsored by F5"><use href="assets/img/nginx-logo.svg#logo"/></svg>
             </a>
             <div class="topbar-heading">
                 <span class="topbar-eyebrow">Traefik Migration Tool</span>
@@ -1052,8 +1051,12 @@ spec:
     maxResponseBodyBytes: 10485760  # reject response bodies over 10 MiB (500)
     memResponseBodyBytes: 1048576
     retryExpression: "IsNetworkError() &amp;&amp; Attempts() &lt; 2"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  nginx.org/client-max-body-size: "10m"  # maxRequestBodyBytes (10485760 bytes)</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/client-max-body-size: "10m"  # maxRequestBodyBytes (10485760 bytes)</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> Convert byte counts to NGINX size strings (for example, <code>10485760</code> → <code>10m</code>). The in-memory buffer size (<code>memRequestBodyBytes</code>) maps to the VirtualServer <code>upstreams[].client-body-buffer-size</code> field — see the CRD Approach tab.</div>
                             </div>
@@ -1290,9 +1293,13 @@ spec:
   headers:
     customRequestHeaders:
       X-Client: "web"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  # customRequestHeaders — comma-separated "Name: value" pairs
-  nginx.org/proxy-set-headers: "X-Client: web"</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    # customRequestHeaders — comma-separated "Name: value" pairs
+    nginx.org/proxy-set-headers: "X-Client: web"</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> Explicit values in <code>nginx.org/proxy-set-headers</code> may not contain <code>$</code>. Use the VirtualServer approach for values that need variables, for header removal, or for <code>Host</code> overrides.</div>
                             </div>
@@ -1352,9 +1359,13 @@ spec:
   headers:
     customResponseHeaders:
       X-Robots-Tag: "noindex"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  # customResponseHeaders — comma-separated "Name: value[: always]" pairs
-  nginx.org/add-header: "X-Robots-Tag: noindex: always"</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    # customResponseHeaders — comma-separated "Name: value[: always]" pairs
+    nginx.org/add-header: "X-Robots-Tag: noindex: always"</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> the <code>nginx.org/add-header</code> annotation (and matching ConfigMap key). Values may not contain <code>$</code>, newlines, or unescaped double quotes; append <code>: always</code> to a pair to add the header on all response codes. Header removal has no annotation form — use <code>responseHeaders.hide</code> on a VirtualServer.</div>
                             </div>
@@ -1381,17 +1392,21 @@ spec:
     contentSecurityPolicy: "default-src 'self'"
     referrerPolicy: "strict-origin-when-cross-origin"
     permissionsPolicy: "geolocation=()"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  # browserXssFilter: true -&gt; X-XSS-Protection: 1; mode=block
-  #   (customBrowserXSSValue overrides the value; deprecated in modern browsers)
-  # frameDeny: true        -&gt; X-Frame-Options: DENY
-  #   (customFrameOptionsValue overrides the value)
-  # contentTypeNosniff     -&gt; X-Content-Type-Options: nosniff
-  # contentSecurityPolicy  -&gt; Content-Security-Policy
-  # contentSecurityPolicyReportOnly -&gt; Content-Security-Policy-Report-Only
-  # referrerPolicy         -&gt; Referrer-Policy
-  # permissionsPolicy      -&gt; Permissions-Policy
-  nginx.org/add-header: "X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Content-Security-Policy: default-src 'self', Referrer-Policy: strict-origin-when-cross-origin, Permissions-Policy: geolocation=()"</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    # browserXssFilter: true -&gt; X-XSS-Protection: 1; mode=block
+    #   (customBrowserXSSValue overrides the value; deprecated in modern browsers)
+    # frameDeny: true        -&gt; X-Frame-Options: DENY
+    #   (customFrameOptionsValue overrides the value)
+    # contentTypeNosniff     -&gt; X-Content-Type-Options: nosniff
+    # contentSecurityPolicy  -&gt; Content-Security-Policy
+    # contentSecurityPolicyReportOnly -&gt; Content-Security-Policy-Report-Only
+    # referrerPolicy         -&gt; Referrer-Policy
+    # permissionsPolicy      -&gt; Permissions-Policy
+    nginx.org/add-header: "X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Content-Security-Policy: default-src 'self', Referrer-Policy: strict-origin-when-cross-origin, Permissions-Policy: geolocation=()"</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> Traefik builds these response headers from dedicated toggles; the F5 NGINX Ingress Controller has no per-header toggles — you emit the literal header name and value yourself. <code>nginx.org/add-header</code> is new in v5.5.0; values may not contain <code>$</code>, newlines, or unescaped double quotes, and comma-containing values (such as multi-directive <code>Permissions-Policy</code>) break the comma-separated list — use the CRD approach for those. <code>browserXssFilter</code>/<code>customBrowserXSSValue</code> emit <code>X-XSS-Protection</code>, which is deprecated and ignored by modern browsers; <code>contentSecurityPolicyReportOnly</code> emits the report-only <code>Content-Security-Policy-Report-Only</code> header.</div>
                             </div>
@@ -1458,10 +1473,14 @@ spec:
     stsSeconds: 31536000
     stsIncludeSubdomains: true
     stsPreload: true</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  nginx.org/hsts: "true"  # stsSeconds &gt; 0 enables HSTS
-  nginx.org/hsts-max-age: "31536000"  # stsSeconds
-  nginx.org/hsts-include-subdomains: "true"  # stsIncludeSubdomains
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/hsts: "true"  # stsSeconds &gt; 0 enables HSTS
+    nginx.org/hsts-max-age: "31536000"  # stsSeconds
+    nginx.org/hsts-include-subdomains: "true"  # stsIncludeSubdomains
 # stsPreload: per the docs, NIC includes "preload" in the HSTS
 # header it emits — there is no separate toggle</code></pre></div>
                             </div>
@@ -1956,19 +1975,35 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code># https — TLS to the backend
-annotations:
-  traefik.ingress.kubernetes.io/service.serversscheme: https
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app-https
+  annotations:
+    traefik.ingress.kubernetes.io/service.serversscheme: https
 
 # h2c — plaintext HTTP/2 to the backend
-annotations:
-  traefik.ingress.kubernetes.io/service.serversscheme: h2c</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app-h2c
+  annotations:
+    traefik.ingress.kubernetes.io/service.serversscheme: h2c</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># https — proxy_pass https://
-annotations:
-  nginx.org/ssl-services: "backend-svc"   # serversscheme: https
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app-https
+  annotations:
+    nginx.org/ssl-services: "backend-svc"   # serversscheme: https
 
 # h2c — grpc_pass grpc:// speaks plaintext HTTP/2
-annotations:
-  nginx.org/grpc-services: "backend-svc"  # serversscheme: h2c</code></pre></div>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app-h2c
+  annotations:
+    nginx.org/grpc-services: "backend-svc"  # serversscheme: h2c</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Both annotations take a comma-separated list of Service names. <code>grpc_pass grpc://</code> requires the <code>http2</code> ConfigMap key and a TLS-terminated Ingress; listing a Service in both annotations proxies with <code>grpcs://</code>. <code>serversscheme: http</code> is the default upstream scheme — remove the annotation, no replacement needed. On mergeable Ingress these annotations go on minions, not the master.</div>
                         </div></td></tr>
@@ -2697,9 +2732,13 @@ spec:
   retry:
     attempts: 3
     initialInterval: 100ms</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  nginx.org/proxy-next-upstream: "error timeout"  # Traefik retry: network errors only (by default)
-  nginx.org/proxy-next-upstream-tries: "3"  # retry.attempts</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/proxy-next-upstream: "error timeout"  # Traefik retry: network errors only (by default)
+    nginx.org/proxy-next-upstream-tries: "3"  # retry.attempts</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.4.0:</strong> the <code>nginx.org/proxy-next-upstream</code> and <code>nginx.org/proxy-next-upstream-tries</code> annotations let you configure retries directly on Ingress resources without moving to VirtualServer.</div>
                             </div>
@@ -2792,10 +2831,14 @@ metadata:
 spec:
   replacePath:
     path: /healthz</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  # replacePath.path — rewrite value per service:
-  # "serviceName=&lt;svc&gt; rewrite=&lt;path&gt;", semicolon-separated
-  nginx.org/rewrites: "serviceName=backend-svc rewrite=/healthz"</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    # replacePath.path — rewrite value per service:
+    # "serviceName=&lt;svc&gt; rewrite=&lt;path&gt;", semicolon-separated
+    nginx.org/rewrites: "serviceName=backend-svc rewrite=/healthz"</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> <code>nginx.org/rewrites</code> performs prefix replacement only (via the <code>proxy_pass</code> URI) — the rewrite value must start with <code>/</code> and cannot contain regex or captures (whitespace, <code>{</code>, <code>}</code>, and <code>$</code> are rejected). On the VirtualServer side, use an exact-match route (<code>path: =/status</code>) if the entire path must be replaced regardless of sub-paths, mirroring Traefik's <code>replacePath</code> semantics.</div>
@@ -2912,7 +2955,7 @@ spec:
       action:
         proxy:
           upstream: backend
-          rewritePath: /$1</code></pre></div>
+          rewritePath: /$1  # forward the remainder without the prefix</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content" data-approach="annotation">
@@ -2926,9 +2969,13 @@ spec:
     prefixes:
       - /api
       - /legacy</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  # Strips the matched Ingress path prefix before proxying
-  nginx.org/rewrites: "serviceName=backend-svc rewrite=/"
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    # Strips the matched Ingress path prefix before proxying
+    nginx.org/rewrites: "serviceName=backend-svc rewrite=/"
 # Used with Ingress paths: /api, /legacy</code></pre></div>
                                 </div>
                             </div>
@@ -4359,16 +4406,20 @@ spec:
       - name: app-shadow
         port: 80
         percent: 10       # mirror 10% of requests</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>annotations:
-  nginx.org/location-snippets: |  # mirroring
-    mirror /mirror;          # mirrors[]
-    mirror_request_body on;  # mirrorBody: true (false → off)
-  nginx.org/server-snippets: |  # internal location for the mirror copies
-    location /mirror {
-      internal;
-      proxy_set_header Host app-shadow;  # mirrors[].name
-      proxy_pass http://app-shadow.default.svc.cluster.local:80$request_uri;  # mirrors[].name + port
-    }
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/location-snippets: |  # mirroring
+      mirror /mirror;          # mirrors[]
+      mirror_request_body on;  # mirrorBody: true (false → off)
+    nginx.org/server-snippets: |  # internal location for the mirror copies
+      location /mirror {
+        internal;
+        proxy_set_header Host app-shadow;  # mirrors[].name
+        proxy_pass http://app-shadow.default.svc.cluster.local:80$request_uri;  # mirrors[].name + port
+      }
 # The Ingress backend stays the main service (mirroring.name)</code></pre></div>
                                 </div>
                             </div>

@@ -22,10 +22,15 @@
 
 const path = require('node:path');
 
-const ROOT = path.join(__dirname, '..', '..', '..');
-const SOURCE_MODULE = 'assets/js/migration-ingress-nginx.js';
+const { resolveSource, DEFAULT_SOURCE } = require('./sources');
 
-function createEngine() {
+const ROOT = path.join(__dirname, '..', '..', '..');
+// Kept for the callers and tests that predate --source; the table in
+// sources.js is what actually decides which module boots.
+const SOURCE_MODULE = resolveSource(DEFAULT_SOURCE).module;
+
+function createEngine(sourceId) {
+    const src = resolveSource(sourceId);
     let loaded;
     try {
         // eslint-disable-next-line global-require
@@ -38,12 +43,15 @@ function createEngine() {
         );
     }
 
-    const { source, tool, warnings } = loaded.loadAnalyzer(SOURCE_MODULE);
-    if (!source || !source.analyzer) throw new Error(SOURCE_MODULE + ' exposed no analyzer');
+    const { source, tool, warnings } = loaded.loadAnalyzer(src.module);
+    if (!source || !source.analyzer) throw new Error(src.module + ' exposed no analyzer');
 
     return {
         source,
         tool,
+        // The descriptor, so callers do not re-resolve it: the scanner needs
+        // its prefixes and the report loop needs its kinds.
+        sourceInfo: src,
         strategies: Object.keys((source.analyzer.strategies && source.analyzer.strategies.descriptions) || {}),
         defaultStrategy: (source.analyzer.strategies && source.analyzer.strategies.initial) || 'crd',
 

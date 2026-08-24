@@ -28,6 +28,29 @@ const NIC_API = 'k8s.nginx.org/v1';
 
 /* ------------------------------------------------------------------ model */
 
+/* The class on the source Ingress selects the SOURCE controller. NIC matches
+   its own -ingress-class (default "nginx"), so copying "haproxy", "traefik" or
+   any other foreign class onto the output produces a resource NIC ignores —
+   silently, because an unmatched class is not an error. Carry a class only when
+   the caller names one with --class; otherwise omit it and say why.
+
+   "nginx" is the exception: the community controller's class is usually
+   literally nginx, which is also NIC's default, so it is safe to carry. */
+const NIC_SAFE_CLASSES = ['nginx'];
+
+function resolveClass(model, opts, notes) {
+    if (opts && opts.ingressClass) return opts.ingressClass;
+    const cls = model && model.ingressClassName;
+    if (!cls) return null;
+    if (NIC_SAFE_CLASSES.indexOf(cls) !== -1) return cls;
+    if (notes) {
+        notes.push('ingressClassName "' + cls + '" selects the source controller, so it is omitted — ' +
+                   'NIC would ignore a resource claiming it. Pass --class <name> to set NIC\'s class ' +
+                   '(it must match the controller\'s -ingress-class, default "nginx").');
+    }
+    return null;
+}
+
 function toModel(doc) {
     const md = doc.metadata || {};
     const spec = doc.spec || {};
@@ -210,7 +233,7 @@ function buildVirtualServers(model, gen, opts) {
         if (!routes.length) { notes.push('no routable paths for ' + hostEntry.host + ' — no VirtualServer emitted'); continue; }
 
         const spec = {};
-        const cls = opts.ingressClass || model.ingressClassName;
+        const cls = resolveClass(model, opts, notes);
         if (cls) spec.ingressClassName = cls;
         spec.host = hostEntry.host;
         if (hostEntry.tlsSecret) {
@@ -290,7 +313,7 @@ function buildIngress(model, gen, swaps, opts) {
     }
 
     const spec = {};
-    const cls = opts.ingressClass || model.ingressClassName;
+    const cls = resolveClass(model, opts, notes);
     if (cls) spec.ingressClassName = cls;
     if (model.defaultBackend) spec.defaultBackend = model.defaultBackend;
     const tls = [];

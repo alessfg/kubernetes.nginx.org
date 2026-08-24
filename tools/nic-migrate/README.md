@@ -1,6 +1,7 @@
 # nic-migrate
 
-Run the migration tool's analyzer over real Ingress manifests, from a terminal.
+Run the migration tool's analyzer over real Ingress manifests, from a terminal —
+ingress-nginx by default, or HAProxy with `--source haproxy`.
 
 > **Beta.** Review the output before you apply anything to a cluster. Command
 > names, flags, and the manifests it generates may still change.
@@ -21,6 +22,7 @@ and `--validate`.
 ```bash
 # What would change, and what the analyzer cannot work out on its own
 node tools/nic-migrate/nic-migrate.js report -f ./manifests
+node tools/nic-migrate/nic-migrate.js report --source haproxy -f ./manifests
 node tools/nic-migrate/nic-migrate.js report --kubectl -n prod
 
 # Manifests you can apply
@@ -35,6 +37,38 @@ node tools/nic-migrate/nic-migrate.js checklist
 annotation, and names what those illustrations leave out. Use it to understand
 a workload. `convert` merges them into manifests you can apply. Use it to
 migrate one.
+
+## Sources
+
+`--source` picks which of the site's analyzers to run. The mapping data, value
+transforms and generators all come from `assets/js/`, so the CLI reports exactly
+what the matching page reports.
+
+| | ingress-nginx | haproxy |
+|---|---|---|
+| module | `assets/js/migration-ingress-nginx.js` | `assets/js/migration-haproxy.js` |
+| annotation prefixes | `nginx.ingress.kubernetes.io/` | `haproxy.org/`, `haproxy.com/`, `ingress.kubernetes.io/` |
+| kinds read | Ingress | Ingress, Service, ConfigMap, and the Global / Defaults / Backend / Frontend / TCP CRs |
+
+The kinds column is the substantive difference. ingress-nginx keeps every
+setting on the Ingress, so an Ingress-only scan sees all of it. HAProxy spreads
+the same job across annotated Ingress **and Service** objects, its controller
+ConfigMap and five CRs — a scan that only looked at Ingresses would report
+"nothing found" on a real HAProxy deployment.
+
+`report` covers all of those kinds. `convert` builds from the Ingress, so for a
+HAProxy input it names the Service objects, ConfigMap and CRs it did not
+represent on stderr and tells you to run `report` for them, rather than dropping
+them quietly.
+
+One more difference worth knowing: the class on a source Ingress selects the
+*source* controller. Copying `ingressClassName: haproxy` onto NIC output would
+produce a resource NIC ignores — silently, since an unmatched class is not an
+error — so `convert` omits a foreign class and says so. Pass `--class nginx` to
+set NIC's. The community controller's class is usually literally `nginx`, which
+is also NIC's default, so that one carries over untouched.
+
+Adding a source is one entry in `lib/sources.js` plus a module in `assets/js/`.
 
 ## Reading a report
 
@@ -157,6 +191,7 @@ source's name. Applying it replaces the Ingress you are migrating. Pass
 
 ```
 nic-migrate.js      CLI: argument parsing, input gathering, output, validation
+lib/sources.js      One entry per source: module path, kinds read, CLI strings
 lib/engine.js       Boots the site's analyzer headless through .github/test/lib/load.js
 lib/ingress.js      Document splitting and the Ingress scanner (report only)
 lib/gaps.js         The gap checks (report only)

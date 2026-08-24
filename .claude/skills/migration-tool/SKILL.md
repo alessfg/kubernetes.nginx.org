@@ -165,6 +165,9 @@ The wiring suite asserts placement per page from the rendered rows, so this hold
 
 ## Ordering and structure rules
 
+- **Badge the resource, always.** A cell that names a field says which resource it sits on, and it says it with a badge — never bare text. Use `badge-ingress` when the field is on the Ingress the reader already has (`spec.ingressClassName`, `spec.defaultBackend`, `spec.rules[].host`): every other badge means "author this", that one means "edit what you have". A cell with no badge at all is an annotation, which names its own resource.
+- **An alternative offered in a cell is shown in the panel.** `— or —` (and a slash between two named targets) promises the reader two ways of doing it, so the panel carries both as approach tabs — never one form with the other mentioned in a comment or a note. If only one form can be shown, the cell names one target and the second belongs in the note. Both pages are asserted by the wiring suite; a signpost row whose panel only points at another table must not use `— or —` either.
+- **Category `<h3>` headings** within a mapping `<section>` are in case-insensitive alphabetical order by heading text, so scrolling and filtering land a reader in the same place. A new category is inserted at its letter, never appended. The wiring suite asserts it per page; `ingress-nginx-migration.html` is exempt and carries its reason in the `PAGES` table.
 - **Annotation mapping rows** within each category table are sorted alphabetically by the community annotation name (left column).
 - **Within a single row**, when multiple annotations are listed on either side, they are in alphabetical order.
 - **"No direct equivalent" rows** (NIC-only annotations) go at the end of their category table, after all community-to-NIC mappings.

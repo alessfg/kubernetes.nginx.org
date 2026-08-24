@@ -13,7 +13,13 @@ const { ROOT, loadAnalyzer } = require('./lib/load.js');
 /* One entry per migration tool the branch ships. Branches that add a second
    source module add a row here; nothing else in this file is source-specific. */
 const PAGES = [
-    { name: 'ingress-nginx', page: 'ingress-nginx-migration.html', module: 'assets/js/migration-ingress-nginx.js' },
+    { name: 'ingress-nginx', page: 'ingress-nginx-migration.html', module: 'assets/js/migration-ingress-nginx.js',
+      // Predates the alphabetical-categories rule: four headings in #mappings sit
+      // beside their topic rather than at their letter, and #configmap-mappings is
+      // grouped by what a reader migrates first. Reordering it is its own change.
+      alphabeticalCategories: false },
+    { name: 'haproxy', page: 'haproxy-migration.html', module: 'assets/js/migration-haproxy.js',
+      alphabeticalCategories: true },
 ];
 
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -80,6 +86,54 @@ for (const p of PAGES) {
         assert.deepEqual(missingAnchors, [], 'mapping anchors');
     });
 
+    // A cell that offers two ways — "— or —", or a slash between two named
+    // targets — promises both below it. The panel delivers that with approach
+    // tabs. Naming an alternative and then showing one form is the drift this
+    // catches: ingress-nginx has 42 such cells and 42 tabbed panels.
+    test(`${p.name}: every alternative offered in a cell has an example`, () => {
+        const rows = [...page.matchAll(/<tr class="expandable">\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)];
+        const unbacked = [];
+        for (const [, head, panel] of rows) {
+            const cells = [...head.matchAll(/<td>([\s\S]*?)<\/td>/g)].map((m) => m[1]);
+            if (cells.length !== 2) continue;
+            const offersAlternative = cells[1].includes('or-text') || /<\/code>\s*\/\s*(<span|[A-Za-z])/.test(cells[1]);
+            if (offersAlternative && !panel.includes('approach-tab')) {
+                unbacked.push(cells[0].replace(/<[^>]+>/g, '').trim().slice(0, 40));
+            }
+        }
+        assert.deepEqual(unbacked, [], 'cells offering an alternative with no tabbed example');
+    });
+
+    // Categories are alphabetical within their section, so the order a reader
+    // scrolls past matches the order the category filter offers. Appending a new
+    // category to the end is the easy mistake and is invisible on a long page.
+    test(`${p.name}: category headings are alphabetical within each section`, { skip: p.alphabeticalCategories ? false : 'predates the rule — see PAGES' }, () => {
+        const sections = [...page.matchAll(/<section id="([\w-]+)"([\s\S]*?)(?=<section id="|$)/g)];
+        let checked = 0;
+        for (const [, id, body] of sections) {
+            const headings = [...body.matchAll(/<h3 id="[\w-]+">([\s\S]*?)<\/h3>/g)]
+                .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim());
+            if (headings.length < 2) continue;
+            checked++;
+            const sorted = [...headings].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+            assert.deepEqual(headings, sorted, `#${id} categories out of order`);
+        }
+        assert.ok(checked >= 3, `expected several multi-category sections, checked ${checked}`);
+    });
+
+    // A mapping's category is the label the analyzer prints beside a finding, and
+    // the reader then looks for that heading in the reference tables. Nothing
+    // renders them together, so drift is invisible until someone hunts for a
+    // heading that does not exist — "Access Control" against "Access control".
+    test(`${p.name}: every mapping category is a heading on the page, verbatim`, () => {
+        const headings = new Set([...page.matchAll(/<h3 id="[\w-]+">(.*?)<\/h3>/g)]
+            .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim()));
+        const categories = new Set([...mod.matchAll(/category: ['"]([^'"]+)['"]/g)].map((m) => m[1])
+            .filter((c) => !c.startsWith('categoryFilter')));
+        assert.ok(categories.size > 5, 'categories found');
+        assert.deepEqual([...categories].filter((c) => !headings.has(c)), [], 'categories without a matching h3');
+    });
+
     test(`${p.name}: version-binding attributes are present with static fallbacks`, () => {
         const attrs = [...mod.matchAll(/attr: '([\w-]+)'/g)].map((m) => m[1]);
         assert.ok(attrs.length >= 1);
@@ -121,6 +175,14 @@ for (const p of PAGES) {
     // recorded it only in its commit body, so the target side kept its 61
     // fragments; hence an assertion rather than a convention. Comment-only
     // blocks ("# No direct equivalent") declare nothing and are exempt.
+    //
+    // So is a block whose first line is `args:`. A controller flag is not a
+    // resource to author — the reader is editing the Deployment they already
+    // run — and #flag-mappings says once, in a banner above the tables, which
+    // Deployment and which field (`spec.template.spec.containers[].args`) every
+    // args block below belongs to. Wrapping each of them in nine lines of
+    // Deployment scaffolding would add over a thousand lines to the page to
+    // repeat that one sentence, against a stated size budget.
     test(`${p.name}: every comparison example is a complete manifest`, () => {
         const fragments = [];
         const blocks = page.matchAll(
@@ -131,6 +193,7 @@ for (const p of PAGES) {
                 const content = doc.split('\n')
                     .filter((l) => l.trim() && !l.trimStart().startsWith('#'));
                 if (!content.length) continue;
+                if (content[0].trim() === 'args:') continue;
                 if (!/^\s*kind:\s/m.test(doc)) {
                     fragments.push(`${p.page}:${line} ${content[0].trim().slice(0, 40)}`);
                 }

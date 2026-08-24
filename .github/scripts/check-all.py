@@ -44,7 +44,9 @@ CHECKS = [
     # files to BOTH.
     ('wiring suite', ['node', '--test', '.github/test/index.test.js',
                       '.github/test/wiring.test.js',
-                      '.github/test/nic-migrate.test.js']),
+                      '.github/test/nic-migrate.test.js',
+                      '.github/test/analyzer.test.js',
+                      '.github/test/conversions.test.js']),
     ('locator', [sys.executable, '.github/scripts/where.py', '--self-test']),
 ]
 

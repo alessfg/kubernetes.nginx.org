@@ -342,7 +342,7 @@
          'http-connection-mode', 'http-keep-alive', 'http-server-close', 'maxconn', 'nbthread', 'hard-stop-after',
          'global-config-snippet', 'frontend-config-snippet', 'stats-config-snippet',
          'client-strict-sni', 'ssl-certificate', 'tls-alpn', 'generate-certificates-signer',
-         'quic-alt-svc-max-age'
+         'quic-alt-svc-max-age', 'clean-certs'
         ].forEach(function(n) { CONFIGMAP_CANONICAL[n] = true; });
 
         function canonicalKey(name) {
@@ -1147,7 +1147,7 @@
                         out.notes.push({ code: f.label, message: 'Not needed — NIC already generates a separate upstream per Ingress/VirtualServer, so the shared-backend conflict this annotation works around does not exist.' });
                     } else if (f.key === 'annotation:abortonclose') {
                         out.notes.push({ code: f.label, message: 'NGINX already aborts the upstream request when the client disconnects (proxy_ignore_client_abort off is the default) — HAProxy abortonclose behavior matches out of the box. Remove.' });
-                    } else if (f.key === 'annotation:clean-certs') {
+                    } else if (f.key === 'configmap:clean-certs') {
                         out.notes.push({ code: f.label, message: 'Not applicable — NIC loads certificates from Secrets and manages its own storage. Remove.' });
                     } else {
                         out.notes.push({ code: f.label, message: 'Not applicable on the F5 NGINX Ingress Controller — remove.' });
@@ -1938,7 +1938,7 @@
             { keys: ['annotation:request-set-header', 'annotation:response-set-header', 'annotation:set-host'], source: 'request-set-header / response-set-header / set-host', nic: 'VirtualServer requestHeaders.set / responseHeaders.add — or — nginx.org/proxy-set-headers + nginx.org/add-header', type: 'virtualserver', category: 'Headers', anchor: 'headers', section: 'oss', grouped: true, dualApproach: true, generator: 'generateHeaders' },
 
             // Observability
-            { keys: ['annotation:request-capture', 'annotation:request-capture-len'], source: 'request-capture (+ -len)', nic: 'ConfigMap log-format with $http_* / $cookie_* variables (global)', type: 'configmap', category: 'Observability', anchor: 'observability', section: 'oss', grouped: true, generator: 'generateRequestCapture' },
+            { keys: ['annotation:request-capture', 'annotation:request-capture-len'], source: 'request-capture / request-capture-len', nic: 'ConfigMap log-format with $http_* / $cookie_* variables (global)', type: 'configmap', category: 'Observability', anchor: 'observability', section: 'oss', grouped: true, generator: 'generateRequestCapture' },
             { keys: ['configmap:syslog-server'], source: 'syslog-server', nic: 'ConfigMap access-log (syslog: destination)', type: 'configmap', category: 'Logging', anchor: 'logging', section: 'configmap', grouped: true, generator: 'generateSyslogServer' },
             { keys: ['configmap:log-format'], source: 'log-format', nic: 'ConfigMap log-format (hand-translated)', type: 'configmap', category: 'Logging', anchor: 'logging', section: 'configmap', grouped: true, generator: 'generateLogFormat' },
             { keys: ['configmap:log-format-tcp'], source: 'log-format-tcp', nic: 'ConfigMap stream-log-format (hand-translated)', type: 'configmap', category: 'Logging', anchor: 'logging', section: 'configmap', grouped: true, generator: 'generateLogFormat' },
@@ -1950,9 +1950,11 @@
 
             // Load balancing
             { keys: ['annotation:load-balance'], source: 'load-balance', nic: 'nginx.org/lb-method / ConfigMap lb-method / VirtualServer upstreams[].lb-method', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'generateLoadBalance' },
+            { keys: ['annotation:scale-server-slots'], source: 'scale-server-slots', nic: 'Not applicable — no pre-allocated server slots; NIC re-resolves endpoints on change', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'generateNotApplicable' },
+            { keys: ['annotation:standalone-backend'], source: 'standalone-backend', nic: 'Not applicable — NIC already generates one upstream per Ingress/VirtualServer', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'generateNotApplicable' },
 
             // Miscellaneous (not applicable on NIC)
-            { keys: ['annotation:scale-server-slots', 'annotation:standalone-backend', 'annotation:abortonclose', 'annotation:clean-certs'], source: 'scale-server-slots / standalone-backend / abortonclose / clean-certs', nic: 'Not applicable — NIC architecture makes these unnecessary (see notes)', type: 'annotation', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss', grouped: true, generator: 'generateNotApplicable' },
+            { keys: ['annotation:abortonclose', 'configmap:clean-certs'], source: 'abortonclose / clean-certs', nic: 'Not applicable — NIC architecture makes these unnecessary (see notes)', type: 'annotation', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss', grouped: true, generator: 'generateNotApplicable' },
 
             // Rewrites & redirects
             { keys: ['annotation:path-rewrite'], source: 'path-rewrite', nic: 'nginx.org/rewrite-target (+ nginx.org/path-regex) — or — VirtualServer regex path + rewritePath', type: 'annotation', category: 'Rewrites', anchor: 'rewrites', section: 'oss', grouped: true, generator: 'generatePathRewrite' },

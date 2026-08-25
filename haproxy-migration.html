@@ -1702,19 +1702,18 @@ metadata:
                 <table class="mapping-table" aria-labelledby="miscellaneous"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>abortonclose</code><br><code>clean-certs</code><br><code>scale-server-slots</code><br><code>standalone-backend</code></td>
+                            <td><code>haproxy.org/abortonclose</code><br><code>clean-certs</code> ConfigMap key</td>
                             <td>Not applicable</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
+# abortonclose is a code-only / undocumented HAProxy annotation
 metadata:
   name: my-app
   annotations:
     haproxy.org/abortonclose: "true"
-    haproxy.org/scale-server-slots: "42"
-    haproxy.org/standalone-backend: "true"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -1723,16 +1722,13 @@ metadata:
   namespace: haproxy-controller
 data:
   clean-certs: "true"  # ConfigMap-scoped only</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Not applicable — remove all four; the F5 NGINX Ingress Controller
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Not applicable — remove both; the F5 NGINX Ingress Controller
 # architecture makes them unnecessary:
-#   abortonclose      → NGINX already aborts the upstream request on
-#                        client close (proxy_ignore_client_abort off by default)
-#   clean-certs       → NIC loads certs from Secrets and manages its own storage
-#   scale-server-slots → no pre-allocated server slots; endpoints re-resolve
-#                        on change (OSS reloads; Plus updates dynamically)
-#   standalone-backend → NIC already generates one upstream per Ingress/VirtualServer</code></pre></div>
+#   abortonclose → NGINX already aborts the upstream request on
+#                  client close (proxy_ignore_client_abort off by default)
+#   clean-certs  → NIC loads certs from Secrets and manages its own storage</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> These four HAProxy annotations translate to nothing on the F5 NGINX Ingress Controller — the behaviors they configure are either the NGINX default or handled by NIC's architecture. Remove them during migration.</div>
+                            <div class="info-box note"><strong>Note:</strong> Both constructs translate to nothing on the F5 NGINX Ingress Controller — the behaviors they configure are either the NGINX default or handled by NIC's architecture. Remove them during migration. <code>clean-certs</code> is ConfigMap-only — there is no Ingress or Service tier for it. Two more not-applicable knobs, <code>haproxy.org/scale-server-slots</code> and <code>haproxy.org/standalone-backend</code>, are documented under <a href="#load-balancing">Load balancing</a>.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -1744,7 +1740,7 @@ data:
                 <table class="mapping-table" aria-labelledby="observability"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>request-capture</code><br>(<code>request-capture-len</code>)</td>
+                            <td><code>haproxy.org/request-capture</code><br><code>haproxy.org/request-capture-len</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>log-format</code> with <code>$http_*</code> / <code>$cookie_*</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -2582,7 +2578,7 @@ metadata:
                 <table class="mapping-table" aria-labelledby="tls-certificates"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>ssl-passthrough</code></td>
+                            <td><code>haproxy.org/ssl-passthrough</code></td>
                             <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>protocol: TLS_PASSTHROUGH</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -2751,7 +2747,7 @@ spec:
                 <table class="mapping-table" aria-labelledby="active-health-checks"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>check</code> / <code>httpchk_params</code> (Backend CRD)</td>
+                            <td><code>default_server.check</code> / <code>httpchk_params</code> (Backend CRD)</td>
                             <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>upstreams[].healthCheck</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -2898,6 +2894,7 @@ spec:
             </div>
 
             <h3 id="enterprise">Enterprise features</h3>
+            <div class="info-box note"><strong>Why NGINX Plus:</strong> the F5 NGINX Ingress Controller answers below — App Protect WAF and DoS, zone synchronization, active health checks — are its <strong>NGINX Plus</strong> capabilities, backed by an F5 subscription, so the migration cost is deploying the NGINX Plus image rather than configuring a subscription. On the HAProxy side, only the ModSecurity WAF (see <a href="#waf">WAF</a>) has an Ingress annotation or ConfigMap key in v3.2.12 — every other module here is HAProxy Enterprise <em>platform</em> configuration, so the examples show the HAProxy config it lives in, not a Kubernetes resource.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="enterprise"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -2907,17 +2904,19 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Bot Management is a platform (HAPEE)
-# module — it has no first-class Kubernetes Ingress
-# annotation or CRD in v3.2.12 (configured via raw HAPEE
-# config; Ingress exposure unconfirmed).</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Bot Management — a platform (HAPEE) module
+# loaded and configured in the HAProxy Enterprise config, not
+# through the ingress controller: v3.2.12 has no annotation, no
+# ConfigMap key and no CRD field for it, and the Enterprise
+# controller's configuration reference documents only the
+# ModSecurity WAF.</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># NGINX App Protect DoS (NGINX Plus) — behavioral DDoS /
 # automated-traffic protection. Enable per Ingress with:
 #   appprotectdos.f5.com/app-protect-dos-resource: "default/my-app-dos"
 # backed by a DosProtectedResource CRD (author its spec
 # to match your protected object).</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>Different mechanism:</strong> HAProxy Enterprise Bot Management is a platform (HAPEE) capability with no confirmed first-class Ingress annotation or CRD in v3.2.12 — Ingress exposure is unconfirmed. NGINX App Protect DoS provides <em>behavioral</em> DDoS and automated-traffic protection, not fingerprint-based bot scoring, and its interactive-challenge (CAPTCHA) counterpart has <strong>no NGINX equivalent</strong> (see the CAPTCHA and Fingerprint rows). App Protect WAF bot signatures cover a further slice.</div>
+                            <div class="info-box warning"><strong>Different mechanism:</strong> HAProxy Enterprise Bot Management is a platform (HAPEE) capability with no Ingress annotation or CRD in v3.2.12 — the Enterprise controller's configuration reference documents only the ModSecurity WAF, so bot management is configured outside Kubernetes. NGINX App Protect DoS provides <em>behavioral</em> DDoS and automated-traffic protection, not fingerprint-based bot scoring, and its interactive-challenge (CAPTCHA) counterpart has <strong>no NGINX equivalent</strong> (see the CAPTCHA and Fingerprint rows). App Protect WAF bot signatures cover a further slice.</div>
                             <div class="info-box note"><strong>Note:</strong> App Protect DoS is enabled with the <code>appprotectdos.f5.com/app-protect-dos-resource</code> annotation plus a <code>DosProtectedResource</code> CRD, and requires <strong>NGINX Plus</strong>.</div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -2926,10 +2925,20 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Global Profiling Engine (GPE) — a
-# platform component that aggregates stick-table state
-# (rates, connections, stickiness, keyval) across nodes.
-# No Kubernetes Ingress annotation or CRD (platform-level).</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Global Profiling Engine (GPE) — platform
+# configuration, with no Ingress annotation or CRD: each node
+# peers with the GPE, which mirrors every stick table back as a
+# read-only ".agg" copy holding the cluster-wide counters.
+#
+#   global
+#       localpeer hapee1
+#
+#   peers mypeers
+#       bind 0.0.0.0:10000
+#       server hapee1
+#       server gpe 192.168.50.40:10000
+#       table request_rates type ip size 100k expire 30s store http_req_rate(10s)
+#       table request_rates.agg type ip size 100k expire 30s store http_req_rate(10s)</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -2946,9 +2955,14 @@ data:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise cluster-wide rate limiting aggregates
-# counters through the Global Profiling Engine (platform
-# component; no first-class Ingress annotation or CRD).</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise cluster-wide rate limiting — platform
+# configuration, with no Ingress annotation or CRD: track into
+# the local table, then decide on the GPE-aggregated ".agg" copy
+# so the limit counts every replica's traffic, not just this pod's.
+#
+#   frontend fe_main
+#       http-request track-sc0 src table mypeers/request_rates
+#       http-request deny deny_status 429 if { sc_http_req_rate(0,mypeers/request_rates.agg) gt 1000 }</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Define the limit as a rateLimit Policy (NGINX Plus)
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -2983,9 +2997,14 @@ data:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise "Intelligent WAF" — a marketed
-# behavioral WAF engine (HAPEE platform). No config-import
-# path and no dedicated Kubernetes Ingress annotation.</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise "Intelligent WAF" — a behavioral WAF engine
+# (HAPEE platform) with no config-import path and no dedicated
+# Ingress annotation. The only WAF wiring the controller exposes
+# is the Enterprise-only ModSecurity pair, which is what you will
+# actually be holding:
+#
+#   haproxy.org/modsecurity: haproxy-controller/modsecuritycrs
+#   modsecurity: haproxy-controller/modsecuritycrs   # ConfigMap</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Same target as ModSecurity above — the NGINX App Protect
 # WAF `waf` Policy (NGINX Plus). See the WAF section.
 apiVersion: k8s.nginx.org/v1
@@ -3000,29 +3019,25 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> There is no configuration to import — it is a different engine, so re-author and re-tune the policy against NGINX App Protect WAF (see the <a href="#waf">WAF</a> row). No dedicated HAProxy Ingress annotation was located, so this collapses into the same <code>waf</code> Policy mapping. Requires <strong>NGINX Plus</strong>.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>Support / licensing / EOL</code></td>
-                            <td>NGINX Plus subscription + F5 support</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise (HAPEE) — commercial subscription:
-# vendor support, enterprise packages, and a defined
-# maintenance / end-of-life window.</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># NGINX Plus subscription + F5 support. Install the F5 NGINX
-# Ingress Controller (NGINX Plus) image via Helm or manifests;
-# licensing follows your NGINX Plus / App Protect entitlement.</code></pre></div>
-                            </div>
-                            <div class="info-box note"><strong>Why NGINX Plus:</strong> the features in this section — App Protect WAF and DoS, active health checks, zone synchronization, JWT / OIDC, and the key-value store — are the F5 NGINX Ingress Controller's <strong>NGINX Plus</strong> capabilities, backed by an F5 subscription and support. Nothing to configure at migration time beyond deploying the NGINX Plus image.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
                             <td><code>UDP</code> module (HAProxy Enterprise)</td>
                             <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>protocol: UDP</code> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise UDP load-balancing module (HAPEE
-# platform add-on) — HAProxy IC OSS has no UDP ingress path
-# (the TCP CRD and tcp-services are TCP-only).</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise UDP module — platform configuration, with no
+# Ingress path in the controller at all (the TCP CRD and the
+# tcp-services ConfigMap are both TCP-only):
+#
+#   global
+#       module-load hapee-lb-udp.so
+#
+#   udp-lb dns
+#       dgram-bind 10.0.0.10:53
+#       proxy-requests 1
+#       balance roundrobin
+#       option udp-check
+#       server dns1 10.10.10.10:53 check
+#       server dns2 10.10.10.20:53 check</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Declare a UDP listener (GlobalConfiguration)
 apiVersion: k8s.nginx.org/v1
 kind: GlobalConfiguration
@@ -3076,13 +3091,14 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Fingerprint module — TLS/JA3-style
-# client fingerprinting (HAPEE platform). The standard
-# Frontend `fingerprint_ssl` capture also has no NIC analogue.</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Fingerprint module — TLS/JA3-style client
+# fingerprinting, configured in the HAProxy Enterprise platform
+# config. No Ingress annotation, no CRD field, and nothing in the
+# controller's configuration reference to migrate from.</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — NIC exposes no Ingress-level
 # TLS/JA3 client fingerprinting.</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> the F5 NGINX Ingress Controller has no Ingress-level TLS/JA3 client fingerprinting. HAProxy's standard Frontend <code>fingerprint_ssl</code> boolean (a capture available in both HAProxy editions) likewise has no NGINX equivalent — there is nothing to migrate.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> the F5 NGINX Ingress Controller has no Ingress-level TLS/JA3 client fingerprinting. The HAProxy side has no Ingress construct either — the module is configured in the HAProxy Enterprise platform config — so there is no annotation, ConfigMap key or CRD field to carry across.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4755,7 +4771,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> Accepting PROXY protocol is the global <code>proxy-protocol: "true"</code> ConfigMap key — see <a href="#client-mtls-proxy">Client mTLS &amp; PROXY protocol</a>. It cannot be scoped to one listener, so every port starts expecting a PROXY header: anything still connecting directly breaks.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>log</code> / <code>httplog</code></td>
+                            <td><code>httplog</code> / <code>log_target_list</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>log-format</code> / <code>access-log</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4785,7 +4801,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> Listener logging becomes the global <code>log-format</code> / <code>access-log</code> ConfigMap keys — hand-translate the tokens (see <a href="#logging">Logging</a>). Per-listener logging does not survive the move: one format and one destination cover the whole controller.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>http_request</code> / <code>http_response</code> rules</td>
+                            <td><code>http_request_rule_list</code> / <code>http_response_rule_list</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>server-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4917,7 +4933,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> int64 milliseconds → NGINX time. Caps old-worker drain after a reload (approximate analogue of HAProxy's whole-process soft-stop cap).</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>log</code> / <code>log_target_list</code></td>
+                            <td><code>log_target_list</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>access-log</code> + <code>error-log-level</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -5000,7 +5016,7 @@ data:
                             <div class="info-box note"><strong>Approximate:</strong> the count transfers, but NGINX scales with processes, not threads. <code>auto</code> is supported.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>ssl_default_bind_ciphers</code></td>
+                            <td><code>ssl_options.default_bind_ciphers</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-ciphers</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -5023,7 +5039,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> Direct equivalent — the OpenSSL cipher string ports verbatim.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>ssl_default_bind_options</code></td>
+                            <td><code>ssl_options.default_bind_options</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-protocols</code> (+ <code>ssl-prefer-server-ciphers</code>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -5049,7 +5065,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> One HAProxy string mixes protocol floors with independent flags, so it splits across several NIC keys — the protocol versions become <code>ssl-protocols</code> (an explicit list, not a floor), <code>prefer-client-ciphers</code> inverts to <code>ssl-prefer-server-ciphers: "false"</code>, and the remaining bind flags have no key at all (snippet or drop).</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>ssl_dh_param_file</code></td>
+                            <td><code>ssl_options.dh_param_file</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>ssl-dhparam-file</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">

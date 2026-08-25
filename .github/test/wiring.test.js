@@ -267,6 +267,15 @@ for (const p of PAGES) {
             // kinds a ConfigMap-key or annotation example ships alongside.
             const vendorCr = kind && !/^(ConfigMap|Secret|Service|Ingress|Deployment|DaemonSet)$/.test(kind)
                 && /\./.test(apiVersion) && !/^networking\.k8s\.io\//.test(apiVersion);
+            // A ConfigMap is not always a ConfigMap *setting*. HAProxy Enterprise's
+            // platform modules have no key of their own: their configuration travels
+            // in a `*-config-snippet` value or in the `haproxy-aux.cfg` file mounted
+            // beside the generated config, so the ConfigMap is the vehicle, not the
+            // construct, and those rows belong with their feature rather than in
+            // #configmap-mappings. A row that documents the snippet key itself names
+            // it in the left cell, and stays subject to the rule.
+            const vehicleOnly = /(-config-snippet|haproxy-aux\.cfg):/.test(old)
+                && !/config-snippet|aux/.test(strip(src));
 
             let want;
             if (/badge-plus/.test(nic)) want = 'plus-mappings';
@@ -274,7 +283,7 @@ for (const p of PAGES) {
             else if (/annotations:/.test(old)) want = 'mappings';
             else if (strip(src).startsWith('--')) want = 'flag-mappings';
             else if (vendorCr) want = 'crd-mappings';
-            else if (kind === 'ConfigMap') want = 'configmap-mappings';
+            else if (kind === 'ConfigMap' && !vehicleOnly) want = 'configmap-mappings';
             else want = section;              // spec fields, gap rows: no surface to key off
             // Only hold a page to a section it actually ships.
             if (want !== section && page.includes(`<section id="${want}"`)) {

@@ -2894,7 +2894,8 @@ spec:
             </div>
 
             <h3 id="enterprise">Enterprise features</h3>
-            <div class="info-box note"><strong>Why NGINX Plus:</strong> the F5 NGINX Ingress Controller answers below — App Protect WAF and DoS, zone synchronization, active health checks — are its <strong>NGINX Plus</strong> capabilities, backed by an F5 subscription, so the migration cost is deploying the NGINX Plus image rather than configuring a subscription. On the HAProxy side, only the ModSecurity WAF (see <a href="#waf">WAF</a>) has an Ingress annotation or ConfigMap key in v3.2.12 — every other module here is HAProxy Enterprise <em>platform</em> configuration, so the examples show the HAProxy config it lives in, not a Kubernetes resource.</div>
+            <div class="info-box note"><strong>Why NGINX Plus:</strong> the F5 NGINX Ingress Controller answers below — App Protect WAF and DoS, zone synchronization, active health checks — are its <strong>NGINX Plus</strong> capabilities, backed by an F5 subscription, so the migration cost is deploying the NGINX Plus image rather than configuring a subscription.</div>
+            <div class="info-box note"><strong>Where to find the HAProxy side:</strong> no module below has an annotation, a ConfigMap key, a CRD field or a controller flag — in v3.2.12 the ModSecurity WAF is the only Enterprise feature that does (see <a href="#waf">WAF</a>). Their settings are HAProxy configuration, and it reaches a cluster two ways, both shown in the examples. Directives that belong <em>inside</em> a section the controller generates travel in the <code>global-config-snippet</code> and <code>frontend-config-snippet</code> ConfigMap keys, because a second file cannot reopen a section the controller already wrote. Whole new sections travel in a secondary config file mounted at <code>/etc/haproxy/haproxy-aux.cfg</code>, which the controller loads alongside its own generated config, watches for changes, and never rewrites. Running the controller in external mode puts all of it back into one config file you own. So there <em>is</em> something to inventory in the cluster — two ConfigMaps and a volume mount — but nothing that names the feature, and the contents are HAProxy's configuration language, which is re-authored rather than translated.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="enterprise"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -2904,19 +2905,38 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Bot Management — a platform (HAPEE) module
-# loaded and configured in the HAProxy Enterprise config, not
-# through the ingress controller: v3.2.12 has no annotation, no
-# ConfigMap key and no CRD field for it, and the Enterprise
-# controller's configuration reference documents only the
-# ModSecurity WAF.</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># mounted at /etc/haproxy/haproxy-aux.cfg
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-aux-cfg
+  namespace: haproxy-controller
+data:
+  haproxy-aux.cfg: |
+    # a section the controller never generates, so it lives here
+    botmgmt-profile my-bots
+      # scoring, thresholds and threat detection: Bot Management
+      # module reference (HAProxy customer portal)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  # these must sit inside the frontend the controller generates
+  frontend-config-snippet: |
+    filter botmgmt profile my-bots
+    http-request botmgmt-evaluate profile my-bots
+    http-request deny deny_status 403 if { &lt;bot verdict ACL&gt; }</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># NGINX App Protect DoS (NGINX Plus) — behavioral DDoS /
 # automated-traffic protection. Enable per Ingress with:
-#   appprotectdos.f5.com/app-protect-dos-resource: "default/my-app-dos"
+#   appprotectdos.f5.com/app-protect-dos-resource:
+#     "default/my-app-dos"
 # backed by a DosProtectedResource CRD (author its spec
 # to match your protected object).</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>Different mechanism:</strong> HAProxy Enterprise Bot Management is a platform (HAPEE) capability with no Ingress annotation or CRD in v3.2.12 — the Enterprise controller's configuration reference documents only the ModSecurity WAF, so bot management is configured outside Kubernetes. NGINX App Protect DoS provides <em>behavioral</em> DDoS and automated-traffic protection, not fingerprint-based bot scoring, and its interactive-challenge (CAPTCHA) counterpart has <strong>no NGINX equivalent</strong> (see the CAPTCHA and Fingerprint rows). App Protect WAF bot signatures cover a further slice.</div>
+                            <div class="info-box warning"><strong>Different mechanism:</strong> HAProxy Enterprise Bot Management has no Ingress annotation, ConfigMap key or CRD field in v3.2.12, so it arrives as raw configuration: the profile section through the mounted <code>haproxy-aux.cfg</code>, the per-frontend lines through <code>frontend-config-snippet</code>. Mount the aux ConfigMap with <code>subPath: haproxy-aux.cfg</code> so it lands as a file rather than a directory. The <code>botmgmt-profile</code> section and <code>botmgmt-evaluate</code> are named in HAProxy Enterprise's release notes; the profile's own fields are portal-documented, so treat the body above as a placeholder. NGINX App Protect DoS provides <em>behavioral</em> DDoS and automated-traffic protection, not fingerprint-based bot scoring, and its interactive-challenge (CAPTCHA) counterpart has <strong>no NGINX equivalent</strong> (see the CAPTCHA and Fingerprint rows). App Protect WAF bot signatures cover a further slice.</div>
                             <div class="info-box note"><strong>Note:</strong> App Protect DoS is enabled with the <code>appprotectdos.f5.com/app-protect-dos-resource</code> annotation plus a <code>DosProtectedResource</code> CRD, and requires <strong>NGINX Plus</strong>.</div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -2925,20 +2945,32 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Global Profiling Engine (GPE) — platform
-# configuration, with no Ingress annotation or CRD: each node
-# peers with the GPE, which mirrors every stick table back as a
-# read-only ".agg" copy holding the cluster-wide counters.
-#
-#   global
-#       localpeer hapee1
-#
-#   peers mypeers
-#       bind 0.0.0.0:10000
-#       server hapee1
-#       server gpe 192.168.50.40:10000
-#       table request_rates type ip size 100k expire 30s store http_req_rate(10s)
-#       table request_rates.agg type ip size 100k expire 30s store http_req_rate(10s)</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># mounted at /etc/haproxy/haproxy-aux.cfg
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-aux-cfg
+  namespace: haproxy-controller
+data:
+  haproxy-aux.cfg: |
+    # the GPE peer, and the ".agg" copy it mirrors back with the
+    # cluster-wide counters — a section the controller never writes
+    peers mypeers
+      bind 0.0.0.0:10000
+      server hapee1
+      server gpe 192.168.50.40:10000
+      table request_rates type ip size 100k expire 30s store http_req_rate(10s)
+      table request_rates.agg type ip size 100k expire 30s store http_req_rate(10s)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  # names this node to its peers; a global directive, so it is a snippet
+  global-config-snippet: |
+    localpeer hapee1</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -2955,14 +2987,17 @@ data:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise cluster-wide rate limiting — platform
-# configuration, with no Ingress annotation or CRD: track into
-# the local table, then decide on the GPE-aggregated ".agg" copy
-# so the limit counts every replica's traffic, not just this pod's.
-#
-#   frontend fe_main
-#       http-request track-sc0 src table mypeers/request_rates
-#       http-request deny deny_status 429 if { sc_http_req_rate(0,mypeers/request_rates.agg) gt 1000 }</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  # track into the local table, decide on the GPE-aggregated ".agg" copy,
+  # so the limit counts every replica's traffic and not just this pod's
+  frontend-config-snippet: |
+    http-request track-sc0 src table mypeers/request_rates
+    http-request deny deny_status 429 if { sc_http_req_rate(0,mypeers/request_rates.agg) gt 1000 }</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Define the limit as a rateLimit Policy (NGINX Plus)
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -2989,7 +3024,7 @@ data:
 #    Ingress-attachable — on Ingress use nginx.org/limit-req-*,
 #    which is per-pod)</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Cross-replica aggregation requires the <strong>NGINX Plus</strong> <code>zone-sync</code> ConfigMap keys (<code>zone-sync</code>, <code>zone-sync-port</code> default <code>12345</code>, <code>zone-sync-resolver-addresses</code>, <code>zone-sync-resolver-valid</code>, <code>zone-sync-resolver-ipv6</code>) — <strong>keys, not CLI flags</strong>. On NGINX OSS each pod limits independently (per-pod). The <code>rateLimit</code> Policy is not Ingress-attachable; on plain Ingress use <code>nginx.org/limit-req-*</code>. The <code>key</code> accepts <code>${binary_remote_addr}</code>, <code>${request_uri}</code>, <code>${uri}</code>, <code>${args}</code>, <code>${request_method}</code> and <code>arg_</code> / <code>cookie_</code> / <code>http_</code> / <code>jwt_claim_</code> / <code>apikey_</code>-prefixed variables — <code>${host}</code> is not allowed. See <a href="#rate-limiting">Rate limiting</a> for the single-pod mapping.</div>
+                            <div class="info-box note"><strong>Note:</strong> Cross-replica aggregation requires the <strong>NGINX Plus</strong> <code>zone-sync</code> ConfigMap keys (<code>zone-sync</code>, <code>zone-sync-port</code> default <code>12345</code>, <code>zone-sync-resolver-addresses</code>, <code>zone-sync-resolver-valid</code>, <code>zone-sync-resolver-ipv6</code>) — <strong>keys, not CLI flags</strong>. On NGINX OSS each pod limits independently (per-pod). The <code>rateLimit</code> Policy is not Ingress-attachable; on plain Ingress use <code>nginx.org/limit-req-*</code>. The <code>key</code> accepts <code>${binary_remote_addr}</code>, <code>${request_uri}</code>, <code>${uri}</code>, <code>${args}</code>, <code>${request_method}</code> and <code>arg_</code> / <code>cookie_</code> / <code>http_</code> / <code>jwt_claim_</code> / <code>apikey_</code>-prefixed variables — <code>${host}</code> is not allowed. See <a href="#rate-limiting">Rate limiting</a> for the single-pod mapping. The <code>mypeers/request_rates</code> tables the HAProxy rules read are declared in the aux config file — see the <a href="#enterprise">Global Profiling Engine</a> row above.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Intelligent WAF</code> (HAProxy Enterprise)</td>
@@ -2997,14 +3032,27 @@ data:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise "Intelligent WAF" — a behavioral WAF engine
-# (HAPEE platform) with no config-import path and no dedicated
-# Ingress annotation. The only WAF wiring the controller exposes
-# is the Enterprise-only ModSecurity pair, which is what you will
-# actually be holding:
-#
-#   haproxy.org/modsecurity: haproxy-controller/modsecuritycrs
-#   modsecurity: haproxy-controller/modsecuritycrs   # ConfigMap</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># mounted at /etc/haproxy/haproxy-aux.cfg
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-aux-cfg
+  namespace: haproxy-controller
+data:
+  haproxy-aux.cfg: |
+    waf-profile my-waf
+      # ruleset and engine parameters: Enterprise WAF reference
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  frontend-config-snippet: |
+    http-request waf-evaluate profile my-waf
+  # the one WAF wiring with a real Kubernetes key — see the WAF row
+  modsecurity: haproxy-controller/modsecuritycrs</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Same target as ModSecurity above — the NGINX App Protect
 # WAF `waf` Policy (NGINX Plus). See the WAF section.
 apiVersion: k8s.nginx.org/v1
@@ -3024,20 +3072,33 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise UDP module — platform configuration, with no
-# Ingress path in the controller at all (the TCP CRD and the
-# tcp-services ConfigMap are both TCP-only):
-#
-#   global
-#       module-load hapee-lb-udp.so
-#
-#   udp-lb dns
-#       dgram-bind 10.0.0.10:53
-#       proxy-requests 1
-#       balance roundrobin
-#       option udp-check
-#       server dns1 10.10.10.10:53 check
-#       server dns2 10.10.10.20:53 check</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># mounted at /etc/haproxy/haproxy-aux.cfg
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-aux-cfg
+  namespace: haproxy-controller
+data:
+  haproxy-aux.cfg: |
+    # the controller has no UDP path of its own: the TCP CRD and the
+    # tcp-services ConfigMap are both TCP-only, so the listener is
+    # declared here in full
+    udp-lb dns
+      dgram-bind 10.0.0.10:53
+      proxy-requests 1
+      balance roundrobin
+      option udp-check
+      server dns1 10.10.10.10:53 check
+      server dns2 10.10.10.20:53 check
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  global-config-snippet: |
+    module-load hapee-lb-udp.so</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Declare a UDP listener (GlobalConfiguration)
 apiVersion: k8s.nginx.org/v1
 kind: GlobalConfiguration
@@ -3077,13 +3138,23 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise CAPTCHA / JS-challenge module (HAPEE
-# platform) — serves interactive challenges to suspected bots.</code></pre></div>
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># mounted at /etc/haproxy/haproxy-aux.cfg
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-aux-cfg
+  namespace: haproxy-controller
+data:
+  haproxy-aux.cfg: |
+    # serves an interactive challenge to suspected bots; the section
+    # keys are documented on the HAProxy customer portal
+    captcha my-challenge
+      # provider credentials and challenge settings</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX has no CAPTCHA / interactive
 # challenge construct. App Protect can block or rate-limit
 # automated traffic, but does not serve challenges.</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> the F5 NGINX Ingress Controller has no CAPTCHA or JavaScript-challenge construct. NGINX App Protect WAF and DoS can detect and block or rate-limit automated traffic, but cannot serve an interactive challenge. HAProxy Enterprise exposes CAPTCHA at the platform level, not as a first-class Ingress annotation.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> the F5 NGINX Ingress Controller has no CAPTCHA or JavaScript-challenge construct. NGINX App Protect WAF and DoS can detect and block or rate-limit automated traffic, but cannot serve an interactive challenge. On the HAProxy side there is no annotation, ConfigMap key or CRD field either — the <code>captcha</code> section is declared in the mounted <code>haproxy-aux.cfg</code>, and its section name comes from a third-party parser of Enterprise configuration rather than the (portal-only) module reference, so treat the keys as a placeholder.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Fingerprint</code> module (HAProxy Enterprise)</td>
@@ -3092,13 +3163,14 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy Enterprise Fingerprint module — TLS/JA3-style client
-# fingerprinting, configured in the HAProxy Enterprise platform
-# config. No Ingress annotation, no CRD field, and nothing in the
-# controller's configuration reference to migrate from.</code></pre></div>
+# fingerprinting. No Ingress annotation, ConfigMap key or CRD field:
+# its section lives in the mounted haproxy-aux.cfg and its per-frontend
+# lines in frontend-config-snippet, exactly like Bot Management above.
+# Directive names are documented on the HAProxy customer portal.</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct equivalent — NIC exposes no Ingress-level
 # TLS/JA3 client fingerprinting.</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> the F5 NGINX Ingress Controller has no Ingress-level TLS/JA3 client fingerprinting. The HAProxy side has no Ingress construct either — the module is configured in the HAProxy Enterprise platform config — so there is no annotation, ConfigMap key or CRD field to carry across.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> the F5 NGINX Ingress Controller has no Ingress-level TLS/JA3 client fingerprinting. The HAProxy side has no Ingress construct either — the module's section is declared in the mounted <code>haproxy-aux.cfg</code> and its per-frontend lines arrive through <code>frontend-config-snippet</code> — so there is no annotation, ConfigMap key or CRD field to carry across.</div>
                         </div></td></tr>
                     </tbody>
                 </table>

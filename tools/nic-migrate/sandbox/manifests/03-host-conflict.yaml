@@ -1,0 +1,42 @@
+# Three VirtualServer generators on one host, which is one host too many.
+#
+# rewrite-target, affinity and upstream-hash-by are each a `virtualserver`
+# mapping with its own generator, and each generator emits a complete,
+# self-contained VirtualServer. Three of them claim sandbox-rewrite.example.com.
+# That is correct for a reference page teaching one feature at a time, and
+# unapplyable as a file: F5 NGINX Ingress Controller accepts one and rejects the
+# rest.
+#
+# Deliberately one host, one path and one service, so `host-conflict` is the
+# only blocking gap. It is the gap that most clearly shows why `convert` exists
+# and why `report` output is labelled illustrative.
+#
+# Session affinity is also the feature `--target ingress` silently drops: it
+# lives on upstreams[].sessionCookie and has no nginx.org/* annotation form.
+# Run this fixture through both targets and diff them.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-rewrite
+  namespace: e2e-shop
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/session-cookie-name: SANDBOXSESSION
+    nginx.ingress.kubernetes.io/session-cookie-expires: "3600"
+    nginx.ingress.kubernetes.io/session-cookie-path: /
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sandbox-rewrite.example.com
+      http:
+        paths:
+          - path: /app/(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-svc
+                port:
+                  number: 8080

@@ -1,0 +1,48 @@
+# The fixture that fails on apply rather than in the report.
+#
+# Snippets migrate as text. nginx.org/server-snippets and
+# nginx.org/location-snippets exist and take the same content, so the conversion
+# looks clean — and then NIC rejects the whole Ingress with "snippet specified
+# but snippets feature is not enabled", because enableSnippets is off by
+# default. It refuses rather than degrading, so this is not a warning you can
+# ride out. Install with:
+#
+#   helm ... --set controller.enableSnippets=true
+#
+# That is the `snippet-passthrough` gap, and it is rated blocking for that
+# reason. The second half of the gap matters just as much: the contents are
+# copied across without ever being parsed. A directive that is valid in the
+# community controller's generated config may be invalid in the corresponding
+# context under NIC, and only the controller's own reload will tell you.
+#
+# proxy-http-version is here for the case nobody expects. It looks like an
+# ordinary one-for-one annotation, it has no snippet in its name, and it
+# migrates as nginx.org/location-snippets — so an Ingress carrying nothing but
+# tidy-looking annotations can still need enableSnippets. Read the gap, not the
+# source.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-snippets
+  namespace: e2e-shop
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/server-snippet: |
+      more_set_headers "X-Sandbox: server";
+      client_max_body_size 32m;
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Sandbox-Location: yes";
+      proxy_set_header X-Real-Path $request_uri;
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sandbox-snippets.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 8080

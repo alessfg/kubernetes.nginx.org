@@ -1,0 +1,107 @@
+# A file shaped like something you would really point the tool at: several
+# documents, most of them not Ingresses at all.
+#
+# Real manifest directories are kustomize output or a Helm render, so an Ingress
+# arrives surrounded by ConfigMaps, Services and Deployments. This fixture
+# checks that the splitter finds the Ingresses and ignores everything else, and
+# that the report's per-resource headings let you tell them apart.
+#
+# Three Ingresses, on purpose:
+#   sandbox-mixed      an ordinary community Ingress, class nginx
+#   sandbox-foreign    class traefik, so nothing here is yours to migrate
+#   sandbox-migrated   already on nginx.org/*, so there is nothing left to do
+#
+# The last two are the interesting ones. A tool that reports work to do on
+# either is telling you something false, and both cases turn up constantly in a
+# real cluster part-way through a migration.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sandbox-app-config
+  namespace: e2e-shop
+data:
+  LOG_LEVEL: info
+  UPSTREAM: web-svc.e2e-shop.svc.cluster.local:8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox-extra-svc
+  namespace: e2e-shop
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-mixed
+  namespace: e2e-shop
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "90"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://mixed.example.com"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sandbox-mixed.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 8080
+---
+# Not an ingress-nginx resource. The annotations are another controller's, so
+# the mapping database should not recognise them and there is no migration here.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-foreign
+  namespace: e2e-shop
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: sandbox-foreign.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 8080
+---
+# Already migrated. Running the tool over a namespace mid-migration will hit
+# resources in this state, and it should find nothing to change.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-migrated
+  namespace: e2e-shop
+  annotations:
+    nginx.org/client-max-body-size: "8m"
+    nginx.org/proxy-read-timeout: 90s
+spec:
+  ingressClassName: nginx-nic
+  rules:
+    - host: sandbox-migrated.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 8080

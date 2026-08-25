@@ -1,0 +1,42 @@
+# Four Policy generators at once, and the gap that follows from them.
+#
+# CORS, rate limiting, access control and basic auth each map to a Policy custom
+# resource. The analyzer generates all four and references none of them: the
+# reference on the page is a comment. `report` names that as the blocking
+# `policy-unwired` gap, and `convert` is what actually wires them up —
+# spec.policies on a VirtualServer, or nginx.org/policies on an Ingress.
+#
+# Still one host, one path, one service, so policy-unwired is the only blocking
+# gap in the output. Anything else that appears is worth reading twice.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-policies
+  namespace: e2e-shop
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://sandbox.example.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-max-age: "3600"
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,192.168.0.0/16"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: sandbox-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Sandbox area"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sandbox-policies.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-svc
+                port:
+                  number: 8080

@@ -1,0 +1,43 @@
+# Annotations with nowhere to go, in the two distinct flavours.
+#
+# `unsupported` means the mapping database knows the annotation and records that
+# there is no equivalent: ModSecurity has no NGINX Open Source replacement,
+# HTTP/2 server push was removed from NGINX itself, and a couple are simply not
+# needed because NIC already behaves that way. These surface as `review` gaps
+# with the reason attached, which is the useful part — "remove it" and "you need
+# NGINX Plus for this" are very different migration tasks.
+#
+# `unrecognized` means the annotation is not in the database at all: custom,
+# newer than the mapping set, or a typo. Those surface as a `note`, because the
+# tool cannot tell a deliberate custom annotation from a mistake. The two below
+# are real community annotations that this mapping set does not cover.
+#
+# Nothing here generates a CRD, so this fixture is also a clean look at what a
+# report says when it has no manifests to show you.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-unsupported
+  namespace: e2e-shop
+  annotations:
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
+    nginx.ingress.kubernetes.io/http2-push-preload: "true"
+    nginx.ingress.kubernetes.io/preserve-trailing-slash: "true"
+    nginx.ingress.kubernetes.io/enable-global-auth: "false"
+    nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span: "true"
+    nginx.ingress.kubernetes.io/global-rate-limit: "100"
+    nginx.ingress.kubernetes.io/default-backend-service: e2e-shop/web-svc
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sandbox-unsupported.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 8080

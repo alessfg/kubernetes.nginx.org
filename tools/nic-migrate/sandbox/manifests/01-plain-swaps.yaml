@@ -1,0 +1,44 @@
+# The easy case, and the one worth seeing first.
+#
+# Every annotation here is type `annotation` in the mapping database: it becomes
+# an nginx.org/* key and nothing else. No generator runs, so no CRD is emitted,
+# so almost every gap check has nothing to fire on. One host, one path, one
+# service — the shape the page's analyzer was built for.
+#
+# This is the fixture where `convert --target ingress` is a faithful rewrite
+# rather than a reconstruction. Compare its output against the source and every
+# line should be accounted for.
+#
+# It is also the one to watch for value transforms rather than renames.
+# load-balance: ewma has no NIC equivalent, so the swap is lb-method: least_conn
+# with the substitution stated in the trailing comment. Only proxy-http-version
+# was left out of this list, because it migrates as a snippet and would drag a
+# blocking gap into the clean case — see 06-snippets.yaml.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-plain
+  namespace: e2e-shop
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 8m
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 8k
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 128k
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/load-balance: ewma
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sandbox-plain.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 8080

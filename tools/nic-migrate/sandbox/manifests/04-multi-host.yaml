@@ -1,0 +1,65 @@
+# The realistic one: the shape production Ingresses actually have, and the
+# shape the page's analyzer collapses.
+#
+# Two hosts, three paths, three backends, TLS and an explicit class. parseInput
+# keeps one host, one path, one service and one TLS secret, so `report` drops
+# most of this on the floor and says so — hosts-dropped, paths-dropped,
+# backends-dropped, tls-dropped and class-dropped all fire here.
+#
+# `convert` is the answer to all five. It emits one merged VirtualServer per
+# host, every path as a route, every distinct backend as an upstream, and it
+# carries TLS, namespace and ingressClassName across. Read this fixture's report
+# first and its conversion second: the difference between them is the whole
+# argument for the converter.
+#
+# The /api(/|$)(.*) path also carries the regex trap. The community controller
+# treats an ImplementationSpecific path with metacharacters as a regex; NGINX
+# Ingress Controller matches literally unless nginx.org/path-regex is set.
+# Without it this path matches nothing and every /api/... request falls through
+# to the catch-all / and answers 200 from web-svc instead of api-svc. Nothing in
+# a dry run catches that, which is why --validate cannot warn you.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-shop
+  namespace: e2e-shop
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/session-cookie-name: SANDBOXSHOP
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - sandbox-shop.example.com
+      secretName: shop-tls
+  rules:
+    - host: sandbox-shop.example.com
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-svc
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 8080
+    - host: sandbox-alt.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web2-svc
+                port:
+                  number: 8080

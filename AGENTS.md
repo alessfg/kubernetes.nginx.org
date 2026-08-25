@@ -60,7 +60,12 @@ assets/
         migration-ingress-nginx.js  # ingress-nginx SOURCE module; defines window.MIGRATION_SOURCE
   img/  icon.svg, icon-512.png, apple-touch-icon.{svg,png}, og-image.{svg,png}
   fonts/ InterVariable-subset.woff2, OFL.txt, README.md
+tools/
+  nic-migrate/  # CLI batching the analyzer over real manifests. Reads the engine
+                # out of assets/js/ — never vendor a copy. See its README.
 ```
+
+**`tools/` is not published.** Pages runs the classic Jekyll build on `main`, which skips dot- and underscore-prefixed paths — that is what keeps `.github/` off the site, and it does nothing for a plain top-level directory. `_config.yml` exists solely to exclude `tools/` by name; it restates Jekyll's default `exclude` list because setting the key replaces those defaults rather than extending them.
 
 ## Load order and asset invariants
 
@@ -144,7 +149,11 @@ git log --grep='Considered and rejected'   # ideas already weighed and dropped
 git log -S'<name>'                         # why a class, token or function exists
 ```
 
+**`main` is squash-rewritten, so a commit you can read is not necessarily *on* `main`.** Pre-squash bodies survive only as local `backup/*` tags, and `git log --all`, `-S` and `--grep` search those too — you get a real body, accurately quoted, that no clone of `main` has. Before citing a commit as the record, or deleting prose because a commit supposedly already holds it: `git merge-base --is-ancestor <sha> main`. Unreachable is not the record.
+
 Write commits the same way: what changed, why, what was rejected, how it was verified.
+
+**Development narrative belongs in the commit body, not in a README.** What a run found, what was predicted and wasn't: a reader of `tools/*/README.md` needs what they must *do*. Lift the actionable fact into the section that needs it and let the history go in the commit — which, per the rule above, has to land on `main` to count.
 
 **Keep it proportionate.** The whole history holds ~4,000 words; a body over ~15
 lines is almost always padding. Record the fault you planted and the decision you
@@ -158,9 +167,11 @@ Numbers to stay near, not a hard gate. Migration page: **789KB uncompressed** (H
 
 One invariant behind that: `filterTable` caches row text in a `WeakMap` and is debounced. It used to call `row.textContent.toLowerCase()` on every row on every keystroke, re-serialising 75 row subtrees per character. Do not undo that.
 
-## Spelling
+## Prose and spelling
 
 British in agent-facing prose and code comments (`colour`, `behaviour`) — including in `tokens.css` comments, which are served to every visitor. American in user-facing page copy. CSS property names are `color` regardless. If a style tool proposes normalising these, it is out of scope.
+
+**`tools/*/README.md` is user-facing prose and follows the F5 Technical Writing Style Guide** (`github.com/F5Docs/style-guide`), not this file's voice: American spelling, sentence-case headings without gerunds, active voice, second person, sentences under 20 words (25 conceptual), a language identifier on every fence, no em dashes outside code blocks. The `f5-docs-style-*` skills encoding it are user-level and not checked in, so name the guide. No check reads prose.
 
 ## Domain concepts
 
@@ -168,7 +179,7 @@ British in agent-facing prose and code comments (`colour`, `behaviour`) — incl
 - **CRDs**: NIC supports VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration.
 - **NGINX Plus**: only NIC has Plus features (JWT, OIDC, WAF).
 - **Gateway API**: the standard Kubernetes traffic-management API; NGINX Gateway Fabric is the NGINX implementation.
-- **Naming**: "NGINX Ingress Controller" — never "Official NGINX Ingress Controller" or "NGINX Inc.". The other one is "the community controller" or `kubernetes/ingress-nginx`.
+- **Naming**: "F5 NGINX Ingress Controller" on first mention, "NGINX Ingress Controller" after — never "Official NGINX Ingress Controller", "NGINX Inc." or "NIC" in prose. The other one is "the community controller" or `kubernetes/ingress-nginx`. The migration page carries the F5 prefix on 295 of 297 mentions, `index.html` on none of 16 — an inconsistency to fix, not a licence to drop the prefix.
 
 ## Research resources
 

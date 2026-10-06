@@ -16,8 +16,8 @@
         // also update the version pills/install URLs in index.html). The source
         // controller's version lives at the top of its migration-<source>.js.
         const NIC = {
-            VERSION: 'v5.5.4',
-            HELM_VERSION: '2.6.4'
+            VERSION: 'v5.6.3',
+            HELM_VERSION: '2.7.3'
         };
         NIC.CRD_INSTALL_CMD = 'kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/' + NIC.VERSION + '/deploy/crds.yaml';
         NIC.HELM_INSTALL_CMD = 'helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version ' + NIC.HELM_VERSION + ' --set controller.enableCustomResources=true';

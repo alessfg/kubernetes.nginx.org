@@ -6,7 +6,7 @@ Instructions for AI coding agents. Claude Code reads this via `.claude/CLAUDE.md
 
 ## What this is
 
-A documentation-only site covering NGINX on Kubernetes: a landing page plus an interactive migration tool. No build system, no package manager; there *are* checks and a test suite, and CI runs them on every push and PR. Static HTML with CSS/JS in `assets/`, no CDN and no third-party runtime dependencies — two deliberate exceptions, both images and neither of them script: the featured videos load poster images from `i.ytimg.com` and are click-to-play into `youtube-nocookie`, so nothing off-origin runs until a reader asks for it; and the two featured-blog thumbnails hotlink each post's own artwork on `blog.nginx.org`'s CDN rather than vendoring a copy that ages in the repo. Owned by F5, Inc., Apache 2.0.
+A documentation-only site covering NGINX on Kubernetes: a landing page plus an interactive migration tool. No build system, no package manager; there *are* checks and a test suite, and CI runs them on every push and PR. Static HTML with CSS/JS in `assets/`, no CDN and no third-party runtime dependencies — two deliberate exceptions, both images and neither of them script: the featured videos load poster images from `i.ytimg.com` and are click-to-play into `youtube-nocookie`, so nothing off-origin runs until a reader asks for it; and the two featured-blog thumbnails hotlink each post's own artwork on `blog.nginx.org` rather than vendoring a copy that ages in the repo. Owned by F5, Inc., Apache 2.0.
 
 It covers four things: **NGINX Ingress Controller** (`nginx/kubernetes-ingress`), **NGINX Gateway Fabric** (`nginx/nginx-gateway-fabric`), the **NGINX Ingress Migration Tool** (community `kubernetes/ingress-nginx` → NIC), and **ingress2gateway** (`kubernetes-sigs/ingress2gateway`).
 
@@ -188,4 +188,4 @@ Prefer GitHub MCP tools over WebFetch. NIC's prose docs are **not** in its code 
 
 ## Deeper references
 
-`.claude/skills/*/SKILL.md` — plain markdown, readable by any agent. Claude Code loads them on demand from their own descriptions, so this list is for everyone else: **f5ds-design** (design values, and every deviation with its reason), **migration-tool** (mappings, generators, the accuracy check), **repo-checks** (what each check asserts, how to add one), **release-update** (version bumps), **verify-visually** (rendering and measuring).
+`.claude/skills/*/SKILL.md` — plain markdown, readable by any agent. Claude Code loads them on demand from their own descriptions, so this list is for everyone else: **f5ds-design** (design values, and every deviation with its reason), **migration-tool** (mappings, generators, the accuracy check), **repo-checks** (what each check asserts, how to add one), **release-update** (version bumps — patch and minor; a minor adds steps), **verify-visually** (rendering and measuring).

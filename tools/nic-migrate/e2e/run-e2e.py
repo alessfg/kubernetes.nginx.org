@@ -55,7 +55,7 @@ NAME_SUFFIX = '-nic'
 # Pinned so a run is reproducible. The NIC chart matches what the site
 # documents; see .github/scripts/check-versions.py for the three formats.
 NIC_CHART = 'oci://ghcr.io/nginx/charts/nginx-ingress'
-NIC_CHART_VERSION = '2.6.4'
+NIC_CHART_VERSION = '2.7.3'
 COMMUNITY_REPO = 'https://kubernetes.github.io/ingress-nginx'
 
 

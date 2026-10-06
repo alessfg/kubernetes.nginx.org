@@ -15,7 +15,7 @@
          would warm sockets those requests can never use. -->
     <link rel="preconnect" href="https://www.youtube-nocookie.com">
     <link rel="preconnect" href="https://i.ytimg.com">
-    <link rel="preconnect" href="https://nginxblog-8de1046ff5a84f2c-endpoint.azureedge.net">
+    <link rel="preconnect" href="https://blog.nginx.org">
     <meta property="og:title" content="NGINX - Networking for Kubernetes">
     <meta property="og:description" content="NGINX on Kubernetes — the NGINX Ingress Controller, NGINX Gateway Fabric, migration tools, and ingress2gateway resources.">
     <meta property="og:url" content="https://kubernetes.nginx.org/">
@@ -129,14 +129,14 @@
                         <span class="dot" data-color="green"></span>
                         <span class="sidebar-link-text">
                             <span class="sidebar-link-name">NGINX Ingress Controller</span>
-                            <span class="sidebar-link-desc"><span data-version="nic.release">v5.5.4</span> &middot; Ingress API</span>
+                            <span class="sidebar-link-desc"><span data-version="nic.release">v5.6.3</span> &middot; Ingress API</span>
                         </span>
                     </a></li>
                     <li><a class="sidebar-link" href="#nginx-gateway-fabric" data-product="nginx-gateway-fabric">
                         <span class="dot" data-color="green"></span>
                         <span class="sidebar-link-text">
                             <span class="sidebar-link-name">NGINX Gateway Fabric</span>
-                            <span class="sidebar-link-desc"><span data-version="ngf.release">v2.6.7</span> &middot; Gateway API</span>
+                            <span class="sidebar-link-desc"><span data-version="ngf.release">v2.7.2</span> &middot; Gateway API</span>
                         </span>
                     </a></li>
                 </ul>
@@ -268,21 +268,21 @@
                                 <p>NGINX Ingress, Gateway Fabric, and What's Next</p>
                             </div>
                         </div>
-                        <a class="feature-card feature-card-flush" href="https://blog.nginx.org/blog/the-nginx-kubernetes-open-source-roadmap-first-half-of-2026" target="_blank" rel="noopener">
-                            <img class="feature-card-thumb" src="https://nginxblog-8de1046ff5a84f2c-endpoint.azureedge.net/blobnginxbloga72cde487e/wp-content/uploads/2026/03/image-1.png" alt="NGINX Kubernetes Open Source Roadmap" loading="lazy" decoding="async">
+                        <a class="feature-card feature-card-flush" href="https://blog.nginx.org/blog/nginx-ingress-controller-5-6-hsts-without-snippets-a-faster-start-on-large-clusters-and-improved-configuration-safety" target="_blank" rel="noopener">
+                            <img class="feature-card-thumb" src="https://blog.nginx.org/wp-content/uploads/2026/08/ingress-controller-5.6-1024x536.png" alt="NGINX Ingress Controller 5.6" loading="lazy" decoding="async">
                             <div class="feature-card-body">
                                 <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Featured blog</h3>
-                                <p class="feature-card-eyebrow">The NGINX Kubernetes Open Source Roadmap: First Half of 2026</p>
-                                <p>What's coming next for NGINX Ingress Controller, NGINX Gateway Fabric, and the broader Kubernetes ecosystem.</p>
+                                <p class="feature-card-eyebrow">NGINX Ingress Controller 5.6: HSTS without snippets, a faster start on large clusters, and improved configuration safety</p>
+                                <p>An HSTS Policy, new upstream-vhost and custom-http-errors annotations for Ingress-NGINX migrations, and cross-namespace upstreams that keep their endpoints current.</p>
                                 <span class="feature-card-cta">Read on blog.nginx.org &rsaquo;</span>
                             </div>
                         </a>
-                        <a class="feature-card feature-card-flush" href="https://blog.nginx.org/blog/nginx-ingress-controller-v5-4-0-making-migration-easier-than-ever" target="_blank" rel="noopener">
-                            <img class="feature-card-thumb" src="https://nginxblog-8de1046ff5a84f2c-endpoint.azureedge.net/blobnginxbloga72cde487e/wp-content/uploads/2025/03/K8s-blog2.png" alt="NGINX Ingress Controller v5.4.0" loading="lazy" decoding="async">
+                        <a class="feature-card feature-card-flush" href="https://blog.nginx.org/blog/nginx-gateway-fabric-2-7-gateway-api-1-6-conformance-external-authentication-and-fewer-snippets" target="_blank" rel="noopener">
+                            <img class="feature-card-thumb" src="https://blog.nginx.org/wp-content/uploads/2026/09/gateway-fabric-2.7-1024x536.png" alt="NGINX Gateway Fabric 2.7" loading="lazy" decoding="async">
                             <div class="feature-card-body">
                                 <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Featured blog</h3>
-                                <p class="feature-card-eyebrow">NGINX Ingress Controller v5.4.0: Making Migration Easier Than Ever</p>
-                                <p>New features designed to simplify migration from Ingress-NGINX, including CORS support, configuration validation, and expanded annotation compatibility.</p>
+                                <p class="feature-card-eyebrow">NGINX Gateway Fabric 2.7: Gateway API 1.6 conformance, external authentication, and fewer snippets</p>
+                                <p>TCPRoute and UDPRoute graduate to v1, TLS listeners gain Terminate mode, and HTTPExternalAuthFilter calls an authorization service without a snippet.</p>
                                 <span class="feature-card-cta">Read on blog.nginx.org &rsaquo;</span>
                             </div>
                         </a>
@@ -299,7 +299,7 @@
                         <span class="page-hero-badge nic">
                             <svg aria-hidden="true" width="16" height="16" viewBox="34 5 36 48" fill="none"><path fill="#009639" d="M35.31,40.15c.21.37.52.66.86.86l17.65,10.19c.34.2.75.32,1.17.32s.83-.12,1.17-.32l17.65-10.19c.35-.2.65-.48.86-.86.21-.37.31-.78.31-1.18v-20.38c0-.4-.1-.81-.31-1.18-.21-.37-.52-.66-.86-.86l-17.65-10.19c-.34-.2-.74-.32-1.17-.32s-.83.12-1.17.32l-17.65,10.19c-.35.2-.65.49-.86.86-.21.37-.31.78-.31,1.18v20.38c0,.4.1.8.31,1.18"/><path fill="#fff" d="M56.79,36.68h-13.66c-.37,0-.67-.3-.67-.67v-13.66c0-.37.3-.67.67-.67h13.66c.37,0,.67.3.67.67v13.66c0,.37-.3.67-.67.67Z"/><path fill="#fff" d="M67,22.69h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><path fill="#fff" d="M67,31.68h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><path fill="#fff" d="M67.08,39.88h-4.08c-.25,0-.46-.21-.46-.46v-4.08c0-.25.21-.46.46-.46h4.08c.25,0,.46.21.46.46v4.08c0,.25-.21.46-.46.46Z"/><polygon fill="#fff" points="64.95 29.68 48.15 29.66 64.7 19.76 65.21 20.62 51.76 28.67 64.96 28.68 64.95 29.68"/><rect fill="#fff" x="57" y="24.68" width="1" height="17.18" transform="translate(.78 67.86) rotate(-61.43)"/></svg>
                             Ingress Controller
-                            <a class="hero-version" data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.4" target="_blank" rel="noopener">v5.5.4</a>
+                            <a class="hero-version" data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.6.3" target="_blank" rel="noopener">v5.6.3</a>
                         </span>
                         <h1>NGINX Ingress Controller</h1>
                         <p>Production-grade Ingress controller built on NGINX. Advanced traffic management, TLS termination, VirtualServer CRDs, and full observability for Kubernetes.</p>
@@ -361,11 +361,11 @@
                         <div class="details-grid">
                             <div class="detail-item">
                                 <span class="detail-label">Latest version</span>
-                                <span class="version-pill nic"><a data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/latest" target="_blank" rel="noopener">v5.5.4</a></span>
+                                <span class="version-pill nic"><a data-version="nic.release" href="https://github.com/nginx/kubernetes-ingress/releases/latest" target="_blank" rel="noopener">v5.6.3</a></span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Latest Helm chart</span>
-                                <span class="version-pill nic"><a data-version="nic.helm" href="https://github.com/nginx/kubernetes-ingress/tree/v5.5.4/charts/nginx-ingress" target="_blank" rel="noopener">v2.6.4</a></span>
+                                <span class="version-pill nic"><a data-version="nic.helm" href="https://github.com/nginx/kubernetes-ingress/tree/v5.6.3/charts/nginx-ingress" target="_blank" rel="noopener">v2.7.3</a></span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Custom resources</span>
@@ -394,8 +394,8 @@
                         <caption class="sr-only">NGINX Ingress Controller compatibility</caption>
                         <thead><tr><th scope="col">Component</th><th scope="col">Version</th></tr></thead>
                         <tbody>
-                            <tr><td>Kubernetes</td><td data-compat="kubernetes">1.34, 1.35, 1.36</td></tr>
-                            <tr><td>NGINX</td><td data-compat="nginx">1.31.3</td></tr>
+                            <tr><td>Kubernetes</td><td data-compat="kubernetes">1.35, 1.36, 1.37</td></tr>
+                            <tr><td>NGINX</td><td data-compat="nginx">1.31.6</td></tr>
                         </tbody>
                     </table>
 
@@ -404,7 +404,7 @@
                         <div class="code-block"><button class="copy-btn" aria-label="Copy NIC install command">Copy</button><code><span class="comment"># Install via Helm (OCI registry)</span>
 <span class="cmd">helm</span> install nginx-ingress \
   oci://ghcr.io/nginx/charts/nginx-ingress \
-  <span class="flag">--version</span> <span class="str" data-version="nic.helm" data-version-format="bare">2.6.4</span> \
+  <span class="flag">--version</span> <span class="str" data-version="nic.helm" data-version-format="bare">2.7.3</span> \
   <span class="flag">--namespace</span> nginx-ingress <span class="flag">--create-namespace</span></code></div>
                     </div>
 
@@ -420,7 +420,7 @@
                         <span class="page-hero-badge ngf">
                             <svg aria-hidden="true" width="16" height="16" viewBox="34 5 36 48" fill="none"><path fill="#009639" d="M35.31,39.58c.21.37.52.66.86.86l17.65,10.19c.34.2.75.32,1.17.32s.83-.12,1.17-.32l17.65-10.19c.35-.2.65-.48.86-.86.21-.37.31-.78.31-1.18v-20.38c0-.4-.1-.81-.31-1.18-.21-.37-.52-.66-.86-.86l-17.65-10.19c-.34-.2-.74-.32-1.17-.32s-.83.12-1.17.32l-17.65,10.19c-.35.2-.65.49-.86.86-.21.37-.31.78-.31,1.18v20.38c0,.4.1.8.31,1.18"/><polygon fill="#fff" points="54.87 41.41 43.25 34.46 54.88 27.97 55.37 28.84 45.25 34.49 55.38 40.55 54.87 41.41"/><path fill="#fff" d="M66.51,35.33l-11.38-6.35-.51.3v-12.98l-10.38,6.06-.5-.86,11.89-6.94v12.96l10.88-6.47v14.27ZM56.13,28.39l9.38,5.23v-10.81l-9.38,5.58Z"/><circle fill="#fff" cx="43.99" cy="21.94" r="3"/><circle fill="#fff" cx="66.01" cy="21.94" r="3"/><circle fill="#fff" cx="55.13" cy="15.44" r="3"/><circle fill="#fff" cx="55.13" cy="28.41" r="3"/><circle fill="#fff" cx="44.25" cy="34.48" r="3"/><circle fill="#fff" cx="55.13" cy="40.98" r="3"/><circle fill="#fff" cx="66.01" cy="34.48" r="3"/></svg>
                             Gateway Fabric
-                            <a class="hero-version" data-version="ngf.release" href="https://github.com/nginx/nginx-gateway-fabric/releases/tag/v2.6.7" target="_blank" rel="noopener">v2.6.7</a>
+                            <a class="hero-version" data-version="ngf.release" href="https://github.com/nginx/nginx-gateway-fabric/releases/tag/v2.7.2" target="_blank" rel="noopener">v2.7.2</a>
                         </span>
                         <h1>NGINX Gateway Fabric</h1>
                         <p>Gateway API implementation powered by NGINX. A future-ready, standards-based approach to Kubernetes traffic management with control and data plane separation.</p>
@@ -428,7 +428,7 @@
                 </div>
                 <div class="page-body">
                     <div class="cta-row">
-                        <a class="cta cta-primary ngf" href="https://docs.nginx.com/nginx-gateway-fabric/installation/" target="_blank" rel="noopener">
+                        <a class="cta cta-primary ngf" href="https://docs.nginx.com/nginx-gateway-fabric/install/" target="_blank" rel="noopener">
                             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#icon-bolt"/></svg>
                             Get started
                         </a>
@@ -453,7 +453,7 @@
                     <div class="feature-grid">
                         <div class="feature-card">
                             <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg> Gateway API native</h3>
-                            <p>First-class Kubernetes Gateway API v1.5.1 implementation with full conformance testing across HTTP, GRPC, TLS, TCP, and UDP.</p>
+                            <p>First-class Kubernetes Gateway API v1.6.1 implementation with full conformance testing across HTTP, GRPC, TLS, TCP, and UDP.</p>
                         </div>
                         <div class="feature-card">
                             <h3 class="feature-title"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg> Control &amp; data plane separation</h3>
@@ -482,11 +482,11 @@
                         <div class="details-grid">
                             <div class="detail-item">
                                 <span class="detail-label">Latest version</span>
-                                <span class="version-pill ngf"><a data-version="ngf.release" href="https://github.com/nginx/nginx-gateway-fabric/releases/latest" target="_blank" rel="noopener">v2.6.7</a></span>
+                                <span class="version-pill ngf"><a data-version="ngf.release" href="https://github.com/nginx/nginx-gateway-fabric/releases/latest" target="_blank" rel="noopener">v2.7.2</a></span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Latest Helm chart</span>
-                                <span class="version-pill ngf"><a data-version="ngf.helm" href="https://github.com/nginx/nginx-gateway-fabric/tree/v2.6.7/charts/nginx-gateway-fabric" target="_blank" rel="noopener">v2.6.7</a></span>
+                                <span class="version-pill ngf"><a data-version="ngf.helm" href="https://github.com/nginx/nginx-gateway-fabric/tree/v2.7.2/charts/nginx-gateway-fabric" target="_blank" rel="noopener">v2.7.2</a></span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Supported resources</span>
@@ -496,13 +496,18 @@
                                     <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#httproute" target="_blank" rel="noopener">HTTPRoute</a></span>
                                     <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#grpcroute" target="_blank" rel="noopener">GRPCRoute</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/traffic-management/tcp-routing/" target="_blank" rel="noopener">TCPRoute</a></span>
-                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/traffic-management/tls-passthrough/" target="_blank" rel="noopener">TLSRoute</a></span>
+                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/traffic-management/tlsroute/" target="_blank" rel="noopener">TLSRoute</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/traffic-management/udp-routing/" target="_blank" rel="noopener">UDPRoute</a></span>
+                                    <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#backendtlspolicy" target="_blank" rel="noopener">BackendTLSPolicy</a></span>
+                                    <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#listenerset" target="_blank" rel="noopener">ListenerSet</a></span>
+                                    <span class="detail-tag"><a href="https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#referencegrant" target="_blank" rel="noopener">ReferenceGrant</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.AuthenticationFilter" target="_blank" rel="noopener">AuthenticationFilter</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.ClientSettingsPolicy" target="_blank" rel="noopener">ClientSettingsPolicy</a></span>
+                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.ExternalLoadBalancer" target="_blank" rel="noopener">ExternalLoadBalancer</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.NginxGateway" target="_blank" rel="noopener">NginxGateway</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha2.NginxProxy" target="_blank" rel="noopener">NginxProxy</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha2.ObservabilityPolicy" target="_blank" rel="noopener">ObservabilityPolicy</a></span>
+                                    <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.PayloadProcessor" target="_blank" rel="noopener">PayloadProcessor</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.ProxySettingsPolicy" target="_blank" rel="noopener">ProxySettingsPolicy</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.RateLimitPolicy" target="_blank" rel="noopener">RateLimitPolicy</a></span>
                                     <span class="detail-tag"><a href="https://docs.nginx.com/nginx-gateway-fabric/reference/api/#gateway.nginx.org/v1alpha1.SnippetsFilter" target="_blank" rel="noopener">SnippetsFilter</a></span>
@@ -519,7 +524,7 @@
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Fully conformant Gateway API</span>
-                                <span class="version-pill ngf"><a href="https://gateway-api.sigs.k8s.io/implementations/#gateway-controller-implementation-status" target="_blank" rel="noopener">v1.5.1</a></span>
+                                <span class="version-pill ngf"><a href="https://gateway-api.sigs.k8s.io/docs/implementations/list/#gateway-controller-implementation-status" target="_blank" rel="noopener">v1.6.1</a></span>
                             </div>
                         </div>
                     </div>
@@ -529,17 +534,21 @@
                         <caption class="sr-only">NGINX Gateway Fabric compatibility</caption>
                         <thead><tr><th scope="col">Component</th><th scope="col">Version</th></tr></thead>
                         <tbody>
-                            <tr><td>Kubernetes</td><td data-compat="kubernetes">1.34, 1.35, 1.36</td></tr>
-                            <tr><td>NGINX</td><td data-compat="nginx">1.31.3</td></tr>
+                            <tr><td>Kubernetes</td><td data-compat="kubernetes">1.35, 1.36, 1.37</td></tr>
+                            <tr><td>NGINX</td><td data-compat="nginx">1.31.6</td></tr>
                         </tbody>
                     </table>
 
                     <div class="code-section">
                         <h2 class="section-heading section-heading-plain">Quick start</h2>
+                        <div class="code-block"><button class="copy-btn" aria-label="Copy Gateway API CRD install command">Copy</button><code><span class="comment"># Install the Gateway API CRDs first (standard channel)</span>
+<span class="cmd">kubectl</span> kustomize \
+  <span class="str">"https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=<span data-version="ngf.release">v2.7.2</span>"</span> \
+  | <span class="cmd">kubectl</span> apply -f -</code></div>
                         <div class="code-block"><button class="copy-btn" aria-label="Copy NGF install command">Copy</button><code><span class="comment"># Install via Helm (OCI registry)</span>
 <span class="cmd">helm</span> install nginx-gateway-fabric \
   oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
-  <span class="flag">--version</span> <span class="str" data-version="ngf.helm" data-version-format="bare">2.6.7</span> \
+  <span class="flag">--version</span> <span class="str" data-version="ngf.helm" data-version-format="bare">2.7.2</span> \
   <span class="flag">--namespace</span> nginx-gateway-fabric <span class="flag">--create-namespace</span></code></div>
                     </div>
 

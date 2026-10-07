@@ -7,7 +7,9 @@
 #                       every upstream
 #   enable-cors         a Policy, which must end up referenced and not merely
 #                       generated
-#   proxy-body-size     a plain annotation swap
+#   proxy-body-size,    upstream fields on the virtualserver target, swaps on
+#   proxy-read-timeout, the ingress target; proxy-buffering "on" is the value NIC
+#   proxy-buffering     rejects verbatim, so it must arrive as a bool
 #   ssl-redirect false  keeps plain HTTP assertable; the converter must then NOT
 #                       set tls.redirect, which is its own assertion
 #
@@ -23,6 +25,8 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: 10m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
     nginx.ingress.kubernetes.io/affinity: cookie
     nginx.ingress.kubernetes.io/session-cookie-name: E2ESESSION
     nginx.ingress.kubernetes.io/enable-cors: "true"

@@ -118,6 +118,13 @@ Controller reads standard `networking.k8s.io/v1` Ingress. It defaults to
 `--strategy annotation`, since asking for an Ingress and then running the
 CRD-first strategy produces fragments an Ingress cannot carry.
 
+Custom error pages differ by target. `--target ingress` keeps
+`nginx.org/custom-http-errors` and turns `default-backend` into
+`spec.defaultBackend`, which is where NIC sends the errors. The port comes from
+the Service when run with `--kubectl`, and is otherwise left as a reported
+placeholder. `--target virtualserver` emits `errorPages`, which can only return
+a canned body or redirect, and says so.
+
 Anything the chosen target cannot represent is reported as a note rather than
 dropped. That includes a `$n` rewrite copied onto a path with no capture group,
 which is faithful to the community annotation and almost never intended.

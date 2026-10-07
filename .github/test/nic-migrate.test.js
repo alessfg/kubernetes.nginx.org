@@ -23,7 +23,7 @@ const { detect, sortGaps } = require(path.join(TOOL, 'lib', 'gaps.js'));
 const { createEngine } = require(path.join(TOOL, 'lib', 'engine.js'));
 const { splitKubectlList, loadChecklist } = require(path.join(TOOL, 'nic-migrate.js'));
 const Y = require(path.join(TOOL, 'lib', 'yaml.js'));
-const { toModel, convert } = require(path.join(TOOL, 'lib', 'convert.js'));
+const { toModel, convert, planOptions } = require(path.join(TOOL, 'lib', 'convert.js'));
 
 const engine = createEngine();
 const analyze = (yaml) => {
@@ -212,13 +212,55 @@ test('hosts, paths and backends beyond the first are reported as dropped', () =>
     }
 });
 
-test('an annotation-only migration reports no blocking gaps', () => {
+test('a single-backend migration reports no blocking gaps', () => {
     /* The negative case matters as much as the positives: if every input came
-       back blocking, the severity would carry no information. */
+       back blocking, the severity would carry no information. Under CRD-first
+       these two land on one VirtualServer upstream. */
     const a = analyze(ing(['proxy-body-size: 10m', 'proxy-connect-timeout: "30"'], ONE_RULE));
     const blocking = a.gaps.filter((g) => g.severity === 'blocking');
     assert.deepEqual(blocking, [], 'unexpected blocking gaps: ' + JSON.stringify(blocking));
-    assert.match(a.result.yaml, /nginx\.org\/client-max-body-size/);
+    assert.match(a.result.yaml, /client-max-body-size: "10m"/);
+});
+
+test('upstream settings become one VirtualServer under CRD-first, in the CLI too', () => {
+    /* Thirteen settings used to come out only as annotations, which the
+       virtualserver target cannot carry, so it dropped them. They are now
+       fields of one upstream, converted as the annotation form converts them. */
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = {
+        'nginx.ingress.kubernetes.io/proxy-read-timeout': '120',
+        'nginx.ingress.kubernetes.io/proxy-body-size': '8m',
+        'nginx.ingress.kubernetes.io/proxy-buffering': 'on',
+        'nginx.ingress.kubernetes.io/load-balance': 'ewma',
+        'nginx.ingress.kubernetes.io/connection-proxy-header': 'close'
+    };
+    const page = engine.analyze(Y.stringify(doc), 'crd');
+    const vsParts = page.parts.filter((p) => /kind: VirtualServer/.test(p));
+    assert.equal(vsParts.length, 1, 'one VirtualServer, not one per setting: ' + page.yaml);
+    assert.ok(!/^ {2}nginx\.org\//m.test(page.yaml), 'no annotation swaps left: ' + page.yaml);
+
+    const { out } = runConvert(doc);
+    const ups = out.docs.filter((d) => d.kind === 'VirtualServer').flatMap((v) => v.spec.upstreams);
+    assert.ok(ups.length > 0);
+    for (const u of ups) {
+        assert.equal(u['read-timeout'], '120s');
+        assert.equal(u['client-max-body-size'], '8m');
+        assert.equal(u.buffering, true);
+        assert.equal(u['lb-method'], 'least_conn');
+        assert.equal(u.keepalive, 0);
+    }
+    assert.ok(!out.notes.some((n) => /not represented on the VirtualServer/.test(n)), out.notes.join(' | '));
+});
+
+test('annotation values NIC would reject are converted, not passed through', () => {
+    /* Each of these was emitted verbatim before, and NIC v5.6.3 rejects the
+       whole Ingress for it: proxy-buffering takes a bool, sizes take no b
+       suffix, and chash is not an lb-method. */
+    const a = engine.analyze(ing(['proxy-buffering: "off"', 'proxy-body-size: 1048576b', 'load-balance: chash'], ONE_RULE), 'annotation');
+    assert.match(a.yaml, /nginx\.org\/proxy-buffering: "false"/);
+    assert.match(a.yaml, /nginx\.org\/client-max-body-size: "1048576"/);
+    assert.ok(!/lb-method/.test(a.yaml), a.yaml);
+    assert.ok(a.plan.infoNotes.some((n) => /chash/.test(n.code)), 'chash is reported');
 });
 
 test('an unmapped annotation is reported rather than silently dropped', () => {
@@ -328,8 +370,9 @@ const INGRESS = {
 
 const runConvert = (doc, opts) => {
     const model = toModel(doc);
-    const result = engine.analyze(Y.stringify(doc), (opts && opts.strategy) || 'crd');
-    return { model, out: convert(model, result, Object.assign({ target: 'virtualserver' }, opts)) };
+    const o = Object.assign({ target: 'virtualserver' }, opts);
+    const result = engine.analyze(Y.stringify(doc), o.strategy || 'crd', planOptions(o));
+    return { model, out: convert(model, result, o) };
 };
 
 test('every host becomes one VirtualServer carrying all of its routes', () => {
@@ -472,6 +515,69 @@ test('custom-http-errors without a default backend is flagged on the ingress tar
     const withBackend = runConvert(doc, { target: 'ingress', strategy: 'annotation' }).out;
     assert.ok(!withBackend.notes.some((n) => /no spec\.defaultBackend/.test(n)),
         'no warning once the Ingress has one: ' + withBackend.notes.join(' | '));
+});
+
+const ERRORS = (extra) => {
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = Object.assign({
+        'nginx.ingress.kubernetes.io/custom-http-errors': '404,503',
+        'nginx.ingress.kubernetes.io/default-backend': 'error-svc'
+    }, extra);
+    delete doc.spec.defaultBackend;
+    return doc;
+};
+
+test('custom-http-errors stays an annotation under CRD-first, and says why', () => {
+    /* The one dual mapping where the annotation is the better answer: it serves
+       error pages from a Service, while VirtualServer errorPages can only return
+       or redirect. This is the page's analyzer, which takes no plan options. */
+    const result = engine.analyze(Y.stringify(ERRORS()), 'crd');
+    assert.ok(!/errorPages/.test(result.yaml), 'no errorPages VirtualServer: ' + result.yaml);
+    assert.match(result.yaml, /nginx\.org\/custom-http-errors: "?404,503"?/);
+    assert.ok(result.plan.infoNotes.some((n) => /Kept as an annotation under CRD-first/.test(n.message)),
+        'the strategy override must be explained');
+});
+
+test('the virtualserver target still gets errorPages, and is told what it loses', () => {
+    /* A VirtualServer cannot carry the annotation, so this target asks the
+       analyzer for the CRD form; dropping both left no error handling at all. */
+    const { out } = runConvert(ERRORS());
+    const routes = out.docs.filter((d) => d.kind === 'VirtualServer').flatMap((v) => v.spec.routes);
+    assert.ok(routes.length && routes.every((r) => r.errorPages && r.errorPages[0].codes.join() === '404,503'),
+        'every route carries errorPages: ' + JSON.stringify(routes));
+    assert.ok(!out.notes.some((n) => /not represented on the VirtualServer: .*custom-http-errors/.test(n)), out.notes.join(' | '));
+    assert.ok(out.notes.some((n) => /error-svc/.test(n) && /--target ingress/.test(n)), out.notes.join(' | '));
+});
+
+test('the ingress target turns default-backend into spec.defaultBackend', () => {
+    /* NIC sends custom-http-errors only to spec.defaultBackend; the community
+       annotation names just a Service, and the controller used its first port. */
+    let { out } = runConvert(ERRORS(), { target: 'ingress', strategy: 'annotation' });
+    let ing = out.docs.find((d) => d.kind === 'Ingress');
+    assert.equal(ing.spec.defaultBackend.service.name, 'error-svc');
+    assert.ok(out.notes.some((n) => /unresolved placeholder at Ingress\.spec\.defaultBackend/.test(n)), out.notes.join(' | '));
+    assert.ok(!out.notes.some((n) => /default-backend: error-svc —/.test(n)), 'the analyzer\'s "set it" note is answered: ' + out.notes.join(' | '));
+
+    const asked = [];
+    const resolveServicePort = (ns, name) => { asked.push(ns + '/' + name); return 8080; };
+    ({ out } = runConvert(ERRORS(), { target: 'ingress', strategy: 'annotation', resolveServicePort }));
+    ing = out.docs.find((d) => d.kind === 'Ingress');
+    assert.deepEqual(ing.spec.defaultBackend, { service: { name: 'error-svc', port: { number: 8080 } } });
+    assert.deepEqual(asked, ['prod/error-svc']);
+
+    // A value that is not a Service name never reaches the resolver (kubectl argv).
+    asked.length = 0;
+    ({ out } = runConvert(ERRORS({ 'nginx.ingress.kubernetes.io/default-backend': '--kubeconfig=/tmp/x' }),
+        { target: 'ingress', strategy: 'annotation', resolveServicePort }));
+    assert.deepEqual(asked, []);
+    assert.equal(out.docs.find((d) => d.kind === 'Ingress').spec.defaultBackend, undefined);
+
+    // Without custom-http-errors, default-backend is the no-endpoints fallback,
+    // which spec.defaultBackend is not.
+    const alone = ERRORS();
+    delete alone.metadata.annotations['nginx.ingress.kubernetes.io/custom-http-errors'];
+    ({ out } = runConvert(alone, { target: 'ingress', strategy: 'annotation', resolveServicePort }));
+    assert.equal(out.docs.find((d) => d.kind === 'Ingress').spec.defaultBackend, undefined);
 });
 
 test('the virtualserver target keeps session affinity that the ingress target loses', () => {

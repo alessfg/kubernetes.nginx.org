@@ -1071,12 +1071,19 @@ metadata:
     nginx.ingress.kubernetes.io/client-body-buffer-size: "16k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      client-body-buffer-size: "16k"  # client-body-buffer-size</code></pre></div>
+      client-body-buffer-size: "16k"  # client-body-buffer-size
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                         </div></td></tr>
@@ -1115,12 +1122,19 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      client-max-body-size: "10m"  # proxy-body-size</code></pre></div>
+      client-max-body-size: "10m"  # proxy-body-size
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                         </div></td></tr>
@@ -1146,7 +1160,8 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/proxy-buffer-size: "8k"  # proxy-buffer-size</code></pre></div>
+    nginx.org/proxy-buffer-size: "8k"  # proxy-buffer-size
+    nginx.org/proxy-buffers: "4 8k"  # proxy-buffer-size — the community sizes 4 proxy buffers with it</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -1159,14 +1174,25 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      buffer-size: "8k"  # proxy-buffer-size</code></pre></div>
+      buffers:  # proxy-buffer-size — the community sizes 4 proxy buffers with it
+        number: 4
+        size: "8k"
+      buffer-size: "8k"  # proxy-buffer-size
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller sizes its 4 proxy buffers with <code>proxy-buffer-size</code> too. NIC does not, and NGINX rejects a buffer size larger than its default buffers allow, so the migration also sets the buffers.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-buffering</code></td>
@@ -1190,7 +1216,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/proxy-buffering: "on"  # proxy-buffering</code></pre></div>
+    nginx.org/proxy-buffering: "true"  # proxy-buffering</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -1203,14 +1229,22 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffering: "on"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      buffering: true  # proxy-buffering</code></pre></div>
+      buffering: true  # proxy-buffering
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/proxy-buffering</code> takes <code>true</code> or <code>false</code>. NIC rejects the Ingress for <code>on</code> or <code>off</code>, the values the community controller uses.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-buffers-number</code></td>
@@ -1234,9 +1268,9 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/proxy-buffers: "4 8k"  # proxy-buffers-number</code></pre></div>
+    nginx.org/proxy-buffers: "4 4k"  # proxy-buffers-number — 4k, the community default proxy-buffer-size</code></pre></div>
                                 </div>
-                                <div class="info-box note"><strong>Note:</strong> The F5 NGINX Ingress Controller annotation uses a combined format: <code>"number size"</code> (e.g., <code>"4 8k"</code>).</div>
+                                <div class="info-box note"><strong>Note:</strong> The F5 NGINX Ingress Controller annotation uses a combined format: <code>"number size"</code> (e.g., <code>"4 8k"</code>). The size is <code>proxy-buffer-size</code>, as on the community controller, or its 4k default.</div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
@@ -1248,14 +1282,21 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffers-number: "4"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      buffers:  # proxy-buffers-number
+      buffers:  # proxy-buffers-number — 4k, the community default proxy-buffer-size
         number: 4
-        size: "8k"</code></pre></div>
+        size: "4k"
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                         </div></td></tr>
@@ -1294,12 +1335,19 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "16k"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      busy-buffers-size: "16k"  # proxy-busy-buffers-size</code></pre></div>
+      busy-buffers-size: "16k"  # proxy-busy-buffers-size
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                         </div></td></tr>
@@ -1857,7 +1905,8 @@ spec:
             body: "An error occurred."</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box warning"><strong>Not identical to the community controller:</strong> NIC sends intercepted errors only to the Ingress's own <code>spec.defaultBackend</code>, which must be in the same namespace, and none of the community's <code>X-Code</code>, <code>X-Format</code>, or <code>X-Original-URI</code> headers reach it — error pages that branch on them need rework. Clients receive the original upstream status. On its own, <code>default-backend</code> has no annotation equivalent for its fallback when a Service has no ready endpoints; on NGINX Plus, VirtualServer <code>upstreams[].backup</code> is the closest match. VirtualServer <code>errorPages</code> can only <code>return</code> a canned response or <code>redirect</code> to a URL, not proxy to a Service.</div>
+                            <div class="info-box tip"><strong>Recommended: Annotation Approach.</strong> This is the one construct in this guide where the annotation is preferred over the CRD. <code>nginx.org/custom-http-errors</code> serves error pages from a Service, as the community controller does, while VirtualServer <code>errorPages</code> can only <code>return</code> a canned response or <code>redirect</code> to a URL. The analyzer keeps it as an annotation under either strategy.</div>
+                            <div class="info-box warning"><strong>Not identical to the community controller:</strong> NIC sends intercepted errors only to the Ingress's own <code>spec.defaultBackend</code>, which must be in the same namespace, and none of the community's <code>X-Code</code>, <code>X-Format</code>, or <code>X-Original-URI</code> headers reach it — error pages that branch on them need rework. Clients receive the original upstream status. On its own, <code>default-backend</code> has no annotation equivalent for its fallback when a Service has no ready endpoints; on NGINX Plus, VirtualServer <code>upstreams[].backup</code> is the closest match.</div>
                             <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/custom-http-errors</code> intercepts upstream responses with the listed status codes and serves them from the Ingress's <code>spec.defaultBackend</code>. It takes codes from 300 to 599 plus the <code>4xx</code> and <code>5xx</code> shorthands. NIC rejects the Ingress for an invalid code, including 499, which NGINX refuses in <code>error_page</code>. Without a <code>spec.defaultBackend</code> the annotation does nothing.</div>
                         </div></td></tr>
                     </tbody>
@@ -1871,7 +1920,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/connection-proxy-header</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>requestHeaders.set</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].keepalive</code><span class="or-text">— or —</span><code>nginx.org/keepalive</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -1891,8 +1940,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/location-snippets: |  # connection-proxy-header
-      proxy_set_header Connection "keep-alive";  # connection-proxy-header</code></pre></div>
+    nginx.org/keepalive: "320"  # connection-proxy-header — the community upstream-keepalive-connections default</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -1905,18 +1953,22 @@ metadata:
     nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: my-service
+      port: 80
+      keepalive: 320  # connection-proxy-header — the community upstream-keepalive-connections default
   routes:
     - path: /
       action:
-        proxy:
-          upstream: my-backend
-          requestHeaders:  # connection-proxy-header
-            set:
-              - name: Connection
-                value: "keep-alive"</code></pre></div>
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> NIC sets the <code>Connection</code> header itself, from upstream keepalive: empty when keepalive is on, <code>close</code> when it is off. So <code>keep-alive</code> becomes keepalive on (320 connections, the community default) and <code>close</code> becomes <code>0</code>. Setting the header directly, with a snippet or <code>requestHeaders</code>, sends both values to the backend.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/custom-headers</code></td>
@@ -2080,14 +2132,14 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>hsts</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-include-subdomains</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-max-age</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-preload</code></td>
-                            <td><code>nginx.org/hsts</code><br><code>nginx.org/hsts-include-subdomains</code><br><code>nginx.org/hsts-max-age</code><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>hsts</code> <span class="badge badge-new">New v5.6.0</span></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>hsts</code> <span class="badge badge-new">New v5.6.0</span><span class="or-text">— or —</span><code>nginx.org/hsts</code><br><code>nginx.org/hsts-include-subdomains</code><br><code>nginx.org/hsts-max-age</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># ConfigMap settings only
 apiVersion: v1
@@ -2109,7 +2161,7 @@ metadata:
     nginx.org/hsts-max-age: "31536000"  # hsts-max-age</code></pre></div>
                                 </div>
                             </div>
-                            <div class="approach-content" data-approach="crd">
+                            <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># ConfigMap settings only
 apiVersion: v1
@@ -2237,7 +2289,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/lb-method: "least_conn"  # load-balance</code></pre></div>
+    nginx.org/lb-method: "least_conn"  # load-balance — ewma is not supported, using least_conn as the closest equivalent</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -2250,12 +2302,19 @@ metadata:
     nginx.ingress.kubernetes.io/load-balance: "ewma"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      lb-method: "least_conn"  # load-balance</code></pre></div>
+      lb-method: "least_conn"  # load-balance — ewma is not supported, using least_conn as the closest equivalent
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Supported methods differ. The F5 NGINX Ingress Controller supports: <code>round_robin</code>, <code>least_conn</code>, <code>ip_hash</code>, <code>hash</code>, <code>random</code>, <code>random two</code>, and <code>random two least_conn</code> (NGINX Plus adds <code>least_time</code> variants). The community controller's <code>ewma</code> method is <strong>not supported</strong> — the closest equivalent is <code>least_conn</code>. The F5 NGINX Ingress Controller's default is <code>random two least_conn</code> (not <code>round_robin</code>), so load balancing behavior may change even without explicit configuration.</div>
@@ -2295,12 +2354,19 @@ metadata:
     nginx.ingress.kubernetes.io/service-upstream: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      use-cluster-ip: true  # service-upstream</code></pre></div>
+      use-cluster-ip: true  # service-upstream
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                         </div></td></tr>
@@ -3688,15 +3754,22 @@ metadata:
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 443
       tls:
-        enable: true  # backend-protocol</code></pre></div>
-                                </div>
-                                <div class="info-box note"><strong>Note:</strong> For gRPC backends, use <code>type: grpc</code> on the upstream instead. For gRPC over TLS, combine both: <code>type: grpc</code> and <code>tls.enable: true</code>.</div>
+        enable: true  # backend-protocol
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                            </div>
+                                <div class="info-box note"><strong>Note:</strong> For gRPC backends, use <code>type: grpc</code> on the upstream instead. For gRPC over TLS, combine both: <code>type: grpc</code> and <code>tls.enable: true</code>. gRPC also needs <code>http2: "true"</code> in the ConfigMap and TLS on the VirtualServer, or NIC does not configure it.</div>
                             </div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -3809,14 +3882,14 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/ssl-redirect</code></td>
-                            <td><code>nginx.org/redirect-to-https</code> / <code>nginx.org/ssl-redirect</code> <span class="badge badge-new">New v5.4.0</span> + <code>nginx.org/http-redirect-code: "308"</code> <span class="badge badge-new">New v5.4.0</span><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>tls.redirect.code: 308</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>tls.redirect.code: 308</code><span class="or-text">— or —</span><code>nginx.org/redirect-to-https</code> / <code>nginx.org/ssl-redirect</code> <span class="badge badge-new">New v5.4.0</span> + <code>nginx.org/http-redirect-code: "308"</code> <span class="badge badge-new">New v5.4.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -3838,7 +3911,7 @@ metadata:
     nginx.org/ssl-redirect: "true"  # ssl-redirect</code></pre></div>
                                 </div>
                             </div>
-                            <div class="approach-content" data-approach="crd">
+                            <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -3995,12 +4068,19 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      connect-timeout: "10s"  # proxy-connect-timeout</code></pre></div>
+      connect-timeout: "10s"  # proxy-connect-timeout
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                         </div></td></tr>
@@ -4039,12 +4119,19 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      read-timeout: "60s"  # proxy-read-timeout</code></pre></div>
+      read-timeout: "60s"  # proxy-read-timeout
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                         </div></td></tr>
@@ -4083,12 +4170,19 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: upstream-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      send-timeout: "60s"  # proxy-send-timeout</code></pre></div>
+      send-timeout: "60s"  # proxy-send-timeout
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                         </div></td></tr>

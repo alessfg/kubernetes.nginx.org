@@ -339,11 +339,11 @@ function checkReferenceTables() {
    When a number legitimately changes, update it here in the same commit as
    the change, and say in the message which way it moved and why. */
 const EXPECTED = {
-    'simple/crd':          { findings: 5,  steps: 1, blocks: 1, exported: 1 },
+    'simple/crd':          { findings: 5,  steps: 2, blocks: 3, exported: 2 },
     'simple/annotation':   { findings: 5,  steps: 1, blocks: 1, exported: 1 },
-    'moderate/crd':        { findings: 12, steps: 2, blocks: 2, exported: 2 },
+    'moderate/crd':        { findings: 12, steps: 3, blocks: 4, exported: 3 },
     'moderate/annotation': { findings: 12, steps: 2, blocks: 2, exported: 2 },
-    'advanced/crd':        { findings: 24, steps: 3, blocks: 5, exported: 6 },
+    'advanced/crd':        { findings: 24, steps: 3, blocks: 5, exported: 7 },
     'advanced/annotation': { findings: 24, steps: 3, blocks: 6, exported: 4 }
 };
 
@@ -538,7 +538,7 @@ console.log(`\nWrote .github/data/mapping-index.json (${indexed} mappings).`);
 
 /* ── Accuracy provenance ────────────────────────────────────────────────────
    The three Version-reference banners assert that the whole tool "is based on"
-   a given NIC release. That is one claim about 57 mappings and 19 generators,
+   a given NIC release. That is one claim about 57 mappings and 20 generators,
    and nothing records when any individual one was last checked against a
    tagged source — so a version bump silently re-asserts them all.
 

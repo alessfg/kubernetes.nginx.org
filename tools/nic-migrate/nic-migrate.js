@@ -24,7 +24,7 @@ const { splitDocuments, isIngress, kindOf, describe } = require('./lib/ingress')
 const { detect, sortGaps } = require('./lib/gaps');
 const { renderReport, toJson, fileHeader, makeStyle } = require('./lib/render');
 const yaml = require('./lib/yaml');
-const { toModel, convert } = require('./lib/convert');
+const { toModel, convert, planOptions } = require('./lib/convert');
 
 const USAGE = `nic-migrate — ingress-nginx -> F5 NGINX Ingress Controller  (beta)
 
@@ -272,13 +272,30 @@ function runConvert(sources, engine, strategy, opts) {
         return 1;
     }
 
+    /* With --kubectl the cluster is the source, so it can answer what a
+       manifest cannot: a Service's first port, which is what the community
+       controller used for a default-backend Service. */
+    const ports = new Map();
+    const resolveServicePort = !opts.kubectl ? null : (namespace, name) => {
+        const key = (namespace || '') + '/' + name;
+        // Both come from cluster data; neither may become a kubectl flag.
+        if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(name) || (namespace && !/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(namespace))) return null;
+        if (!ports.has(key)) {
+            const args = ['get', 'service', name, '-o', 'jsonpath={.spec.ports[0].port}'];
+            if (namespace) args.push('-n', namespace);
+            const r = runKubectl(args);
+            ports.set(key, r.ok && /^\d+$/.test(r.output) ? Number(r.output) : null);
+        }
+        return ports.get(key);
+    };
+
     const results = [];
     for (const { doc, sourceFile } of ingresses) {
         const model = toModel(doc);
         // Feed the engine canonical YAML re-emitted from the parsed document,
         // so what it analyzes is exactly what was parsed.
-        const result = engine.analyze(yaml.stringify(doc), strategy);
-        const converted = convert(model, result, opts);
+        const result = engine.analyze(yaml.stringify(doc), strategy, planOptions(opts));
+        const converted = convert(model, result, Object.assign({ resolveServicePort }, opts));
         results.push({ model, sourceFile, converted, warnings: result.warnings });
     }
 

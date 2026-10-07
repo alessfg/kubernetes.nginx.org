@@ -122,8 +122,8 @@
             let usedAnnotations = {};
             // First pass: value-based matching
             let annotatedLines = crdYamlLines.map(function(line) {
-                // Skip comment lines and top-level structural keys
-                if (/^\s*#/.test(line) || /^(apiVersion|kind|metadata|spec):/.test(line.trim())) return line;
+                // Skip comment lines, lines the generator already attributed, and top-level structural keys
+                if (/^\s*#/.test(line) || /  # \S/.test(line) || /^(apiVersion|kind|metadata|spec):/.test(line.trim())) return line;
                 // Skip metadata name (shallow indent ≤4 spaces)
                 let nameCheck = line.match(/^(\s+)name:\s/);
                 if (nameCheck && nameCheck[1].length <= 4) return line;

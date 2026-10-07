@@ -25,6 +25,7 @@
 const yaml = require('./yaml');
 
 const NIC_API = 'k8s.nginx.org/v1';
+const DNS_1035 = /^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$/;
 
 /* ------------------------------------------------------------------ model */
 
@@ -242,7 +243,24 @@ function buildVirtualServers(model, gen, opts) {
 
         docs.push({ apiVersion: NIC_API, kind: 'VirtualServer', metadata, spec });
     }
+    /* A VirtualServer has no default backend, and errorPages can only return
+       or redirect: say what that loses rather than dropping it. */
+    const backend = model.communityAnnotations['default-backend'];
+    if (backend && model.communityAnnotations['custom-http-errors']) {
+        notes.push('errorPages return a canned body; the community controller served these errors from Service ' +
+            backend + ' (default-backend). Use --target ingress to keep that: nginx.org/custom-http-errors can.');
+    } else if (backend) {
+        notes.push('default-backend ' + backend + ' (the fallback when a Service has no ready endpoints) has no ' +
+            'VirtualServer equivalent; on NGINX Plus, upstreams[].backup is the closest.');
+    }
     return { docs, notes };
+}
+
+/* The page's analyzer keeps a preferAnnotation mapping as an annotation even
+   under CRD-first. A VirtualServer cannot carry an Ingress annotation, so that
+   target asks for the CRD form instead. */
+function planOptions(opts) {
+    return { ignorePreferAnnotation: opts.target !== 'ingress' };
 }
 
 function buildIngress(model, gen, swaps, opts) {
@@ -293,6 +311,7 @@ function buildIngress(model, gen, swaps, opts) {
     const cls = opts.ingressClass || model.ingressClassName;
     if (cls) spec.ingressClassName = cls;
     if (model.defaultBackend) spec.defaultBackend = model.defaultBackend;
+    const filled = fillDefaultBackend(model, spec, opts, notes);
     const tls = [];
     const seen = new Set();
     for (const h of model.hosts) {
@@ -350,7 +369,38 @@ function buildIngress(model, gen, swaps, opts) {
             'ignores it — add spec.defaultBackend pointing at your error-page Service');
     }
 
-    return { docs: [{ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata, spec }], notes };
+    return { docs: [{ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata, spec }], notes, filledDefaultBackend: filled };
+}
+
+/* nginx.org/custom-http-errors sends errors to spec.defaultBackend, which the
+   community default-backend annotation names only as a Service: the community
+   controller used that Service's first port, so the port comes from the
+   cluster or stays a reported placeholder. Without custom-http-errors the
+   annotation meant only "fallback when no endpoints are ready", which
+   spec.defaultBackend is not, so it is left alone. */
+function fillDefaultBackend(model, spec, opts, notes) {
+    const svc = model.communityAnnotations['default-backend'];
+    if (!svc || !model.communityAnnotations['custom-http-errors']) return false;
+    /* The community controller rejects anything but a DNS-1035 label here, and
+       the value reaches kubectl's argv under --kubectl, where "-…" is a flag. */
+    if (!DNS_1035.test(svc)) {
+        notes.push('default-backend "' + svc + '" is not a valid Service name, so spec.defaultBackend was not set');
+        return false;
+    }
+    if (spec.defaultBackend) {
+        const existing = (spec.defaultBackend.service || {}).name;
+        if (existing !== svc) {
+            notes.push('default-backend names Service ' + svc + ' but spec.defaultBackend is already ' + existing +
+                ' — NIC sends custom-http-errors to ' + existing);
+        }
+        return false;
+    }
+    const port = opts.resolveServicePort ? opts.resolveServicePort(model.namespace, svc) : null;
+    spec.defaultBackend = { service: { name: svc, port: { number: port || 'TODO: set the port' } } };
+    notes.push('spec.defaultBackend set to Service ' + svc + ' from default-backend, so custom-http-errors has ' +
+        'somewhere to send errors. NIC also routes requests that match no path on this Ingress to it.' +
+        (port ? '' : ' Its port is unresolved: run with --kubectl to read it from the Service, or set it by hand.'));
+    return true;
 }
 
 function withNamespace(doc, namespace) {
@@ -397,7 +447,11 @@ function convert(model, result, opts) {
     /* The analyzer's info notes are where it says an annotation was recognised
        but could not be translated (a value NIC would reject, a setting with no
        annotation form). Without them a refused value simply disappears. */
-    for (const n of (result.plan && result.plan.infoNotes) || []) notes.push(n.code + ' — ' + n.message);
+    for (const n of (result.plan && result.plan.infoNotes) || []) {
+        // The analyzer says "set spec.defaultBackend"; it is set.
+        if (built.filledDefaultBackend && /\/default-backend:/.test(n.code)) continue;
+        notes.push(n.code + ' — ' + n.message);
+    }
 
     const todos = [];
     for (const doc of docs) extractTodos(doc, doc.kind, todos);
@@ -421,4 +475,4 @@ function convert(model, result, opts) {
     return { docs, notes: [...new Set(notes)], policies: gen.policies.length, swaps };
 }
 
-module.exports = { toModel, convert, readGenerated, readSwaps, toVsPath, sanitiseName };
+module.exports = { toModel, convert, planOptions, readGenerated, readSwaps, toVsPath, sanitiseName };

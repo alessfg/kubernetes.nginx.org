@@ -46,9 +46,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "nicSize"
   },
   {
    "community": [
@@ -57,9 +57,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "nicOffset"
   },
   {
    "community": [
@@ -68,9 +68,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "nicSize"
   },
   {
    "community": [
@@ -79,9 +79,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "onOffBool"
   },
   {
    "community": [
@@ -90,8 +90,8 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "appendBufferSize"
   },
   {
@@ -101,9 +101,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "nicSize"
   },
   {
    "community": [
@@ -224,9 +224,9 @@
    "category": "Headers",
    "anchor": "headers",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "snippetWrap"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "connectionKeepalive"
   },
   {
    "community": [
@@ -258,8 +258,8 @@
    "category": "Load balancing",
    "anchor": "load-balancing",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "lbMethod"
   },
   {
@@ -269,8 +269,8 @@
    "category": "Load balancing",
    "anchor": "load-balancing",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "direct"
   },
   {
@@ -508,8 +508,8 @@
    "category": "SSL/TLS",
    "anchor": "ssl-tls",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "backendProtocol"
   },
   {
@@ -585,8 +585,8 @@
    "category": "Timeouts",
    "anchor": "timeouts",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "appendTimeUnit"
   },
   {
@@ -596,8 +596,8 @@
    "category": "Timeouts",
    "anchor": "timeouts",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "appendTimeUnit"
   },
   {
@@ -607,8 +607,8 @@
    "category": "Timeouts",
    "anchor": "timeouts",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "appendTimeUnit"
   },
   {

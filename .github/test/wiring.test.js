@@ -225,4 +225,49 @@ for (const p of PAGES) {
         const scripts = [...page.matchAll(/<script[^>]+src="(assets\/js\/[\w.-]+\.js)"/g)].map((m) => m[1]);
         assert.deepEqual(scripts, ['assets/js/shared.js', p.module, 'assets/js/migration-core.js']);
     });
+
+    // A row offering both a CRD and an annotation answers CRD first, in all three
+    // places a reader meets it: the collapsed cell's first option, the first
+    // tab, and the tab that opens by default. 36 of 39 rows did; the three that
+    // led with the annotation were each added on their own, and nothing said
+    // the order was a rule. A mapping marked preferAnnotation is the deliberate
+    // exception, and the analyzer keeps it as an annotation under CRD-first too:
+    // its row must lead with the annotation, and must exist.
+    const ANNOTATION_FIRST = [...mod.matchAll(/\{ community: \["([\w-]+)"[^\n]*\n\s*preferAnnotation:/g)]
+        .map((m) => `nginx.ingress.kubernetes.io/${m[1]}`);
+    test(`${p.name}: rows with a CRD and an annotation approach lead with the CRD`, () => {
+        const CRD_BADGE = /badge-(?:virtualserver|virtualserverroute|policy|transportserver|globalconfiguration)\b/;
+        const strip = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        const wrong = [];
+        const seen = new Set();
+        for (const m of page.matchAll(
+                /<tr class="expandable">\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)) {
+            const tabs = [...m[2].matchAll(
+                /class="approach-tab( active)?" data-action="switchApproach" data-approach="([\w-]+)"/g)];
+            const kinds = tabs.map((t) => t[2]);
+            if (!kinds.includes('crd') || !kinds.includes('annotation')) continue;
+            const label = strip(m[1]).slice(0, 48);
+            const lead = ANNOTATION_FIRST.find((a) => m[1].includes(`<code>${a}</code>`));
+            const first = lead ? 'annotation' : 'crd';
+            if (lead) seen.add(lead);
+            if (kinds[0] !== first || !tabs[0][1]) wrong.push(`${label} — tabs ${kinds.join(', ')}`);
+            const cells = [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((c) => c[1]);
+            if (cells.length === 2 && CRD_BADGE.test(cells[1].split('class="or-text"')[0]) === !!lead) {
+                wrong.push(`${label} — collapsed cell leads with ${strip(cells[1].split('class="or-text"')[0]).slice(0, 32)}`);
+            }
+        }
+        assert.deepEqual(wrong, [], 'rows that lead with the wrong approach');
+        assert.deepEqual(ANNOTATION_FIRST.filter((a) => !seen.has(a)), [], 'preferAnnotation rows not found');
+    });
+
+    // Bold lead-ins read "New in v5.6.0 — Custom error pages …": the clause after
+    // the dash is a title, so it opens with a capital. Code-formatted words are
+    // exempt (`<code>externalAuth</code>` keeps its case), so the check reads the
+    // markup, not the stripped text.
+    test(`${p.name}: a bold lead-in capitalises the word after an em dash`, () => {
+        const lower = [...page.matchAll(/<strong>([\s\S]*?)<\/strong>/g)]
+            .map((m) => m[1])
+            .filter((t) => /(?:&mdash;|—)\s*[a-z]/.test(t));
+        assert.deepEqual(lower, [], 'lead-ins with a lowercase letter after the em dash');
+    });
 }

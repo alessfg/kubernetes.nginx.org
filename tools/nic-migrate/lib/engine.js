@@ -51,14 +51,14 @@ function createEngine() {
            textarea as a single blob, which collapses a multi-document paste into
            one host/service/path context; feeding documents in one at a time is
            the main behavioural difference between this CLI and the page. */
-        analyze(yamlText, strategy) {
+        analyze(yamlText, strategy, planOptions) {
             const before = warnings.length;
             let parsed;
             let plan;
             let error = null;
             try {
                 parsed = source.analyzer.parseInput(yamlText);
-                plan = source.analyzer.buildPlan(parsed, strategy);
+                plan = source.analyzer.buildPlan(parsed, strategy, planOptions);
             } catch (err) {
                 error = err.message;
             }

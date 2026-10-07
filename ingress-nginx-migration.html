@@ -270,7 +270,7 @@
                         <li><strong>Access Control:</strong> IP allowlists and denylists</li>
                         <li><strong>Basic Auth:</strong> Username/password authentication via htpasswd</li>
                         <li><strong>JWT Validation:</strong> Validate JSON Web Tokens (Plus)</li>
-                        <li><strong>OIDC:</strong> Native OpenID Connect integration (Plus)</li>
+                        <li><strong>OIDC:</strong> OpenID Connect sign-in, through the built-in OIDC module or NGINX JavaScript (Plus)</li>
                         <li><strong>API Key Auth:</strong> Authenticate via API keys in headers/query</li>
                         <li><strong>mTLS:</strong> Client certificate verification (ingress) and backend TLS (egress)</li>
                         <li><strong>WAF:</strong> F5 WAF for NGINX web application firewall (Plus)</li>
@@ -332,14 +332,14 @@
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="review-annotation-mappings-not"><span>Review annotation mappings — not all <code>nginx.ingress.kubernetes.io/</code> annotations have a direct <code>nginx.org/</code> equivalent (see NGINX Mappings)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="map-rewrite-target-annotation-to"><span>Map rewrite-target annotation to <code>nginx.org/rewrite-target</code> (not <code>nginx.org/rewrites</code>)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="migrate-configmap-keys-that"><span>Migrate ConfigMap keys that differ between controllers (see ConfigMap Mappings)</span></li>
-                <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-hsts-configmap-keys"><span>Convert HSTS ConfigMap keys to <code>nginx.org/hsts</code> annotations for per-Ingress control</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-hsts-configmap-keys"><span>Convert HSTS ConfigMap keys to <code>nginx.org/hsts</code> annotations for per-Ingress control, or an <code>hsts</code> Policy on a VirtualServer (v5.6.0+)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-server-tokens-configmap-key"><span>Convert <code>server-tokens</code> ConfigMap key to <code>nginx.org/server-tokens</code> annotation</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-access-control-annotations"><span>Convert access control annotations to Policy CRD (<code>accessControl</code>)</span></li>
-                <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-authentication-annotations-to"><span>Convert authentication annotations to Policy CRD (<code>apiKey</code>, <code>basicAuth</code>, <code>externalAuth</code>, <code>jwt</code>, <code>oidc</code>)</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-authentication-annotations-to"><span>Convert authentication annotations to Policy CRD (<code>apiKey</code>, <code>basicAuth</code>, <code>externalAuth</code>, <code>jwt</code>, <code>oidc</code>, <code>oidcNative</code>)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-canary-traffic-splitting"><span>Convert canary/traffic splitting to VirtualServer <code>splits</code>/<code>matches</code></span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-mtls-annotations-to"><span>Convert mTLS annotations to <code>ingressMTLS</code>/<code>egressMTLS</code> policies</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-cors-annotations-to"><span>Convert CORS annotations to the <code>cors</code> Policy CRD via <code>nginx.org/policies</code> (v5.4.0+), falling back to snippets only where needed</span></li>
-                <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-custom-error-pages"><span>Convert custom error pages to VirtualServer <code>errorPages</code></span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-custom-error-pages"><span>Convert custom error pages to <code>nginx.org/custom-http-errors</code> with a <code>spec.defaultBackend</code> (v5.6.0+), or VirtualServer <code>errorPages</code></span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-header-manipulation-to"><span>Convert header manipulation to VirtualServer <code>requestHeaders</code>/<code>responseHeaders</code></span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-rate-limiting-annotations"><span>Convert rate limiting annotations to Policy CRD (<code>rateLimit</code>)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-redirect-annotations-to"><span>Convert redirect annotations to VirtualServer <code>action.redirect</code></span></li>
@@ -467,6 +467,7 @@ spec:
             <div class="info-box note" style="margin: var(--space-2hx) 0 0;"><strong>Note:</strong> Many Kubernetes Ingress NGINX (Ingress-NGINX) capabilities that do not have direct F5 NGINX Ingress Controller annotations or CRDs can still be achieved through NGINX configuration snippets (via either snippet annotations or VirtualServer/VirtualServerRoute CRDs). We recommend that users proceed with caution when using snippets, as they inject raw NGINX configuration and are intended for more advanced use cases.</div>
             <div class="info-box note" style="margin: var(--space-2x) 0 0;"><strong>New in v5.4.0 &mdash; Policy CRDs on Ingress objects:</strong> Policy CRDs (e.g. <code>accessControl</code>, <code>cors</code>) can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation &mdash; no VirtualServer required. This is the recommended migration path for features that support it. Look for the <strong>(Recommended)</strong> tab in the mapping examples.</div>
             <div class="info-box note" style="margin: var(--space-2x) 0 0;"><strong>New in v5.5.0 &mdash; ExternalAuth Policy and expanded Policy CRDs on Ingress:</strong> A brand new <code>externalAuth</code> Policy CRD provides an OSS-capable replacement for the community's generic <code>auth_request</code> annotations (<code>auth-url</code>, <code>auth-signin</code>, <code>auth-snippet</code>) &mdash; the headline migration win of this release. The <code>ingressMTLS</code>, <code>egressMTLS</code>, and <code>waf</code> (Plus, via <code>nginx.com/policies</code>) Policy CRDs can now also be attached directly to Ingress resources. New direct annotation mappings arrived for <code>proxy-redirect-from</code>/<code>proxy-redirect-to</code>, alongside a new inline <code>nginx.org/add-header</code> (plus <code>nginx.org/add-header-inherit</code>) for response header injection.</div>
+            <div class="info-box note" style="margin: var(--space-2x) 0 0;"><strong>New in v5.6.0 &mdash; Custom error pages and upstream Host on Ingress:</strong> Two community annotations now have direct Ingress equivalents: <code>nginx.org/custom-http-errors</code> serves intercepted errors from the Ingress's <code>spec.defaultBackend</code>, and <code>nginx.org/upstream-vhost</code> sets the <code>Host</code> header sent upstream. A new <code>hsts</code> Policy CRD sets HSTS on a VirtualServer, including <code>preload</code> on request. With NGINX Plus, the new <code>oidcNative</code> Policy runs OpenID Connect in the built-in module and attaches to Ingress through <code>nginx.com/policies</code>.</div>
         </section>
 
         <!-- OSS Mappings -->
@@ -745,7 +746,7 @@ spec:
 
             <!-- Authentication (External) -->
             <h3 id="authentication-external">Authentication (external)</h3>
-            <div class="info-box note" style="margin: 0 0 var(--space-2x);"><strong>New in v5.5.0 &mdash; ExternalAuth Policy:</strong> The new <code>externalAuth</code> Policy CRD is the recommended migration path for the community's generic <code>auth_request</code> pattern (<code>auth-url</code>, <code>auth-signin</code>, <code>auth-snippet</code>). Unlike the <code>oidc</code> Policy (Plus-only, native OIDC), <code>externalAuth</code> works in NGINX OSS and Plus and can be attached directly to Ingress, VirtualServer, and VirtualServerRoute resources via <code>nginx.org/policies</code>. For native OIDC, see the <a href="#oidc-authentication">OIDC authentication</a> section in Plus Mappings.</div>
+            <div class="info-box note" style="margin: 0 0 var(--space-2x);"><strong>New in v5.5.0 &mdash; ExternalAuth Policy:</strong> The new <code>externalAuth</code> Policy CRD is the recommended migration path for the community's generic <code>auth_request</code> pattern (<code>auth-url</code>, <code>auth-signin</code>, <code>auth-snippet</code>). Unlike the OIDC Policies (<code>oidcNative</code> and <code>oidc</code>, NGINX Plus only), <code>externalAuth</code> works in NGINX OSS and Plus and can be attached directly to Ingress, VirtualServer, and VirtualServerRoute resources via <code>nginx.org/policies</code>. For OIDC itself, see the <a href="#oidc-authentication">OIDC authentication</a> section in Plus Mappings.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="authentication-external"><thead><tr><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -1796,23 +1797,55 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/custom-http-errors</code><br><code>nginx.ingress.kubernetes.io/default-backend</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>errorPages[]</code></td>
+                            <td><code>nginx.org/custom-http-errors</code> <span class="badge badge-new">New v5.6.0</span> + <code>spec.defaultBackend</code><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>errorPages[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                            </div>
+                            <div class="approach-content active" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     nginx.ingress.kubernetes.io/custom-http-errors: "404,500,502"
     nginx.ingress.kubernetes.io/default-backend: "error-svc"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
-kind: VirtualServer
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/custom-http-errors: "404,500,502"  # custom-http-errors
 spec:
+  defaultBackend:  # default-backend
+    service:
+      name: error-svc
+      port:
+        number: 80</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/custom-http-errors: "404,500,502"
+    nginx.ingress.kubernetes.io/default-backend: "error-svc"</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># default-backend "error-svc": errorPages cannot proxy to a Service; nginx.org/custom-http-errors on the Ingress can
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: error-pages-app
+spec:
+  host: app.example.com
   upstreams:
     - name: backend
-      service: backend-svc
+      service: my-service
       port: 80
   routes:
     - path: /
@@ -1821,10 +1854,11 @@ spec:
       errorPages:  # custom-http-errors
         - codes: [404, 500, 502]
           return:
-            code: 503
-            body: "Service Unavailable"</code></pre></div>
+            body: "An error occurred."</code></pre></div>
+                                </div>
                             </div>
-                            <div class="info-box warning"><strong>No error-Service proxying:</strong> NIC <code>errorPages</code> can only <code>return</code> a canned response or <code>redirect</code> to a URL — they cannot pass the intercepted error to a <code>default-backend</code> Service the way the community controller does. To serve custom error pages from a Service, host them behind their own VirtualServer and <code>redirect</code> to it.</div>
+                            <div class="info-box warning"><strong>Not identical to the community controller:</strong> NIC sends intercepted errors only to the Ingress's own <code>spec.defaultBackend</code>, which must be in the same namespace, and none of the community's <code>X-Code</code>, <code>X-Format</code>, or <code>X-Original-URI</code> headers reach it — error pages that branch on them need rework. Clients receive the original upstream status. On its own, <code>default-backend</code> has no annotation equivalent for its fallback when a Service has no ready endpoints; on NGINX Plus, VirtualServer <code>upstreams[].backup</code> is the closest match. VirtualServer <code>errorPages</code> can only <code>return</code> a canned response or <code>redirect</code> to a URL, not proxy to a Service.</div>
+                            <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/custom-http-errors</code> intercepts upstream responses with the listed status codes and serves them from the Ingress's <code>spec.defaultBackend</code>. It takes codes from 300 to 599 plus the <code>4xx</code> and <code>5xx</code> shorthands. NIC rejects the Ingress for an invalid code, including 499, which NGINX refuses in <code>error_page</code>. Without a <code>spec.defaultBackend</code> the annotation does nothing.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -1936,32 +1970,65 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/upstream-vhost</code><br><code>nginx.ingress.kubernetes.io/x-forwarded-prefix</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>requestHeaders.set</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>requestHeaders.set</code><span class="or-text">— or —</span><code>nginx.org/proxy-set-headers</code><br><code>nginx.org/upstream-vhost</code> <span class="badge badge-new">New v5.6.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                            </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     nginx.ingress.kubernetes.io/upstream-vhost: "backend.internal"
     nginx.ingress.kubernetes.io/x-forwarded-prefix: "/api"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/proxy-set-headers: "X-Forwarded-Prefix: /api"  # x-forwarded-prefix
+    nginx.org/upstream-vhost: "backend.internal"  # upstream-vhost</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/upstream-vhost: "backend.internal"
+    nginx.ingress.kubernetes.io/x-forwarded-prefix: "/api"</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: headers-app
 spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: my-service
+      port: 80
   routes:
-    - path: /api
+    - path: /
       action:
         proxy:
-          upstream: my-backend
+          upstream: backend
           requestHeaders:
             set:
               - name: Host
                 value: "backend.internal"  # upstream-vhost
               - name: X-Forwarded-Prefix
                 value: "/api"  # x-forwarded-prefix</code></pre></div>
+                                </div>
                             </div>
+                            <div class="info-box warning"><strong>Literal values only on the annotation path:</strong> <code>nginx.org/upstream-vhost</code> accepts a lowercase hostname with no port and no NGINX variables, and <code>nginx.org/proxy-set-headers</code> rejects <code>$</code> in a value. NIC rejects the whole Ingress otherwise. For a port or a variable, use the CRD approach, which writes variables in braces (<code>${host}</code>). A capture group such as <code>$1</code> in <code>x-forwarded-prefix</code> has no equivalent in either.</div>
+                            <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/upstream-vhost</code> sets the <code>Host</code> header sent upstream (<code>grpc_set_header</code> for gRPC Services); minion Ingresses inherit it from their master. Don't also set <code>Host</code> in <code>nginx.org/proxy-set-headers</code>: that writes a second directive and NIC warns on the Ingress.</div>
                         </div></td></tr>
                         <tr class="expandable"><td>No direct equivalent</td><td><code>nginx.org/add-header</code> <span class="badge badge-new">New v5.5.0</span><br><code>nginx.org/add-header-inherit</code> <span class="badge badge-new">New v5.5.0</span></td></tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -1990,25 +2057,17 @@ metadata:
                         <tr class="expandable"><td>No direct equivalent</td><td><code>nginx.org/proxy-set-headers</code></td></tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># Custom headers set via ConfigMap
-# proxy-set-headers in controller ConfigMap</code></pre></div>
+                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># No per-Ingress annotation. Request headers are set
+# controller-wide: the proxy-set-headers ConfigMap key
+# names a second ConfigMap holding the header pairs.</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/proxy-set-headers: "my-custom-headers"
----
-# ConfigMap with custom headers
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: my-custom-headers
-data:
-  X-Custom-Header: "my-value"
-  X-Forwarded-Proto: "$scheme"</code></pre></div>
+    nginx.org/proxy-set-headers: "X-Custom-Header: my-value, X-Request-Source"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/proxy-set-headers</code> requires two resources: (1) the annotation on the Ingress, referencing a ConfigMap name, and (2) the ConfigMap itself containing header key-value pairs. Headers defined in the ConfigMap are added to all proxied requests for that Ingress. The ConfigMap must be in the same namespace as the Ingress resource.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/proxy-set-headers</code> takes a comma-separated list of headers inline, each written <code>Name: value</code>. A name without a value forwards the client's own header of that name (<code>X-Request-Source</code> above sends <code>$http_x_request_source</code>). Values are literal: NIC rejects the Ingress for a <code>$</code>, a newline, or an unescaped quote in one. Set the upstream <code>Host</code> with <code>nginx.org/upstream-vhost</code> instead.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2021,11 +2080,16 @@ data:
                     <tbody>
                         <tr class="expandable">
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>hsts</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-include-subdomains</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-max-age</code><br><span class="badge badge-configmap">ConfigMap</span> <code>hsts-preload</code></td>
-                            <td><code>nginx.org/hsts</code><br><code>nginx.org/hsts-include-subdomains</code><br><code>nginx.org/hsts-max-age</code></td>
+                            <td><code>nginx.org/hsts</code><br><code>nginx.org/hsts-include-subdomains</code><br><code>nginx.org/hsts-max-age</code><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <code>hsts</code> <span class="badge badge-new">New v5.6.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># ConfigMap settings only
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                            </div>
+                            <div class="approach-content active" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># ConfigMap settings only
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -2035,7 +2099,7 @@ data:
   hsts-max-age: "31536000"
   hsts-include-subdomains: "true"
   hsts-preload: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
@@ -2043,8 +2107,52 @@ metadata:
     nginx.org/hsts: "true"  # hsts
     nginx.org/hsts-include-subdomains: "true"  # hsts-include-subdomains
     nginx.org/hsts-max-age: "31536000"  # hsts-max-age</code></pre></div>
+                                </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HSTS annotations are F5 NGINX Ingress Controller-only and provide per-Ingress control. The community controller handles HSTS via ConfigMap only. The F5 NGINX Ingress Controller's <code>nginx.org/hsts</code> annotation includes the <code>preload</code> directive by default — there is no separate equivalent of the community <code>hsts-preload</code> ConfigMap key.</div>
+                            <div class="approach-content" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code># ConfigMap settings only
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+data:
+  hsts: "true"
+  hsts-max-age: "31536000"
+  hsts-include-subdomains: "true"
+  hsts-preload: "true"</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: hsts-policy
+spec:
+  hsts:  # hsts
+    maxAge: 31536000  # hsts-max-age
+    includeSubDomains: true  # hsts-include-subdomains
+    preload: true  # hsts-preload
+---
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  tls:
+    secret: app-tls
+  policies:
+    - name: hsts-policy
+  upstreams:
+    - name: backend
+      service: my-service
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller sets HSTS only controller-wide, through its ConfigMap. The F5 NGINX Ingress Controller sets it per resource. The <code>nginx.org/hsts</code> annotation always adds the <code>preload</code> directive, so the community <code>hsts-preload</code> key has no separate annotation.</div>
+                            <div class="info-box note"><strong>New in v5.6.0:</strong> The <code>hsts</code> Policy CRD adds <code>preload</code> only when asked, which needs <code>includeSubDomains: true</code> and a <code>maxAge</code> of at least 31536000. Reference it from a VirtualServer's <code>spec.policies</code>; NIC returns a 500 for an <code>hsts</code> Policy on a route, a VirtualServerRoute, or an Ingress. It needs TLS on the VirtualServer, or <code>behindProxy: true</code> when TLS terminates upstream.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -4190,17 +4298,22 @@ spec:
 
             <!-- External Authentication & OIDC -->
             <h3 id="oidc-authentication">OIDC authentication</h3>
-            <div class="info-box note" style="margin: 0 0 var(--space-2x);"><strong>Looking for generic <code>auth_request</code> (non-OIDC) migration?</strong> Use the new <code>externalAuth</code> Policy CRD documented in the <a href="#authentication-external">Authentication (external)</a> section &mdash; it works in NGINX OSS and Plus. The <code>oidc</code> Policy below is specifically for native OIDC flows (no oauth2-proxy required) and requires NGINX Plus.</div>
+            <div class="info-box note" style="margin: 0 0 var(--space-2x);"><strong>Looking for generic <code>auth_request</code> (non-OIDC) migration?</strong> Use the new <code>externalAuth</code> Policy CRD documented in the <a href="#authentication-external">Authentication (external)</a> section &mdash; it works in NGINX OSS and Plus. The <code>oidcNative</code> and <code>oidc</code> Policies below make NGINX Plus the OpenID Connect client itself, with no oauth2-proxy.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="oidc-authentication"><thead><tr><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-cache-duration</code><br><code>nginx.ingress.kubernetes.io/auth-cache-key</code><br><code>nginx.ingress.kubernetes.io/auth-method</code><br><code>nginx.ingress.kubernetes.io/auth-proxy-set-headers</code><br><code>nginx.ingress.kubernetes.io/auth-request-redirect</code><br><code>nginx.ingress.kubernetes.io/auth-response-headers</code><br><code>nginx.ingress.kubernetes.io/auth-signin</code><br><code>nginx.ingress.kubernetes.io/auth-signin-redirect-param</code><br><code>nginx.ingress.kubernetes.io/auth-url</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>oidc</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>oidcNative</code> + <code>nginx.com/policies</code> <span class="badge badge-new">New v5.6.0</span><span class="or-text">— or —</span><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">Plus</span> <code>oidc</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="ingress-policy">Policy + Ingress (Recommended)</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="vs-policy">Policy + VirtualServer</button>
+                            </div>
+                            <div class="approach-content active" data-approach="ingress-policy">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
@@ -4214,7 +4327,52 @@ metadata:
     nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/oauth2/start"
     nginx.ingress.kubernetes.io/auth-signin-redirect-param: "rd"
     nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/oauth2/auth"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller (Plus)</h4><pre><code>apiVersion: v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller (Plus)</h4><pre><code>apiVersion: v1
+kind: Secret
+metadata:
+  name: oidc-secret
+type: nginx.org/oidc
+data:
+  client-secret: c2VjcmV0...
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: oidc-native-policy
+spec:
+  oidcNative:
+    issuer: "https://idp.example.com/realms/main"  # auth-url, auth-signin (the provider behind oauth2-proxy)
+    clientID: "my-client-id"
+    clientSecret: oidc-secret
+    scope: "openid profile email"
+    logoutURI: "/logout"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.com/policies: "oidc-native-policy"</code></pre></div>
+                                </div>
+                                <div class="info-box note"><strong>New in v5.6.0:</strong> The <code>oidcNative</code> Policy runs the whole OpenID Connect flow inside NGINX Plus with its built-in OIDC module. Endpoints come from the provider's discovery document, so you give only the <code>issuer</code>. Unlike <code>oidc</code>, it attaches to an Ingress, through <code>nginx.com/policies</code> (not <code>nginx.org/policies</code>). It needs the <code>-enable-oidc</code> flag and a <code>resolver-addresses</code> ConfigMap entry so NGINX can reach the provider.</div>
+                            </div>
+                            <div class="approach-content" data-approach="vs-policy">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/auth-cache-duration: "200 10m, 401 1m"
+    nginx.ingress.kubernetes.io/auth-cache-key: "$remote_addr"
+    nginx.ingress.kubernetes.io/auth-method: "GET"
+    nginx.ingress.kubernetes.io/auth-proxy-set-headers: "default/auth-headers"
+    nginx.ingress.kubernetes.io/auth-request-redirect: "https://app.example.com/callback"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-User"
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/oauth2/start"
+    nginx.ingress.kubernetes.io/auth-signin-redirect-param: "rd"
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/oauth2/auth"</code></pre></div>
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller (Plus)</h4><pre><code>apiVersion: v1
 kind: Secret
 metadata:
   name: oidc-secret
@@ -4233,9 +4391,30 @@ spec:
     clientSecret: oidc-secret
     jwksURI: "https://idp.example.com/.well-known/jwks.json"
     scope: "openid+profile+email"
-    tokenEndpoint: "https://idp.example.com/token"  # auth-url</code></pre></div>
+    tokenEndpoint: "https://idp.example.com/token"  # auth-url
+---
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  tls:
+    secret: app-tls
+  policies:
+    - name: oidc-auth
+  upstreams:
+    - name: backend
+      service: my-service
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
+                                <div class="info-box note"><strong>Note:</strong> A VirtualServer takes either Policy: <code>oidcNative</code> as in the first tab, or the NJS-based <code>oidc</code> shown here, which needs the provider's endpoints set by hand and cannot be used on an Ingress. The two are mutually exclusive on a route.</div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Native OIDC support eliminates the need for oauth2-proxy sidecar. The community <code>auth-url</code>/<code>auth-signin</code> pattern uses the <code>auth_request</code> module (typically with oauth2-proxy) and supports any external auth service, not just OIDC. The community annotations <code>auth-cache-duration</code>, <code>auth-cache-key</code>, <code>auth-method</code>, <code>auth-proxy-set-headers</code>, <code>auth-request-redirect</code>, <code>auth-response-headers</code>, and <code>auth-signin-redirect-param</code> have no direct OIDC Policy equivalents — the Policy manages these concerns internally. If you need generic external auth (non-OIDC), prefer the new <code>externalAuth</code> Policy CRD (v5.5.0+, OSS-capable) documented in the <a href="#authentication-external">Authentication (external)</a> section, or fall back to <code>nginx.org/location-snippets</code> with the <code>auth_request</code> directive.</div>
+                            <div class="info-box note"><strong>Note:</strong> Either Policy removes the oauth2-proxy sidecar. The community <code>auth-url</code>/<code>auth-signin</code> pattern uses the <code>auth_request</code> module (typically with oauth2-proxy) and supports any external auth service, not just OIDC. The community annotations <code>auth-cache-duration</code>, <code>auth-cache-key</code>, <code>auth-method</code>, <code>auth-proxy-set-headers</code>, <code>auth-request-redirect</code>, <code>auth-response-headers</code>, and <code>auth-signin-redirect-param</code> have no direct OIDC Policy equivalents — the Policy manages these concerns internally. If you need generic external auth (non-OIDC), prefer the new <code>externalAuth</code> Policy CRD (v5.5.0+, OSS-capable) documented in the <a href="#authentication-external">Authentication (external)</a> section, or fall back to <code>nginx.org/location-snippets</code> with the <code>auth_request</code> directive.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4324,6 +4503,7 @@ spec:
                                 <div class="info-box note"><strong>Note:</strong> The <code>appprotect.f5.com/</code> annotations enable F5 WAF for NGINX directly on the Ingress without a Policy CRD. The Policy + Ingress approach (v5.5.0+) is recommended for new deployments as it provides reusability and a more consistent configuration model with other NIC Policies.</div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> F5 WAF for NGINX provides enterprise WAF capabilities beyond ModSecurity. The Policy CRD approach allows WAF policies to be shared across multiple Ingress / VirtualServer resources. For community ModSecurity annotations, see the <a href="#modsecurity">ModSecurity / WAF</a> section in OSS Mappings. WAF IP Intelligence (threat-feed-based blocking) can also be enabled in v5.5.0 via the <code>-enable-app-protect-ip-intelligence</code> controller flag (or the <code>controller.appprotect.ipIntelligence.enable</code> Helm value) and configured inside the APPolicy resource.</div>
+                            <div class="info-box note"><strong>New in v5.6.0:</strong> The <code>waf</code> Policy can fetch compiled bundles itself: <code>apBundleSource</code> for the policy and <code>apLogBundleSource</code> for each security log, from an HTTPS URL, F5 NGINX Instance Manager, or F5 NGINX One Console, optionally polling for updates. Use one of <code>apPolicy</code>, <code>apBundle</code>, or <code>apBundleSource</code>.</div>
                             </div>
                         </td></tr>
                     </tbody>
@@ -4896,7 +5076,7 @@ metadata:
 data:
   hsts: "true"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The F5 NGINX Ingress Controller's <code>hsts: "true"</code> includes the <code>preload</code> directive by default. There is no separate <code>hsts-preload</code> key — just enable <code>hsts</code>.</div>
+                            <div class="info-box note"><strong>Note:</strong> The F5 NGINX Ingress Controller's <code>hsts: "true"</code> includes the <code>preload</code> directive by default. There is no separate <code>hsts-preload</code> key — just enable <code>hsts</code>. For HSTS without <code>preload</code>, use the <code>hsts</code> Policy CRD (v5.6.0+) on a VirtualServer — see <a href="#hsts">HSTS</a>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>ssl-dh-param</code></td>
@@ -5546,7 +5726,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>custom-http-errors</code></td>
-                            <td><code>server-snippets</code></td>
+                            <td><code>server-snippets</code><span class="or-text">— or —</span><code>nginx.org/custom-http-errors</code> <span class="badge badge-new">New v5.6.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5562,9 +5742,15 @@ metadata:
   name: nginx-config
 data:
   server-snippets: |  # custom-http-errors
-    error_page 404 503 @custom_errors;</code></pre></div>
+    proxy_intercept_errors on;
+    error_page 404 503 @custom_errors;
+    location @custom_errors {
+      internal;
+      proxy_intercept_errors off;
+      proxy_pass http://error-pages.default.svc.cluster.local;
+    }</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller integrates with a default backend for custom error pages. The NIC requires manual <code>error_page</code> directives via snippets, typically combined with a custom error backend.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community key is controller-wide and sends errors to the controller's default backend; the F5 NGINX Ingress Controller has no ConfigMap key for it. Controller-wide, a <code>server-snippets</code> entry must define both the <code>error_page</code> and the named location it targets, and the Service in <code>proxy_pass</code> must exist when NGINX reloads or the reload fails. Per Ingress, <code>nginx.org/custom-http-errors</code> (v5.6.0+) does the same without snippets, sending errors to that Ingress's <code>spec.defaultBackend</code> — see <a href="#error-handling">Error handling</a>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>enable-brotli</code></td>

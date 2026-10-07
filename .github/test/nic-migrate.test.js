@@ -440,6 +440,40 @@ test('session affinity loss is reported on the ingress target, without blaming P
     assert.ok(!/plus/i.test(note), 'affinity is not a Plus feature: ' + note);
 });
 
+test('an annotation the analyzer cannot translate is reported, not silently dropped', () => {
+    /* NIC rejects a whole Ingress whose nginx.org/upstream-vhost is not a bare
+       lowercase hostname, so the analyzer emits no swap for "$host:8080" and
+       says why in an info note. The convert path read swaps and generated
+       resources but never the notes, so on the ingress target the setting just
+       vanished. */
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = { 'nginx.ingress.kubernetes.io/upstream-vhost': '$host:8080' };
+    const { out } = runConvert(doc, { target: 'ingress', strategy: 'annotation' });
+    const ing = out.docs.find((d) => d.kind === 'Ingress');
+    assert.equal((ing.metadata.annotations || {})['nginx.org/upstream-vhost'], undefined);
+    assert.ok(out.notes.some((n) => /upstream-vhost/.test(n) && /hostname/.test(n)),
+        'the refusal must be reported: ' + out.notes.join(' | '));
+});
+
+test('custom-http-errors without a default backend is flagged on the ingress target', () => {
+    /* NIC sends intercepted errors only to the Ingress's own spec.defaultBackend
+       and treats the annotation as a no-op without one; the community
+       controller fell back to its global default backend. */
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = { 'nginx.ingress.kubernetes.io/custom-http-errors': '404,503' };
+    delete doc.spec.defaultBackend;
+    const { out } = runConvert(doc, { target: 'ingress', strategy: 'annotation' });
+    const ing = out.docs.find((d) => d.kind === 'Ingress');
+    assert.equal(ing.metadata.annotations['nginx.org/custom-http-errors'], '404,503');
+    assert.ok(out.notes.some((n) => /spec\.defaultBackend/.test(n)),
+        'a missing default backend must be flagged: ' + out.notes.join(' | '));
+
+    doc.spec.defaultBackend = { service: { name: 'error-svc', port: { number: 80 } } };
+    const withBackend = runConvert(doc, { target: 'ingress', strategy: 'annotation' }).out;
+    assert.ok(!withBackend.notes.some((n) => /no spec\.defaultBackend/.test(n)),
+        'no warning once the Ingress has one: ' + withBackend.notes.join(' | '));
+});
+
 test('the virtualserver target keeps session affinity that the ingress target loses', () => {
     const { out } = runConvert(INGRESS);
     const vs = out.docs.filter((d) => d.kind === 'VirtualServer');

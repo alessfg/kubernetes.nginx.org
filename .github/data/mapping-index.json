@@ -215,7 +215,7 @@
    "type": "virtualserver",
    "crdKind": "VirtualServer",
    "templateFn": "generateErrorPagesVirtualServer",
-   "transform": null
+   "transform": "customHttpErrors"
   },
   {
    "community": [
@@ -249,7 +249,7 @@
    "type": "virtualserver",
    "crdKind": "VirtualServer",
    "templateFn": "generateRequestHeadersVS",
-   "transform": null
+   "transform": "upstreamVhost"
   },
   {
    "community": [

@@ -342,6 +342,14 @@ function buildIngress(model, gen, swaps, opts) {
     }
     if (gen.redirect) notes.push('a redirect action needs a VirtualServer and is absent from the Ingress target');
 
+    /* NIC sends intercepted errors only to this Ingress's own spec.defaultBackend
+       and treats the annotation as a no-op without one; the community controller
+       fell back to its global default backend. */
+    if (annotations['nginx.org/custom-http-errors'] && !spec.defaultBackend) {
+        notes.push('nginx.org/custom-http-errors has no spec.defaultBackend to send errors to, so NIC ' +
+            'ignores it — add spec.defaultBackend pointing at your error-page Service');
+    }
+
     return { docs: [{ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata, spec }], notes };
 }
 
@@ -385,6 +393,11 @@ function convert(model, result, opts) {
         notes.push('a TransportServer was emitted separately — it carries L4 traffic and cannot merge into a VirtualServer');
     }
     for (const u of gen.unmergeable) notes.push(u.kind + '/' + u.name + ': ' + u.reason);
+
+    /* The analyzer's info notes are where it says an annotation was recognised
+       but could not be translated (a value NIC would reject, a setting with no
+       annotation form). Without them a refused value simply disappears. */
+    for (const n of (result.plan && result.plan.infoNotes) || []) notes.push(n.code + ' — ' + n.message);
 
     const todos = [];
     for (const doc of docs) extractTodos(doc, doc.kind, todos);

@@ -66,16 +66,16 @@
             { community: ["cors-allow-credentials", "cors-allow-headers", "cors-allow-methods", "cors-allow-origin", "cors-expose-headers", "cors-max-age", "enable-cors"], nic: "Policy CRD cors (+ nginx.org/policies annotation) — or — Annotation snippets — or — VirtualServer CRD responseHeaders", type: "policy", category: "CORS / header manipulation", anchor: "cors", section: "oss", dualApproach: true, plusRequired: false,
               nicMapping: { annotations: { "enable-cors": { key: "nginx.org/server-snippets", transform: "corsSnippet" } }, crdKind: "Policy", crdInstall: true, templateFn: "generateCORSPolicy" } },
             // Error Handling
-            { community: ["custom-http-errors", "default-backend"], nic: "VirtualServer CRD errorPages[]", type: "virtualserver", category: "Error handling", anchor: "error-handling", section: "oss", dualApproach: false, plusRequired: false,
-              nicMapping: { crdKind: "VirtualServer", crdInstall: true, templateFn: "generateErrorPagesVirtualServer" } },
+            { community: ["custom-http-errors", "default-backend"], nic: "nginx.org/custom-http-errors + Ingress spec.defaultBackend — or — VirtualServer CRD errorPages[]", type: "virtualserver", category: "Error handling", anchor: "error-handling", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+              nicMapping: { annotations: { "custom-http-errors": { key: "nginx.org/custom-http-errors", transform: "customHttpErrors" }, "default-backend": { key: "spec.defaultBackend", transform: "defaultBackend" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateErrorPagesVirtualServer" } },
             // Headers
             { community: ["connection-proxy-header"], nic: "Snippets — or — VirtualServer CRD requestHeaders.set", type: "annotation", category: "Headers", anchor: "headers", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "connection-proxy-header": { key: "nginx.org/location-snippets", transform: "snippetWrap", template: "proxy_set_header Connection \"${value}\";" } } } },
             { community: ["custom-headers"], nic: "VirtualServer CRD responseHeaders.add", type: "virtualserver", category: "Headers", anchor: "headers", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { crdKind: "VirtualServer", crdInstall: true, templateFn: "generateCustomHeadersVS" } },
             // proxy-hide-headers & proxy-pass-headers: F5 NGINX Ingress Controller-only annotations (nginx.org/) — no community equivalent
-            { community: ["upstream-vhost", "x-forwarded-prefix"], nic: "VirtualServer CRD requestHeaders.set", type: "virtualserver", category: "Headers", anchor: "headers", section: "oss", dualApproach: false, plusRequired: false,
-              nicMapping: { crdKind: "VirtualServer", crdInstall: true, templateFn: "generateRequestHeadersVS" } },
+            { community: ["upstream-vhost", "x-forwarded-prefix"], nic: "nginx.org/upstream-vhost, nginx.org/proxy-set-headers — or — VirtualServer CRD requestHeaders.set", type: "virtualserver", category: "Headers", anchor: "headers", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+              nicMapping: { annotations: { "upstream-vhost": { key: "nginx.org/upstream-vhost", transform: "upstreamVhost" }, "x-forwarded-prefix": { key: "nginx.org/proxy-set-headers", transform: "proxySetHeader", template: "X-Forwarded-Prefix: ${value}" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateRequestHeadersVS" } },
             // Load Balancing
             { community: ["load-balance"], nic: "nginx.org/lb-method — or — VirtualServer CRD upstreams[].lb-method", type: "annotation", category: "Load balancing", anchor: "load-balancing", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "load-balance": { key: "nginx.org/lb-method", transform: "lbMethod" } } } },
@@ -153,7 +153,7 @@
             { community: ["proxy-send-timeout"], nic: "nginx.org/proxy-send-timeout — or — VirtualServer CRD upstreams[].send-timeout", type: "annotation", category: "Timeouts", anchor: "timeouts", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "proxy-send-timeout": { key: "nginx.org/proxy-send-timeout", transform: "appendTimeUnit" } } } },
             // Authentication (External): generic auth_request → externalAuth Policy (OSS, recommended).
-            // Native OIDC (Plus) is documented as an alternative in the OIDC Authentication section.
+            // OIDC itself (Plus: oidcNative or oidc Policy) is documented as an alternative in the OIDC authentication section.
             { community: ["auth-cache-duration", "auth-cache-key", "auth-method", "auth-proxy-set-headers", "auth-request-redirect", "auth-response-headers", "auth-signin", "auth-signin-redirect-param", "auth-snippet", "auth-url"], nic: "Policy CRD externalAuth (+ nginx.org/policies annotation)", type: "policy", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { crdKind: "Policy", crdInstall: true, templateFn: "generateExternalAuthPolicy" } },
             { community: ["auth-keepalive", "auth-keepalive-requests", "auth-keepalive-share-vars", "auth-keepalive-timeout"], nic: "Annotation nginx.org/location-snippets (auth_request directives)", type: "annotation", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
@@ -287,10 +287,14 @@
         // Translate a community annotation value to its NIC equivalent.
         // Returns either a string (the translated value) or an object
         // { value, note } when a non-trivial substitution was applied.
+        // { value: null, note } means NIC has no annotation for this value:
+        // the caller reports the note instead of emitting a swap.
         // `found` (the entry's found annotations) enables cross-annotation
         // transforms like burstMultiplier.
         function translateValue(value, transform, template, found) {
-            if (!value && value !== '0') return value;
+            // defaultBackend never has an annotation form, so even an empty value
+            // has to reach its case rather than become an empty swap.
+            if (!value && value !== '0' && transform !== 'defaultBackend') return value;
             switch (transform) {
                 case 'direct': return value;
                 case 'booleanInvert': return value === 'true' ? 'false' : value === 'false' ? 'true' : value;
@@ -321,6 +325,46 @@
                         return { value: lbAliases[trimmed], note: trimmed + ' is not supported, using ' + lbAliases[trimmed] + ' as the closest equivalent' };
                     }
                     return value;
+                }
+                case 'upstreamVhost': {
+                    // NIC validates nginx.org/upstream-vhost as an RFC 1123
+                    // subdomain and rejects the whole Ingress otherwise. The
+                    // community annotation also took ports and $variables.
+                    let host = String(value).trim().toLowerCase();
+                    if (host.length <= 253 && /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/.test(host)) {
+                        return host === value ? value : { value: host, note: 'lowercased — NIC accepts only a lowercase hostname' };
+                    }
+                    return { value: null, note: 'nginx.org/upstream-vhost takes only a literal lowercase hostname, with no port or variables, and NIC rejects the Ingress otherwise. Switch the migration strategy to CRD-first: VirtualServer requestHeaders.set accepts it.' };
+                }
+                case 'proxySetHeader': {
+                    // nginx.org/proxy-set-headers is a comma-separated list of
+                    // literal values: NIC rejects $, and a comma splits the entry.
+                    if (/[$,"\\\r\n]/.test(value)) {
+                        return { value: null, note: 'nginx.org/proxy-set-headers takes only literal values, and NIC rejects $ in them, so capture groups such as $1 have no annotation equivalent. Switch the migration strategy to CRD-first.' };
+                    }
+                    return template ? template.replace('${value}', String(value).trim()) : value;
+                }
+                case 'customHttpErrors': {
+                    // NIC rejects 499 in error_page, and so the whole Ingress.
+                    let codes = String(value).split(',').map(function(c) { return c.trim(); }).filter(Boolean);
+                    let kept = codes.filter(function(c) { return c !== '499'; });
+                    let notes = [];
+                    if (kept.length < codes.length) notes.push('499 dropped — NIC rejects it in error_page');
+                    if (!getAnnotationValue(found || [], 'default-backend')) {
+                        notes.push('errors go to this Ingress\'s spec.defaultBackend, so set one — the community controller fell back to its global default backend');
+                    }
+                    if (kept.length === 0) return { value: null, note: 'No status code survives: NIC rejects 499 in error_page.' };
+                    let joined = kept.join(',');
+                    return notes.length || joined !== value ? { value: joined, note: notes.join('; ') || null } : value;
+                }
+                case 'defaultBackend': {
+                    // The community annotation names a Service; NIC reads the
+                    // Ingress's spec.defaultBackend, which has no annotation form.
+                    let svc = String(value || '').trim() || '<service>';
+                    if (getAnnotationValue(found || [], 'custom-http-errors')) {
+                        return { value: null, note: 'Set the Ingress spec.defaultBackend to Service "' + svc + '" (with its port) — it is the only place nginx.org/custom-http-errors sends intercepted errors, and it also serves requests that match no rule.' };
+                    }
+                    return { value: null, note: 'Set the Ingress spec.defaultBackend to Service "' + svc + '" for requests that match no rule. NIC has no annotation for the community fallback used when a Service has no ready endpoints; on NGINX Plus, VirtualServer upstreams[].backup is the closest equivalent.' };
                 }
                 default: return value;
             }
@@ -413,6 +457,9 @@
         function specService(spec) { return (spec && spec.serviceName) || '# TODO: Set your service'; }
         function specPort(spec) { return (spec && spec.servicePort) || '80'; }
         function specPath(spec) { return (spec && spec.path) || '/'; }
+        // VirtualServer header values take NGINX variables only in braces:
+        // $host must be written ${host}.
+        function braceVariables(value) { return String(value).replace(/\$([A-Za-z_][A-Za-z0-9_]*)/g, '${$1}'); }
 
         let CRD_GENERATORS = {
             generateAccessControlPolicy: function(found) {
@@ -548,9 +595,16 @@
                 return ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: rewrite-app', 'spec:', '  host: ' + specHost(spec), '  upstreams:', '    - name: backend', '      service: ' + specService(spec), '      port: ' + specPort(spec), '  routes:', '    - path: ' + path, '      action:', '        proxy:', '          upstream: backend', '          rewritePath: ' + target].join('\n');
             },
             generateErrorPagesVirtualServer: function(found, spec) {
-                let codes = getAnnotationValue(found, 'custom-http-errors') || '404,500,502';
-                let codeList = codes.split(',').map(function(c) { return c.trim(); });
-                return ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: error-pages-app', 'spec:', '  host: ' + specHost(spec), '  upstreams:', '    - name: backend', '      service: ' + specService(spec), '      port: ' + specPort(spec), '  routes:', '    - path: ' + specPath(spec), '      action:', '        pass: backend', '      errorPages:', '        - codes: [' + codeList.join(', ') + ']', '          return:', '            code: 503', '            body: "Service Unavailable"'].join('\n');
+                // NIC rejects 499 in error_page. Leaving return.code unset keeps
+                // the upstream's status, as the community controller does.
+                let codes = getAnnotationValue(found, 'custom-http-errors');
+                let codeList = codes ? codes.split(',').map(function(c) { return c.trim(); }).filter(function(c) { return c && c !== '499'; }) : [];
+                let backend = getAnnotationValue(found, 'default-backend');
+                let lines = [];
+                if (backend) lines.push('# default-backend "' + backend + '": errorPages cannot proxy to a Service; nginx.org/custom-http-errors on the Ingress can');
+                lines.push('apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: error-pages-app', 'spec:', '  host: ' + specHost(spec), '  upstreams:', '    - name: backend', '      service: ' + specService(spec), '      port: ' + specPort(spec), '  routes:', '    - path: ' + specPath(spec), '      action:', '        pass: backend');
+                if (codeList.length) lines.push('      errorPages:', '        - codes: [' + codeList.join(', ') + ']', '          return:', '            body: "An error occurred."');
+                return lines.join('\n');
             },
             generateSSLPassthroughTransportServer: function(found, spec) {
                 return ['# tls-passthrough is a built-in listener — no GlobalConfiguration needed', 'apiVersion: k8s.nginx.org/v1', 'kind: TransportServer', 'metadata:', '  name: ssl-passthrough-app', 'spec:', '  listener:', '    name: tls-passthrough', '    protocol: TLS_PASSTHROUGH', '  host: ' + specHost(spec), '  upstreams:', '    - name: backend', '      service: ' + specService(spec), '      port: 443', '  action:', '    pass: backend'].join('\n');
@@ -566,8 +620,12 @@
                 let vhost = getAnnotationValue(found, 'upstream-vhost');
                 let prefix = getAnnotationValue(found, 'x-forwarded-prefix');
                 let headers = [];
-                if (vhost) headers.push('              - name: Host', '                value: "' + vhost + '"');
-                if (prefix) headers.push('              - name: X-Forwarded-Prefix', '                value: "' + prefix + '"');
+                if (vhost) headers.push('              - name: Host', '                value: "' + braceVariables(vhost) + '"');
+                if (prefix && /\$\d/.test(prefix)) {
+                    headers.push('              - name: X-Forwarded-Prefix', '                value: # TODO: Set a literal prefix (capture groups like $1 have no VirtualServer equivalent)');
+                } else if (prefix) {
+                    headers.push('              - name: X-Forwarded-Prefix', '                value: "' + braceVariables(prefix) + '"');
+                }
                 if (headers.length === 0) headers.push('              - name: # TODO: Set header', '                value: # TODO: Set value');
                 return ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: headers-app', 'spec:', '  host: ' + specHost(spec), '  upstreams:', '    - name: backend', '      service: ' + specService(spec), '      port: ' + specPort(spec), '  routes:', '    - path: ' + specPath(spec), '      action:', '        proxy:', '          upstream: backend', '          requestHeaders:', '            set:'].concat(headers).join('\n');
             },
@@ -616,7 +674,7 @@
                     lines.push('    authSnippets: |  # auth-snippet');
                     snippet.split('\n').forEach(function(l) { lines.push('      ' + l.trim()); });
                 }
-                lines.push('', '# Reference from Ingress (v5.5.0+):', '#   annotations:', '#     nginx.org/policies: "external-auth-policy"', '# For native OIDC (Plus), use the oidc Policy instead — see the OIDC Authentication section.');
+                lines.push('', '# Reference from Ingress (v5.5.0+):', '#   annotations:', '#     nginx.org/policies: "external-auth-policy"', '# If the auth service is an OIDC provider, NGINX Plus can be the client itself with the oidcNative Policy — see the OIDC authentication section.');
                 return lines.join('\n');
             },
             generateSessionAffinityVS: function(found, spec) {
@@ -729,6 +787,12 @@
                                 return;
                             }
                             let translated = unwrapTranslated(translateValue(a.value, spec.transform, spec.template, entry.foundAnnotations));
+                            // A transform that returns no value has found that NIC
+                            // offers no annotation for it: report, do not emit.
+                            if (translated.value === null) {
+                                infoNotes.push({ annotation: a.annotation, value: a.value, message: translated.note, entry: entry });
+                                return;
+                            }
                             annotationSwaps.push({ from: 'nginx.ingress.kubernetes.io/' + a.annotation, fromAnnotations: [{ annotation: a.annotation, value: a.value }], to: spec.key, value: translated.value, note: translated.note, originalValue: a.value, entry: entry });
                         });
                     }

@@ -59,6 +59,17 @@
     margin: var(--space-xsmall) 0 var(--space-small) var(--space-3x);
     transition: max-height var(--dur-reveal) var(--ease-enter);
 }
+/* A collapsed list was clipped to zero height but stayed in the Tab order and
+   the accessibility tree: four to eight invisible stops on every pass, read
+   out under a parent announcing itself collapsed. Hidden once the collapse
+   has finished animating. The open state deliberately sets no visibility of
+   its own: `visible` there would override the closed mobile drawer's
+   `hidden` and put these items back in the Tab order off-screen. */
+.sidebar-subnav:not(.open) {
+    visibility: hidden;
+    transition: max-height var(--dur-reveal) var(--ease-enter),
+                visibility 0s linear var(--dur-reveal);
+}
 .sidebar-subnav.open { max-height: 500px; }
 .sidebar-subnav .sidebar-link {
     padding: var(--space-small) var(--space-base);
@@ -121,18 +132,33 @@ h3 {
     margin: var(--space-3hx) 0 var(--space-2x);
 }
 
-h2[id], h3[id] { display: flex; align-items: center; }
-h2[id], h3[id], section[id] { scroll-margin-top: calc(var(--fixed-top-h) + var(--space-5x)); }
+/* On top of the top-bar clearance html's scroll-padding already gives
+   (shared.css), so headings land where they always did: 40px below the bar. */
+h2[id], h3[id], section[id] { scroll-margin-top: var(--space-4x); }
+
+/* The permalink sits BESIDE its heading, in a wrapper migration-core.js adds,
+   not inside it. Inside, "Permalink: <heading>" became part of every heading's
+   accessible name, and of every table named by aria-labelledby — 50 of the 54
+   headings and all 50 mapping tables read it. The wrapper carries the
+   heading's own box (the rule, the bottom margin), so the layout is the same
+   one the inline anchor gave. */
+.heading-row { display: flex; align-items: center; gap: var(--space-base); }
+.heading-row > h2, .heading-row > h3 { margin: 0; padding: 0; border: 0; }
+.heading-row-h2 {
+    padding-bottom: var(--space-base);
+    margin-bottom: var(--space-3x);
+    border-bottom: 1px solid var(--border);
+}
+.heading-row-h3 { margin: var(--space-3hx) 0 var(--space-2x); }
 .heading-anchor {
     display: inline-flex;
     align-items: center;
-    margin-left: var(--space-base);
     opacity: 0;
     color: var(--text-secondary);
     text-decoration: none;
     transition: opacity var(--dur-colour) linear;
 }
-h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus-visible { opacity: 1; }
+.heading-row:hover .heading-anchor, .heading-anchor:focus-visible { opacity: 1; }
 
 .doc-list { padding-left: var(--space-5x); }
 
@@ -316,28 +342,19 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 .comparison-block.old h4 { background: var(--pomegranate-tint); color: var(--text); }
 .comparison-block.new h4 { background: var(--green-tint); color: var(--text); }
 .comparison-block pre { margin: 0; border: 0; border-radius: 0; }
-/* Shared geometry for the two copy buttons the analyzer and the comparison
-   blocks build at runtime. They differ only in placement and rest colours;
-   everything below was written out twice, and the .copied state a third time
-   in a rule for a .copy-btn the migration page never renders. */
-.comparison-copy-btn, .analyzer-copy-btn {
-    padding: 0 var(--space-base);
-    border: 1px solid;
-    border-radius: var(--radius);
-    font-family: var(--font);
-    font-size: var(--fs-caption);
-    line-height: var(--lh-caption);
-    cursor: pointer;
-    transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
-}
-.comparison-copy-btn.copied, .analyzer-copy-btn.copied {
-    background: var(--green-text);
-    border-color: var(--green-text);
-    color: var(--n0);
-}
+/* Copy-button geometry and the copied state are shared with the landing page
+   and live in shared.css; what is here is placement and rest colours.
 
+   The comparison button sits over the header bar rather than inside the <h4>.
+   Inside it, the button's label became part of the heading's accessible name,
+   so ~350 headings read "… Copy code snippet". Centred on the bar's first line,
+   and the heading keeps room for the "Copied!" label on its right. */
+.comparison-block h4 { padding-right: calc(var(--space-8x) + var(--space-2x)); }
 .comparison-copy-btn {
-    min-height: 20px;
+    position: absolute;
+    top: calc(var(--space-base) + var(--lh-caption) / 2);
+    right: var(--space-2x);
+    transform: translateY(-50%);
     background: var(--surface);
     border-color: var(--border-control);
     color: var(--text-secondary);
@@ -509,6 +526,7 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 
 .eol-toggle {
     margin-left: var(--space-base);
+    min-height: 24px;   /* the WCAG 2.2 target minimum; it measured 44x20 */
     padding: 0 var(--space-base);
     background: none;
     border: 1px solid currentColor;
@@ -523,7 +541,7 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 }
 .eol-compact {
     margin: 0 0 var(--space-2x);
-    padding: var(--space-base) var(--space-2x) var(--space-base) var(--space-5x);
+    padding: var(--space-base) var(--space-2x) var(--space-base) var(--info-box-inset);
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
 }
@@ -556,9 +574,19 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
        because the negative margin is what keeps the bar flush with the fixed
        header once it sticks. */
     .main-inner section > p:has(+ .controls) { margin-bottom: var(--space-2x); }
-    /* Headings below the sticky bar need clearance for the fixed header plus the bar. */
+    /* Everything below the sticky bar needs to clear the bar as well as the
+       fixed header, and html's scroll-padding covers only the header. The
+       headings keep their old landing spot (header + 80px); every other
+       focusable thing under the bar gets the bar's height plus 8px, since the
+       browser scrolls it there on Tab. Before this, shift-tabbing back through
+       the tables left 17 of 60 focus stops hidden under the two bars. */
     #mappings h3[id], #plus-mappings h3[id], #configmap-mappings h3[id] {
-        scroll-margin-top: calc(var(--fixed-top-h) + var(--space-8x) + var(--space-2x));
+        scroll-margin-top: calc(var(--space-8x) + var(--space-base));
+    }
+    /* `pre` because Chrome makes a horizontally scrollable code block a Tab
+       stop of its own; 32 of 630 stops were still obscured without it. */
+    :is(#mappings, #plus-mappings, #configmap-mappings) .controls ~ * :is(a, button, pre, [tabindex]):not(h3) {
+        scroll-margin-top: var(--space-6x);
     }
 }
 .controls input[type="search"], .controls select {
@@ -586,6 +614,16 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
     white-space: nowrap;
 }
 .search-count.no-results { color: var(--pomegranate-text); font-weight: 500; }
+/* Built by filterTable() under the bar when a section has no matching rows. */
+.search-empty {
+    margin: 0 0 var(--space-2hx);
+    padding: var(--space-2x);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text-secondary);
+}
 
 
 /* ── Feature cards ────────────────────────────────────────────────────────
@@ -667,6 +705,10 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
     font-size: var(--fs-body);
     line-height: var(--lh-body);
 }
+/* A flex item's min-width defaults to its content, so one unbreakable run —
+   `controller.enableCustomResources=true` — widened the whole page and pushed
+   the dark-mode toggle off-screen at 320–340px. */
+.checklist li > span { min-width: 0; overflow-wrap: anywhere; }
 .checklist li::before {
     content: '';
     flex-shrink: 0;
@@ -834,7 +876,9 @@ button.analyzer-pill { font-family: var(--font); }
 
 #analyzerResults { margin-top: var(--space-2hx); }
 /* Analyzer scroll targets (results, step jumps) must clear the fixed header. */
-#analyzerResults, .analyzer-step, #analyzer-unrecognized { scroll-margin-top: calc(var(--fixed-top-h) + var(--space-2x)); }
+/* html's scroll-padding already clears the header; this is the 8px on top of
+   that, so these still land 16px below it. */
+#analyzerResults, .analyzer-step, #analyzer-unrecognized { scroll-margin-top: var(--space-base); }
 .analyzer-unrecognized-section { margin-top: var(--space-2hx); }
 .analyzer-unrecognized-section h4 {
     margin-bottom: var(--space-base);
@@ -943,7 +987,6 @@ button.analyzer-pill { font-family: var(--font); }
     top: var(--space-base);
     right: var(--space-base);
     z-index: 1;
-    min-height: 24px;
     background: var(--on-code);
     border-color: var(--on-code-strong);
     color: var(--n300);
@@ -1266,10 +1309,15 @@ button.analyzer-pill { font-family: var(--font); }
 /* ── Migration strategy toggle ────────────────────────────────────────────
    A segmented control, which F5DS names as the component for switching view or
    filtering within one context. */
+/* The row wraps rather than squeezing: at 1100–1400px the flex row used to
+   shrink both segment labels onto two lines each, which reads as four options.
+   The labels never wrap now; the description is what gives way, onto a line
+   of its own when there is not room beside the segments. */
 .strategy-toggle {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-2x);
+    gap: var(--space-base) var(--space-2x);
     margin: var(--space-2x) 0;
     padding: var(--space-2x);
     background: var(--surface);
@@ -1281,6 +1329,7 @@ button.analyzer-pill { font-family: var(--font); }
 .strategy-toggle-label { font-weight: 500; color: var(--text); white-space: nowrap; }
 .strategy-toggle-options {
     display: flex;
+    flex-shrink: 0;
     padding: 2px;
     background: var(--surface-sunken);
     border: 1px solid var(--border);
@@ -1297,12 +1346,13 @@ button.analyzer-pill { font-family: var(--font); }
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
     font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
     transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
 }
 .strategy-option.active { background: var(--surface); color: var(--text); box-shadow: var(--elev-1); }
 .strategy-option:not(.active):hover { color: var(--text); }
-.strategy-desc { margin-left: var(--space-small); font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
+.strategy-desc { flex: 1 1 240px; margin-left: var(--space-small); font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-secondary); }
 
 
 /* ── Scroll to top ────────────────────────────────────────────────────────
@@ -1329,6 +1379,28 @@ button.analyzer-pill { font-family: var(--font); }
 .scroll-to-top:hover { background: var(--green-deep); transform: scale(1.1); }
 
 
+/* ── Forced colours ───────────────────────────────────────────────────────
+   The tool's own selected states, restated in what forced colours keep. The
+   site-wide rules (the nav rail, the lockup) are in shared.css. */
+@media (forced-colors: active) {
+    /* The selected strategy was a lighter surface and a shadow, both
+       discarded. A border on every segment, then the selected one drawn in
+       the user's highlight pair. */
+    .strategy-option { border: 1px solid transparent; }
+    .strategy-option.active {
+        forced-color-adjust: none;
+        background: Highlight;
+        border-color: Highlight;
+        color: HighlightText;
+    }
+    .approach-tab.active::after { forced-color-adjust: none; background: Highlight; }
+    tr.expandable.expanded { border-left-color: Highlight; }
+    tr.expandable td:first-child::after { forced-color-adjust: none; border-color: CanvasText; }
+    .checklist li::before { border-color: CanvasText; }
+    .checklist li.checked::before { forced-color-adjust: none; background-color: Highlight; border-color: Highlight; }
+}
+
+
 /* ── Dark-mode overrides ──────────────────────────────────────────────────
    Almost everything above now resolves through tokens that already flip, so
    what remains is only the handful of cases where a light-theme choice does not
@@ -1346,8 +1418,12 @@ button.analyzer-pill { font-family: var(--font); }
 :is(html, body).dark-mode .analyzer-comparison-badge { background: var(--surface); }
 :is(html, body).dark-mode .analyzer-step-number { color: var(--n700); }
 :is(html, body).dark-mode .analyzer-copy-all { color: var(--n700); }
-:is(html, body).dark-mode .comparison-copy-btn.copied,
-:is(html, body).dark-mode .analyzer-copy-btn.copied { color: var(--n700); }
+/* Links on a sentiment tint. Dark --blue-text over the tints measures 4.26:1
+   (warning) to 4.38:1 (note) on a section, under the bar; --blue-deep is
+   5.37–5.52:1. Covers the three info-box tints and the "See reference guide"
+   link the analyzer puts in its warning cards. */
+:is(html, body).dark-mode .main-inner .info-box a:link,
+:is(html, body).dark-mode .main-inner .info-box a:visited { color: var(--blue-deep); }
 :is(html, body).dark-mode .checklist li.checked::before { background-color: var(--green); border-color: var(--green); }
 :is(html, body).dark-mode .scroll-to-top { color: var(--n700); }
 
@@ -1367,7 +1443,6 @@ button.analyzer-pill { font-family: var(--font); }
     .example-content { padding: var(--space-2x); margin: var(--space-small); }
     .approach-tabs { flex-wrap: wrap; gap: var(--space-2x); }
     .approach-tab { min-height: 44px; }
-    .info-box { padding: var(--space-2x) var(--space-2x) var(--space-2x) var(--space-5x); }
     /* .feature-grid is flex on this page (unlike index.css's grid) — stack via the cards. */
     .feature-card { flex: 1 1 100%; }
 }
@@ -1376,6 +1451,7 @@ button.analyzer-pill { font-family: var(--font); }
     .main-inner { padding: var(--space-2x) var(--space-2x) var(--space-4x); }
     .main-inner section { padding: var(--space-2x); margin-bottom: var(--space-2hx); }
     h2 { font-size: var(--fs-h3); line-height: var(--lh-h3); margin-bottom: var(--space-2x); }
+    .heading-row-h2 { margin-bottom: var(--space-2x); }
     h3 { font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); }
 
     .analyzer-actions { flex-direction: column; }
@@ -1436,7 +1512,16 @@ button.analyzer-pill { font-family: var(--font); }
     .analyzer-edit-btn, .analyzer-yaml-expand, .analyzer-empty-state,
     .controls, .analyzer-export-actions, .comparison-copy-btn { display: none !important; }
 
-    .main-inner section { box-shadow: none; break-inside: avoid; }
+    /* Unbreakable units are the small things a reader takes in whole, never a
+       section: a section spans dozens of pages, so `break-inside: avoid` on it
+       pushed each to a fresh page and left the page before it near-blank, from
+       page 1 on. Measured on the reference guide, A4: 140 pages with page 1
+       blank before; 185 with every row and code block kept whole, because a
+       multi-page example row cannot fit and jumps; 139 with this set, against
+       ~131 for a print with no breaks avoided at all. */
+    .main-inner section { box-shadow: none; }
+    tr.expandable, .info-box, .comparison-block h4 { break-inside: avoid; }
+    .heading-row, .comparison-block h4 { break-after: avoid; }
 
     /* Static code examples keep their on-screen dark palette otherwise —
        browsers strip backgrounds by default, leaving light-grey-on-white text. */

@@ -332,6 +332,21 @@
                 });
             }
 
+            // The skip link moves focus without touching the URL. As a plain
+            // link it rewrote the hash to #main-content, which is not a view,
+            // so reloading — or sharing the URL — landed on Home instead of
+            // the product the reader was on. The href stays for no-JS.
+            let skip = document.querySelector('.skip-link');
+            if (skip) {
+                skip.addEventListener('click', function(e) {
+                    let main = document.getElementById('main-content');
+                    if (!main) return;
+                    e.preventDefault();
+                    focusTarget(main);
+                    main.scrollIntoView();
+                });
+            }
+
             // Copy button click handlers
             document.querySelectorAll('.copy-btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {

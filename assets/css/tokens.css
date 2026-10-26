@@ -402,8 +402,17 @@
     --font-display: var(--font);
     /* Deliberate deviation: F5DS specifies Courier for its one code style,
        which is unreadable at the sizes the YAML analyzer and install commands
-       use. docs.nginx.com deviates identically (JetBrains Mono). */
-    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+       use. docs.nginx.com deviates identically (JetBrains Mono).
+
+       ui-monospace leads because it is the only way to reach SF Mono from a
+       web page: macOS does not expose that face by family name, so the
+       'SF Mono' that used to lead this stack never resolved, and Chrome on
+       macOS fell all the way through to the generic, which is Menlo. Safari
+       resolves ui-monospace to SF Mono; Chrome on macOS still renders Menlo
+       (verified via CSS.getPlatformFontsForNode), which is what it rendered
+       before. Elsewhere ui-monospace is unsupported and the stack carries on
+       to the names below, as it always did. */
+    --mono: ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
 
     --fs-h1:      2.25rem;   --lh-h1:      3.375rem;  /* 36 / 54 — page hero titles */
     --fs-h2:      1.5rem;    --lh-h2:      2.25rem;   /* 24 / 36 — section titles */

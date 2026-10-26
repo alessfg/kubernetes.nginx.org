@@ -391,22 +391,39 @@
                     });
                 }
             });
-            // Add copy buttons to comparison blocks
+            // Add copy buttons to comparison blocks. The button is the block's
+            // child, beside the <h4> rather than inside it: inside, its label
+            // became part of the heading's accessible name, so ~350 headings
+            // read "… Copy code snippet". And every one of those buttons had
+            // that same name; each now says which row, side and approach it
+            // copies, e.g. "Copy: proxy-body-size, CRD Approach, F5 NGINX
+            // Ingress Controller".
             document.querySelectorAll('.comparison-block').forEach(function(block) {
                 let h5 = block.querySelector('h4');
                 let pre = block.querySelector('pre');
                 if (!h5 || !pre) return;
+                let exampleRow = block.closest('tr.example-row');
+                let trigger = exampleRow && exampleRow.previousElementSibling;
+                let rowName = '';
+                if (trigger) {
+                    let first = trigger.querySelector('td code') || trigger.querySelector('td');
+                    rowName = (first ? first.textContent : '').replace(/^nginx\.ingress\.kubernetes\.io\//, '').replace(/\s+/g, ' ').trim();
+                }
+                let panel = block.closest('.approach-content');
+                let tab = panel && exampleRow && exampleRow.querySelector('.approach-tab[data-approach="' + panel.getAttribute('data-approach') + '"]');
+                let parts = [rowName, tab ? tab.textContent.replace(/\s+/g, ' ').trim() : '', h5.textContent.replace(/\s+/g, ' ').trim()];
                 let btn = document.createElement('button');
+                btn.type = 'button';
                 btn.className = 'comparison-copy-btn';
                 btn.textContent = 'Copy';
-                btn.setAttribute('aria-label', 'Copy code snippet');
+                btn.setAttribute('aria-label', 'Copy: ' + parts.filter(Boolean).join(', '));
                 btn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     // Shared helper handles the fallback path, button feedback, and
                     // the screen-reader announcement via #page-announce.
                     copyToClipboard(pre.textContent, btn);
                 });
-                h5.appendChild(btn);
+                block.insertBefore(btn, h5.nextSibling);
             });
             // Syntax-highlight static YAML examples: the visible page immediately,
             // the ~300 blocks inside hidden pages and collapsed rows during idle
@@ -505,6 +522,28 @@
             return cached;
         }
 
+        let _searchAnnounceTimer = null;
+
+        // A visible line where the tables were, when a search or category
+        // leaves a section with nothing to show. Before this the section went
+        // silently empty under its filter bar; only the small counter changed.
+        function setEmptyState(s, own, othersVisible) {
+            let section = document.getElementById(s.id);
+            let controls = section && section.querySelector('.controls');
+            if (!controls) return;
+            let empty = section.querySelector('.search-empty');
+            let show = own.total > 0 && own.visible === 0;
+            if (!show) { if (empty) empty.hidden = true; return; }
+            if (!empty) {
+                empty = document.createElement('p');
+                empty.className = 'search-empty';
+                controls.parentNode.insertBefore(empty, controls.nextSibling);
+            }
+            empty.textContent = 'No rows in this section match.' +
+                (othersVisible > 0 ? ' ' + othersVisible + ' match' + (othersVisible !== 1 ? 'es' : '') + ' in other sections.' : ' Try a shorter term or another category.');
+            empty.hidden = false;
+        }
+
         function filterTable(source) {
             let sections = SOURCE.reference.sections;
             let inputs = {};
@@ -523,7 +562,9 @@
                 let inp = inputs[s.filterSource];
                 if (inp && inp !== primary) inp.value = primary.value;
             });
-            let term = primary.value.toLowerCase();
+            // Trimmed: a pasted "  proxy-body-size  " matched nothing, because
+            // the padding was searched for as part of the term.
+            let term = primary.value.trim().toLowerCase();
             let categoryBySection = {};
             let anyCategory = false;
             sections.forEach(function(s) {
@@ -540,10 +581,14 @@
             document.querySelectorAll('.mapping-table').forEach(function(table) {
                 let visibleCount = 0;
                 let wrapper = table.closest('.table-wrapper');
-                // Walk back past any info-boxes sitting between the heading and the table.
+                // Walk back past any info-boxes sitting between the heading and
+                // the table. The heading is normally inside its .heading-row
+                // (the permalink wrapper); `h3` is whichever of the two is the
+                // table's sibling, so hiding it hides the permalink as well.
                 let h3 = wrapper ? wrapper.previousElementSibling : null;
-                while (h3 && h3.tagName !== 'H3') h3 = h3.previousElementSibling;
-                let tableCategory = (h3 && h3.id) ? h3.id : '';
+                while (h3 && h3.tagName !== 'H3' && !(h3.classList && h3.classList.contains('heading-row'))) h3 = h3.previousElementSibling;
+                let heading = h3 && (h3.tagName === 'H3' ? h3 : h3.querySelector('h3'));
+                let tableCategory = (heading && heading.id) ? heading.id : '';
                 // Determine which category filter applies based on parent section
                 let parentSection = table.closest('section[id]');
                 let sectionId = parentSection ? parentSection.id : '';
@@ -607,7 +652,17 @@
                 let othersVisible = 0;
                 sections.forEach(function(o) { if (o !== s) othersVisible += sectionCounts[o.id].visible; });
                 setCount(document.getElementById(s.count), own, othersVisible);
+                setEmptyState(s, own, othersVisible);
             });
+            // One announcement per search, for the section being typed in. The
+            // three counters used to be aria-live themselves, and the inputs are
+            // mirrored, so every keystroke queued three announcements at once.
+            let typedIn = sections.filter(function(s) { return s.filterSource === source; })[0] || sections[0];
+            let typedCount = document.getElementById(typedIn.count);
+            clearTimeout(_searchAnnounceTimer);
+            _searchAnnounceTimer = setTimeout(function() {
+                if (typedCount && typedCount.textContent) announce(typedCount.textContent);
+            }, 600);
             // Restore expanded state when filters are cleared
             if (!term && !anyCategory && _savedExpanded.length > 0) {
                 _savedExpanded.forEach(function(r) {
@@ -643,6 +698,12 @@
             // Highlight any code blocks that weren't highlighted on initial load
             highlightStaticExamples(panel);
         }
+        // Permalinks go BESIDE their heading, in a .heading-row wrapper, not
+        // inside it. Inside, "Permalink: <heading>" was part of the heading's
+        // accessible name — and of the name of every table that points at the
+        // heading with aria-labelledby: 50 headings and 50 tables read it.
+        // Headings inside a .install-box or .feature-card are left alone: they
+        // carry no id and get no anchor, as before.
         document.querySelectorAll('h2[id], h3[id]').forEach(heading => {
             const anchor = document.createElement('a');
             anchor.className = 'heading-anchor';
@@ -656,14 +717,20 @@
             anchor.addEventListener('click', function(e) {
                 e.preventDefault();
                 history.replaceState(null, '', '#' + anchorId);
-                scrollToAnchor(document.getElementById(anchorId), true);
+                jumpTo(document.getElementById(anchorId), true);
             });
             anchor.setAttribute('aria-label', 'Permalink: ' + heading.textContent.trim());
             anchor.appendChild(makeSvg(
                 { width: '16', height: '16', viewBox: '0 0 16 16', fill: 'currentColor', 'aria-hidden': 'true' },
                 [['path', { d: 'm7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z' }]]
             ));
-            heading.appendChild(anchor);
+            let row = document.createElement('div');
+            // Whole literals, not 'heading-row ' + tagName: a composed name is
+            // invisible to check-classes.py, which then calls the rule dead.
+            row.className = heading.tagName === 'H2' ? 'heading-row heading-row-h2' : 'heading-row heading-row-h3';
+            heading.parentNode.insertBefore(row, heading);
+            row.appendChild(heading);
+            row.appendChild(anchor);
         });
 
         // Respect the user's reduced-motion preference for programmatic scrolling.
@@ -682,7 +749,8 @@
         // the sticky search/filter bar when the target sits below it inside a
         // mapping section (the bar would otherwise cover the scrolled-to heading).
         function scrollOffsetFor(target) {
-            let offset = fixedTopHeight() + 12;
+            // 16px clearance, --space-2x (12px is not on the spacing scale).
+            let offset = fixedTopHeight() + 16;
             let section = target.closest('section');
             let controls = section && section.querySelector('.controls');
             if (controls && window.matchMedia('(min-width: 901px)').matches &&
@@ -700,6 +768,45 @@
             if (!target) return;
             let y = target.getBoundingClientRect().top + window.pageYOffset - scrollOffsetFor(target);
             window.scrollTo(smooth ? { top: y, behavior: scrollBehavior() } : { top: y });
+        }
+
+        // The element a reader should land on for an anchor: a section's own
+        // heading rather than the section box, so focus announces a name.
+        function headingFor(target) {
+            if (!target) return null;
+            if (/^H[1-6]$/.test(target.tagName)) return target;
+            return target.querySelector('h2, h3, h4') || target;
+        }
+
+        // An in-tool jump that moves the reader, not just the viewport: scroll
+        // the target below the fixed bars and put focus on it. Scrolling alone
+        // used to leave focus on the triggering link or pill — or, when the
+        // jump switched pages, on the whole page container, so screen readers
+        // announced the end-of-maintenance banner and the next Tab restarted
+        // at the top of the page.
+        function jumpTo(target, smooth) {
+            if (!target) return;
+            scrollToAnchor(target, smooth);
+            focusTarget(headingFor(target));
+        }
+
+        // Go to an anchor anywhere in the tool: through its sidebar link when
+        // it has one (which switches page, updates the hash and the nav state),
+        // otherwise by revealing the owning page; then, once that page is laid
+        // out, jump to the anchor itself and focus it.
+        function goToAnchor(anchorId, sidebarSection) {
+            let target = document.getElementById(anchorId);
+            if (!target) return;
+            let link = document.querySelector('.sidebar-link[data-section="' + (sidebarSection || anchorId) + '"]');
+            if (link) {
+                link.click();
+            } else {
+                let page = target.closest('.tool-page');
+                let pageBtn = page && !page.classList.contains('active') &&
+                    document.querySelector('.sidebar-link[data-page="' + page.id.replace('page-', '') + '"]');
+                if (pageBtn) pageBtn.click();
+            }
+            requestAnimationFrame(function() { jumpTo(target, false); });
         }
 
         function copyAnalyzerBlock(btn) {
@@ -775,9 +882,14 @@
                 renderParserWarnings(warningHolder, allWarnings);
                 resultsDiv.insertBefore(warningHolder, firstChild);
             }
-            // Smooth scroll to results
+            // Smooth scroll to results, and take focus with it: left on the
+            // Analyze button, focus sat scrolled up under the top bar and the
+            // next Tab went back into the editor controls. A re-run from the
+            // strategy toggle keeps focus on the toggle the reader just used.
             setTimeout(function() {
                 resultsDiv.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+                let active = document.activeElement;
+                if (!(active && active.closest && active.closest('.strategy-toggle'))) focusTarget(resultsDiv);
             }, 100);
             } catch (err) {
                 showAnalyzerMessage(resultsDiv, 'error', 'Analysis failed.', 'There was an error parsing the YAML. Please check the format and try again.');
@@ -915,12 +1027,19 @@
             return svg;
         }
 
-        function buildYamlBlock(text, collapsible) {
+        // `label` names the block for assistive technology. Every Copy button
+        // used to have the same accessible name, "Copy", so a screen reader
+        // listing buttons heard a column of identical entries.
+        let _yamlBlockSeq = 0;
+        function buildYamlBlock(text, collapsible, label) {
             let pre = document.createElement('div');
             pre.className = 'analyzer-yaml-output';
+            pre.id = 'analyzer-yaml-' + (++_yamlBlockSeq);
             let copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
             copyBtn.className = 'analyzer-copy-btn';
             copyBtn.textContent = 'Copy';
+            if (label) copyBtn.setAttribute('aria-label', 'Copy YAML: ' + label);
             copyBtn.addEventListener('click', function() { copyAnalyzerBlock(copyBtn); });
             pre.appendChild(copyBtn);
             pre.appendChild(highlightYaml(text));
@@ -931,16 +1050,17 @@
                 let wrapper = document.createDocumentFragment();
                 wrapper.appendChild(pre);
                 let expandBtn = document.createElement('button');
+                expandBtn.type = 'button';
                 expandBtn.className = 'analyzer-yaml-expand';
-                expandBtn.textContent = 'Show Full YAML (' + lineCount + ' lines)';
+                expandBtn.setAttribute('aria-controls', pre.id);
+                let setExpanded = function(expanded) {
+                    pre.classList.toggle('collapsed', !expanded);
+                    expandBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                    expandBtn.textContent = expanded ? 'Collapse' : 'Show Full YAML (' + lineCount + ' lines)';
+                };
+                setExpanded(false);
                 expandBtn.addEventListener('click', function() {
-                    if (pre.classList.contains('collapsed')) {
-                        pre.classList.remove('collapsed');
-                        expandBtn.textContent = 'Collapse';
-                    } else {
-                        pre.classList.add('collapsed');
-                        expandBtn.textContent = 'Show Full YAML (' + lineCount + ' lines)';
-                    }
+                    setExpanded(pre.classList.contains('collapsed'));
                 });
                 wrapper.appendChild(expandBtn);
                 return wrapper;
@@ -953,7 +1073,10 @@
         // into DOM. It has no source-specific branches: every string it shows comes
         // from the plan; unknown block types are skipped with a console warning.
 
-        function renderComparisonBlock(block) {
+        // `context` is what this comparison is about (the step or the CRD
+        // category); with the side's own heading it makes each Copy button's
+        // accessible name unique.
+        function renderComparisonBlock(block, context) {
             let comp = document.createElement('div');
             comp.className = 'analyzer-comparison';
             [{ side: block.old, cls: 'old' }, { side: block.new, cls: 'new' }].forEach(function(pair) {
@@ -968,7 +1091,8 @@
                     h5.appendChild(badge);
                 }
                 sideBlock.appendChild(h5);
-                sideBlock.appendChild(buildYamlBlock(pair.side.yaml, pair.side.collapsible));
+                let side = (pair.side.title + (pair.side.badge ? ' (' + pair.side.badge + ')' : '')).replace(/\s+/g, ' ').trim();
+                sideBlock.appendChild(buildYamlBlock(pair.side.yaml, pair.side.collapsible, context ? context + ', ' + side : side));
                 comp.appendChild(sideBlock);
             });
             return comp;
@@ -987,8 +1111,7 @@
             installLink.textContent = 'Installing CRDs';
             installLink.addEventListener('click', function(e) {
                 e.preventDefault();
-                let sidebarLink = document.querySelector('.sidebar-link[data-section="installation"]');
-                if (sidebarLink) sidebarLink.click();
+                goToAnchor('installation');
             });
             installNote.appendChild(installLink);
             installNote.appendChild(document.createTextNode(' for Helm and manifest installation instructions.'));
@@ -1027,7 +1150,7 @@
                 }
                 if (item.dualSuffix) catLabel.appendChild(document.createTextNode(item.dualSuffix));
                 groupDiv.appendChild(catLabel);
-                groupDiv.appendChild(renderComparisonBlock({ old: item.old, new: item.new }));
+                groupDiv.appendChild(renderComparisonBlock({ old: item.old, new: item.new }, item.category + ' ' + block.kind));
             });
             return groupDiv;
         }
@@ -1102,9 +1225,14 @@
                     pill.type = 'button';
                     pill.setAttribute('data-scroll', p.scrollTo);
                     pill.setAttribute('title', 'Click to jump to this section');
+                    // Focus goes with the scroll, onto the step's heading. It
+                    // used to stay on the pill, so the next Tab went back to
+                    // the top of the results rather than into the step.
                     pill.addEventListener('click', function() {
                         let el = document.getElementById(p.scrollTo);
-                        if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+                        if (!el) return;
+                        el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+                        focusTarget(headingFor(el));
                     });
                 }
                 summary.appendChild(pill);
@@ -1126,8 +1254,10 @@
             // Success banner
             let banner = document.createElement('div');
             banner.className = 'analyzer-success-banner';
+            // Every icon the renderer draws sits beside text that says the same
+            // thing, so all four are hidden from assistive technology.
             banner.appendChild(makeSvg(
-                { width: '22', height: '22', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.5' },
+                { width: '22', height: '22', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.5', 'aria-hidden': 'true' },
                 [['path', { d: 'M22 11.08V12a10 10 0 1 1-5.93-9.14' }],
                  ['polyline', { points: '22 4 12 14.01 9 11.01' }]]
             ));
@@ -1175,7 +1305,7 @@
 
                 stepData.blocks.forEach(function(block) {
                     if (block.type === 'comparison') {
-                        step.appendChild(renderComparisonBlock(block));
+                        step.appendChild(renderComparisonBlock(block, stepData.title));
                     } else if (block.type === 'dual-note') {
                         let dualNote = document.createElement('div');
                         dualNote.className = 'analyzer-dual-note';
@@ -1232,13 +1362,12 @@
                         link.href = '#' + cardData.anchor;
                         link.className = 'analyzer-note-link';
                         link.textContent = 'See reference guide →';
+                        // One of these per card, so the visible text alone does
+                        // not say where each goes.
+                        if (cardData.title) link.setAttribute('aria-label', 'See reference guide: ' + cardData.title);
                         link.addEventListener('click', function(e) {
                             e.preventDefault();
-                            let sidebarLink = document.querySelector('.sidebar-link[data-section="' + cardData.sidebarSection + '"]');
-                            if (sidebarLink) sidebarLink.click();
-                            setTimeout(function() {
-                                scrollToAnchor(document.getElementById(cardData.anchor), true);
-                            }, 150);
+                            goToAnchor(cardData.anchor, cardData.sidebarSection);
                         });
                         card.appendChild(link);
                     }
@@ -1268,7 +1397,10 @@
                     uHeader.className = 'analyzer-card-header';
                     let uFound = document.createElement('div');
                     uFound.className = 'found-annotations';
-                    uFound.appendChild(buildYamlBlock(u.yaml));
+                    // Named by the annotation it holds, the first key under
+                    // `annotations:` in the item's snippet.
+                    let uKey = (/^\s+([^\s:]+):/m.exec(u.yaml) || [])[1];
+                    uFound.appendChild(buildYamlBlock(u.yaml, false, uKey ? 'unrecognized ' + uKey : 'unrecognized annotation'));
                     uHeader.appendChild(uFound);
                     uCard.appendChild(uHeader);
                     unrecSection.appendChild(uCard);
@@ -1293,8 +1425,9 @@
                 exportRow.className = 'analyzer-export-actions';
                 let copyAllBtn = document.createElement('button');
                 copyAllBtn.className = 'analyzer-copy-all';
+                copyAllBtn.type = 'button';
                 copyAllBtn.appendChild(makeSvg(
-                    { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+                    { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'aria-hidden': 'true' },
                     [['rect', { x: '9', y: '9', width: '13', height: '13', rx: '2', ry: '2' }],
                      ['path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }]]
                 ));
@@ -1309,8 +1442,9 @@
                 // Download YAML button
                 let dlBtn = document.createElement('button');
                 dlBtn.className = 'analyzer-download-btn';
+                dlBtn.type = 'button';
                 dlBtn.appendChild(makeSvg(
-                    { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+                    { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'aria-hidden': 'true' },
                     [['path', { d: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4' }],
                      ['polyline', { points: '7 10 12 15 17 10' }],
                      ['line', { x1: '12', y1: '15', x2: '12', y2: '3' }]]
@@ -1329,6 +1463,9 @@
                     URL.revokeObjectURL(url);
                     dlBtn.classList.add('downloaded');
                     dlLabel.textContent = 'Downloaded!';
+                    // The label change is silent to a screen reader, and so is
+                    // the download itself; Copy already announces, now this does.
+                    announce('Downloaded ' + SOURCE.export.filename);
                     setTimeout(function() {
                         dlLabel.textContent = 'Download YAML';
                         dlBtn.classList.remove('downloaded');
@@ -1338,12 +1475,12 @@
                 container.appendChild(exportRow);
             }
 
-            // What's Next? section
+            // What's next section
             if (plan.nextItems && plan.nextItems.length > 0) {
                 let nextBox = document.createElement('div');
                 nextBox.className = 'analyzer-next-steps';
                 let nextH4 = document.createElement('h4');
-                nextH4.textContent = "What's Next?";
+                nextH4.textContent = "What's next?";
                 nextBox.appendChild(nextH4);
                 let nextUl = document.createElement('ul');
                 plan.nextItems.forEach(function(item) {
@@ -1370,12 +1507,14 @@
                 // Edit YAML button
                 let editBtn = document.createElement('button');
                 editBtn.className = 'analyzer-edit-btn';
+                editBtn.type = 'button';
                 editBtn.appendChild(makeSvg(
-                    { width: '16', height: '16', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+                    { width: '16', height: '16', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'aria-hidden': 'true' },
                     [['path', { d: 'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7' }],
                      ['path', { d: 'M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z' }]]
                 ));
-                editBtn.appendChild(document.createTextNode('Edit YAML & re-analyze'));
+                // A button, so Title Case like every other button label.
+                editBtn.appendChild(document.createTextNode('Edit YAML & Re-Analyze'));
                 editBtn.addEventListener('click', function() {
                     // Switch to analyzer page
                     let analyzerPageLink = document.querySelector('.sidebar-link[data-page="analyzer"]');
@@ -1393,6 +1532,14 @@
         function clearAnalyzer() {
             document.getElementById('yamlInput').value = '';
             document.getElementById('analyzerResults').textContent = '';
+            // The highlight overlay is painted from the textarea, and clearing
+            // the value fires no input event — the old YAML stayed painted
+            // behind an empty editor. The live region likewise kept the last
+            // run's result, which a screen reader could still land on.
+            updateYamlHighlight();
+            let liveStatus = document.getElementById('analyzerLiveStatus');
+            if (liveStatus) liveStatus.textContent = '';
+            announce('Analyzer cleared');
             showEmptyState();
             updateInputStatus();
         }
@@ -1423,7 +1570,30 @@
                     dropdown.style.bottom = 'auto';
                 }
                 let firstItem = dropdown.querySelector('[role="menuitem"]');
-                if (firstItem) firstItem.focus();
+                if (firstItem) focusMenuItem(firstItem);
+            }
+        }
+
+        // Roving tabindex (WAI-ARIA menu pattern): exactly one item is
+        // reachable, the one with focus, and arrow keys move between them. Every
+        // item used to be its own Tab stop, so tabbing through the open menu
+        // took three stops and left it open behind you.
+        function focusMenuItem(item) {
+            let dropdown = document.getElementById('sampleDropdown');
+            dropdown.querySelectorAll('[role="menuitem"]').forEach(function(i) {
+                i.setAttribute('tabindex', i === item ? '0' : '-1');
+            });
+            item.focus();
+        }
+
+        function closeSampleMenu(returnFocus) {
+            let dropdown = document.getElementById('sampleDropdown');
+            let btn = document.querySelector('.sample-dropdown-btn');
+            if (!dropdown || !dropdown.classList.contains('visible')) return;
+            dropdown.classList.remove('visible');
+            if (btn) {
+                btn.setAttribute('aria-expanded', 'false');
+                if (returnFocus) btn.focus();
             }
         }
 
@@ -1441,16 +1611,27 @@
         (function() {
             let dropdown = document.getElementById('sampleDropdown');
             if (!dropdown) return;
+            // The markup gives each item tabindex="0" so it stays operable if
+            // this script never runs; once it does, only the roving item is.
+            dropdown.querySelectorAll('[role="menuitem"]').forEach(function(i) { i.setAttribute('tabindex', '-1'); });
             dropdown.addEventListener('keydown', function(e) {
                 let items = Array.from(dropdown.querySelectorAll('[role="menuitem"]'));
                 if (!items.length) return;
                 let idx = items.indexOf(document.activeElement);
-                let btn = document.querySelector('.sample-dropdown-btn');
-                if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
-                else if (e.key === 'ArrowUp') { e.preventDefault(); items[(idx - 1 + items.length) % items.length].focus(); }
-                else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
-                else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
-                else if (e.key === 'Escape') { e.preventDefault(); dropdown.classList.remove('visible'); if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.focus(); } }
+                if (e.key === 'ArrowDown') { e.preventDefault(); focusMenuItem(items[(idx + 1) % items.length]); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); focusMenuItem(items[(idx - 1 + items.length) % items.length]); }
+                else if (e.key === 'Home') { e.preventDefault(); focusMenuItem(items[0]); }
+                else if (e.key === 'End') { e.preventDefault(); focusMenuItem(items[items.length - 1]); }
+                else if (e.key === 'Escape') { e.preventDefault(); closeSampleMenu(true); }
+                // Tab leaves the menu as the pattern specifies: it closes, and
+                // focus moves on from the trigger rather than from inside a
+                // menu that is about to vanish.
+                else if (e.key === 'Tab') { closeSampleMenu(false); }
+            });
+            // Any other way focus leaves (a click elsewhere is handled above;
+            // this covers a screen reader's virtual cursor and Shift+Tab).
+            dropdown.addEventListener('focusout', function(e) {
+                if (!dropdown.contains(e.relatedTarget)) closeSampleMenu(false);
             });
         })();
 
@@ -1459,35 +1640,18 @@
             let yaml = presets[preset] || presets[SOURCE.analyzer.defaultPreset];
             document.getElementById('yamlInput').value = yaml;
             document.getElementById('analyzerResults').textContent = '';
-            document.getElementById('sampleDropdown').classList.remove('visible');
-            let btn = document.querySelector('.sample-dropdown-btn');
-            if (btn) {
-                btn.setAttribute('aria-expanded', 'false');
-                // Focus was on the now-hidden menu item — return it to the trigger.
-                btn.focus();
-            }
+            // Focus was on the now-hidden menu item — return it to the trigger.
+            closeSampleMenu(true);
             updateInputStatus();
             updateYamlHighlight();
         }
 
+        // Go to a section, focus its heading, and flash it so the eye finds it.
         function highlightSection(anchorId) {
             let el = document.getElementById(anchorId);
             if (!el) return;
-            // Switch to the correct page if needed
-            let sectionLink = document.querySelector('.sidebar-link[data-section="' + anchorId + '"]');
-            if (sectionLink) {
-                sectionLink.click();
-            } else {
-                // Fallback: check which page contains the element
-                let page = el.closest('.tool-page');
-                if (page && !page.classList.contains('active')) {
-                    let pageId = page.id.replace('page-', '');
-                    let pageBtn = document.querySelector('.sidebar-link[data-page="' + pageId + '"]');
-                    if (pageBtn) pageBtn.click();
-                }
-            }
+            goToAnchor(anchorId);
             requestAnimationFrame(function() {
-                el.scrollIntoView({ behavior: scrollBehavior() });
                 el.style.transition = 'background-color var(--dur-reveal)';
                 el.style.backgroundColor = 'var(--amber-tint)';
                 setTimeout(function() {

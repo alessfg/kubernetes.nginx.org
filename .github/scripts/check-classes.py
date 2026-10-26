@@ -11,9 +11,16 @@ It reports both directions:
   - USED BUT UNSTYLED is a failure. Something references a class with no rule.
   - DEFINED BUT UNUSED is reported only, never failed. This codebase has
     dormant-by-design CSS: the event banner ran for three weeks in 2026 for a
-    conference, the blogs/videos sections are built but unlinked, and the
-    ingress2gateway annotation grid is waiting on content. Run `git log -S`
-    before deleting anything on that list.
+    conference, and the ingress2gateway annotation grid is waiting on content.
+    Run `git log -S` before deleting anything on that list.
+
+What it cannot see: a compound selector whose parts are each used somewhere,
+but never together. `.page-hero.videos` passes because `.page-hero` is used
+and `videos` is a STATE_ONLY modifier; the same goes for `.status-dot.positive`
+and `.info-box.info`, and an element selector such as `kbd` is not a class at
+all. Twenty-odd rules of that shape outlived the markup they styled — the blog
+and video pages among them, which no longer exist. Proving one dead means
+grepping the markup AND every script that could add the class at runtime.
 
 Usage:  python3 .github/scripts/check-classes.py
 Exit:   0 nothing unstyled, 1 otherwise.

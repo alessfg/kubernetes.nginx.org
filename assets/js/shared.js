@@ -25,6 +25,15 @@ function updateThemeColorMeta() {
     });
 }
 
+// One writer for the theme: both class hosts, the toggle's state, and the
+// browser-UI colour. The toggle and the OS-change listener both come through here.
+function applyTheme(isDark) {
+    document.documentElement.classList.toggle('dark-mode', isDark);
+    document.body.classList.toggle('dark-mode', isDark);
+    updateDarkAriaLabel();
+    updateThemeColorMeta();
+}
+
 function updateDarkAriaLabel() {
     let btn = document.getElementById('darkToggle');
     if (!btn) return;
@@ -49,6 +58,22 @@ function announce(text) {
         announcer.textContent = text;
         _announceTimeout = null;
     }, 50);
+}
+
+/* ── Moving focus to content ── */
+// Land keyboard and screen-reader focus on a non-interactive target — a
+// heading, a results region — after an in-page jump. Without this a jump
+// scrolled the page but left focus behind on the control that triggered it,
+// or on a page container when that control's page was hidden, so the next
+// Tab started from the wrong place. tabindex=-1 makes the target focusable by
+// script without adding it to the Tab order; preventScroll leaves the scroll
+// to the caller, which knows the offset the fixed header needs.
+function focusTarget(el) {
+    if (!el) return;
+    if (!el.hasAttribute('tabindex') && !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) {
+        el.setAttribute('tabindex', '-1');
+    }
+    el.focus({ preventScroll: true });
 }
 
 /* ── Sidebar drawer (mobile) ── */
@@ -179,13 +204,23 @@ document.addEventListener('DOMContentLoaded', function() {
     if (darkToggle) {
         darkToggle.addEventListener('click', function() {
             let isDark = !document.body.classList.contains('dark-mode');
-            document.documentElement.classList.toggle('dark-mode', isDark);
-            document.body.classList.toggle('dark-mode', isDark);
+            applyTheme(isDark);
             try { localStorage.setItem('darkMode', isDark ? '1' : '0'); } catch (e) { /* storage blocked (e.g. private mode) */ }
-            updateDarkAriaLabel();
-            updateThemeColorMeta();
         });
     }
+
+    // Follow a live OS theme change, but only for a reader who has never
+    // chosen one here: the <head> script picks the OS theme on load when
+    // localStorage holds no choice, and until now nothing kept it in step
+    // afterwards. Read at change time, so a toggle mid-session wins.
+    let schemeMq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    let onSchemeChange = function(e) {
+        let stored = null;
+        try { stored = localStorage.getItem('darkMode'); } catch (err) { /* storage blocked */ }
+        if (stored === null) applyTheme(e.matches);
+    };
+    if (schemeMq && schemeMq.addEventListener) schemeMq.addEventListener('change', onSchemeChange);
+    else if (schemeMq && schemeMq.addListener) schemeMq.addListener(onSchemeChange);
 
     // Menu toggle (sidebar drawer)
     let menuToggle = document.getElementById('menuToggle');

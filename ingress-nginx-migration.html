@@ -193,7 +193,7 @@
 
         <section id="overview">
             <h2 id="migration-overview">Overview</h2>
-            <p>This interactive guide helps you migrate from the community-maintained Kubernetes Ingress NGINX (Ingress-NGINX) controller (<code>kubernetes/ingress-nginx</code>) to the F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). It covers 130+ annotation mappings, ConfigMap key translations, and CRD migration examples across three tabs:</p>
+            <p>This interactive guide helps you migrate from the community-maintained Kubernetes Ingress NGINX (Ingress-NGINX) controller (<code>kubernetes/ingress-nginx</code>) to the F5 NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). It covers 130+ annotation mappings, ConfigMap key translations, and CRD migration examples across three pages, listed in the sidebar:</p>
             <ul class="doc-list">
                 <li><strong>Getting started</strong> — Background on why to migrate, CRD overviews, installation, and a migration checklist</li>
                 <li><strong>Ingress NGINX config analyzer</strong> — Paste an Ingress manifest and get automatic migration suggestions with ready-to-use YAML</li>
@@ -411,8 +411,8 @@ spec:
                 <span class="status-item" id="statusAnnotations" style="display:none;"><span class="status-dot active"></span><span id="statusAnnotationCount">0 annotations detected</span></span>
             </div>
             <div class="strategy-toggle">
-                <span class="strategy-toggle-label">Migration strategy:</span>
-                <div class="strategy-toggle-options">
+                <span class="strategy-toggle-label" id="strategyLabel">Migration strategy:</span>
+                <div class="strategy-toggle-options" role="group" aria-labelledby="strategyLabel" aria-describedby="strategyDesc">
                     <button class="strategy-option active" data-action="setStrategy" data-strategy="crd" aria-pressed="true">CRD-first (recommended)</button>
                     <button class="strategy-option" data-action="setStrategy" data-strategy="annotation" aria-pressed="false">Annotation-first</button>
                 </div>
@@ -476,10 +476,10 @@ spec:
             <p>These features are available in both NGINX Open Source and NGINX Plus editions. All items are annotations unless otherwise indicated with a badge (e.g. <span class="badge badge-configmap">ConfigMap</span>, <span class="badge badge-policy">Policy CRD</span>, <span class="badge badge-virtualserver">VirtualServer CRD</span>). Community annotations use the <code>nginx.ingress.kubernetes.io/</code> prefix; F5 NGINX Ingress Controller annotations use <code>nginx.org/</code>.</p>
 
             <div class="info-box tip" style="margin: var(--space-2hx) 0;">
-                <strong>How to Read the Mappings</strong>
+                <strong>How to read the mappings</strong>
                 <ul style="margin: var(--space-base) 0 0 var(--space-2hx);">
-                    <li><strong>Annotation-to-annotation rows <span style="color: var(--green-text);">▶</span>:</strong> Direct mappings where you change the annotation name/prefix. Click to expand and see before/after Ingress YAML examples.</li>
-                    <li><strong>CRD-based rows <span style="color: var(--green-text);">▶</span>:</strong> Annotations that map to a CRD (VirtualServer, Policy, or TransportServer). Click to expand for full CRD examples with installation instructions.</li>
+                    <li><strong>Annotation-to-annotation rows <span style="color: var(--green-deep);">▶</span>:</strong> Direct mappings where you change the annotation name/prefix. Click to expand and see before/after Ingress YAML examples.</li>
+                    <li><strong>CRD-based rows <span style="color: var(--green-deep);">▶</span>:</strong> Annotations that map to a CRD (VirtualServer, Policy, or TransportServer). Click to expand for full CRD examples with installation instructions.</li>
                     <li><strong>Grouped annotations:</strong> Related annotations that work together are grouped in a single expandable row, showing how they map to a unified configuration.</li>
                     <li><strong>F5 NGINX Ingress Controller-only rows:</strong> Rows marked <em>No direct equivalent</em> on the left are features unique to the F5 NGINX Ingress Controller with no community equivalent.</li>
                 </ul>
@@ -490,7 +490,7 @@ spec:
                 <select id="categoryFilter" data-filter-source="oss" aria-label="Filter by category">
                     <option value="">All categories</option>
                 </select>
-                <span id="searchCount" class="search-count" aria-live="polite"></span>
+                <span id="searchCount" class="search-count"></span>
                 <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
                 <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
             </div>
@@ -4269,10 +4269,10 @@ metadata:
             <p>These features require an NGINX Plus subscription and provide enterprise-grade capabilities. Most Plus features use CRD-based configuration—click the expandable rows <span style="color: var(--green-text);">▶</span> to see full examples. All items are annotations unless otherwise indicated with a badge. Community annotations use the <code>nginx.ingress.kubernetes.io/</code> prefix; F5 NGINX Ingress Controller Plus annotations use the <code>nginx.com/</code> prefix (or <code>appprotect.f5.com/</code> for F5 WAF for NGINX).</p>
 
             <div class="info-box tip" style="margin: var(--space-2hx) 0;">
-                <strong>How to Read the Mappings</strong>
+                <strong>How to read the mappings</strong>
                 <ul style="margin: var(--space-base) 0 0 var(--space-2hx);">
-                    <li><strong>Annotation-to-annotation rows <span style="color: var(--green-text);">▶</span>:</strong> Direct mappings where you change the annotation name/prefix. Click to expand and see before/after Ingress YAML examples.</li>
-                    <li><strong>CRD-based rows <span style="color: var(--green-text);">▶</span>:</strong> Annotations that map to a CRD (VirtualServer, Policy, or TransportServer). Click to expand for full CRD examples with installation instructions.</li>
+                    <li><strong>Annotation-to-annotation rows <span style="color: var(--green-deep);">▶</span>:</strong> Direct mappings where you change the annotation name/prefix. Click to expand and see before/after Ingress YAML examples.</li>
+                    <li><strong>CRD-based rows <span style="color: var(--green-deep);">▶</span>:</strong> Annotations that map to a CRD (VirtualServer, Policy, or TransportServer). Click to expand for full CRD examples with installation instructions.</li>
                     <li><strong>Grouped annotations:</strong> Related annotations that work together are grouped in a single expandable row, showing how they map to a unified configuration.</li>
                     <li><strong>F5 NGINX Ingress Controller-only rows:</strong> Rows marked <em>No direct equivalent</em> on the left are features unique to the F5 NGINX Ingress Controller with no community equivalent.</li>
                 </ul>
@@ -4283,7 +4283,7 @@ metadata:
                 <select id="categoryFilterPlus" data-filter-source="plus" aria-label="Filter by category">
                     <option value="">All categories</option>
                 </select>
-                <span id="searchCountPlus" class="search-count" aria-live="polite"></span>
+                <span id="searchCountPlus" class="search-count"></span>
                 <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
                 <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
             </div>
@@ -4618,7 +4618,7 @@ spec:
                 <select id="categoryFilterConfigMap" data-filter-source="configmap" aria-label="Filter by category">
                     <option value="">All categories</option>
                 </select>
-                <span id="searchCountConfigMap" class="search-count" aria-live="polite"></span>
+                <span id="searchCountConfigMap" class="search-count"></span>
                 <button class="btn btn-primary" data-action="expandAllExamples">Expand All</button>
                 <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
             </div>

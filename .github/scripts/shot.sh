@@ -63,6 +63,8 @@ fi
 #    but a server is closer to production and avoids origin differences.
 python3 -m http.server "$PORT" --directory "$ROOT" >/dev/null 2>&1 &
 SERVER=$!
+# disown, so killing it at exit does not print bash's "Terminated" job notice.
+disown $SERVER 2>/dev/null || true
 trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 1
 
@@ -194,6 +196,66 @@ fi
 if [ ! -s "$PNG" ]; then
   echo "FAILED: no PNG written. The page may not have loaded from $URL" >&2
   exit 1
+fi
+
+# ── A written PNG is not evidence that anything rendered. Chrome exits 0 having
+#    captured nothing at all — this script once reported success for a
+#    1400x8000 image of one colour, a deep link whose anchor sat below the
+#    capture. Refuse any image in which no row holds more than one colour.
+#    Exact, not a heuristic: each scanline is checked against what a uniform
+#    row would encode to under its own PNG filter, and the first row with
+#    content ends the check.
+if ! python3 - "$PNG" <<'PY'
+import struct, sys, zlib
+data = open(sys.argv[1], 'rb').read()
+pos, idat, ihdr = 8, [], None
+while pos < len(data):
+    n, = struct.unpack('>I', data[pos:pos + 4])
+    kind = data[pos + 4:pos + 8]
+    if kind == b'IHDR':
+        ihdr = struct.unpack('>IIBBBBB', data[pos + 8:pos + 21])
+    elif kind == b'IDAT':
+        idat.append(data[pos + 8:pos + 8 + n])
+    pos += 12 + n
+w, h, depth, ctype, _, _, interlace = ihdr
+bpp = {2: 3, 6: 4}.get(ctype)
+if depth != 8 or not bpp or interlace:
+    sys.exit(0)                       # not a layout Chrome writes; do not guess
+raw, stride, prev = zlib.decompress(b''.join(idat)), w * bpp, bytes(bpp)
+for y in range(h):
+    row = raw[y * (stride + 1):(y + 1) * (stride + 1)]
+    f, d, first = row[0], row[1:], row[1:1 + bpp]
+    # Every row above was one colour, `prev`. If this one is too, its colour v
+    # follows from its first pixel and the filter's predictor for that pixel:
+    # None/Sub predict 0, Up and Paeth predict prev, Average predicts prev/2.
+    pred = {0: bytes(bpp), 1: bytes(bpp), 2: prev, 3: bytes(p >> 1 for p in prev), 4: prev}[f]
+    v = bytes((first[i] + pred[i]) & 255 for i in range(bpp))
+    # ...and the rest of the row must then encode to exactly this.
+    if f == 0:
+        want = v * w
+    elif f in (1, 4):                 # left neighbour predicts v: all zeros
+        want = first + bytes(stride - bpp)
+    elif f == 2:
+        want = first * w
+    else:
+        want = first + bytes((v[i] - ((v[i] + prev[i]) >> 1)) & 255
+                             for i in range(bpp)) * (w - 1)
+    if d != want:
+        sys.exit(0)                   # this row has content
+    prev = v
+sys.exit(5)
+PY
+then
+  cat >&2 <<MSG
+BLANK: $PNG is ${WIDTH}x${HEIGHT} and no row of it holds more than one colour.
+Nothing rendered into the capture, so do NOT report a visual check.
+
+The usual cause is a deep link on a page taller than the window: the document
+scrolls to the anchor and --screenshot captures the band it scrolled away from.
+Use .github/scripts/cdp.js shot, which captures from the anchor itself.
+MSG
+  rm -f "$PNG"
+  exit 5
 fi
 
 echo "wrote $PNG  (${WIDTH}x${HEIGHT}, $([ "$DARK" = 1 ] && echo dark || echo light))"

@@ -84,16 +84,12 @@ The tool does not reference NGF at all, so an NGF release never touches it.
 
 ## After
 
-Run all seven, each on its own line, then render the changed pages and look at them — none of them can see a rendered page.
+Run the checks through the runner, then render the changed pages and look at them — none of them can see a rendered page.
 
 ```bash
-for f in assets/js/*.js; do node --check "$f" || break; done
-python3 .github/scripts/check-tokens.py
-python3 .github/scripts/check-contrast.py
-python3 .github/scripts/check-classes.py
-python3 .github/scripts/check-versions.py
-node    .github/scripts/test-analyzer.js
-node --test .github/test/*.test.js
+python3 .github/scripts/check-all.py
 ```
+
+Not a hand-written list of the scripts: the shell loop this section used to give (`for f in assets/js/*.js; do node --check "$f" || break; done`) exits 0 when `node` is missing, because the `||` swallows the 127, so it reported a clean parse having run nothing. `check-all.py` treats a missing interpreter as a failure and prints how many checks ran.
 
 Also update the compat cells, which carry `data-compat="nginx"` and `data-compat="kubernetes"` so they can be found per product rather than by matching a bare number that appears elsewhere on the page. Nothing derives them, so they remain the one part of a release that only a human can confirm.

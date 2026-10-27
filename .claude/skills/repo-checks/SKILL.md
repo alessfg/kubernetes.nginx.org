@@ -59,7 +59,8 @@ keep all three:
   the absence of errors.
 
 A missing interpreter or script is a **failure**, never a skip (`FileNotFoundError`
-→ exit 127).
+→ exit 127). The summary lists it as "could not run" rather than as a check that
+ran and failed, because the fix is to install the interpreter, not to edit code.
 
 The same shape is why the CI test step names its glob and guards on `find`:
 `node --test` exits 0 when it matches no files, so a moved directory would turn
@@ -92,14 +93,14 @@ times out. Save and restore through Python, or call `/bin/cp` directly.
 | Check | Asserts |
 |---|---|
 | `check-syntax.py` | every script parses — one `node --check` per file, never a glob |
-| `check-tokens.py` | token invariants, retired colours/typefaces, undefined `var()`, inline `style=`, type pairing, the manifest, webfont coverage |
-| `check-contrast.py` | every pairing against WCAG 2.1 AA in both themes, plus pairings derived from the CSS, plus the measured-ratio comments |
-| `check-classes.py` | classes resolve to rules; load order, asset paths, sitemap and navigation labels hold; every id `shared.js` queries exists on every page |
-| `check-versions.py` | every version string agrees with its source of truth |
+| `check-tokens.py` | token invariants in px, rem and em, literal line-heights and durations, retired colours/typefaces, hex/rgb/hsl/named colours at call sites, undefined `var()`, inline `style=`, JS `style.X =` and `cssText`, content-link scoping, type pairing, the manifest, webfont coverage. An `EXEMPT` value blanks only itself, so the rest of its line is still checked; a missing font list or manifest fails |
+| `check-contrast.py` | every pairing against WCAG 2.1 AA in both themes, plus pairings derived from the CSS (white labels included), plus the measured-ratio comments |
+| `check-classes.py` | classes resolve to rules; load order, asset paths, sitemap and navigation labels hold |
+| `check-versions.py` | every version string agrees with its source of truth, including the NIC chart the e2e runner installs |
 | `check-markup.py` | tag balance, duplicate ids, anchors, JSON-LD |
-| `test-analyzer.js` | the migration analyzer under a DOM stub; regenerates `mapping-index.json` |
-| `node --test .github/test/` | page ↔ engine ↔ module wiring |
-| `where.py --self-test` | the locator's resolvers still match (by kind, not line number, against independent counts); every repo path the docs backtick exists, every SHA they cite resolves, and every number they still state matches its source; `--outline`, `--tests`, `--stats` and `--diff` work, `--diff` including on a planted drift |
+| `test-analyzer.js` | the migration analyzer under a DOM stub; regenerates `mapping-index.json`. Quiet on success; `-v` for each check and the accuracy-provenance queue |
+| `node --test .github/test/` | page ↔ engine ↔ module wiring, including every id `shared.js` queries on every page; the analyzer over all 130 annotations × both strategies, failing on any translator warning and parsing every output back; the e2e runner's own `--self-test`, which needs no cluster |
+| `where.py --self-test` | the locator's resolvers still match (by kind, not line number, against independent counts); every repo path the docs backtick exists, every SHA they cite resolves, and every number they still state matches its source; `--outline`, `--tests`, `--stats` and `--diff` work, `--diff` including on a planted drift; every reference row's example matches the analyzer and its NIC cell names each key its mapping writes, except the tabs `ALTERNATIVE_TABS` lists with a reason |
 
 Five things to know:
 

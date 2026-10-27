@@ -711,6 +711,22 @@ const out = input.cases.map((c) => {
 process.stdout.write(JSON.stringify(out));
 """
 
+# The NIC names each mapping declares: an annotation key, a ConfigMap key and
+# a VirtualServer field per community annotation, read from the module itself.
+MAPPING_KEYS_JS = r"""
+const { loadAnalyzer } = require(process.argv[1]);
+const { source } = loadAnalyzer(JSON.parse(require('fs').readFileSync(0, 'utf8')).module);
+const out = [];
+for (const m of source.analyzer.mappings) {
+    const nm = m.nicMapping || {};
+    for (const [community, s] of Object.entries(Object.assign({}, nm.annotations, nm.configMap))) {
+        // A VirtualServer field is written as its path on the page: upstreams[].type.
+        out.push({ community, keys: [s.key, s.vsField && 'upstreams[].' + s.vsField].filter(Boolean) });
+    }
+}
+process.stdout.write(JSON.stringify(out));
+"""
+
 # Which analyzer strategy a tab demonstrates. CRD-first replaces the Ingress
 # with a VirtualServer; annotation-first keeps the Ingress, so a Policy that
 # attaches through nginx.org/policies (`ingress-policy`) is annotation-first.
@@ -859,7 +875,14 @@ def run_analyzer(cases):
 def diff_annotation(name):
     """[(row, tab, strategy, diff_lines, warnings)] and an error string."""
     bare = name.split('/')[-1]
-    rows = [r for r in reference_rows() if bare in r['left']]
+    results, err = diff_rows([r for r in reference_rows() if bare in r['left']])
+    if not results and not err:
+        return [], 'no reference row shows an Ingress for %r to analyze' % bare
+    return results, err
+
+
+def diff_rows(rows):
+    """Every tab of `rows` against the analyzer, in one node process."""
     plan, cases = [], []
     for row in rows:
         for tab, old, new in panels(row):
@@ -869,7 +892,7 @@ def diff_annotation(name):
             plan.append((row, tab or '(single)', strategy, new))
             cases.append((with_spec(old), strategy))
     if not cases:
-        return [], 'no reference row shows an Ingress for %r to analyze' % bare
+        return [], ''
     results, err = run_analyzer(cases)
     if results is None:
         return [], err
@@ -1361,10 +1384,87 @@ def command_failures():
     return failures
 
 
+# ── Every reference row against the analyzer ─────────────────────────────────
+# AGENTS.md's "one rule that cannot wait": a row's example and its generator
+# agree. --diff answers it for one annotation when someone thinks to ask; this
+# asks it of every row on every run. A tab listed here shows, on purpose, an
+# answer the analyzer never emits. Keyed by row anchor and tab, not by
+# annotation, because #oidc-authentication lists the external-auth annotations
+# whose own row must still match. An entry that stops differing fails too, so
+# the list cannot outlive its reason.
+ALTERNATIVE_TABS = {
+    ('cors', 'annotation'): 'CORS as server snippets: the hand-written alternative to the Policy the analyzer emits',
+    ('cors', 'crd-headers'): 'CORS as VirtualServer responseHeaders: the declarative alternative to the Policy',
+    ('oidc-authentication', 'ingress-policy'): 'NGINX Plus oidcNative: needs an issuer and client credentials no annotation carries',
+    ('oidc-authentication', 'vs-policy'): 'NGINX Plus oidc on a VirtualServer: same reason',
+    ('headers', '(single)'): 'nginx.org/add-header, a NIC-only annotation, written by hand in place of a '
+                             'configuration-snippet; the analyzer carries the snippet over unchanged',
+}
+
+
+def mapping_keys():
+    node = shutil.which('node')
+    loader = os.path.join(ROOT, '.github/test/lib/load.js')
+    proc = subprocess.run([node, '-e', MAPPING_KEYS_JS, loader], input=json.dumps({'module': SOURCE}),
+                          capture_output=True, text=True, cwd=ROOT, timeout=60)
+    if proc.returncode != 0:
+        return None
+    return json.loads(proc.stdout)
+
+
+def reference_row_failures():
+    if not shutil.which('node'):
+        SKIPPED.add('reference rows (node is not on PATH)')
+        return []
+    failures = []
+    # The collapsed NIC cell names what each mapping writes: a misspelled or
+    # stale key there is the half of the rule the example diff cannot see.
+    keys = mapping_keys()
+    if keys is None:
+        failures.append('the mapping keys could not be read from %s' % SOURCE)
+    # Annotation rows only: the ConfigMap tables share bare names
+    # (proxy-connect-timeout is both), and a ConfigMap row must not stand in
+    # for the annotation row's NIC cell.
+    annotation_rows = [r for r in reference_rows() if r['section'] in ('mappings', 'plus-mappings')]
+    for k in keys or []:
+        rows = [r for r in annotation_rows if k['community'] in r['left']]
+        if not rows:
+            failures.append('%s is mapped but no reference row lists it' % k['community'])
+            continue
+        shown = set(n for r in rows for n in r['right'])
+        for key in k['keys']:
+            bare = key.split('/')[-1]
+            if bare not in shown:
+                failures.append('%s maps to %s, which no row for it names in its NIC cell (%s:%d)'
+                                % (k['community'], key, MIGRATION, rows[0]['start'] + 1))
+    results, err = diff_rows(reference_rows())
+    if err:
+        return failures + ['the reference rows did not run through the analyzer: %s' % err]
+    differing = set()
+    for row, tab, strategy, delta, extra, warnings in results:
+        key = (row['heading'] or row['section'], tab)
+        where = '%s:%d #%s tab %s' % (MIGRATION, row['start'] + 1, key[0], tab)
+        for w in warnings:
+            failures.append('%s: the analyzer warned: %s' % (where, w[:160]))
+        if not delta:
+            continue
+        differing.add(key)
+        if key not in ALTERNATIVE_TABS:
+            failures.append('%s differs from the analyzer (%s); first line: %s'
+                            % (where, 'where.py --diff ' + row['left'][0] if row['left']
+                               else 'its left cell names no annotation: see the row', delta[0].strip()))
+    for key, why in sorted(ALTERNATIVE_TABS.items()):
+        if key not in differing:
+            failures.append('ALTERNATIVE_TABS lists #%s tab %s, which now matches the '
+                            'analyzer: remove the entry (%s)' % (key[0], key[1], why))
+    return failures
+
+
 SELF_TEST_GROUPS = [
     ('resolvers', resolver_failures),
     ('documented facts', doc_failures),
     ('commands', command_failures),
+    ('reference rows', reference_row_failures),
 ]
 
 

@@ -739,3 +739,18 @@ test('the e2e workload and runner agree on names', () => {
             'run-e2e.py waits for deploy/' + dep);
     }
 });
+
+test('the e2e runner passes its own self-test, which needs no cluster', () => {
+    /* It covers the response parsing, the curl arguments and the waits a
+       cluster run is worst at explaining — the readiness probe that returned
+       on its first refused attempt, and a convert that exited 1 with partial
+       output being applied anyway. Only the e2e workflow ran it, and only when
+       e2e paths changed; here it runs with every check. */
+    const { spawnSync } = require('node:child_process');
+    const python = process.platform === 'win32' ? 'python' : 'python3';
+    const r = spawnSync(python, [path.join(ROOT, 'tools', 'nic-migrate', 'e2e', 'run-e2e.py'), '--self-test'],
+        { encoding: 'utf8', timeout: 60000 });
+    assert.equal(r.error, undefined, 'could not run ' + python + ': ' + (r.error && r.error.message));
+    assert.equal(r.status, 0, (r.stdout + r.stderr).split('\n').filter((l) => /FAIL|got/.test(l)).join('\n') || r.stdout + r.stderr);
+    assert.match(r.stdout, /(\d+) of \1 self-tests passed/);
+});

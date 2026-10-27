@@ -8,7 +8,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { ROOT, loadAnalyzer } = require('./lib/load.js');
+const { ROOT, loadAnalyzer, idsQueriedBy } = require('./lib/load.js');
 
 /* One entry per migration tool the branch ships. Branches that add a second
    source module add a row here; nothing else in this file is source-specific. */
@@ -19,12 +19,28 @@ const PAGES = [
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const core = read('assets/js/migration-core.js');
 
-// Element ids the engine queries by literal — skip dynamic concatenations
-// (ids ending in '-' come from `getElementById('page-' + x)`-style code).
-const engineIds = [...new Set([
-    ...[...core.matchAll(/getElementById\(\s*'([^']+)'\s*\)/g)].map((m) => m[1]),
-    ...[...core.matchAll(/querySelector\(\s*'#([A-Za-z][\w-]*)'\s*\)/g)].map((m) => m[1]),
-])].filter((id) => !id.endsWith('-'));
+// Element ids the engine queries by literal (dynamic concatenations skipped).
+const engineIds = idsQueriedBy(core);
+
+// shared.js runs on every page and null-guards each lookup, so a page missing
+// #sidebarBackdrop or #page-announce loses the drawer or the announcements
+// silently. AGENTS.md lists these ids as what the shared JS keys off; nothing
+// read shared.js until this test.
+const sharedIds = idsQueriedBy(read('assets/js/shared.js'));
+const allPages = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html'));
+
+test('shared.js: it queries at least the ids AGENTS.md names', () => {
+    for (const id of ['sidebar', 'sidebarBackdrop', 'menuToggle', 'darkToggle', 'copyright-year', 'page-announce']) {
+        assert.ok(sharedIds.includes(id), 'shared.js no longer queries #' + id + ' — update AGENTS.md or this list');
+    }
+});
+
+for (const f of allPages) {
+    test(`${f}: every element id shared.js queries exists`, () => {
+        const html = read(f);
+        assert.deepEqual(sharedIds.filter((id) => !html.includes(`id="${id}"`)), []);
+    });
+}
 
 // data-action values the engine dispatches.
 const actionsBlock = core.match(/let ACTIONS = \{([\s\S]*?)\n {12}\};/);
@@ -63,6 +79,18 @@ for (const p of PAGES) {
         const presetsUsed = new Set([...page.matchAll(/data-preset="(\w+)"/g)].map((m) => m[1]));
         assert.deepEqual([...presetsUsed].filter((x) => !presetsDefined.has(x)), [], 'data-preset values');
         assert.ok(presetsDefined.has(source.analyzer.defaultPreset), 'defaultPreset exists');
+    });
+
+    // The strategy line under the toggle is written twice: statically in the
+    // page (what shows before any click) and in the module, which swaps it in
+    // on each toggle. Nothing tied them, and the module's copy described an
+    // analyzer that had since changed.
+    test(`${p.name}: the strategy description in the page is the module's for the initial strategy`, () => {
+        const strategies = loadAnalyzer(p.module).source.analyzer.strategies;
+        const shown = (page.match(/<span class="strategy-desc" id="strategyDesc">([^<]*)<\/span>/) || [])[1];
+        assert.ok(shown, 'no #strategyDesc in the page');
+        assert.equal(shown.trim(), strategies.descriptions[strategies.initial]);
+        assert.match(page, new RegExp('data-strategy="' + strategies.initial + '" aria-pressed="true"'));
     });
 
     test(`${p.name}: every reference section and mapping anchor resolves to a page id`, () => {

@@ -36,6 +36,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -228,6 +229,40 @@ def self_test():
     check('http uses port 80', plain[-1], 'http://h:80/')
     check('http omits -k', '-k' not in plain, True)
 
+    # The two waits a cluster run is worst at explaining, with the cluster
+    # stubbed out: the readiness probe must poll through refusals (it returned
+    # on the first, because a status-0 dict is truthy), and convert must stop
+    # on exit 1 even when it printed part of the output.
+    g = globals()
+    saved = {k: g[k] for k in ('http', 'kubectl', 'run', 'say', 'wait_for')}
+    try:
+        g['say'] = lambda *a, **k: None
+        g['kubectl'] = lambda *a, **k: subprocess.CompletedProcess(a, 0, ' '.join(
+            k + '.k8s.nginx.org' for k in ('virtualservers', 'policies', 'transportservers')), '')
+        g['wait_for'] = lambda what, fn, timeout=0, interval=0: next(
+            (r for r in (fn() for _ in range(5)) if r), None) or (_ for _ in ()).throw(Fail('timed out'))
+        answers = iter([{'status': 0}, {'status': 0}, {'status': 404}])
+        g['http'] = lambda target, case: dict(next(answers))
+        try:
+            check_nic_ready('t')
+            check('readiness polls through refusals', True, True)
+        except Fail as err:
+            check('readiness polls through refusals', str(err), 'no failure')
+        g['http'] = lambda target, case: {'status': 0, 'error': 'refused'}
+        try:
+            check_nic_ready('t')
+            check('readiness fails when nothing answers', 'passed', 'Fail')
+        except Fail:
+            check('readiness fails when nothing answers', 'Fail', 'Fail')
+        g['run'] = lambda cmd, check=False: subprocess.CompletedProcess(cmd, 1, 'kind: VirtualServer\n', 'generator failed')
+        try:
+            convert(argparse.Namespace(target='virtualserver', workdir=os.path.join(tempfile.gettempdir(), 'e2e-self-test')))
+            check('convert stops on exit 1 with partial output', 'applied it', 'Fail')
+        except Fail:
+            check('convert stops on exit 1 with partial output', 'Fail', 'Fail')
+    finally:
+        g.update(saved)
+
     failed = [c for c in checks if not c[1]]
     for name, ok, got, want in checks:
         say('  %s  %s' % ('ok  ' if ok else 'FAIL', name))
@@ -368,12 +403,9 @@ def make_tls_secret():
 def apply_source(args):
     phase('Source Ingress (community)')
     kubectl('apply', '-f', os.path.join(MANIFESTS, 'source-ingress.yaml'))
-    wait_for('the community controller to program the Ingress',
-             lambda: kubectl('get', 'ingress', 'shop', '-n', NS,
-                             '-o', 'jsonpath={.status.loadBalancer}', check=False).stdout.strip() not in ('', '{}')
-             or True, timeout=30, interval=2)
-    # A ClusterIP controller never populates status.loadBalancer, so settle by
-    # polling the controller itself in the baseline phase instead.
+    # No wait here: a ClusterIP controller never populates status.loadBalancer,
+    # so a wait on it could only ever pass at once (it did, with `or True`).
+    # Stage 1 settles by polling the controller until it serves the Ingress.
     say('  applied ingress/shop on class %s' % COMMUNITY_CLASS)
 
 
@@ -384,10 +416,14 @@ def convert(args):
     cmd = ['node', cli, 'convert', '-f', src, '--target', args.target,
            '--class', NIC_CLASS, '--name-suffix', NAME_SUFFIX, '--no-color']
     proc = run(cmd, check=False)
-    if proc.returncode != 0 and not proc.stdout.strip():
-        raise Fail('nic-migrate convert failed:\n' + proc.stderr)
     for line in proc.stderr.strip().splitlines():
         say('  ' + line)
+    # Any non-zero exit, output or not: convert exits 1 when a generator failed
+    # and a resource is missing, after printing the rest. Applying that partial
+    # YAML would test NIC against a migration it never received.
+    if proc.returncode != 0:
+        raise Fail('nic-migrate convert exited %d%s' % (
+            proc.returncode, ' with partial output' if proc.stdout.strip() else '') + ':\n' + proc.stderr)
     out_path = os.path.join(args.workdir, 'converted.yaml')
     os.makedirs(args.workdir, exist_ok=True)
     with open(out_path, 'w') as fh:
@@ -805,10 +841,18 @@ def check_nic_ready(nic_target):
     # With no resource for this host yet, a healthy NIC answers 404 from its
     # default server. A connection error means the controller is not serving at
     # all, which is a different problem entirely.
-    probe = wait_for('NIC to answer on its Service',
-                     lambda: http(nic_target, CASES[0]) or None, timeout=120)
-    if probe['status'] == 0:
-        raise Fail('NIC did not answer on %s (%s)' % (nic_target, probe.get('error')))
+    # http() returns a dict even for a refused connection (status 0), and a
+    # dict is truthy: `http(...) or None` returned on the first attempt, so a
+    # controller still starting read as one that never answered. Poll the status.
+    last = {}
+
+    def answered():
+        last.update(http(nic_target, CASES[0]))
+        return last if last['status'] else None
+    try:
+        probe = wait_for('NIC to answer on its Service', answered, timeout=120)
+    except Fail:
+        raise Fail('NIC did not answer on %s within 120s (%s)' % (nic_target, last.get('error')))
     say('  ok    controller answers on its Service (HTTP %d, no resources yet)' % probe['status'])
 
 

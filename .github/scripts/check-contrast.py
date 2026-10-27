@@ -210,10 +210,11 @@ DERIVED_EXEMPT = {
         'to read as unavailable',
     '--n300':
         'only ever used on --on-code surfaces, which are dark in both themes',
-    '--n0':
-        'white label on a filled control — the fill is the pairing that '
-        'matters and is asserted by BUTTONS above',
 }
+# --n0 (white) was exempt here on the grounds that BUTTONS asserts the filled
+# controls. BUTTONS asserts only the controls someone listed, so a new class
+# with white on --green (3.87:1) passed; white labels are measured like any
+# other text now, and none of today's fails.
 # Backgrounds that are dark in BOTH themes, so a "light theme" reading of them
 # is meaningless: the VS Code code palette is a documented deviation.
 DERIVED_EXEMPT_BG = {

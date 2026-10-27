@@ -140,29 +140,36 @@ test('B1: annotation-first emits the whole migrated Ingress, not an annotations 
     assert.deepEqual(ing.spec.tls, [{ hosts: ['a.example.com'], secretName: 'a-tls' }]);
 });
 
+/* One Ingress per mapped annotation, with the siblings it needs to mean
+   anything (canary-weight alone is ignored by the community controller too).
+   The sweeps below run all 130 under both strategies. */
+const SAMPLE = { 'whitelist-source-range': '10.0.0.0/8', canary: 'true', affinity: 'cookie', 'auth-url': 'http://auth.ns.svc.cluster.local/auth',
+    'enable-cors': 'true', 'backend-protocol': 'HTTPS', 'load-balance': 'ewma', 'upstream-hash-by': '$request_uri', 'proxy-buffering': 'on',
+    'connection-proxy-header': 'keep-alive', 'ssl-passthrough': 'true', 'custom-http-errors': '404', 'permanent-redirect': 'https://x.example.com',
+    'temporal-redirect': 'https://t.example.com', 'limit-rps': '10', 'mirror-target': 'https://m.example.com', 'auth-type': 'basic',
+    'rewrite-target': '/', 'app-root': '/a', 'stream-snippet': 'server { listen 1; }', 'server-alias': 'b.example.com',
+    'auth-tls-secret': 'ns/ca', 'proxy-ssl-secret': 'ns/c', 'custom-headers': 'ns/cm', 'from-to-www-redirect': 'true', 'default-backend': 'svc' };
+const NEEDS = [[/^canary-/, { canary: 'true' }], [/^cors-/, { 'enable-cors': 'true' }], [/^(session-cookie|affinity-mode)/, { affinity: 'cookie' }],
+    [/^auth-(signin|snippet|method|response-headers|request-redirect|signin-redirect-param|cache-key|cache-duration|proxy-set-headers)$/, { 'auth-url': 'http://auth.ns.svc.cluster.local/auth' }],
+    [/^permanent-redirect-code$/, { 'permanent-redirect': 'https://x.example.com' }], [/^temporal-redirect-code$/, { 'temporal-redirect': 'https://t.example.com' }],
+    [/^proxy-ssl-/, { 'proxy-ssl-secret': 'ns/c' }], [/^limit-burst-multiplier$/, { 'limit-rps': '10' }], [/^auth-(secret-type|realm|type)$/, { 'auth-secret': 's' }],
+    [/^upstream-hash-by-subset/, { 'upstream-hash-by': '$request_uri' }]];
+const sweepInput = (name) => {
+    const ann = { [name]: SAMPLE[name] !== undefined ? SAMPLE[name] : '7' };
+    for (const [re, add] of NEEDS) if (re.test(name)) Object.assign(ann, add);
+    return ann;
+};
+const MAPPED = source.analyzer.mappings.flatMap((m) => m.community);
+
 test('every recognised annotation is named in the output, under both strategies', () => {
     /* A3: ~25 recognised annotations used to vanish under "Analysis complete".
        Each of the 130 now ends up in a generated comment, a note or a card. */
-    const SAMPLE = { 'whitelist-source-range': '10.0.0.0/8', canary: 'true', affinity: 'cookie', 'auth-url': 'http://auth.ns.svc.cluster.local/auth',
-        'enable-cors': 'true', 'backend-protocol': 'HTTPS', 'load-balance': 'ewma', 'upstream-hash-by': '$request_uri', 'proxy-buffering': 'on',
-        'connection-proxy-header': 'keep-alive', 'ssl-passthrough': 'true', 'custom-http-errors': '404', 'permanent-redirect': 'https://x.example.com',
-        'temporal-redirect': 'https://t.example.com', 'limit-rps': '10', 'mirror-target': 'https://m.example.com', 'auth-type': 'basic',
-        'rewrite-target': '/', 'app-root': '/a', 'stream-snippet': 'server { listen 1; }', 'server-alias': 'b.example.com',
-        'auth-tls-secret': 'ns/ca', 'proxy-ssl-secret': 'ns/c', 'custom-headers': 'ns/cm', 'from-to-www-redirect': 'true', 'default-backend': 'svc' };
-    const NEEDS = [[/^canary-/, { canary: 'true' }], [/^cors-/, { 'enable-cors': 'true' }], [/^(session-cookie|affinity-mode)/, { affinity: 'cookie' }],
-        [/^auth-(signin|snippet|method|response-headers|request-redirect|signin-redirect-param|cache-key|cache-duration|proxy-set-headers)$/, { 'auth-url': 'http://auth.ns.svc.cluster.local/auth' }],
-        [/^permanent-redirect-code$/, { 'permanent-redirect': 'https://x.example.com' }], [/^temporal-redirect-code$/, { 'temporal-redirect': 'https://t.example.com' }],
-        [/^proxy-ssl-/, { 'proxy-ssl-secret': 'ns/c' }], [/^limit-burst-multiplier$/, { 'limit-rps': '10' }], [/^auth-(secret-type|realm|type)$/, { 'auth-secret': 's' }],
-        [/^upstream-hash-by-subset/, { 'upstream-hash-by': '$request_uri' }]];
-    const mapped = [];
-    for (const m of source.analyzer.mappings) mapped.push(...m.community);
+    const mapped = MAPPED;
     assert.equal(mapped.length, 130);
     const missing = [];
     for (const name of mapped) {
         for (const strategy of ['crd', 'annotation']) {
-            const ann = { [name]: SAMPLE[name] !== undefined ? SAMPLE[name] : '7' };
-            for (const [re, add] of NEEDS) if (re.test(name)) Object.assign(ann, add);
-            const r = run(ingress(ann), strategy);
+            const r = run(ingress(sweepInput(name)), strategy);
             const found = (r.text.match(/#.*$/gm) || []).join('\n') + JSON.stringify([r.plan.infoNotes, r.plan.unsupported, r.plan.unrecognized]);
             if (!new RegExp('(^|[^a-z-])' + name + '($|[^a-z-])').test(found)) missing.push(strategy + ' ' + name);
             // Named only as "no translation" is a lost feature, not a migration:
@@ -474,4 +481,57 @@ test('each card shows the community annotations behind its own resource', () => 
     const bare = run(ingress({ 'enable-modsecurity': 'true' })).plan.steps.find((s) => s.id === 'analyzer-step-3').blocks.find((b) => b.items).items[0];
     assert.match(bare.old.yaml, /spec:\n  tls:/);
     assert.doesNotMatch(bare.old.yaml, /annotations: \{\}/);
+});
+
+test('the analyzer view keeps its four promises for every annotation and sample', () => {
+    /* Rules, not a snapshot: what must hold whatever the engine does, checked
+       over the 130-annotation sweep under both strategies and the three
+       samples. A snapshot would read every intended improvement as a
+       regression; these fail only when a promise to the reader breaks. Each
+       failure names its rule, the input, the strategy and the card. */
+    const mappingOf = {};
+    for (const m of source.analyzer.mappings) for (const n of m.community) mappingOf[n] = m;
+    const cases = MAPPED.map((name) => ({ label: name, doc: ingress(sweepInput(name)), pasted: Object.keys(sweepInput(name)) }))
+        .concat(Object.keys(source.analyzer.samplePresets).map((p) => {
+            const yaml = source.analyzer.samplePresets[p];
+            return { label: 'sample ' + p, doc: yaml, pasted: [...new Set((yaml.match(/nginx\.ingress\.kubernetes\.io\/([a-z0-9-]+)/g) || []).map((x) => x.split('/')[1]))] };
+        }));
+    const kindsIn = (text) => (text.match(/^kind: (\w+)/gm) || []).map((k) => k.slice(6));
+    const broken = [];
+    for (const c of cases) {
+        for (const strategy of ['crd', 'annotation']) {
+            const r = run(c.doc, strategy);
+            const at = c.label + ' / ' + strategy;
+            const cards = r.plan.steps.flatMap((s) => s.blocks.flatMap((b) => b.items || (b.old ? [b] : [])))
+                .map((it) => ({
+                    title: it.category || it.old.title,
+                    left: (it.old.yaml.match(/nginx\.ingress\.kubernetes\.io\/([a-z0-9-]+)/g) || []).map((x) => x.split('/')[1]),
+                    oldYaml: it.old.yaml,
+                    kinds: kindsIn(it.new.yaml),
+                    newYaml: it.new.yaml
+                }));
+            for (const card of cards) {
+                // 1. Both sides, and the left shows only what was pasted.
+                if (!card.oldYaml.trim() || !card.newYaml.trim()) broken.push('1 ' + at + ': ' + card.title + ' has an empty side');
+                if (/annotations: \{\}/.test(card.oldYaml)) broken.push('1 ' + at + ': ' + card.title + ' shows an empty annotations block');
+                for (const k of card.left) if (!c.pasted.includes(k)) broken.push('1 ' + at + ': ' + card.title + ' shows ' + k + ', which was not pasted');
+                // 2. A Policy comes from one mapping, so its card shows that mapping's annotations only.
+                if (card.kinds.length === 1 && card.kinds[0] === 'Policy' && new Set(card.left.map((k) => mappingOf[k])).size > 1) {
+                    broken.push('2 ' + at + ': Policy card ' + card.title + ' mixes ' + card.left.join(', '));
+                }
+            }
+            // 4. The export carries exactly the resources the cards show.
+            const shown = cards.flatMap((card) => card.kinds).sort().join(', ');
+            const exported = (r.plan.export ? r.plan.export.parts : []).flatMap(kindsIn).sort().join(', ');
+            if (shown !== exported) broken.push('4 ' + at + ': the cards show [' + shown + '], the export holds [' + exported + ']');
+            // 5. CRD-first replaces the Ingress; annotation-first keeps it. TLS
+            //    passthrough has no Ingress form, so it is a TransportServer under both.
+            const all = cards.flatMap((card) => card.kinds);
+            if (strategy === 'crd' && all.includes('Ingress')) broken.push('5 ' + at + ': CRD-first emitted an Ingress');
+            if (strategy === 'annotation' && all.includes('VirtualServer') && !all.includes('TransportServer')) {
+                broken.push('5 ' + at + ': annotation-first emitted a VirtualServer');
+            }
+        }
+    }
+    assert.deepEqual(broken, [], 'a promise of the analyzer view broke');
 });

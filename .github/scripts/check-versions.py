@@ -17,7 +17,8 @@ Sources of truth, in order of authority:
                               TARGET, used to build the install commands
   assets/js/migration-*.js    INGRESS_NGINX_VERSION — the migration SOURCE
 
-Everything else is a copy, and this asserts every copy.
+Everything else is a copy, and this asserts every copy — including the NIC
+chart the e2e runner installs (tools/nic-migrate/e2e/run-e2e.py).
 
 What this deliberately does NOT check:
   - `badge badge-new` labels ("New v5.4.0"). They are claims about which
@@ -159,6 +160,17 @@ def check_migration_target(config):
 
     want_release = config['nic']['release']
     want_helm = config['nic']['helm'].lstrip('v')
+
+    # The e2e runner installs NIC from the chart; testing a different release
+    # than the site documents proves nothing about what a reader installs.
+    e2e = 'tools/nic-migrate/e2e/run-e2e.py'
+    chart = re.search(r"^NIC_CHART_VERSION = '([^']+)'", read(e2e), re.M)
+    if not chart:
+        failures.append(f'{e2e}: could not find NIC_CHART_VERSION')
+    elif chart.group(1) != want_helm:
+        failures.append(f'{e2e}: NIC_CHART_VERSION is {chart.group(1)}, '
+                        f'VERSION_CONFIG.nic.helm is {want_helm}')
+
     if version.group(1) != want_release:
         failures.append(f'assets/js/migration-core.js: NIC.VERSION is {version.group(1)}, '
                         f'VERSION_CONFIG.nic.release is {want_release}')

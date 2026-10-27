@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Structural validation of the two hand-edited HTML pages.
 
-ingress-nginx-migration.html is 4,952 lines of hand-authored markup with
-hundreds of near-identical table rows, and nothing looked at its structure.
+ingress-nginx-migration.html is thousands of lines of hand-authored markup
+(where.py --stats has today's count) with hundreds of near-identical table rows,
+and nothing looked at its structure.
 Deleting a single `</td>` passes every other check: browsers do not error, they
 silently reflow, so every cell from that row onward renders in the wrong column
-and the page still "works". On a page with 130 reference rows nobody reads to
-the end, that can ship.
+and the page still "works". On a page with over a hundred reference rows nobody
+reads to the end, that can ship.
 
 What it asserts:
   - tag balance, with an explicit void-element set

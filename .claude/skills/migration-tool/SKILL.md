@@ -98,12 +98,16 @@ Edit in this order, because each step's check depends on the last:
 
 `test-analyzer.js` asserts steps 1–3 agree mechanically: every `templateFn` has a
 generator and vice versa, every `transform` has a `translateValue` case, and
-every mapped annotation has a documented row and vice versa. It **cannot** see
-step 4 — a hand-written example drifting from a still-correct generator is
-row-level invisible, and remains the recurring bug here. `where.py --diff` is
-the tool for it, run by hand: not a gate, because many rows legitimately show
-more than the analyzer emits (a fuller example, the Ingress a Policy attaches
-to), so a DIFFERS needs a judgement no check can make.
+every mapped annotation has a documented row and vice versa. Step 4 — a
+hand-written example drifting from a still-correct generator, the recurring bug
+here — is checked by `where.py --self-test` ("reference rows"): every row's
+example against the analyzer, and every key a mapping writes against its row's
+NIC cell. It was once rejected as a gate because rows legitimately show more
+than the analyzer emits; `--diff` now reports the Ingress or VirtualServer a
+Policy attaches to as context rather than drift, which left five tabs that show
+a different answer on purpose. Those are listed, each with its reason, in
+`ALTERNATIVE_TABS`; an entry that stops differing fails too. Add to it only for
+a tab that shows an answer the analyzer must not emit, never to quiet drift.
 
 Storage keys are frozen: the checklist persists against `data-id` values in
 `localStorage`, so renaming one silently resets every reader's progress.
@@ -129,8 +133,8 @@ Considered and rejected: rendering them from the mapping data at load.
 
 The sync problem it would have solved is instead solved by assertion:
 `test-analyzer.js` fails when the mappings and the tables disagree in either
-direction. That covers rows; example YAML is covered only by running
-`where.py --diff`, which is the residual risk accepted here.
+direction, and `where.py --self-test` when an example or a NIC cell disagrees
+with the generator.
 
 ## Mappings and reference tables must agree in both directions
 
@@ -156,7 +160,7 @@ const { parsed, plan, text } = analyze(source, ingressYaml, 'crd');   // or 'ann
 // text = the generated YAML (plan.export.parts joined with ---); assert warnings.length === 0
 ```
 
-`python3 .github/scripts/where.py --diff <annotation>` does this for you: it runs the reference row's own Ingress example through `analyze` under each strategy the row has a tab for, and diffs the output against that tab's NIC example. It is the accuracy step no check covers — run it after touching a mapping, a generator or an example.
+`python3 .github/scripts/where.py --diff <annotation>` does this for you: it runs the reference row's own Ingress example through `analyze` under each strategy the row has a tab for, and diffs the output against that tab's NIC example. `--self-test` runs it over every row; run it for one annotation to see the diff itself.
 
 **Many inputs: the CLI.** `node tools/nic-migrate/nic-migrate.js report --json -f <file-or-dir>` runs the same engine over real manifests in well under a second each, with per-Ingress findings, generated resources and gaps as JSON. Use it for a before/after comparison across a directory of manifests rather than one paste at a time.
 
@@ -208,7 +212,7 @@ Every annotation, ConfigMap key, CRD field or feature documented here **must exi
 **Record the result.** When you complete the four-point check for a mapping, add
 `verified: "<tag>"` to it. The Version-reference banner makes one claim about
 every mapping at once, so a version bump silently re-asserts all of them;
-`test-analyzer.js` prints how many carry a tag and how many are behind the
+`node .github/scripts/test-analyzer.js -v` prints how many carry a tag and how many are behind the
 current pin, which turns an unbounded re-audit into a queue that shrinks. It
 never fails on it — an empty queue is a goal, not a gate.
 

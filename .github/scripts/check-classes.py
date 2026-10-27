@@ -2,7 +2,7 @@
 """Assert every class the markup or JS uses actually has a CSS rule.
 
 This is the check that matters most after a restyle. The two HTML pages carry
-~5,600 lines of markup and migration-core.js builds several hundred more nodes
+thousands of lines of markup and migration-core.js builds several hundred more nodes
 at runtime; the stylesheets were rewritten underneath all of it. A class that
 lost its rule does not error — the element simply renders unstyled, which is
 easy to miss on a page with thousands of rows.

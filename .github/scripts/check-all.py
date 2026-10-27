@@ -131,12 +131,21 @@ def main():
     print('\nSUMMARY')
     print('-' * (width + 12))
     for label, code, _ in results:
-        print(f'  {"PASS" if code == 0 else "FAIL"}  {label.ljust(width)}  exit {code}')
+        state = 'PASS' if code == 0 else 'SKIP' if code == 127 else 'FAIL'
+        print(f'  {state}  {label.ljust(width)}  exit {code}')
+    # A check whose interpreter could not start did not run, and saying it
+    # "ran" and "failed" sent the reader to fix code that was never read. It
+    # still fails the run: it is never a pass.
+    unrun = [label for label, code, _ in results if code == 127]
+    ran = len(results) - len(unrun)
     passed = sum(1 for _, code, _ in results if code == 0)
     print('-' * (width + 12))
-    print(f'  {len(results)} of {len(CHECKS)} checks ran, {passed} passed, '
-          f'{len(results) - passed} failed')
-    if passed != len(results):
+    print(f'  {ran} of {len(CHECKS)} checks ran, {passed} passed, {ran - passed} failed'
+          + (f'; {len(unrun)} could not run' if unrun else ''))
+    if unrun:
+        print(f'\nCould not run: {", ".join(unrun)} — an interpreter is missing (the output '
+              f'above names it). That is the environment, not the code: install it and re-run.')
+    if passed != ran:
         print('\nRe-run a failing check on its own for its full output, or pass -v.')
     return max(code for _, code, _ in results)
 

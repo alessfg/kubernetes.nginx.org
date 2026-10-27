@@ -3,14 +3,16 @@
 ########################
 *.crt
 *.key
-*~
-\#*
 
 ##########################
 # Backup/temporary files #
 ##########################
 *~
 \#*
+# Vim swap files. One open in another session read as an untracked file in
+# `git status`, the signal used to prove a temporary edit was reverted.
+.*.sw?
+.*.swo
 
 ##################
 # MacOS specific #

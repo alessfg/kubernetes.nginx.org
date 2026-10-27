@@ -11,10 +11,10 @@ description: Authoring and verifying the migration tool — the engine split, th
 
 The page runs on a source-agnostic engine:
 
-- `assets/js/migration-ingress-nginx.js` — the **source module**. Supplies the source-controller version, `ANNOTATION_MAPPINGS`, the CRD generators and sample presets; defines `window.MIGRATION_SOURCE`. Never touches the DOM, and may dereference `MigrationTool.*` only inside function bodies (call time), never at top level.
-- `assets/js/migration-core.js` — the **core**. Owns analysis orchestration and rendering, table filtering, page nav and the checklist; defines `window.MigrationTool` (NIC target versions plus shared utilities).
+- `assets/js/migration-ingress-nginx.js` — the **source module**. Supplies the source-controller version, `ANNOTATION_MAPPINGS`, the translators, the assembler and sample presets; defines `window.MIGRATION_SOURCE`. Never touches the DOM, and may dereference `MigrationTool.*` only inside function bodies (call time), never at top level.
+- `assets/js/migration-core.js` — the **core**. Owns the YAML parser and emitter (`MigrationTool.yaml`), analysis orchestration and rendering, table filtering, page nav and the checklist; defines `window.MigrationTool`.
 
-Which half owns YAML parsing and resource assembly is moving toward the core, so do not rely on a function's file from memory — `where.py <function>` says where it is today.
+How an Ingress becomes resources. `parseInput` parses the paste with `MigrationTool.yaml` (every document on its own; Lists expanded) into Ingress models. For each Ingress, every matched mapping's **translator** (`TRANSLATORS[templateFn]`, or the value-level path for mappings with only `annotations`) writes **fragments** — upstream fields, route fields, snippet lines, Policies, `nginx.org/*` annotations, ConfigMap keys — and marks what it consumed. The **assembler** then builds the resources from the real Ingress: under CRD-first one VirtualServer per host (every route, backend, TLS secret, Policy reference and snippet); under annotation-first the whole migrated Ingress. NIC lets one resource own a host, so it never emits two. `nic-migrate` calls the same assembler (`source.analyzer.migrate` / `migrateMany`), so the page and the CLI cannot disagree.
 
 Load order is `shared.js` → `migration-<source>.js` → `migration-core.js`, and the source must precede the core because the core reads `window.MIGRATION_SOURCE` at top level.
 
@@ -76,9 +76,10 @@ shape below is illustrative:
 | `dualApproach` | the row offers both an annotation and a CRD; the chosen strategy picks which one the analyzer emits |
 | `verified` | the NIC tag the four-point accuracy check below was last done against |
 | `nicMapping.annotations` | keyed **by community annotation name**, each with a target `key` and a `transform` |
-| `nicMapping.crdKind` + `templateFn` | for a mapping that emits a resource; the generator name must be a real function |
-| `vsField` | on an annotation entry, the VirtualServer upstream field it also sets. Every mapping carrying one shares `generateUpstreamSettingsVS`, which emits ONE VirtualServer for all of them, converting values with the entry's own `transform` |
-| `preferAnnotation` | on a `dualApproach` mapping, a reason string: the annotation path wins under both strategies (only `custom-http-errors`) |
+| `templateFn` | the translator in `TRANSLATORS` that turns this mapping's annotations into fragments; it must exist, and every translator must be named (asserted) |
+| `nicMapping.crdKind` | the kind of resource the mapping's CRD form produces, for the reference row and the mapping index |
+| `vsField` | on an annotation entry, the VirtualServer upstream field it sets under CRD-first (`generateUpstreamSettingsVS`, every upstream), converted with the entry's own `transform`; under annotation-first the entry's `key` is written instead |
+| `preferAnnotation` | on a `dualApproach` mapping, a reason string: the annotation form is the better answer. CRD-first still emits the CRD form (there is no Ingress to carry the annotation) and shows the reason as a warning recommending annotation-first (only `custom-http-errors`) |
 
 `transform` is nested inside each annotation entry, not a top-level field — a
 misspelling there falls through `translateValue`'s `default: return value` and
@@ -88,7 +89,7 @@ occurrence could be corrupted with the suite still green.
 Edit in this order, because each step's check depends on the last:
 
 1. the mapping in `assets/js/migration-ingress-nginx.js`
-2. its generator, if it declares `templateFn`
+2. its translator, if it declares `templateFn` — mark every annotation it reads with `ctx.use()`, and say with `ctx.note()` what it cannot carry
 3. the reference-table row in the HTML
 4. the example YAML in that row's expanded panel — **generated output is the
    truth, the example follows it**; `where.py --diff <annotation>` shows where
@@ -164,7 +165,9 @@ Two techniques worth knowing beyond running them:
 - **Golden diff.** For a refactor that should change nothing, dump the full plan JSON for every preset (or the CLI's `--json` for a directory) before and after and compare. Byte-identical output is a far stronger claim than "the counts still match"; `1ab8df9` was verified that way.
 - **Fault injection.** Before trusting a new assertion, break the thing it claims to catch and confirm it reports it (`repo-checks` skill).
 
-**Load-bearing gotcha:** the plan builder runs each generator in a `try/catch` that only `console.warn`s on failure, so a broken generator **silently drops its resource** from the output instead of throwing. `warnings.length > 0` — not a thrown exception — is the only way to detect it. `node --check` catches syntax only.
+**Load-bearing gotcha:** the assembler runs each translator in a `try/catch` that only `console.warn`s on failure, so a broken translator **silently drops its part of the output** instead of throwing. `warnings.length > 0` — not a thrown exception — is the only way to detect it. `node --check` catches syntax only.
+
+**Nothing recognised may vanish.** `.github/test/analyzer.test.js` runs every mapped annotation through both strategies and fails unless each one is named in a generated comment, a note or a card — and fails if one is named only as "has no translation", which is how a lost feature hides. It caught request mirroring losing its branch in a refactor. A new mapping needs its translator to `use()` what it reads, or the test says so.
 
 Also sanity-check generated `k8s.nginx.org/v1` field names against the `json:` tags in `nginx/kubernetes-ingress/pkg/apis/configuration/v1/types.go` to catch invalid CRD fields.
 
@@ -213,7 +216,7 @@ That rule catches **fabrication**. It does not catch **staleness** — a constru
 
 1. **Exists** — the annotation or field is in the pinned version.
 2. **Semantics match** — behaviour, status codes, defaults and value formats match the pinned source. *Example:* the community `auth-signin` accepts a full URL, but NIC's externalAuth `authSigninURI` is a **relative** URI (CRD pattern `^/.*$`), so the tool must strip the scheme and host rather than pass the URL through.
-3. **Complete** — no omitted fields or sub-options that exist in the pinned version and that a migrator would hit. *Example:* NIC's `accessControl` Policy is allow **xor** deny — validation requires exactly one of `allow`/`deny` — so a source rule needing both becomes two Policies; collapsing it into one silently drops half the intent.
+3. **Complete** — no omitted fields or sub-options that exist in the pinned version and that a migrator would hit, and no combination NIC quietly reduces. *Example:* NIC's `accessControl` Policy is allow **xor** deny, and a resource that references an allow Policy and a deny Policy gets **only the allow list** (policy reference: "uses only the allow list policies"). Two Policies looked complete and let denied addresses inside the allowed range through. The analyzer emits one allow Policy and denies those addresses in a location snippet, which NGINX checks first (verified on nginx 1.29: denied address 403, the rest of the range 200).
 4. **NIC side checked both ways** — NIC-side claims are neither overstated (e.g. "no HTTP fallback-service field" when VirtualServer/VirtualServerRoute upstreams have `backup`/`backupPort`) nor understated, and any Plus-only NIC capability (e.g. `least_time`, ExternalName upstream services) is labelled as such.
 
 ## Research sources

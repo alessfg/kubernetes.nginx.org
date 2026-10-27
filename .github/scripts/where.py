@@ -528,7 +528,7 @@ def find_function(name):
     """A function, an object-literal method, or a const/let/var binding.
 
     A binding's extent follows whatever it opens — `[` for ANNOTATION_MAPPINGS,
-    `{` for CRD_GENERATORS — or ends on its own line for a scalar.
+    `{` for TRANSLATORS — or ends on its own line for a scalar.
     """
     hits = []
     esc = re.escape(name)
@@ -711,10 +711,11 @@ const out = input.cases.map((c) => {
 process.stdout.write(JSON.stringify(out));
 """
 
-# Which analyzer strategy a tab demonstrates. A Policy tab is what CRD-first
-# emits; `ingress-policy` is the Policy plus its nginx.org/policies reference.
-TAB_STRATEGY = {'crd': 'crd', 'annotation': 'annotation', 'policy': 'crd',
-                'ingress-policy': 'crd', 'vs-policy': 'crd', 'crd-headers': 'crd'}
+# Which analyzer strategy a tab demonstrates. CRD-first replaces the Ingress
+# with a VirtualServer; annotation-first keeps the Ingress, so a Policy that
+# attaches through nginx.org/policies (`ingress-policy`) is annotation-first.
+TAB_STRATEGY = {'crd': 'crd', 'annotation': 'annotation', 'policy': 'annotation',
+                'ingress-policy': 'annotation', 'vs-policy': 'crd', 'crd-headers': 'crd'}
 
 
 def panels(row, rel='ingress-nginx-migration.html'):
@@ -735,6 +736,37 @@ def panels(row, rel='ingress-nginx-migration.html'):
 
 
 SCAFFOLD = re.compile(r'^(\s*(?:-\s+)?(?:host|service|name|port|path|pass|upstream)):\s*(.*)$')
+
+# Reference rows show the annotations of an Ingress and leave its spec out. The
+# analyzer builds resources from the spec (one VirtualServer per host), so a
+# spec-less row would yield none: give it the one rule the rows imply.
+ROW_SPEC = '''spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-service
+                port:
+                  number: 80
+'''
+
+
+# A VirtualServer with nothing but host, one upstream and one passing route,
+# as normalise() renders it.
+SCAFFOLD_VS = {'apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: <name>',
+               'spec:', '  host: <host>', '  upstreams:', '    - name: <name>', '      service: <service>',
+               '      port: <port>', '  routes:', '    - path: <path>', '      action:', '        pass: <pass>',
+               '  tls:', '    secret: <secret>', '    redirect:', '      enable: true', '      code: 308'}
+
+
+def with_spec(ingress_yaml):
+    if re.search(r'^spec:', ingress_yaml, re.M):
+        return ingress_yaml
+    return ingress_yaml.rstrip('\n') + '\n' + ROW_SPEC
 
 
 def normalise(text, ingress_name='my-app'):
@@ -835,7 +867,7 @@ def diff_annotation(name):
                 continue                          # a ConfigMap row: not analyzer input
             strategy = TAB_STRATEGY.get(tab, 'crd')
             plan.append((row, tab or '(single)', strategy, new))
-            cases.append((old, strategy))
+            cases.append((with_spec(old), strategy))
     if not cases:
         return [], 'no reference row shows an Ingress for %r to analyze' % bare
     results, err = run_analyzer(cases)
@@ -884,12 +916,24 @@ def compare_documents(want, got, tab, strategy):
             extra.append(kind)
             continue
         used.add(match)
+        # The page's Ingress shows only its annotations; the spec the analyzer
+        # was given (ROW_SPEC) comes back on the migrated Ingress. Compare what
+        # the page shows.
+        if kind == 'Ingress' and 'spec:' not in body:
+            gen_body = gen_docs[match][1]
+            if 'spec:' in gen_body:
+                gen_docs[match] = (kind, gen_body[:gen_body.index('spec:')])
         delta += list(difflib.unified_diff(body, gen_docs[match][1],
                                            'page %s (%s tab)' % (kind, tab),
                                            'analyzer %s (--strategy %s)' % (kind, strategy),
                                            lineterm='', n=1))[2:]
     for k, (kind, body) in enumerate(gen_docs):
         if k not in used:
+            # The VirtualServer that replaces the row's Ingress, carrying
+            # nothing but its scaffold, is not the row's subject: a row about a
+            # ConfigMap key or an unsupported annotation need not show it.
+            if kind == 'VirtualServer' and set(body) <= SCAFFOLD_VS:
+                continue
             delta += ['+ analyzer emits a %s the %s tab does not show:' % (kind, tab)] + \
                      ['+' + l for l in body]
     return delta, extra
@@ -1056,7 +1100,7 @@ def resolver_failures():
                 failures.append('%s #%s does not resolve' % (rel, n.id))
 
     # Constants are sized by what they open, not by the first brace inside.
-    for name, opener, closer in (('ANNOTATION_MAPPINGS', '[', ']'), ('CRD_GENERATORS', '{', '}')):
+    for name, opener, closer in (('ANNOTATION_MAPPINGS', '[', ']'), ('TRANSLATORS', '{', '}')):
         hits = [h for h in find_function(name) if h.kind == 'binding']
         if not hits:
             failures.append('%s: no binding found' % name)
@@ -1161,7 +1205,10 @@ def looks_like_repo_path(span):
     first = span.lstrip('/').split('/')[0]
     if '/' in span.strip('/'):
         return first in TOP_LEVEL
-    return bool(re.search(FILE_EXT, span)) and not span.startswith(('nginx.', 'k8s.'))
+    # Dotted names that are not files: annotation and API prefixes, and a JS
+    # property path on a capitalised global (`MigrationTool.yaml`).
+    return (bool(re.search(FILE_EXT, span)) and not span.startswith(('nginx.', 'k8s.'))
+            and not re.match(r'[A-Z][A-Za-z]*\.', span))
 
 
 _FILES = None
@@ -1306,7 +1353,7 @@ def command_failures():
     if planted == new:
         failures.append('--diff self-test could not plant its fault: the example changed shape')
     else:
-        got, err = run_analyzer([(old, 'crd')])
+        got, err = run_analyzer([(with_spec(old), 'crd')])
         delta, _ = compare_documents(normalise(planted), normalise(got[0]['text']), 'crd', 'crd') \
             if got else ([], [])
         if not delta:

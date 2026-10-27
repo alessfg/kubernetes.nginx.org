@@ -286,8 +286,7 @@ def install_community(args):
 def install_nic(args):
     # NGINX OSS. The chart's default image is the OSS build, which is the scope
     # of this pipeline: everything asserted has to be satisfiable without a
-    # subscription. Nothing currently asserted needs Plus — session affinity in
-    # particular works on OSS. A Plus run would set controller.nginxplus=true
+    # subscription. Nothing currently asserted needs Plus. A Plus run would set controller.nginxplus=true
     # and an image pull secret, and could add cases for JWT, OIDC and WAF, which
     # genuinely have no community equivalent.
     say('  installing F5 NGINX Ingress Controller, OSS (class %s)' % NIC_CLASS)
@@ -471,15 +470,11 @@ CASES = [
     dict(name='cors-header-present', host='shop.example.com', path='/',
          headers={'Origin': 'https://shop.example.com'},
          compare=('status',), expect_status=200, header_present='access-control-allow-origin'),
-    # Session affinity maps to VirtualServer upstreams[].sessionCookie, which
-    # works on NGINX OSS — this run asserts it and it passes. It is skipped on
-    # the Ingress target for a different reason: the mapping is
-    # VirtualServer-only and has no nginx.org annotation form, so there is
-    # nothing for the annotation strategy to emit. Not a Plus limitation.
+    # Session affinity: VirtualServer upstreams[].sessionCookie on the
+    # virtualserver target, nginx.org/sticky-cookie-services on the ingress
+    # target. Both run on NGINX OSS, so both targets assert it.
     dict(name='affinity-cookie-present', host='shop.example.com', path='/api/x',
-         compare=('status',), expect_status=200, header_present='set-cookie',
-         skip_targets=('ingress',),
-         skip_reason='maps to VirtualServer sessionCookie, which has no Ingress annotation form'),
+         compare=('status',), expect_status=200, header_present='set-cookie'),
     dict(name='tls-terminates', host='shop.example.com', path='/', scheme='https',
          expect_status=200, expect_app='web'),
     dict(name='plain-http-not-redirected', host='shop.example.com', path='/',

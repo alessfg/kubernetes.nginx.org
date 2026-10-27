@@ -337,14 +337,19 @@ function checkReferenceTables() {
    output — six lines, and it fails the moment a number moves.
 
    When a number legitimately changes, update it here in the same commit as
-   the change, and say in the message which way it moved and why. */
+   the change, and say in the message which way it moved and why.
+
+   Every export is now complete manifests: one VirtualServer per host
+   (CRD-first) or the migrated Ingress (annotation-first), plus Policies and
+   the ConfigMap. The CRD-first numbers fell when the bare `annotations:` block
+   and the per-feature VirtualServers that claimed the same host went. */
 const EXPECTED = {
-    'simple/crd':          { findings: 5,  steps: 2, blocks: 3, exported: 2 },
+    'simple/crd':          { findings: 5,  steps: 1, blocks: 2, exported: 1 },
     'simple/annotation':   { findings: 5,  steps: 1, blocks: 1, exported: 1 },
-    'moderate/crd':        { findings: 12, steps: 3, blocks: 4, exported: 3 },
+    'moderate/crd':        { findings: 12, steps: 2, blocks: 3, exported: 2 },
     'moderate/annotation': { findings: 12, steps: 2, blocks: 2, exported: 2 },
-    'advanced/crd':        { findings: 24, steps: 3, blocks: 5, exported: 7 },
-    'advanced/annotation': { findings: 24, steps: 3, blocks: 6, exported: 4 }
+    'advanced/crd':        { findings: 24, steps: 2, blocks: 4, exported: 5 },
+    'advanced/annotation': { findings: 24, steps: 3, blocks: 4, exported: 4 }
 };
 
 const presets = Object.keys(SOURCE.analyzer.samplePresets);

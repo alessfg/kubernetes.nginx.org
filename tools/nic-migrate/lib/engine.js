@@ -47,6 +47,27 @@ function createEngine() {
         strategies: Object.keys((source.analyzer.strategies && source.analyzer.strategies.descriptions) || {}),
         defaultStrategy: (source.analyzer.strategies && source.analyzer.strategies.initial) || 'crd',
 
+        /* Assemble ONE parsed Ingress into resources — the same function the
+           page's buildPlan calls per Ingress. Warnings are attributed as in
+           analyze(). */
+        migrate(doc, strategy, options) {
+            const before = warnings.length;
+            const out = source.analyzer.migrate(doc, strategy, options);
+            out.warnings = warnings.slice(before);
+            return out;
+        },
+
+        /* Several Ingresses at once, so a canary Ingress folds into its stable
+           one's VirtualServer as on the page. A translator warning cannot be
+           traced to one Ingress here, so every result carries the run's. */
+        migrateMany(docs, strategy, options) {
+            const before = warnings.length;
+            const outs = source.analyzer.migrateMany(docs, strategy, options);
+            const run = warnings.slice(before);
+            for (const o of outs) o.out.warnings = run;
+            return outs;
+        },
+
         /* Analyze ONE Ingress document. The web tool analyzes whatever is in the
            textarea as a single blob, which collapses a multi-document paste into
            one host/service/path context; feeding documents in one at a time is

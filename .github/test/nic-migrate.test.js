@@ -18,12 +18,14 @@ const path = require('node:path');
 const { ROOT } = require('./lib/load.js');
 const TOOL = path.join(ROOT, 'tools', 'nic-migrate');
 
-const { splitDocuments, isIngress, describe: describeIngress } = require(path.join(TOOL, 'lib', 'ingress.js'));
+const { readIngresses, describe: describeDoc } = require(path.join(TOOL, 'lib', 'ingress.js'));
 const { detect, sortGaps } = require(path.join(TOOL, 'lib', 'gaps.js'));
 const { createEngine } = require(path.join(TOOL, 'lib', 'engine.js'));
-const { splitKubectlList, loadChecklist } = require(path.join(TOOL, 'nic-migrate.js'));
+const { loadChecklist } = require(path.join(TOOL, 'nic-migrate.js'));
 const Y = require(path.join(TOOL, 'lib', 'yaml.js'));
-const { toModel, convert, planOptions } = require(path.join(TOOL, 'lib', 'convert.js'));
+// describe() reads a parsed Ingress; the tests write theirs as text.
+const describeIngress = (text) => describeDoc(Y.parse(text));
+const { toModel, convert } = require(path.join(TOOL, 'lib', 'convert.js'));
 
 const engine = createEngine();
 const analyze = (yaml) => {
@@ -58,17 +60,16 @@ const ONE_RULE = [
     '              number: 80'
 ];
 
-test('splitDocuments separates a multi-document stream and ignores --- inside values', () => {
-    const docs = splitDocuments('kind: Ingress\na: 1\n---\nkind: Service\nb: "---"\n');
-    assert.equal(docs.length, 2);
-    assert.equal(docs.filter(isIngress).length, 1);
+test('a multi-document stream yields its Ingresses, and --- inside a value is not a separator', () => {
+    const read = readIngresses('kind: Ingress\nmetadata: {name: a}\n---\nkind: Service\nb: "---"\n');
+    assert.equal(read.ingresses.length, 1);
+    assert.deepEqual(read.skipped, { Service: 1 });
 });
 
-test('splitKubectlList expands a List into one document per item', () => {
-    /* Regression: the item check has to precede the "back to top level" test,
-       because "- apiVersion:" starts at column 0 and is non-whitespace. With
-       the tests in the other order the scan ended on the first item and the
-       whole List was analyzed as a single Ingress. */
+test('a kubectl List expands into one Ingress per item, from a file as from --kubectl', () => {
+    /* A14: report -f rejected a saved List — only --kubectl ran the string
+       surgery that split it. Every input now goes through the parser, where a
+       List is a document with items. */
     const list = [
         'apiVersion: v1',
         'kind: List',
@@ -86,11 +87,18 @@ test('splitKubectlList expands a List into one document per item', () => {
         'metadata:',
         '  resourceVersion: ""'
     ].join('\n');
-    const docs = splitKubectlList(list);
-    assert.equal(docs.length, 2);
-    assert.ok(docs.every(isIngress), 'every item should parse as an Ingress');
-    assert.deepEqual(docs.map((d) => describeIngress(d).name), ['alpha', 'beta']);
-    assert.deepEqual(docs.map((d) => describeIngress(d).namespace), ['ns1', 'ns2']);
+    const { ingresses } = readIngresses(list);
+    assert.deepEqual(ingresses.map((d) => describeDoc(d).name), ['alpha', 'beta']);
+    assert.deepEqual(ingresses.map((d) => describeDoc(d).namespace), ['ns1', 'ns2']);
+    // An IngressList, and the same List as kubectl -o json, read the same.
+    assert.equal(readIngresses(list.replace('kind: List', 'kind: IngressList')).ingresses.length, 2);
+    assert.equal(readIngresses(JSON.stringify(Y.parse(list))).ingresses.length, 2);
+});
+
+test('a document that does not parse is reported without hiding the others', () => {
+    const read = readIngresses('kind: Ingress\nmetadata: {name: ok}\n---\nkind: Ingress\nmetadata:\n\tname: tabbed\n');
+    assert.equal(read.ingresses.length, 1);
+    assert.match(read.errors[0], /tab/);
 });
 
 test('describe extracts hosts, paths, services, TLS, namespace and class', () => {
@@ -160,25 +168,41 @@ test('tls hosts are not counted as rule hosts', () => {
     assert.deepEqual(d.hosts, ['a.example.com'], 'tls[].hosts is a plural list, not a rule host');
 });
 
-test('two single-feature generators claiming one host are reported as a conflict', () => {
-    /* rewrite-target and affinity each emit their own VirtualServer bound to
-       the same host. Applied together NIC accepts one and rejects the other,
-       so this has to surface as blocking rather than as two happy resources. */
-    const a = analyze(ing(['rewrite-target: /$1', 'affinity: cookie'], ONE_RULE));
-    const conflict = a.gaps.find((g) => g.id === 'host-conflict');
-    assert.ok(conflict, 'expected a host-conflict gap, got: ' + gapIds(a).join(', '));
-    assert.equal(conflict.severity, 'blocking');
-    assert.match(conflict.message, /a\.example\.com/);
+test('features that once got a VirtualServer each now share one per host', () => {
+    /* rewrite-target and affinity used to emit a VirtualServer each, both bound
+       to the host; NIC accepted one and rejected the other ("host is taken"). */
+    const a = analyze(ing(['rewrite-target: /$1', 'affinity: cookie'], ONE_RULE.map((l) => l.replace('path: /', 'path: /(.*)'))));
+    const vs = a.result.parts.filter((p) => /kind: VirtualServer/.test(p));
+    assert.equal(vs.length, 1, a.result.yaml);
+    assert.match(vs[0], /rewritePath/);
+    assert.match(vs[0], /sessionCookie/);
+    assert.ok(!gapIds(a).includes('host-conflict'), gapIds(a).join(', '));
 });
 
-test('generated Policies that are never referenced are reported as unwired', () => {
+test('a generated Policy is referenced by the VirtualServer', () => {
     const a = analyze(ing(['enable-cors: "true"'], ONE_RULE));
-    const unwired = a.gaps.find((g) => g.id === 'policy-unwired');
-    assert.ok(unwired, 'expected policy-unwired, got: ' + gapIds(a).join(', '));
-    assert.equal(unwired.severity, 'blocking');
+    assert.ok(!gapIds(a).includes('policy-unwired'), gapIds(a).join(', '));
+    assert.match(a.result.yaml, /policies:[^\n]*\n\s+- name: app-cors/);
 });
 
-test('hosts, paths and backends beyond the first are reported as dropped', () => {
+test('the gap detectors still catch a broken result', () => {
+    /* The assembler makes these gaps impossible, so the detectors are tested
+       against a hand-broken result: two VirtualServers on one host, a Policy
+       nobody references, a host and a backend missing, TLS dropped. */
+    const desc = describeIngress(ing(['enable-cors: "true"'], [
+        '  tls:', '  - hosts: [a.example.com]', '    secretName: a-tls',
+        ...ONE_RULE, '  - host: b.example.com', '    http:', '      paths:', '      - path: /',
+        '        backend:', '          service:', '            name: b-svc', '            port:', '              number: 80']));
+    const vs = (name) => 'apiVersion: k8s.nginx.org/v1\nkind: VirtualServer\nmetadata:\n  name: ' + name +
+        '\nspec:\n  host: a.example.com\n  upstreams:\n    - name: a\n      service: a-svc\n      port: 80';
+    const parts = [vs('one'), vs('two'), 'apiVersion: k8s.nginx.org/v1\nkind: Policy\nmetadata:\n  name: lonely\nspec:\n  cors: {}'];
+    const ids = gapIds({ gaps: detect(desc, { parts, yaml: parts.join('\n---\n'), plan: {} }) });
+    for (const id of ['host-conflict', 'policy-unwired', 'hosts-dropped', 'backends-dropped', 'tls-dropped']) {
+        assert.ok(ids.includes(id), 'expected ' + id + ', got: ' + ids.join(', '));
+    }
+});
+
+test('every host, path and backend of the Ingress is in the output', () => {
     const a = analyze(ing(['rewrite-target: /$1'], [
         '  rules:',
         '  - host: a.example.com',
@@ -208,7 +232,10 @@ test('hosts, paths and backends beyond the first are reported as dropped', () =>
     ]));
     const ids = gapIds(a);
     for (const id of ['hosts-dropped', 'paths-dropped', 'backends-dropped']) {
-        assert.ok(ids.includes(id), 'expected ' + id + ', got: ' + ids.join(', '));
+        assert.ok(!ids.includes(id), id + ' reported: ' + ids.join(', '));
+    }
+    for (const want of ['host: a.example.com', 'host: b.example.com', 'service: api-svc', 'service: web-svc', 'service: b-svc']) {
+        assert.ok(a.result.yaml.includes(want), want + ' missing:\n' + a.result.yaml);
     }
 });
 
@@ -236,8 +263,8 @@ test('upstream settings become one VirtualServer under CRD-first, in the CLI too
     };
     const page = engine.analyze(Y.stringify(doc), 'crd');
     const vsParts = page.parts.filter((p) => /kind: VirtualServer/.test(p));
-    assert.equal(vsParts.length, 1, 'one VirtualServer, not one per setting: ' + page.yaml);
-    assert.ok(!/^ {2}nginx\.org\//m.test(page.yaml), 'no annotation swaps left: ' + page.yaml);
+    assert.equal(vsParts.length, doc.spec.rules.length, 'one VirtualServer per host, not one per setting: ' + page.yaml);
+    assert.ok(!/^\s*nginx\.org\/[\w-]+:/m.test(page.yaml), 'no annotation swaps left: ' + page.yaml);
 
     const { out } = runConvert(doc);
     const ups = out.docs.filter((d) => d.kind === 'VirtualServer').flatMap((v) => v.spec.upstreams);
@@ -249,7 +276,6 @@ test('upstream settings become one VirtualServer under CRD-first, in the CLI too
         assert.equal(u['lb-method'], 'least_conn');
         assert.equal(u.keepalive, 0);
     }
-    assert.ok(!out.notes.some((n) => /not represented on the VirtualServer/.test(n)), out.notes.join(' | '));
 });
 
 test('annotation values NIC would reject are converted, not passed through', () => {
@@ -371,14 +397,12 @@ const INGRESS = {
 const runConvert = (doc, opts) => {
     const model = toModel(doc);
     const o = Object.assign({ target: 'virtualserver' }, opts);
-    const result = engine.analyze(Y.stringify(doc), o.strategy || 'crd', planOptions(o));
-    return { model, out: convert(model, result, o) };
+    return { model, out: convert(model, engine, o) };
 };
 
 test('every host becomes one VirtualServer carrying all of its routes', () => {
-    /* This is the difference from the page's output, which emits one
-       single-feature VirtualServer per annotation, all bound to the first
-       host, and drops every other path. */
+    /* The page and the CLI share this assembly now; it replaced one
+       single-feature VirtualServer per annotation, all on the first host. */
     const { out } = runConvert(INGRESS);
     const vs = out.docs.filter((d) => d.kind === 'VirtualServer');
     assert.equal(vs.length, 2);
@@ -413,16 +437,31 @@ test('an Ingress-scoped upstream setting reaches every upstream', () => {
         'affinity: cookie is Ingress-scoped, so every upstream gets it');
 });
 
-test('a $n rewrite is not copied onto a path with no capture group', () => {
-    /* Copying "/$1" onto a plain "/" route rewrites every request to "/".
-       Faithful to the community annotation, and never what anyone meant. */
+test('rewrite-target makes every path a case-insensitive regex, longest first', () => {
+    /* The community controller matched every path on the host as `~* "^path"`
+       once rewrite-target was set, tried the longest first, and rewrote with
+       "(?i)path". `~ (?i)^path` reproduces both under NIC (nginx 1.29:
+       /api/things/42 -> /things/42, /API/x -> /x). "/" rewritten to "/" (the
+       uncaptured $1 is empty) is a no-op and is dropped, not reported. */
     const { out } = runConvert(INGRESS);
     const a = out.docs.find((d) => d.kind === 'VirtualServer' && d.spec.host === 'a.example.com');
-    const regexRoute = a.spec.routes.find((r) => r.path.startsWith('~'));
-    const plainRoute = a.spec.routes.find((r) => !r.path.startsWith('~'));
-    assert.equal(regexRoute.action.proxy.rewritePath, '/$1');
-    assert.ok(!plainRoute.action.proxy || !plainRoute.action.proxy.rewritePath);
-    assert.ok(out.notes.some((n) => /no capture group/.test(n)), 'the drop must be reported');
+    assert.deepEqual(a.spec.routes.map((r) => r.path), ['~ (?i)^/api(/|$)(.*)', '~ (?i)^/']);
+    assert.equal(a.spec.routes[0].action.proxy.rewritePath, '/$1');
+    assert.equal(a.spec.routes[1].action.pass, 'web-svc');
+    assert.ok(!out.notes.some((n) => /no capture group/.test(n)), out.notes.join(' | '));
+});
+
+test('a $n rewrite on a path without the group keeps the literal remainder, and says so', () => {
+    /* B2: "/$2" on a path with no second group sent EVERY request to "/"
+       (verified on nginx 1.29). The route keeps what the community controller
+       did, and the note says it is probably not what was meant. */
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = { 'nginx.ingress.kubernetes.io/rewrite-target': '/app/$2' };
+    doc.spec.rules = [doc.spec.rules[0]];
+    const { out } = runConvert(doc);
+    const routes = out.docs.find((d) => d.kind === 'VirtualServer').spec.routes;
+    assert.equal(routes.find((r) => r.path === '~ (?i)^/').action.proxy.rewritePath, '/app/');
+    assert.ok(out.notes.some((n) => /no capture group/.test(n)), out.notes.join(' | '));
 });
 
 test('the ingress target keeps the Ingress and rewrites its annotations', () => {
@@ -439,48 +478,49 @@ test('the ingress target keeps the Ingress and rewrites its annotations', () => 
     assert.deepEqual(ing.spec.tls, [{ hosts: ['a.example.com'], secretName: 'a-tls' }]);
 });
 
-test('a regex path adds nginx.org/path-regex on the ingress target', () => {
-    /* Found by the e2e pipeline, not by reading: NIC matches Ingress paths
-       literally, so without this annotation "/api(/|$)(.*)" matches nothing and
-       every request falls through to the catch-all "/" — a 200 from the wrong
-       backend. */
+test('rewrite-target adds a case-insensitive nginx.org/path-regex on the ingress target', () => {
+    /* NIC matches Ingress paths literally unless told otherwise (the e2e
+       pipeline found "/api(/|$)(.*)" falling through to "/"). B6: the community
+       regex was ~* (case-insensitive), so the annotation says case_insensitive. */
     const { out } = runConvert(INGRESS, { target: 'ingress', strategy: 'annotation' });
     const ing = out.docs.find((d) => d.kind === 'Ingress');
-    assert.equal(ing.metadata.annotations['nginx.org/path-regex'], 'case_sensitive');
+    assert.equal(ing.metadata.annotations['nginx.org/path-regex'], 'case_insensitive');
+    assert.equal(ing.metadata.annotations['nginx.org/rewrite-target'], '/$1');
     assert.ok(out.notes.some((n) => /path-regex/.test(n)), 'the annotation must be explained');
 });
 
-test('an Ingress with no regex path does not get path-regex', () => {
+test('an Ingress with neither use-regex nor rewrite-target gets no path-regex', () => {
+    /* Without either annotation the community controller matched paths
+       literally too — even "/api(/|$)(.*)" was a plain prefix. */
     const plain = JSON.parse(JSON.stringify(INGRESS));
-    plain.spec.rules = [{
-        host: 'a.example.com',
-        http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'a-svc', port: { number: 80 } } } }] }
-    }];
+    plain.metadata.annotations = { 'nginx.ingress.kubernetes.io/proxy-body-size': '8m' };
     const { out } = runConvert(plain, { target: 'ingress', strategy: 'annotation' });
     const ing = out.docs.find((d) => d.kind === 'Ingress');
     assert.equal(ing.metadata.annotations['nginx.org/path-regex'], undefined);
 });
 
 test('snippet output warns that NIC rejects snippets by default', () => {
-    /* NIC does not degrade here, it rejects the Ingress outright:
-       "snippet specified but snippets feature is not enabled". */
-    const { out } = runConvert(INGRESS, { target: 'ingress', strategy: 'annotation' });
+    /* NIC does not degrade here, it rejects the resource outright:
+       "snippet specified but snippets feature is not enabled". CORS is a Policy
+       now, so the fixture uses a configuration-snippet. */
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = { 'nginx.ingress.kubernetes.io/configuration-snippet': 'add_header X-A b;' };
+    const { out } = runConvert(doc, { target: 'ingress', strategy: 'annotation' });
     const ing = out.docs.find((d) => d.kind === 'Ingress');
-    const hasSnippet = Object.keys(ing.metadata.annotations).some((k) => /-snippets$/.test(k));
-    assert.ok(hasSnippet, 'the fixture should produce snippets under the annotation strategy');
+    assert.equal(ing.metadata.annotations['nginx.org/location-snippets'], 'add_header X-A b;\n');
     assert.ok(out.notes.some((n) => /enableSnippets/.test(n)), 'the rejection must be flagged');
 });
 
-test('session affinity loss is reported on the ingress target, without blaming Plus', () => {
-    /* affinity maps to VirtualServer upstreams[].sessionCookie — section "oss",
-       plusRequired false. It works on NGINX OSS; it simply has no annotation
-       form. Saying otherwise sends readers to buy a subscription they do not
-       need, so the wording is asserted, not just the presence of a note. */
+test('session affinity reaches the ingress target as nginx.org/sticky-cookie-services', () => {
+    /* NIC 5.6 reads nginx.org/sticky-cookie-services on NGINX OSS (since NGINX
+       1.29.6); this was reported as lost. The cookie name and expiry carry
+       over; the community default name is INGRESSCOOKIE. */
     const { out } = runConvert(INGRESS, { target: 'ingress', strategy: 'annotation' });
-    const note = out.notes.find((n) => /session affinity/i.test(n));
-    assert.ok(note, 'expected a note about affinity');
-    assert.match(note, /virtualserver/i);
-    assert.ok(!/plus/i.test(note), 'affinity is not a Plus feature: ' + note);
+    const ing = out.docs.find((d) => d.kind === 'Ingress');
+    const sticky = ing.metadata.annotations['nginx.org/sticky-cookie-services'];
+    assert.ok(sticky, 'expected nginx.org/sticky-cookie-services');
+    for (const svc of ['api-svc', 'web-svc', 'b-svc']) assert.match(sticky, new RegExp('serviceName=' + svc + ' INGRESSCOOKIE'));
+    assert.ok(!out.notes.some((n) => /session affinity/i.test(n) && /lost|not represented/i.test(n)), out.notes.join(' | '));
 });
 
 test('an annotation the analyzer cannot translate is reported, not silently dropped', () => {
@@ -527,26 +567,26 @@ const ERRORS = (extra) => {
     return doc;
 };
 
-test('custom-http-errors stays an annotation under CRD-first, and says why', () => {
-    /* The one dual mapping where the annotation is the better answer: it serves
-       error pages from a Service, while VirtualServer errorPages can only return
-       or redirect. This is the page's analyzer, which takes no plan options. */
+test('custom-http-errors under CRD-first gets errorPages and recommends annotation-first', () => {
+    /* preferAnnotation: the annotation serves error pages from a Service, which
+       VirtualServer errorPages cannot. CRD-first emits one VirtualServer per
+       host, which cannot carry the annotation, so it emits errorPages (a
+       canned body keeping the status) and says why annotation-first is better. */
     const result = engine.analyze(Y.stringify(ERRORS()), 'crd');
-    assert.ok(!/errorPages/.test(result.yaml), 'no errorPages VirtualServer: ' + result.yaml);
-    assert.match(result.yaml, /nginx\.org\/custom-http-errors: "?404,503"?/);
-    assert.ok(result.plan.infoNotes.some((n) => /Kept as an annotation under CRD-first/.test(n.message)),
-        'the strategy override must be explained');
+    assert.match(result.yaml, /errorPages:/);
+    assert.ok(!/nginx\.org\/custom-http-errors/.test(result.yaml), result.yaml);
+    assert.ok(result.plan.infoNotes.some((n) => /Annotation-first is recommended/.test(n.message) && n.severity === 'warning'),
+        'the recommendation must be a warning');
 });
 
-test('the virtualserver target still gets errorPages, and is told what it loses', () => {
-    /* A VirtualServer cannot carry the annotation, so this target asks the
-       analyzer for the CRD form; dropping both left no error handling at all. */
+test('the virtualserver target gets errorPages, and is told what it loses', () => {
     const { out } = runConvert(ERRORS());
     const routes = out.docs.filter((d) => d.kind === 'VirtualServer').flatMap((v) => v.spec.routes);
     assert.ok(routes.length && routes.every((r) => r.errorPages && r.errorPages[0].codes.join() === '404,503'),
         'every route carries errorPages: ' + JSON.stringify(routes));
-    assert.ok(!out.notes.some((n) => /not represented on the VirtualServer: .*custom-http-errors/.test(n)), out.notes.join(' | '));
-    assert.ok(out.notes.some((n) => /error-svc/.test(n) && /--target ingress/.test(n)), out.notes.join(' | '));
+    // NIC allows only ${upstream_status} in an error-page body, and no code keeps the original status.
+    assert.ok(routes.every((r) => r.errorPages[0].return && r.errorPages[0].return.code === undefined && !/\$\{(?!upstream_status\})/.test(r.errorPages[0].return.body)));
+    assert.ok(out.notes.some((n) => /error-svc/.test(n) && /annotation-first/.test(n)), out.notes.join(' | '));
 });
 
 test('the ingress target turns default-backend into spec.defaultBackend', () => {
@@ -555,8 +595,7 @@ test('the ingress target turns default-backend into spec.defaultBackend', () => 
     let { out } = runConvert(ERRORS(), { target: 'ingress', strategy: 'annotation' });
     let ing = out.docs.find((d) => d.kind === 'Ingress');
     assert.equal(ing.spec.defaultBackend.service.name, 'error-svc');
-    assert.ok(out.notes.some((n) => /unresolved placeholder at Ingress\.spec\.defaultBackend/.test(n)), out.notes.join(' | '));
-    assert.ok(!out.notes.some((n) => /default-backend: error-svc —/.test(n)), 'the analyzer\'s "set it" note is answered: ' + out.notes.join(' | '));
+    assert.ok(out.notes.some((n) => /unresolved placeholder at spec\.defaultBackend/.test(n)), out.notes.join(' | '));
 
     const asked = [];
     const resolveServicePort = (ns, name) => { asked.push(ns + '/' + name); return 8080; };
@@ -580,11 +619,38 @@ test('the ingress target turns default-backend into spec.defaultBackend', () => 
     assert.equal(out.docs.find((d) => d.kind === 'Ingress').spec.defaultBackend, undefined);
 });
 
-test('the virtualserver target keeps session affinity that the ingress target loses', () => {
+test('the virtualserver target keeps session affinity as sessionCookie', () => {
     const { out } = runConvert(INGRESS);
     const vs = out.docs.filter((d) => d.kind === 'VirtualServer');
     assert.ok(vs.every((v) => v.spec.upstreams.every((u) => u.sessionCookie)),
         'every upstream should carry sessionCookie');
+});
+
+test('convert folds a canary Ingress into its stable one, as the page does', () => {
+    /* B3/A7 on the CLI: convert ran one Ingress at a time, so a canary and its
+       stable Ingress became two VirtualServers claiming one host. */
+    const { convertAll } = require(path.join(TOOL, 'lib', 'convert.js'));
+    const stable = JSON.parse(JSON.stringify(INGRESS));
+    stable.metadata.annotations = {};
+    stable.spec.rules = [stable.spec.rules[1]];
+    const canary = JSON.parse(JSON.stringify(stable));
+    canary.metadata.name = 'shop-canary';
+    canary.metadata.annotations = { 'nginx.ingress.kubernetes.io/canary': 'true', 'nginx.ingress.kubernetes.io/canary-weight': '10' };
+    canary.spec.rules[0].http.paths[0].backend.service.name = 'b-canary';
+    const out = convertAll([toModel(stable), toModel(canary)], engine, { target: 'virtualserver' });
+    assert.equal(out[1].mergedInto, 0);
+    const vs = out[0].docs.filter((d) => d.kind === 'VirtualServer');
+    assert.equal(vs.length, 1);
+    assert.deepEqual(vs[0].spec.routes[0].splits.map((x) => x.weight), [90, 10]);
+});
+
+test('convert emits the ConfigMap keys a run needs, as one merge document', () => {
+    const { convertAll, configMapDoc } = require(path.join(TOOL, 'lib', 'convert.js'));
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = { 'nginx.ingress.kubernetes.io/limit-connections': '5', 'nginx.ingress.kubernetes.io/enable-access-log': 'false' };
+    const cm = configMapDoc(convertAll([toModel(doc)], engine, { target: 'virtualserver' }));
+    assert.equal(cm.doc.data['access-log-off'], 'true');
+    assert.match(cm.doc.data['http-snippets'], /^limit_conn_zone \$binary_remote_addr zone=prod_shop_conn:5m;$/m);
 });
 
 test('--class overrides the source ingressClassName on every output', () => {
@@ -639,7 +705,7 @@ test('the e2e Ingress converts cleanly and covers every host and path', () => {
     const result = engine.analyze(Y.stringify(ingress), 'crd');
     assert.deepEqual(result.warnings, [], 'a generator failed on the e2e fixture');
 
-    const out = convert(model, result, { target: 'virtualserver', ingressClass: 'nginx-nic' });
+    const out = convert(model, engine, { target: 'virtualserver', ingressClass: 'nginx-nic' });
     const vs = out.docs.filter((d) => d.kind === 'VirtualServer');
     assert.equal(vs.length, ingress.spec.rules.length, 'one VirtualServer per host');
 

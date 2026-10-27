@@ -152,7 +152,7 @@
    "anchor": "session-affinity",
    "type": "virtualserver",
    "crdKind": "VirtualServer",
-   "templateFn": null,
+   "templateFn": "generateCanaryAffinityNote",
    "transform": null
   },
   {
@@ -372,7 +372,7 @@
    "anchor": "mirroring",
    "type": "annotation",
    "crdKind": null,
-   "templateFn": null,
+   "templateFn": "generateMirrorSnippets",
    "transform": "mirrorSnippet"
   },
   {
@@ -405,8 +405,8 @@
    "anchor": "opentelemetry",
    "type": "configmap",
    "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "templateFn": "generateOtelConfigMap",
+   "transform": null
   },
   {
    "community": [
@@ -642,8 +642,8 @@
    "anchor": "authentication-external",
    "type": "annotation",
    "crdKind": null,
-   "templateFn": null,
-   "transform": "snippetWrap"
+   "templateFn": "generateAuthKeepaliveNote",
+   "transform": null
   },
   {
    "community": [
@@ -653,8 +653,8 @@
    "anchor": "authentication-external",
    "type": "annotation",
    "crdKind": null,
-   "templateFn": null,
-   "transform": "snippetWrap"
+   "templateFn": "generateAuthCookieNote",
+   "transform": null
   },
   {
    "community": [

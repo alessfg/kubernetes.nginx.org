@@ -224,11 +224,47 @@
             <h2 id="phased-migration-strategy">Phased migration strategy</h2>
             <p>Rather than performing a "big bang" cutover, F5 recommends a phased migration that allows you to validate each workload before decommissioning the community controller. Both controllers can run side-by-side in the same cluster using separate <code>IngressClass</code> resources.</p>
             <ol class="doc-list">
-                <li><strong>Deploy side-by-side</strong> — Install the F5 NGINX Ingress Controller alongside the community controller using a distinct <code>IngressClass</code> (e.g., <code>nginx-nic</code>). This ensures existing traffic is unaffected.</li>
-                <li><strong>Migrate service-by-service</strong> — Update each Ingress resource's <code>ingressClassName</code> to point to the new controller. Convert annotations as described in the Reference Guide, validate routing and TLS behavior, and promote to production before moving on to the next service.</li>
+                <li><strong>Deploy side-by-side</strong> — Install the F5 NGINX Ingress Controller alongside the community controller using a distinct <code>IngressClass</code> such as <code>nginx-nic</code> (see <a href="#side-by-side-install">Install alongside the community controller</a>). Existing traffic is unaffected.</li>
+                <li><strong>Migrate service-by-service</strong> — Update each Ingress resource's <code>ingressClassName</code> to point to the new controller. Convert annotations as described in the reference guide, validate routing and TLS behavior, and promote to production before moving on to the next service.</li>
                 <li><strong>Decommission</strong> — After all workloads have been migrated and validated, remove the community controller deployment, its <code>IngressClass</code>, and any unused ConfigMaps.</li>
             </ol>
-            <div class="info-box tip"><strong>Tip:</strong> Use the <a href="#analyzer" data-action="showPage" data-page="analyzer">Ingress NGINX config analyzer</a> tab to process each Ingress manifest during step 2. It will flag unsupported annotations and generate the equivalent F5 NGINX Ingress Controller configuration.</div>
+            <div class="info-box tip"><strong>Tip:</strong> Use the <a href="#analyzer" data-action="showPage" data-page="analyzer">Ingress NGINX config analyzer</a> to process each Ingress manifest during step 2. It flags unsupported annotations and generates the equivalent F5 NGINX Ingress Controller configuration.</div>
+
+            <h3 id="side-by-side-install">Install alongside the community controller</h3>
+            <p>Both Helm charts name their class <code>nginx</code> by default, and an <code>IngressClass</code> name can belong to only one controller. Give F5 NGINX Ingress Controller its own class:</p>
+            <div class="install-box"><h3>Helm (example)</h3>
+                <pre><code>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress \
+  --set controller.ingressClass.name=nginx-nic \
+  --set controller.enableSnippets=true \
+  --set controller.enableTLSPassthrough=true</code></pre>
+            </div>
+            <p>Keep only the flags your Ingresses need:</p>
+            <ul class="doc-list">
+                <li><strong><code>controller.enableSnippets</code></strong> — Off by default. With it off, F5 NGINX Ingress Controller rejects any resource that carries a snippet, so <code>configuration-snippet</code>, <code>server-snippet</code> and every mapping that becomes a snippet fail. Snippets are copied as written: directives from modules the community image included, such as <code>more_set_headers</code> (headers-more) and Lua, do not exist in F5 NGINX Ingress Controller and fail the configuration reload.</li>
+                <li><strong><code>controller.enableTLSPassthrough</code></strong> — Off by default. <code>ssl-passthrough</code> becomes a TransportServer on the built-in <code>tls-passthrough</code> listener, which exists only with this flag.</li>
+            </ul>
+            <div class="info-box note"><strong>Note:</strong> The F5 NGINX Ingress Controller documentation covers this in <a href="https://docs.nginx.com/nginx-ingress-controller/install/multiple-controllers/" target="_blank" rel="noopener">Run multiple Ingress controllers</a> and the <a href="https://docs.nginx.com/nginx-ingress-controller/install/migrate-ingress-nginx/" target="_blank" rel="noopener">ingress-nginx migration guide</a>.</div>
+
+            <h3 id="changed-defaults">Defaults that change</h3>
+            <p>A setting you never configured still changes if the two controllers default it differently. Set the F5 NGINX Ingress Controller value in the <code>nginx-config</code> ConfigMap, or per resource, wherever the old default matters to you.</p>
+            <div class="table-wrapper">
+                <table class="diff-table" aria-labelledby="changed-defaults">
+                    <thead><tr><th scope="col">Setting</th><th scope="col">Kubernetes Ingress NGINX (Ingress-NGINX)</th><th scope="col">F5 NGINX Ingress Controller</th><th scope="col">What to check</th></tr></thead>
+                    <tbody>
+                        <tr><td>Response buffering</td><td>Off</td><td>On (<code>proxy-buffering</code>)</td><td>Server-sent events and streamed responses arrive in chunks. Set <code>proxy-buffering: "false"</code> for them.</td></tr>
+                        <tr><td>HTTP/2</td><td>On</td><td>Off (<code>http2</code>)</td><td>gRPC needs HTTP/2. Set <code>http2: "true"</code>.</td></tr>
+                        <tr><td>HSTS</td><td>On</td><td>Off (<code>hsts</code>)</td><td>Browsers stop receiving <code>Strict-Transport-Security</code>.</td></tr>
+                        <tr><td>Upstream keepalive connections</td><td>320</td><td>0 (<code>keepalive</code>)</td><td>Each request opens a new connection to the Pod.</td></tr>
+                        <tr><td>Upstream connect timeout</td><td>5s</td><td>60s (<code>proxy-connect-timeout</code>)</td><td>An unreachable Pod is retried later.</td></tr>
+                        <tr><td>Load-balancing method</td><td>Round robin</td><td><code>random two least_conn</code> (<code>lb-method</code>)</td><td>Request distribution changes.</td></tr>
+                        <tr><td>HTTP-to-HTTPS redirect code</td><td>308</td><td>301 (<code>http-redirect-code</code>)</td><td>Clients can turn a redirected POST into a GET. The analyzer sets 308.</td></tr>
+                        <tr><td><code>Server</code> header version</td><td>Hidden</td><td>Shown (<code>server-tokens</code>)</td><td>Set <code>server-tokens: "false"</code> to hide the NGINX version.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 id="gateway-api">Gateway API</h3>
+            <p>The community project recommends that new users adopt a Gateway API implementation. <a href="https://docs.nginx.com/nginx-gateway-fabric/" target="_blank" rel="noopener">NGINX Gateway Fabric</a> is the NGINX implementation of the <a href="https://gateway-api.sigs.k8s.io/" target="_blank" rel="noopener">Gateway API</a>, and <a href="https://github.com/kubernetes-sigs/ingress2gateway" target="_blank" rel="noopener">ingress2gateway</a> converts Ingress resources to it (<code>--providers=ingress-nginx</code> for community annotations). This tool covers the move to F5 NGINX Ingress Controller, which keeps the Ingress API.</p>
         </section>
 
         <!-- CRD Features Summary -->
@@ -329,9 +365,11 @@
             </div>
             <ul class="checklist" id="migrationChecklist" role="group" aria-labelledby="migration-checklist">
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="install-crds-via-helm"><span>Install CRDs via Helm (<code>controller.enableCustomResources=true</code>) or manifests (<code>deploy/crds.yaml</code>)</span></li>
-                <li role="checkbox" aria-checked="false" tabindex="0" data-id="review-annotation-mappings-not"><span>Review annotation mappings — not all <code>nginx.ingress.kubernetes.io/</code> annotations have a direct <code>nginx.org/</code> equivalent (see NGINX Mappings)</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="install-with-own-ingress-class"><span>Install with its own <code>IngressClass</code> (<code>controller.ingressClass.name=nginx-nic</code>), and turn on <code>controller.enableSnippets</code> or <code>controller.enableTLSPassthrough</code> if your Ingresses need them</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="review-changed-defaults"><span>Review the defaults that change (response buffering, HTTP/2, HSTS, keepalive, timeouts, load balancing) and set the ones that matter in <code>nginx-config</code></span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="review-annotation-mappings-not"><span>Review annotation mappings — not all <code>nginx.ingress.kubernetes.io/</code> annotations have a direct <code>nginx.org/</code> equivalent (see NGINX mappings)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="map-rewrite-target-annotation-to"><span>Map rewrite-target annotation to <code>nginx.org/rewrite-target</code> (not <code>nginx.org/rewrites</code>)</span></li>
-                <li role="checkbox" aria-checked="false" tabindex="0" data-id="migrate-configmap-keys-that"><span>Migrate ConfigMap keys that differ between controllers (see ConfigMap Mappings)</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="migrate-configmap-keys-that"><span>Migrate ConfigMap keys that differ between controllers (see ConfigMap mappings)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-hsts-configmap-keys"><span>Convert HSTS ConfigMap keys to <code>nginx.org/hsts</code> annotations for per-Ingress control, or an <code>hsts</code> Policy on a VirtualServer (v5.6.0+)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-server-tokens-configmap-key"><span>Convert <code>server-tokens</code> ConfigMap key to <code>nginx.org/server-tokens</code> annotation</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-access-control-annotations"><span>Convert access control annotations to Policy CRD (<code>accessControl</code>)</span></li>
@@ -347,7 +385,7 @@
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-ssl-passthrough-to"><span>Convert SSL passthrough to TransportServer CRD</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-tcp-udp-services"><span>Convert TCP/UDP services to TransportServer CRD</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="replace-ssl-redirect-with-nginxorg"><span>Replace <code>ssl-redirect</code> with <code>nginx.org/ssl-redirect</code> (not the deprecated <code>ingress.kubernetes.io/ssl-redirect</code>)</span></li>
-                <li role="checkbox" aria-checked="false" tabindex="0" data-id="verify-snippets-configuration-snippet-server-snippet"><span>Verify snippets (<code>configuration-snippet</code>, <code>server-snippet</code>) use F5 NGINX Ingress Controller equivalents</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="verify-snippets-configuration-snippet-server-snippet"><span>Verify snippets (<code>configuration-snippet</code>, <code>server-snippet</code>) use only directives F5 NGINX Ingress Controller ships — no <code>more_set_headers</code> or Lua</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="test-in-staging-environment"><span>Test in staging environment</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="update-monitoring-and-alerting"><span>Update monitoring and alerting</span></li>
             </ul>
@@ -426,15 +464,15 @@ spec:
                     <div class="sample-dropdown-menu" id="sampleDropdown" role="menu" aria-label="Sample YAML presets">
                         <div class="sample-dropdown-item" role="menuitem" tabindex="0" data-action="loadSampleYaml" data-preset="simple">
                             <div class="sample-title"><span class="sample-badge simple">Simple</span> Basic proxy</div>
-                            <div class="sample-desc">SSL redirect, timeouts, body size — annotation-only migration</div>
+                            <div class="sample-desc">SSL redirect, timeouts, body size</div>
                         </div>
                         <div class="sample-dropdown-item" role="menuitem" tabindex="0" data-action="loadSampleYaml" data-preset="moderate">
                             <div class="sample-title"><span class="sample-badge moderate">Moderate</span> Production app</div>
-                            <div class="sample-desc">HTTPS backend, load balancing, ConfigMap settings — annotations + ConfigMap</div>
+                            <div class="sample-desc">HTTPS backend, load balancing, settings that move to the ConfigMap</div>
                         </div>
                         <div class="sample-dropdown-item" role="menuitem" tabindex="0" data-action="loadSampleYaml" data-preset="advanced">
                             <div class="sample-title"><span class="sample-badge advanced">Advanced</span> Complex stack</div>
-                            <div class="sample-desc">mTLS, session affinity, rate limiting, ConfigMap — annotations + ConfigMap + CRDs</div>
+                            <div class="sample-desc">mTLS, session affinity, rate limiting, CORS, ModSecurity</div>
                         </div>
                     </div>
                 </div>
@@ -517,37 +555,32 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.ingress.kubernetes.io/denylist-source-range: "192.168.1.100"
+    nginx.ingress.kubernetes.io/denylist-source-range: "10.1.2.3"
     nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create two AccessControl Policies — NIC requires exactly one of
-#    allow or deny per Policy, so they become two separate Policies.
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. One allow Policy — NIC applies only the allow list when a resource
+#    references allow and deny Policies, so the deny list is not a Policy.
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: access-control-allow
+  name: my-app-access-control
 spec:
   accessControl:
     allow:  # whitelist-source-range
-      - 10.0.0.0/8
-      - 172.16.0.0/12
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
 ---
-apiVersion: k8s.nginx.org/v1
-kind: Policy
-metadata:
-  name: access-control-deny
-spec:
-  accessControl:
-    deny:  # denylist-source-range
-      - 192.168.1.100
----
-# 2. Reference from Ingress
+# 2. Reference it from the Ingress, and deny the addresses inside the
+#    allowed ranges in a location snippet, which NGINX checks first.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "access-control-allow,access-control-deny"  # attaches the Policies above</code></pre></div>
+    nginx.org/policies: "my-app-access-control"  # attaches the Policy above
+    nginx.org/location-snippets: |  # denylist-source-range
+      deny 10.1.2.3;</code></pre></div>
                                 </div>
+                                <div class="info-box warning"><strong>Allow plus deny:</strong> When a resource references an allow and a deny Policy, NGINX Ingress Controller applies only the allow list. The community controller checked the deny list first, so an address inside an allowed range could still be denied. Keep that by denying those addresses in a location snippet: NGINX evaluates it before the Policy's <code>allow</code> rules. Denied addresses outside every allowed range need nothing, because allow-only already blocks them. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
                                 <div class="info-box note"><strong>New in v5.4.0:</strong> AccessControl policies can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
@@ -557,30 +590,22 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.ingress.kubernetes.io/denylist-source-range: "192.168.1.100"
+    nginx.ingress.kubernetes.io/denylist-source-range: "10.1.2.3"
     nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. Create two AccessControl Policies (allow and deny — NIC requires
-#    exactly one of allow or deny per Policy)
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. One allow Policy — NIC applies only the allow list when a resource
+#    references allow and deny Policies, so the deny list is not a Policy.
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: access-control-allow
+  name: my-app-access-control
 spec:
   accessControl:
     allow:  # whitelist-source-range
-      - 10.0.0.0/8
-      - 172.16.0.0/12
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
 ---
-apiVersion: k8s.nginx.org/v1
-kind: Policy
-metadata:
-  name: access-control-deny
-spec:
-  accessControl:
-    deny:  # denylist-source-range
-      - 192.168.1.100
----
-# 2. Reference from VirtualServer
+# 2. Reference it from the VirtualServer, and deny the addresses inside the
+#    allowed ranges in a location snippet, which NGINX checks first.
 apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
@@ -588,17 +613,19 @@ metadata:
 spec:
   host: app.example.com
   policies:
-    - name: access-control-allow
-    - name: access-control-deny
+    - name: my-app-access-control
   upstreams:
     - name: backend
       service: backend-svc
       port: 80
   routes:
     - path: /
+      location-snippets: |  # denylist-source-range
+        deny 10.1.2.3;
       action:
         pass: backend</code></pre></div>
                                 </div>
+                                <div class="info-box warning"><strong>Allow plus deny:</strong> When a resource references an allow and a deny Policy, NGINX Ingress Controller applies only the allow list. The community controller checked the deny list first, so an address inside an allowed range could still be denied. Keep that by denying those addresses in a location snippet: NGINX evaluates it before the Policy's <code>allow</code> rules. Denied addresses outside every allowed range need nothing, because allow-only already blocks them. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
                                 <div class="info-box note"><strong>Note:</strong> The VirtualServer approach has been available since before v5.4.0. Use this if you are already migrating to VirtualServer resources for other reasons (e.g., advanced routing, traffic splitting).</div>
                             </div>
                         </div></td></tr>
@@ -724,18 +751,36 @@ data:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: basic-auth-policy
+  name: my-app-basic-auth
 spec:
   basicAuth:
     realm: "Protected Area"  # auth-realm
-    secret: basic-auth  # auth-secret</code></pre></div>
+    secret: basic-auth  # auth-secret
+---
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:  # attaches the Policy above
+    - name: my-app-basic-auth
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note">
                                 <strong>Note:</strong> The community <code>auth-secret-type</code> annotation
                                 (<code>auth-file</code> or <code>auth-map</code>) has no F5 NGINX Ingress Controller equivalent.
                                 The F5 NGINX Ingress Controller only supports htpasswd format, specified via the
-                                Secret's <code>type: nginx.org/htpasswd</code> field. The <code>auth-type</code>
+                                Secret's <code>type: nginx.org/htpasswd</code> field, with the file under the
+                                <code>htpasswd</code> key (the community controller read the <code>auth</code> key). The <code>auth-type</code>
                                 annotation is also implicit — the F5 NGINX Ingress Controller only supports basic auth
                                 via these annotations.
                             </div>
@@ -768,16 +813,27 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/auth-always-set-cookie: "true"
     nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># Use snippets to propagate cookies from auth responses
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. auth-url becomes an externalAuth Policy
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-external-auth
+spec:
+  externalAuth:
+    authURI: /verify  # auth-url (path)
+    authServiceName: auth-svc  # auth-url (service)
+    sslEnabled: true  # auth-url (https)
+---
+# 2. Attach it, and copy the auth response's cookie in a location snippet
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
+    nginx.org/policies: "my-app-external-auth"  # attaches the Policy above
     nginx.org/location-snippets: |  # auth-always-set-cookie
-      auth_request /auth;
       auth_request_set $auth_cookie $upstream_http_set_cookie;
-      add_header Set-Cookie $auth_cookie;  # auth-always-set-cookie</code></pre></div>
+      add_header Set-Cookie $auth_cookie always;  # auth-always-set-cookie (always: with every response status)</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -789,12 +845,26 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/auth-always-set-cookie: "true"
     nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. auth-url becomes an externalAuth Policy
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-external-auth
+spec:
+  externalAuth:
+    authURI: /verify  # auth-url (path)
+    authServiceName: auth-svc  # auth-url (service)
+    sslEnabled: true  # auth-url (https)
+---
+# 2. Attach it, and copy the auth response's cookie in a location snippet
+apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: my-app
 spec:
   host: app.example.com
+  policies:  # attaches the Policy above
+    - name: my-app-external-auth
   upstreams:
     - name: backend
       service: backend-svc
@@ -802,14 +872,13 @@ spec:
   routes:
     - path: /
       location-snippets: |  # auth-always-set-cookie
-        auth_request /auth;
         auth_request_set $auth_cookie $upstream_http_set_cookie;
-        add_header Set-Cookie $auth_cookie;  # auth-always-set-cookie
+        add_header Set-Cookie $auth_cookie always;  # auth-always-set-cookie (always: with every response status)
       action:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community <code>auth-always-set-cookie</code> ensures Set-Cookie headers from the auth service are forwarded to the client regardless of the response code. Use <code>nginx.org/location-snippets</code> with <code>auth_request_set</code> to capture and forward cookies. (The Plus-only <code>oidc</code> Policy handles cookies internally.)</div>
+                                                        <div class="info-box note"><strong>Note:</strong> NGINX Ingress Controller adds the <code>auth_request</code> directive for the <code>externalAuth</code> Policy itself, so the snippet carries only the cookie lines. It does not pass the auth service's <code>Set-Cookie</code> on by itself, as the community controller did for every <code>auth-url</code>; <code>always</code> sends it with every response code, which is what <code>auth-always-set-cookie</code> added. The auth service is reached through a Service: <code>auth.example.com</code> lies outside the cluster, so <code>auth-svc</code> stands for an ExternalName Service in front of it, which NGINX Ingress Controller supports only with NGINX Plus. On NGINX OSS, run the auth service in the cluster and name its Service. Snippets need the controller's <code>-enable-snippets</code> flag. (The Plus-only <code>oidc</code> Policy handles cookies internally.)</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-cache-duration</code><br><code>nginx.ingress.kubernetes.io/auth-cache-key</code><br><code>nginx.ingress.kubernetes.io/auth-method</code><br><code>nginx.ingress.kubernetes.io/auth-proxy-set-headers</code><br><code>nginx.ingress.kubernetes.io/auth-request-redirect</code><br><code>nginx.ingress.kubernetes.io/auth-response-headers</code><br><code>nginx.ingress.kubernetes.io/auth-signin</code><br><code>nginx.ingress.kubernetes.io/auth-signin-redirect-param</code><br><code>nginx.ingress.kubernetes.io/auth-snippet</code><br><code>nginx.ingress.kubernetes.io/auth-url</code></td>
@@ -836,14 +905,16 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: external-auth
+  name: my-app-external-auth
 spec:
   externalAuth:
     authURI: "/auth"  # auth-url (path)
     authServiceName: "default/auth-svc"  # auth-url (service)
-    authSigninURI: "/login"  # auth-signin (path only — NIC authSigninURI is relative)
-    authSnippets: |  # auth-snippet
+    authSigninURI: "/login"  # auth-signin (path only — authSigninURI is relative)
+    authSigninRedirectBasePath: "/login"  # auth-signin (NIC serves this path from the auth Service)
+    authSnippets: |  # auth-snippet + auth-method
       proxy_set_header X-Original-URI $request_uri;
+      proxy_method GET;
 ---
 # 2. Reference from Ingress (new in v5.5.0)
 apiVersion: networking.k8s.io/v1
@@ -851,9 +922,9 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "external-auth"  # attaches the Policy above</code></pre></div>
+    nginx.org/policies: "my-app-external-auth"  # attaches the Policy above</code></pre></div>
                                 </div>
-                                <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>externalAuth</code> Policy CRD can be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. <code>auth-url</code> is split into <code>authURI</code> (path) and <code>authServiceName</code> (<code>&lt;namespace&gt;/&lt;service&gt;</code>). The community's <code>auth-method</code>, <code>auth-response-headers</code>, <code>auth-cache-duration</code>, <code>auth-cache-key</code>, <code>auth-proxy-set-headers</code>, <code>auth-request-redirect</code>, and <code>auth-signin-redirect-param</code> annotations have no dedicated Policy fields — express these through <code>authSnippets</code> when needed. If you are not adopting a Policy, place the same directives directly in <code>nginx.org/location-snippets</code> alongside the <code>auth_request</code> directive instead. NIC's <code>authSigninURI</code> is a <em>relative</em> URI (validated <code>^/.*$</code>): a full <code>auth-signin</code> URL is reduced to its path, and a sign-in page on a different host cannot be expressed by this field.</div>
+                                <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>externalAuth</code> Policy CRD can be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. <code>auth-url</code> is split into <code>authURI</code> (path) and <code>authServiceName</code> (<code>&lt;namespace&gt;/&lt;service&gt;</code>). The community's <code>auth-method</code>, <code>auth-response-headers</code>, <code>auth-cache-duration</code>, <code>auth-cache-key</code>, <code>auth-proxy-set-headers</code>, <code>auth-request-redirect</code>, and <code>auth-signin-redirect-param</code> annotations have no dedicated Policy fields — express these through <code>authSnippets</code> when needed. If you are not adopting a Policy, place the same directives directly in <code>nginx.org/location-snippets</code> alongside the <code>auth_request</code> directive instead. NIC's <code>authSigninURI</code> is a <em>relative</em> URI (validated <code>^/.*$</code>): a full <code>auth-signin</code> URL is reduced to its path, and a sign-in page on a different host cannot be expressed by this field. NIC proxies sign-in requests to the auth Service from a location at <code>authSigninRedirectBasePath</code> (default <code>/oauth2</code>); never set it to <code>/</code> or to a path a route already uses, because NGINX rejects the duplicate location. The analyzer sets it to the sign-in path's parent directory, or to the path itself when that parent is <code>/</code>, as for <code>/login</code> here.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
                                 <div class="comparison">
@@ -871,14 +942,16 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: external-auth
+  name: my-app-external-auth
 spec:
   externalAuth:
     authURI: "/auth"  # auth-url (path)
     authServiceName: "default/auth-svc"  # auth-url (service)
-    authSigninURI: "/login"  # auth-signin (path only — NIC authSigninURI is relative)
-    authSnippets: |  # auth-snippet
+    authSigninURI: "/login"  # auth-signin (path only — authSigninURI is relative)
+    authSigninRedirectBasePath: "/login"  # auth-signin (NIC serves this path from the auth Service)
+    authSnippets: |  # auth-snippet + auth-method
       proxy_set_header X-Original-URI $request_uri;
+      proxy_method GET;
 ---
 # 2. Reference from VirtualServer (or VirtualServerRoute)
 apiVersion: k8s.nginx.org/v1
@@ -887,8 +960,8 @@ metadata:
   name: my-app
 spec:
   host: app.example.com
-  policies:
-    - name: external-auth
+  policies:  # attaches the Policy above
+    - name: my-app-external-auth
   upstreams:
     - name: backend
       service: backend-svc
@@ -903,14 +976,14 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/auth-keepalive</code><br><code>nginx.ingress.kubernetes.io/auth-keepalive-requests</code><br><code>nginx.ingress.kubernetes.io/auth-keepalive-share-vars</code><br><code>nginx.ingress.kubernetes.io/auth-keepalive-timeout</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="ingress-policy">Policy + Ingress</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="vs-policy">Policy + VirtualServer</button>
                             </div>
-                            <div class="approach-content" data-approach="annotation">
+                            <div class="approach-content active" data-approach="ingress-policy">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -922,20 +995,27 @@ metadata:
     nginx.ingress.kubernetes.io/auth-keepalive-share-vars: "true"
     nginx.ingress.kubernetes.io/auth-keepalive-timeout: "60"
     nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># No direct auth-keepalive annotations; use snippets
-# for auth_request subrequest customization.
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># auth-keepalive*: no equivalent, so nothing to write for them.
+# auth-url still becomes an externalAuth Policy.
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-external-auth
+spec:
+  externalAuth:
+    authURI: /verify  # auth-url (path)
+    authServiceName: auth-svc  # auth-url (service)
+    sslEnabled: true  # auth-url (https)
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/location-snippets: |  # auth-keepalive
-      auth_request /auth;
-      auth_request_set $auth_user $upstream_http_x_auth_user;
-      proxy_set_header X-Auth-User $auth_user;</code></pre></div>
+    nginx.org/policies: "my-app-external-auth"  # attaches the Policy above</code></pre></div>
                                 </div>
                             </div>
-                            <div class="approach-content active" data-approach="crd">
+                            <div class="approach-content" data-approach="vs-policy">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Kubernetes Ingress NGINX (Ingress-NGINX)</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -947,27 +1027,38 @@ metadata:
     nginx.ingress.kubernetes.io/auth-keepalive-share-vars: "true"
     nginx.ingress.kubernetes.io/auth-keepalive-timeout: "60"
     nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/verify"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># auth-keepalive*: no equivalent, so nothing to write for them.
+# auth-url still becomes an externalAuth Policy.
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-external-auth
+spec:
+  externalAuth:
+    authURI: /verify  # auth-url (path)
+    authServiceName: auth-svc  # auth-url (service)
+    sslEnabled: true  # auth-url (https)
+---
+apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: my-app
 spec:
   host: app.example.com
+  policies:  # attaches the Policy above
+    - name: my-app-external-auth
   upstreams:
     - name: backend
       service: backend-svc
       port: 80
   routes:
     - path: /
-      location-snippets: |  # auth-keepalive
-        auth_request /auth;
-        auth_request_set $auth_user $upstream_http_x_auth_user;
-        proxy_set_header X-Auth-User $auth_user;
       action:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller's <code>auth-keepalive</code>, <code>auth-keepalive-requests</code>, <code>auth-keepalive-share-vars</code>, and <code>auth-keepalive-timeout</code> annotations configure keepalive connections to the external auth service. The F5 NGINX Ingress Controller doesn't have dedicated <code>auth_request</code> annotations. For generic external auth, use <code>nginx.org/location-snippets</code> with the <code>auth_request</code> directive. If you adopt the <code>externalAuth</code> Policy (shown in the row above), keepalive concerns can be expressed via the Policy's <code>authSnippets</code> field.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> The community controller's <code>auth-keepalive</code>, <code>auth-keepalive-requests</code>, <code>auth-keepalive-share-vars</code>, and <code>auth-keepalive-timeout</code> annotations kept a dedicated pool of connections to the external auth service open between checks. NGINX Ingress Controller has no setting for the auth Service alone. On a VirtualServer it opens a new connection for each check; on an Ingress, the auth Service shares the Ingress's <code>nginx.org/keepalive</code> (or the ConfigMap's <code>keepalive</code>) with every other upstream. Nothing replaces <code>auth-keepalive-requests</code>, <code>auth-keepalive-timeout</code>, or <code>auth-keepalive-share-vars</code>. Expect more connections to the auth Service, and size it for that.</div>
+                            <div class="info-box note"><strong>Note:</strong> The auth service is reached through a Service: <code>auth.example.com</code> lies outside the cluster, so <code>auth-svc</code> stands for an ExternalName Service in front of it, which NGINX Ingress Controller supports only with NGINX Plus. On NGINX OSS, run the auth service in the cluster and name its Service. The <code>externalAuth</code> Policy is covered in the row above.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/enable-global-auth</code></td>
@@ -1368,8 +1459,27 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/proxy-max-temp-file-size: "1024m"  # proxy-max-temp-file-size</code></pre></div>
+    nginx.org/proxy-max-temp-file-size: "1024m"  # proxy-max-temp-file-size
+---
+# Or on a VirtualServer, which has no field for it: a location snippet
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      location-snippets: |  # proxy-max-temp-file-size
+        proxy_max_temp_file_size 1024m;
+      action:
+        pass: backend</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> VirtualServer has no field for <code>proxy_max_temp_file_size</code>, so on a VirtualServer it is a location snippet, which needs the controller's <code>-enable-snippets</code> flag. To set it for every resource at once, use the <code>proxy-max-temp-file-size</code> key in the <code>nginx-config</code> ConfigMap instead.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-request-buffering</code></td>
@@ -1453,9 +1563,14 @@ metadata:
     nginx.ingress.kubernetes.io/canary-by-header-value: "always"
     nginx.ingress.kubernetes.io/canary-weight: "20"
     nginx.ingress.kubernetes.io/canary-weight-total: "100"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># One VirtualServer for the host: the stable upstream comes from
+# the main Ingress, the canary upstream from this one.
+apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
+  host: app.example.com
   upstreams:
     - name: main
       service: main-svc
@@ -1468,12 +1583,7 @@ spec:
       matches:
         - conditions:
             - header: X-Canary  # canary-by-header
-              value: always  # canary-by-header-value
-          action:
-            pass: canary
-        - conditions:
-            - header: X-Canary  # canary-by-header
-              value: "~^(test|staging)$"  # canary-by-header-pattern (regex)
+              value: always  # canary-by-header-value (it overrides canary-by-header-pattern)
           action:
             pass: canary
         - conditions:
@@ -1483,10 +1593,13 @@ spec:
             pass: canary
       splits:  # canary-weight / canary-weight-total
         - weight: 80
-          action: { pass: main }
+          action:
+            pass: main
         - weight: 20
-          action: { pass: canary }</code></pre></div>
+          action:
+            pass: canary</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> A canary Ingress names only the canary Service, so the stable upstream comes from the main Ingress for the same host and path. Paste both into the analyzer and it merges them into one VirtualServer; pasted alone, the stable Service is left for you to fill in. The community controller ignores <code>canary-by-header-pattern</code> when <code>canary-by-header-value</code> is set; on its own, the pattern becomes a regex match value (<code>~^(test|staging)$</code>).</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -1609,7 +1722,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/stream-snippet</code></td>
-                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> +<span class="badge badge-transportserver">TransportServer CRD</span></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>stream-snippets</code><span class="or-text">— or —</span><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> +<span class="badge badge-transportserver">TransportServer CRD</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1620,7 +1733,32 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/stream-snippet: |
       server { listen 3306; proxy_pass mysql; }</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># stream-snippet → GlobalConfiguration + TransportServer CRD
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. As-is: the stream-snippets key of the global ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  stream-snippets: |  # stream-snippet
+    server { listen 3306; proxy_pass mysql; }
+---
+# The rest of the Ingress still becomes a VirtualServer for its host
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend
+---
+# 2. Long-term: a GlobalConfiguration listener + TransportServer
 apiVersion: k8s.nginx.org/v1
 kind: GlobalConfiguration
 metadata:
@@ -1647,6 +1785,7 @@ spec:
   action:
     pass: mysql</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> The analyzer moves the snippet as-is into the <code>stream-snippets</code> ConfigMap key, which, like <code>http-snippets</code>, does not need the <code>-enable-snippets</code> flag. Its upstreams name Services by DNS, which NGINX resolves once at reload, so a Pod change is not picked up until the next one. A TransportServer behind a GlobalConfiguration listener tracks the Pod endpoints instead, which makes it the long-term form.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -1720,23 +1859,23 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: cors-policy
+  name: my-app-cors
 spec:
   cors:
     allowOrigin:  # cors-allow-origin
-      - "https://frontend.example.com"
+      - https://frontend.example.com
     allowMethods:  # cors-allow-methods
-      - "GET"
-      - "POST"
-      - "PUT"
-      - "DELETE"
-      - "OPTIONS"
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
     allowHeaders:  # cors-allow-headers
-      - "Authorization"
-      - "Content-Type"
+      - Authorization
+      - Content-Type
     allowCredentials: true  # cors-allow-credentials
     exposeHeaders:  # cors-expose-headers
-      - "X-Request-ID"
+      - X-Request-ID
     maxAge: 3600  # cors-max-age
 ---
 # 2. Reference from Ingress
@@ -1745,14 +1884,14 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "cors-policy"  # attaches the Policy above
+    nginx.org/policies: "my-app-cors"  # attaches the Policy above
 
 # Or reference from VirtualServer:
 # spec:
 #   policies:
-#     - name: cors-policy</code></pre></div>
+#     - name: my-app-cors</code></pre></div>
                                 </div>
-                                <div class="info-box note"><strong>New in v5.4.0:</strong> The CORS Policy CRD is the recommended migration path. Create a reusable Policy and reference it via <code>nginx.org/policies</code> on Ingress or VirtualServer.</div>
+                                <div class="info-box note"><strong>New in v5.4.0:</strong> The CORS Policy CRD is the recommended migration path. Create a reusable Policy and reference it via <code>nginx.org/policies</code> on Ingress or VirtualServer. The analyzer emits this Policy under either strategy; the other two tabs are alternatives you write by hand.</div>
                             </div>
                             <div class="approach-content" data-approach="crd-headers">
                                 <div class="comparison">
@@ -1868,6 +2007,17 @@ metadata:
   annotations:
     nginx.org/custom-http-errors: "404,500,502"  # custom-http-errors
 spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80
   defaultBackend:  # default-backend
     service:
       name: error-svc
@@ -1888,7 +2038,7 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
-  name: error-pages-app
+  name: my-app
 spec:
   host: app.example.com
   upstreams:
@@ -1900,14 +2050,18 @@ spec:
       action:
         pass: backend
       errorPages:  # custom-http-errors
-        - codes: [404, 500, 502]
+        - codes:
+            - 404
+            - 500
+            - 502
           return:
-            body: "An error occurred."</code></pre></div>
+            type: text/html
+            body: "&lt;html&gt;&lt;body&gt;&lt;h1&gt;Error ${upstream_status}&lt;/h1&gt;&lt;/body&gt;&lt;/html&gt;"</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box tip"><strong>Recommended: Annotation Approach.</strong> This is the one construct in this guide where the annotation is preferred over the CRD. <code>nginx.org/custom-http-errors</code> serves error pages from a Service, as the community controller does, while VirtualServer <code>errorPages</code> can only <code>return</code> a canned response or <code>redirect</code> to a URL. The analyzer keeps it as an annotation under either strategy.</div>
                             <div class="info-box warning"><strong>Not identical to the community controller:</strong> NIC sends intercepted errors only to the Ingress's own <code>spec.defaultBackend</code>, which must be in the same namespace, and none of the community's <code>X-Code</code>, <code>X-Format</code>, or <code>X-Original-URI</code> headers reach it — error pages that branch on them need rework. Clients receive the original upstream status. On its own, <code>default-backend</code> has no annotation equivalent for its fallback when a Service has no ready endpoints; on NGINX Plus, VirtualServer <code>upstreams[].backup</code> is the closest match.</div>
-                            <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/custom-http-errors</code> intercepts upstream responses with the listed status codes and serves them from the Ingress's <code>spec.defaultBackend</code>. It takes codes from 300 to 599 plus the <code>4xx</code> and <code>5xx</code> shorthands. NIC rejects the Ingress for an invalid code, including 499, which NGINX refuses in <code>error_page</code>. Without a <code>spec.defaultBackend</code> the annotation does nothing.</div>
+                            <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/custom-http-errors</code> intercepts upstream responses with the listed status codes and serves them from the Ingress's <code>spec.defaultBackend</code>. It takes codes from 300 to 599 plus the <code>4xx</code> and <code>5xx</code> shorthands. NIC rejects the Ingress for an invalid code, including 499, which NGINX refuses in <code>error_page</code>. Without a <code>spec.defaultBackend</code> the annotation does nothing. The <code>default-backend</code> annotation names only a Service, so set the port in <code>spec.defaultBackend</code> to the one that Service serves on; the community controller used its first port.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -1981,22 +2135,32 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.ingress.kubernetes.io/custom-headers: "default/custom-headers-configmap"</code></pre></div>
+    nginx.ingress.kubernetes.io/custom-headers: "default/custom-headers-configmap"
+# default/custom-headers-configmap holds one header per key:
+#   X-Frame-Options: "DENY"
+#   X-Content-Type-Options: "nosniff"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
   routes:
     - path: /
       action:
         proxy:
-          upstream: my-backend
-          responseHeaders:  # custom-headers
+          upstream: backend
+          responseHeaders:  # custom-headers — TODO: replace the placeholder with each header in ConfigMap default/custom-headers-configmap
             add:
-              - name: X-Frame-Options
-                value: "DENY"
-              - name: X-Content-Type-Options
-                value: "nosniff"</code></pre></div>
+              - name: X-Example-Header
+                value: "value"
+                always: true</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> The headers live in the ConfigMap the annotation names, which the analyzer cannot read: it writes a placeholder header for you to replace with each key and value from that ConfigMap; for the one above, <code>X-Frame-Options: DENY</code> and <code>X-Content-Type-Options: nosniff</code>. The community controller sent them with <code>more_set_headers</code>, on every response code, so each header keeps <code>always: true</code>. To keep an Ingress instead, use <code>nginx.org/add-header</code>, with <code>always</code> as a third field: <code>X-Frame-Options: DENY: always</code>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>server-tokens</code></td>
@@ -2407,12 +2571,19 @@ metadata:
     nginx.ingress.kubernetes.io/upstream-hash-by-subset-size: "3"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      lb-method: "hash $request_uri consistent"  # upstream-hash-by</code></pre></div>
+      lb-method: "hash $request_uri consistent"  # upstream-hash-by
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> The F5 NGINX Ingress Controller has no dedicated <code>upstream-hash-by</code> equivalent. Instead, the hash key is specified as part of the <code>lb-method</code> value (e.g., <code>hash $request_uri consistent</code>). Subset hashing (<code>upstream-hash-by-subset</code>) is not supported; use <code>consistent</code> hashing for similar distribution.</div>
@@ -2536,13 +2707,13 @@ metadata:
   name: my-app
   annotations:
     nginx.org/location-snippets: |  # mirror-target + mirror-request-body
-      mirror /mirror;  # mirror-target
-      mirror_request_body on;  # mirror-request-body
-    nginx.org/server-snippets: |  # mirror-host + mirror-target
-      location /mirror {
-        internal;
-        proxy_set_header Host mirror.example.com;  # mirror-host
-        proxy_pass https://mirror.example.com$request_uri;  # mirror-target
+      mirror /_mirror-my-app;
+      mirror_request_body on;
+    nginx.org/server-snippets: |  # mirror-target + mirror-host
+      location = /_mirror-my-app {
+          internal;
+          proxy_set_header Host mirror.example.com;
+          proxy_pass https://mirror.example.com$request_uri;
       }</code></pre></div>
                                 </div>
                             </div>
@@ -2562,11 +2733,11 @@ metadata:
   name: my-app
 spec:
   host: app.example.com
-  server-snippets: |  # mirror-host + mirror-target
-    location /mirror {
-      internal;
-      proxy_set_header Host mirror.example.com;  # mirror-host
-      proxy_pass https://mirror.example.com$request_uri;  # mirror-target
+  server-snippets: |  # mirror-target + mirror-host
+    location = /_mirror-my-app {
+        internal;
+        proxy_set_header Host mirror.example.com;
+        proxy_pass https://mirror.example.com$request_uri;
     }
   upstreams:
     - name: backend
@@ -2575,12 +2746,13 @@ spec:
   routes:
     - path: /
       location-snippets: |  # mirror-target + mirror-request-body
-        mirror /mirror;  # mirror-target
-        mirror_request_body on;  # mirror-request-body
+        mirror /_mirror-my-app;
+        mirror_request_body on;
       action:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> This is the internal location the community controller generated for <code>mirror-target</code>. Without <code>mirror-host</code>, set <code>Host</code> to the target's hostname, as the community controller did; <code>mirror_request_body</code> is <code>on</code> unless <code>mirror-request-body</code> is <code>off</code>. A target with NGINX variables, such as <code>$request_uri</code>, makes NGINX resolve its hostname per request, and that needs a <code>resolver</code>. The community controller always configured one; NGINX Ingress Controller does not, so add a <code>resolver</code> line to the server snippet (on NGINX Plus, the <code>resolver-addresses</code> ConfigMap key also works), or the mirror requests fail. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2616,7 +2788,7 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: ingress-mtls
+  name: my-app-ingress-mtls
 spec:
   ingressMTLS:
     clientCertSecret: ca-secret  # auth-tls-secret
@@ -2624,19 +2796,23 @@ spec:
     verifyDepth: 2  # auth-tls-verify-depth
 ---
 # 2. Reference from Ingress (new in v5.5.0)
-# auth-tls-pass-certificate-to-upstream → location-snippets
+# client certificate headers → location-snippets
 # auth-tls-error-page → server-snippets
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "ingress-mtls"  # attaches the Policy above
-    nginx.org/location-snippets: |  # auth-tls-pass-certificate-to-upstream
+    nginx.org/policies: "my-app-ingress-mtls"  # attaches the Policy above
+    nginx.org/location-snippets: |  # auth-tls-secret + auth-tls-pass-certificate-to-upstream
+      proxy_set_header ssl-client-verify $ssl_client_verify;
+      proxy_set_header ssl-client-subject-dn $ssl_client_s_dn;
+      proxy_set_header ssl-client-issuer-dn $ssl_client_i_dn;
       proxy_set_header ssl-client-cert $ssl_client_escaped_cert;
     nginx.org/server-snippets: |  # auth-tls-error-page
       error_page 495 496 = https://example.com/cert-error;</code></pre></div>
                                 </div>
+                                <div class="info-box warning"><strong>CA Secret and TLS:</strong> NGINX Ingress Controller reads the CA from a Secret of type <code>nginx.org/ca</code>, with the certificate under <code>ca.crt</code>, in the Policy's namespace; the community controller read a generic Secret, so drop the <code>ns/</code> prefix and re-create the Secret. The Policy takes effect only on a host that terminates TLS: without it, NGINX Ingress Controller answers every request with 500. The community controller sent the <code>ssl-client-verify</code>, <code>ssl-client-subject-dn</code>, and <code>ssl-client-issuer-dn</code> headers whenever a CA was set, and <code>ssl-client-cert</code> only with <code>auth-tls-pass-certificate-to-upstream</code>, so the snippet carries all four. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>ingressMTLS</code> Policy CRD can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
@@ -2655,7 +2831,7 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: ingress-mtls
+  name: my-app-ingress-mtls
 spec:
   ingressMTLS:
     clientCertSecret: ca-secret  # auth-tls-secret
@@ -2669,8 +2845,8 @@ metadata:
   name: my-app
 spec:
   host: app.example.com
-  policies:
-    - name: ingress-mtls
+  policies:  # attaches the Policy above
+    - name: my-app-ingress-mtls
   server-snippets: |  # auth-tls-error-page
     error_page 495 496 = https://example.com/cert-error;
   upstreams:
@@ -2679,11 +2855,15 @@ spec:
       port: 80
   routes:
     - path: /
-      location-snippets: |  # auth-tls-pass-certificate-to-upstream
+      location-snippets: |  # auth-tls-secret + auth-tls-pass-certificate-to-upstream
+        proxy_set_header ssl-client-verify $ssl_client_verify;
+        proxy_set_header ssl-client-subject-dn $ssl_client_s_dn;
+        proxy_set_header ssl-client-issuer-dn $ssl_client_i_dn;
         proxy_set_header ssl-client-cert $ssl_client_escaped_cert;
       action:
         pass: backend</code></pre></div>
                                 </div>
+                                <div class="info-box warning"><strong>CA Secret and TLS:</strong> NGINX Ingress Controller reads the CA from a Secret of type <code>nginx.org/ca</code>, with the certificate under <code>ca.crt</code>, in the Policy's namespace; the community controller read a generic Secret, so drop the <code>ns/</code> prefix and re-create the Secret. The Policy takes effect only on a host that terminates TLS: without it, NGINX Ingress Controller answers every request with 500. The community controller sent the <code>ssl-client-verify</code>, <code>ssl-client-subject-dn</code>, and <code>ssl-client-issuer-dn</code> headers whenever a CA was set, and <code>ssl-client-cert</code> only with <code>auth-tls-pass-certificate-to-upstream</code>, so the snippet carries all four. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
                                 <div class="info-box note"><strong>Note:</strong> The VirtualServer approach has been available since before v5.5.0. Use this if you are already migrating to VirtualServer resources for other reasons (e.g., advanced routing, traffic splitting).</div>
                             </div>
                         </div></td></tr>
@@ -2710,9 +2890,7 @@ metadata:
   name: my-app
   annotations:
     nginx.org/location-snippets: |  # auth-tls-match-cn
-      if ($ssl_client_s_dn !~ "CN=client-[0-9]+") {  # auth-tls-match-cn
-          return 403;
-      }</code></pre></div>
+      if ($ssl_client_s_dn !~ "CN=client-[0-9]+") { return 403; }</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -2736,9 +2914,7 @@ spec:
   routes:
     - path: /
       location-snippets: |  # auth-tls-match-cn
-        if ($ssl_client_s_dn !~ "CN=client-[0-9]+") {
-            return 403;
-        }
+        if ($ssl_client_s_dn !~ "CN=client-[0-9]+") { return 403; }
       action:
         pass: backend</code></pre></div>
                                 </div>
@@ -2770,6 +2946,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
     nginx.ingress.kubernetes.io/proxy-ssl-ciphers: "HIGH:!aNULL:!MD5"
     nginx.ingress.kubernetes.io/proxy-ssl-name: "backend.example.com"
     nginx.ingress.kubernetes.io/proxy-ssl-protocols: "TLSv1.2 TLSv1.3"
@@ -2781,17 +2958,17 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: egress-mtls
+  name: my-app-egress-mtls
 spec:
   egressMTLS:
-    ciphers: "HIGH:!aNULL:!MD5"  # proxy-ssl-ciphers
-    sslName: "backend.example.com"  # proxy-ssl-name
-    protocols: "TLSv1.2 TLSv1.3"  # proxy-ssl-protocols
-    tlsSecret: client-cert  # proxy-ssl-secret
-    serverName: true  # proxy-ssl-server-name
+    tlsSecret: client-cert  # proxy-ssl-secret (tls.crt, tls.key)
     verifyServer: true  # proxy-ssl-verify
+    trustedCertSecret: client-cert-ca  # proxy-ssl-secret (its ca.crt)
     verifyDepth: 2  # proxy-ssl-verify-depth
-    trustedCertSecret: ca-cert
+    ciphers: "HIGH:!aNULL:!MD5"  # proxy-ssl-ciphers
+    protocols: "TLSv1.2 TLSv1.3"  # proxy-ssl-protocols
+    serverName: true  # proxy-ssl-server-name
+    sslName: "backend.example.com"  # proxy-ssl-name
 ---
 # 2. Reference from Ingress (new in v5.5.0)
 apiVersion: networking.k8s.io/v1
@@ -2799,9 +2976,10 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "egress-mtls"  # attaches the Policy above
-    nginx.org/ssl-services: "secure-app"  # opt-in upstream(s) to TLS</code></pre></div>
+    nginx.org/policies: "my-app-egress-mtls"  # attaches the Policy above
+    nginx.org/ssl-services: "my-service"  # backend-protocol HTTPS (the Ingress's backend Service)</code></pre></div>
                                 </div>
+                                <div class="info-box warning"><strong>Secrets and upstream TLS:</strong> The community controller read the client certificate and the CA from one <code>proxy-ssl-secret</code>. NGINX Ingress Controller splits them: <code>tlsSecret</code> is a Secret of type <code>kubernetes.io/tls</code>, and <code>trustedCertSecret</code> a separate Secret of type <code>nginx.org/ca</code> with the CA under <code>ca.crt</code>, both in the Policy's namespace. The Policy applies only to an upstream that already speaks TLS, which <code>backend-protocol: "HTTPS"</code> sets up as <code>nginx.org/ssl-services</code> or upstream <code>tls.enable</code>.</div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>egressMTLS</code> Policy CRD can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. Combine with <code>nginx.org/ssl-services</code> to identify which backend services should use TLS.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
@@ -2811,6 +2989,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
     nginx.ingress.kubernetes.io/proxy-ssl-ciphers: "HIGH:!aNULL:!MD5"
     nginx.ingress.kubernetes.io/proxy-ssl-name: "backend.example.com"
     nginx.ingress.kubernetes.io/proxy-ssl-protocols: "TLSv1.2 TLSv1.3"
@@ -2822,17 +3001,17 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: egress-mtls
+  name: my-app-egress-mtls
 spec:
   egressMTLS:
-    ciphers: "HIGH:!aNULL:!MD5"  # proxy-ssl-ciphers
-    sslName: "backend.example.com"  # proxy-ssl-name
-    protocols: "TLSv1.2 TLSv1.3"  # proxy-ssl-protocols
-    tlsSecret: client-cert  # proxy-ssl-secret
-    serverName: true  # proxy-ssl-server-name
+    tlsSecret: client-cert  # proxy-ssl-secret (tls.crt, tls.key)
     verifyServer: true  # proxy-ssl-verify
+    trustedCertSecret: client-cert-ca  # proxy-ssl-secret (its ca.crt)
     verifyDepth: 2  # proxy-ssl-verify-depth
-    trustedCertSecret: ca-cert
+    ciphers: "HIGH:!aNULL:!MD5"  # proxy-ssl-ciphers
+    protocols: "TLSv1.2 TLSv1.3"  # proxy-ssl-protocols
+    serverName: true  # proxy-ssl-server-name
+    sslName: "backend.example.com"  # proxy-ssl-name
 ---
 # 2. Reference from VirtualServer
 apiVersion: k8s.nginx.org/v1
@@ -2841,19 +3020,20 @@ metadata:
   name: my-app
 spec:
   host: app.example.com
-  policies:
-    - name: egress-mtls
+  policies:  # attaches the Policy above
+    - name: my-app-egress-mtls
   upstreams:
-    - name: secure-app
-      service: secure-app-svc
-      port: 443
-      tls:
+    - name: backend
+      service: backend-svc
+      port: 80
+      tls:  # backend-protocol HTTPS
         enable: true
   routes:
     - path: /
       action:
-        pass: secure-app</code></pre></div>
+        pass: backend</code></pre></div>
                                 </div>
+                                <div class="info-box warning"><strong>Secrets and upstream TLS:</strong> The community controller read the client certificate and the CA from one <code>proxy-ssl-secret</code>. NGINX Ingress Controller splits them: <code>tlsSecret</code> is a Secret of type <code>kubernetes.io/tls</code>, and <code>trustedCertSecret</code> a separate Secret of type <code>nginx.org/ca</code> with the CA under <code>ca.crt</code>, both in the Policy's namespace. The Policy applies only to an upstream that already speaks TLS, which <code>backend-protocol: "HTTPS"</code> sets up as <code>nginx.org/ssl-services</code> or upstream <code>tls.enable</code>.</div>
                                 <div class="info-box note"><strong>Note:</strong> The VirtualServer approach has been available since before v5.5.0. TLS to upstream is enabled per-upstream via <code>tls.enable: true</code> (replacing the Ingress-level <code>nginx.org/ssl-services</code> annotation).</div>
                             </div>
                         </div></td></tr>
@@ -2919,10 +3099,10 @@ metadata:
   name: nginx-config
 data:
   otel-trace-in-http: "true"  # enable-opentelemetry
-  otel-exporter-endpoint: "otel-collector:4317"  # required: collector address
-  otel-service-name: "nginx-ingress"  # optional: service name for traces</code></pre></div>
+  otel-exporter-endpoint: "otel-collector:4317"  # TODO: your collector — NIC turns tracing off without it (the community read otlp-collector-host, port 4317)
+  otel-service-name: "nginx"  # the community default service name</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>otel-trace-in-http</code> is the direct replacement for <code>enable-opentelemetry</code>. Additional ConfigMap keys: <code>otel-exporter-endpoint</code> (required), <code>otel-service-name</code>, <code>otel-exporter-header-name</code>, <code>otel-exporter-header-value</code>. Unlike the community annotation, this enables tracing globally — not per-Ingress.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>otel-trace-in-http</code> is the direct replacement for <code>enable-opentelemetry</code>, but only with <code>otel-exporter-endpoint</code> set: without it, NGINX Ingress Controller reports the ConfigMap invalid and leaves tracing off. <code>otel-service-name</code> keeps the community controller's <code>nginx</code>; without it, NGINX reports <code>unknown_service:nginx</code>. <code>otel-exporter-header-name</code> and <code>otel-exporter-header-value</code> are optional. Unlike the community annotation, this enables tracing globally — not per-Ingress — and there is no per-Ingress opt-out.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span</code></td>
@@ -2969,7 +3149,7 @@ data:
   otel-exporter-header-value: "Bearer token"  # optional: auth header value
   otel-service-name: "my-app"  # optional: service name for traces</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> These ConfigMap keys are NIC-only and configure the OpenTelemetry exporter. <code>otel-exporter-endpoint</code> is required when tracing is enabled. <code>otel-service-name</code> sets the service name in traces (defaults to <code>nginx-ingress</code>). <code>otel-exporter-header-name</code> and <code>otel-exporter-header-value</code> add custom headers to exporter requests (e.g., for authentication).</div>
+                            <div class="info-box note"><strong>Note:</strong> These ConfigMap keys are NIC-only and configure the OpenTelemetry exporter. <code>otel-exporter-endpoint</code> is required when tracing is enabled. <code>otel-service-name</code> sets the service name in traces; without it, NGINX reports <code>unknown_service:nginx</code>. <code>otel-exporter-header-name</code> and <code>otel-exporter-header-value</code> add custom headers to exporter requests (e.g., for authentication).</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -3129,14 +3309,21 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
       next-upstream: "error timeout"  # proxy-next-upstream
       next-upstream-timeout: 30s  # proxy-next-upstream-timeout
-      next-upstream-tries: 3  # proxy-next-upstream-tries</code></pre></div>
+      next-upstream-tries: 3  # proxy-next-upstream-tries
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note"><strong>New in v5.4.0:</strong> The <code>nginx.org/proxy-next-upstream</code>, <code>nginx.org/proxy-next-upstream-timeout</code>, and <code>nginx.org/proxy-next-upstream-tries</code> annotations are new. They provide direct 1:1 mappings from the community annotations without requiring a VirtualServer CRD.</div>
@@ -3173,21 +3360,33 @@ metadata:
     nginx.ingress.kubernetes.io/limit-rpm: "300"
     nginx.ingress.kubernetes.io/limit-rps: "10"
     nginx.ingress.kubernetes.io/limit-whitelist: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. The Ingress: one request rate, plus the connection and
+#    bandwidth limits as a location snippet
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/limit-req-burst: "50"  # limit-burst-multiplier (limit-rps × multiplier)
-    nginx.org/limit-req-rate: "10r/s"  # limit-rps (also covers limit-rpm)
-    # limit-connections, limit-rate, limit-rate-after, limit-whitelist
-    # → use location-snippets:
-    nginx.org/location-snippets: |  # limit-connections / limit-rate / limit-rate-after
-      limit_conn addr 5;  # limit-connections
-      limit_rate 100k;  # limit-rate
-      limit_rate_after 1024k;  # limit-rate-after (community value is kilobytes)
-      # limit-whitelist → use geo module or map in server-snippets</code></pre></div>
+    nginx.org/limit-req-rate: "10r/s"  # limit-rps
+    nginx.org/limit-req-burst: "50"  # limit-rps × limit-burst-multiplier (5)
+    nginx.org/limit-req-no-delay: "true"  # the community controller always used nodelay
+    nginx.org/limit-req-reject-code: "503"  # the community limit-req-status-code default
+    nginx.org/location-snippets: |  # limit-connections + the community limit-conn-status-code default + limit-rate + limit-rate-after
+      limit_conn my_app_conn 5;
+      limit_conn_status 503;
+      limit_rate 100k;
+      limit_rate_after 1024k;
+---
+# 2. The zone limit_conn counts in, in the global ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  http-snippets: |  # zones the migrated location snippets use
+    limit_conn_zone $binary_remote_addr zone=my_app_conn:5m;</code></pre></div>
                                 </div>
+                                <div class="info-box warning"><strong>Not carried over:</strong> An Ingress takes one <code>nginx.org/limit-req-rate</code>, so this approach keeps <code>limit-rps</code> and drops <code>limit-rpm</code>; use the CRD Approach to keep both. NGINX Ingress Controller has no rate-limit exemption list for <code>limit-whitelist</code>. To keep <code>10.0.0.0/8</code> and <code>172.16.0.0/12</code> unlimited, set <code>nginx.org/limit-req-key</code> from a <code>geo</code> map in the ConfigMap's <code>http-snippets</code> that yields an empty key for them, because NGINX does not count an empty key.</div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
@@ -3203,19 +3402,68 @@ metadata:
     nginx.ingress.kubernetes.io/limit-rpm: "300"
     nginx.ingress.kubernetes.io/limit-rps: "10"
     nginx.ingress.kubernetes.io/limit-whitelist: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># 1. The zone limit_conn counts in, in the global ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  http-snippets: |  # zones the migrated location snippets use
+    limit_conn_zone $binary_remote_addr zone=my_app_conn:5m;
+---
+# 2. One rateLimit Policy per community rate
+apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: rate-limit
+  name: my-app-rate-limit-rs
 spec:
   rateLimit:
-    burst: 50  # limit-rps × limit-burst-multiplier
+    rate: "10r/s"  # limit-rps
+    burst: 50  # limit-rps × limit-burst-multiplier (5)
+    noDelay: true  # the community controller always used nodelay
     key: ${binary_remote_addr}
-    rate: 10r/s  # limit-rps
-    rejectCode: 429
-    zoneSize: 10M</code></pre></div>
+    zoneSize: "10M"
+    rejectCode: 503  # the community limit-req-status-code default
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-rate-limit-rm
+spec:
+  rateLimit:
+    rate: "300r/m"  # limit-rpm
+    burst: 1500  # limit-rpm × limit-burst-multiplier (5)
+    noDelay: true  # the community controller always used nodelay
+    key: ${binary_remote_addr}
+    zoneSize: "10M"
+    rejectCode: 503  # the community limit-req-status-code default
+---
+# 3. Attach both, with the connection and bandwidth limits as a snippet
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:  # attaches the Policies above
+    - name: my-app-rate-limit-rs
+    - name: my-app-rate-limit-rm
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      location-snippets: |  # limit-connections + the community limit-conn-status-code default + limit-rate + limit-rate-after
+        limit_conn my_app_conn 5;
+        limit_conn_status 503;
+        limit_rate 100k;
+        limit_rate_after 1024k;
+      action:
+        pass: backend</code></pre></div>
                                 </div>
-                                <div class="info-box note"><strong>Note:</strong> The rateLimit Policy CRD covers <code>limit-rps</code>, <code>limit-rpm</code> (as <code>rate</code> in <code>r/m</code>), and <code>limit-burst-multiplier</code>. The community annotations <code>limit-connections</code>, <code>limit-rate</code>, <code>limit-rate-after</code>, and <code>limit-whitelist</code> have no Policy CRD equivalents — use <code>location-snippets</code> for those (see the Annotation Approach).</div>
+                                <div class="info-box warning"><strong>No exemption list:</strong> NGINX Ingress Controller has no rate-limit exemption list for <code>limit-whitelist</code>. To keep <code>10.0.0.0/8</code> and <code>172.16.0.0/12</code> unlimited, set the rateLimit <code>key</code> from a <code>geo</code> map in the ConfigMap's <code>http-snippets</code> that yields an empty key for them, because NGINX does not count an empty key.</div>
+                                <div class="info-box note"><strong>Note:</strong> The rateLimit Policy CRD covers <code>limit-rps</code>, <code>limit-rpm</code> (as <code>rate</code> in <code>r/m</code>), and <code>limit-burst-multiplier</code>; a VirtualServer can reference one Policy per rate, as the community controller enforced both. The community controller always used <code>nodelay</code> and answered 503, so the Policies say so. <code>limit-connections</code>, <code>limit-rate</code>, and <code>limit-rate-after</code> have no Policy fields and become a location snippet; <code>limit_conn</code> needs a <code>limit_conn_zone</code>, which goes in the ConfigMap's <code>http-snippets</code> (no <code>-enable-snippets</code> needed there). The location snippet does need <code>-enable-snippets</code>.</div>
                             </div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -3294,8 +3542,14 @@ metadata:
     # nginx.ingress.kubernetes.io/from-to-www-redirect: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
   host: old.example.com
+  upstreams:  # the Ingress's backend, kept though the route only redirects
+    - name: backend
+      service: backend-svc
+      port: 80
   routes:
     - path: /
       action:
@@ -3308,9 +3562,14 @@ spec:
   #     redirect:
   #       url: https://maintenance.example.com
   #       code: 307
-  # from-to-www-redirect → separate VirtualServer:
-  # server-snippets: |
-  #   return 301 https://www.example.com$request_uri;</code></pre></div>
+  # from-to-www-redirect → a separate VirtualServer for the other name:
+  # host: example.com
+  # routes:
+  #   - path: /
+  #     action:
+  #       redirect:
+  #         url: ${scheme}://www.example.com${request_uri}
+  #         code: 308</code></pre></div>
                             </div>
                         </div></td></tr>
                     </tbody>
@@ -3341,15 +3600,38 @@ metadata:
     nginx.ingress.kubernetes.io/app-root: "/dashboard"
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/use-regex: "true"
-# Used with Ingress path: /api(/|$)(.*)</code></pre></div>
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     nginx.org/app-root: "/dashboard"  # app-root
-    nginx.org/path-regex: "case_sensitive"  # use-regex
-    nginx.org/rewrite-target: /$2  # rewrite-target</code></pre></div>
+    nginx.org/path-regex: "case_insensitive"  # rewrite-target makes every path a case-insensitive regex
+    nginx.org/rewrite-target: /$2  # rewrite-target
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -3362,23 +3644,42 @@ metadata:
     nginx.ingress.kubernetes.io/app-root: "/dashboard"
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/use-regex: "true"
-# Used with Ingress path: /api(/|$)(.*)</code></pre></div>
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
   routes:
-    - path: /
+    - path: =/
       action:
-        redirect:
-          url: /dashboard  # app-root
+        redirect:  # app-root
+          url: ${scheme}://${host}/dashboard
           code: 302
-    - path: ~ ^/api(/|$)(.*)  # use-regex
+    - path: ~ (?i)^/api(/|$)(.*)  # use-regex
       action:
         proxy:
-          upstream: api
+          upstream: backend
           rewritePath: /$2  # rewrite-target</code></pre></div>
                                 </div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>rewrite-target</code> or <code>use-regex</code> made the community controller treat every path on the host as a case-insensitive regex, so the route becomes <code>~ (?i)^/api…</code> and <code>nginx.org/path-regex</code> is <code>case_insensitive</code>, which applies to every path on the Ingress. <code>app-root</code> redirects only a request for <code>/</code> itself, hence the exact <code>=/</code> route; a VirtualServer redirect needs a scheme, so the target is <code>${scheme}://${host}/dashboard</code>.</div>
                             <div class="info-box note"><strong>New in v5.4.0:</strong> The <code>nginx.org/app-root</code> annotation is new. It provides a direct 1:1 mapping from the community <code>app-root</code> annotation without requiring a VirtualServer CRD.</div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -3458,9 +3759,27 @@ metadata:
   name: my-app
   annotations:
     nginx.org/proxy-redirect-from: "http://internal/"  # proxy-redirect-from
-    nginx.org/proxy-redirect-to: "https://external/"  # proxy-redirect-to</code></pre></div>
+    nginx.org/proxy-redirect-to: "https://external/"  # proxy-redirect-to
+---
+# Or on a VirtualServer, which has no field for it: a location snippet
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      location-snippets: |  # proxy-redirect-from / proxy-redirect-to
+        proxy_redirect http://internal/ https://external/;
+      action:
+        pass: backend</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>nginx.org/proxy-redirect-from</code> and <code>nginx.org/proxy-redirect-to</code> annotations are new and provide direct 1:1 mappings from the community annotations. The <code>from</code> value also accepts <code>off</code>, <code>default</code>, or a regex prefixed with <code>~</code>/<code>~*</code>.</div>
+                            <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>nginx.org/proxy-redirect-from</code> and <code>nginx.org/proxy-redirect-to</code> annotations are new and provide direct 1:1 mappings from the community annotations. The <code>from</code> value also accepts <code>off</code>, <code>default</code>, or a regex prefixed with <code>~</code>/<code>~*</code>. VirtualServer has no field for <code>proxy_redirect</code>, so there it is a location snippet, which needs the controller's <code>-enable-snippets</code> flag.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -3491,7 +3810,7 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/server-alias</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> one resource per hostname<span class="or-text">— or —</span><code>nginx.org/server-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> one resource per hostname<span class="or-text">— or —</span>One Ingress rule per hostname</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -3506,13 +3825,13 @@ metadata:
   name: my-app
   annotations:
     nginx.ingress.kubernetes.io/server-alias: "alias.example.com"</code></pre></div>
-                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                    <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># server-alias has no annotation: list alias.example.com as a
+# further rule (and TLS host) in this Ingress's spec, beside its
+# existing host, with the same paths.
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: my-app
-  annotations:
-    nginx.org/server-snippets: |  # server-alias
-      server_name alias.example.com;  # server-alias</code></pre></div>
+  name: my-app</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -3540,7 +3859,7 @@ spec:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community <code>server-alias</code> annotation adds an additional hostname to the same NGINX server block. The F5 NGINX Ingress Controller does not have an equivalent annotation — instead, create a separate VirtualServer resource for each hostname, all pointing to the same backend service. Alternatively, use <code>nginx.org/server-snippets</code> to add additional <code>server_name</code> directives.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community <code>server-alias</code> annotation adds an additional hostname to the same NGINX server block. The F5 NGINX Ingress Controller does not have an equivalent annotation — instead, create a separate VirtualServer resource for each hostname, all pointing to the same backend service, or keep the Ingress and list each alias as a further rule (and TLS host). A <code>server_name</code> line in <code>nginx.org/server-snippets</code> also answers for the alias, but NGINX Ingress Controller cannot see that host, so it neither covers it with the Ingress's TLS certificate nor detects collisions with other resources.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -3620,7 +3939,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/sticky-cookie-services: "serviceName=my-service srv_id expires=48h path=/"  # affinity: "cookie" + session-cookie-*</code></pre></div>
+    nginx.org/sticky-cookie-services: "serviceName=my-service SERVERID expires=2d httponly path=/"  # affinity + session-cookie-*</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> The <code>nginx.org/sticky-cookie-services</code> annotation works with both NGINX OSS and NGINX Plus and provides a simpler way to configure session persistence via Ingress annotations (the legacy <code>nginx.com/sticky-cookie-services</code> form is Plus-only and kept for backward compatibility). For more granular control (domain, secure, samesite, httpOnly), use the VirtualServer CRD approach.</div>
                             </div>
@@ -3644,27 +3963,34 @@ metadata:
     nginx.ingress.kubernetes.io/session-cookie-secure: "true"</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
+  host: app.example.com
   upstreams:
     - name: backend
       service: my-service
       port: 80
-      sessionCookie:
-        domain: ".example.com"  # session-cookie-domain
-        enable: true  # affinity: "cookie"
-        expires: 48h  # session-cookie-expires / session-cookie-max-age
-        httpOnly: true
+      sessionCookie:  # affinity: "cookie"
+        enable: true
         name: SERVERID  # session-cookie-name
-        path: /  # session-cookie-path
+        expires: "2d"  # session-cookie-max-age
+        path: "/"  # session-cookie-path
+        domain: ".example.com"  # session-cookie-domain
+        httpOnly: true  # the community controller always set HttpOnly
+        secure: true  # session-cookie-secure
         samesite: strict  # session-cookie-samesite
-        secure: true  # session-cookie-secure</code></pre></div>
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.4.0:</strong> Session persistence via <code>sessionCookie</code> is now available in both NGINX OSS and NGINX Plus. Community-specific features <code>affinity-mode</code>, <code>session-cookie-change-on-failure</code>, and <code>session-cookie-conditional-samesite-none</code> have no direct equivalents.</div>
                             </div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/affinity-canary-behavior</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>matches[]</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].sessionCookie</code></td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3678,24 +4004,25 @@ metadata:
     nginx.ingress.kubernetes.io/affinity-canary-behavior: "sticky"
     nginx.ingress.kubernetes.io/canary: "true"
     nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"</code></pre></div>
-                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code># affinity-canary-behavior: no equivalent. The rest of the
+# canary Ingress migrates; the stable upstream comes from the main Ingress.
+apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
+  host: app.example.com
   upstreams:
-    - name: main
-      service: main-svc
-      port: 80
-      sessionCookie:  # affinity: "cookie" + affinity-canary-behavior: "sticky"
-        enable: true  # affinity: "cookie"
-        httpOnly: true
-        name: SERVERID
     - name: canary
       service: canary-svc
       port: 80
-      sessionCookie:  # affinity: "cookie" + affinity-canary-behavior: "sticky"
-        enable: true  # affinity: "cookie"
-        httpOnly: true
-        name: SERVERID
+      sessionCookie:  # affinity: "cookie"
+        enable: true
+        name: INGRESSCOOKIE  # session-cookie-name (community default INGRESSCOOKIE)
+        httpOnly: true  # the community controller always set HttpOnly
+    - name: main
+      service: main-svc
+      port: 80
   routes:
     - path: /
       matches:
@@ -3707,7 +4034,7 @@ spec:
       action:
         pass: main</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller's <code>affinity-canary-behavior: "sticky"</code> ensures users routed to canary by session affinity continue to be served by the canary. The F5 NGINX Ingress Controller separates these concerns: canary routing uses VirtualServer <code>matches[]</code>, <code>splits[]</code>, while session persistence uses the VirtualServer <code>upstreams[].sessionCookie</code> field. The <code>sessionCookie</code> feature is available in both NGINX OSS and NGINX Plus.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> The community controller's <code>affinity-canary-behavior: "sticky"</code> (the default) kept a client that a canary had served on the canary. NGINX Ingress Controller picks the split for every request, and <code>sessionCookie</code> keeps a client on one Pod within the chosen upstream, not on the canary. To pin a client to the canary, route it with a cookie or header match (<code>canary-by-cookie</code> or <code>canary-by-header</code>), as above. The <code>sessionCookie</code> feature is available in both NGINX OSS and NGINX Plus.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -3827,8 +4154,27 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/ssl-ciphers: "HIGH:!aNULL:!MD5"  # ssl-ciphers</code></pre></div>
+    nginx.org/ssl-ciphers: "HIGH:!aNULL:!MD5"  # ssl-ciphers
+---
+# Or on a VirtualServer, which has no field for it: a server snippet
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  server-snippets: |  # ssl-ciphers
+    ssl_ciphers "HIGH:!aNULL:!MD5";
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> VirtualServer has no field for <code>ssl_ciphers</code>, so there it is a server snippet, which needs the controller's <code>-enable-snippets</code> flag. To set it for every host at once, use the <code>ssl-ciphers</code> key in the <code>nginx-config</code> ConfigMap instead.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/ssl-passthrough</code></td>
@@ -3877,8 +4223,27 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/ssl-prefer-server-ciphers: "true"  # ssl-prefer-server-ciphers</code></pre></div>
+    nginx.org/ssl-prefer-server-ciphers: "true"  # ssl-prefer-server-ciphers
+---
+# Or on a VirtualServer, which has no field for it: a server snippet
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  server-snippets: |  # ssl-prefer-server-ciphers
+    ssl_prefer_server_ciphers on;
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> VirtualServer has no field for <code>ssl_prefer_server_ciphers</code>, so there it is a server snippet, which needs the controller's <code>-enable-snippets</code> flag. To set it for every host at once, use the <code>ssl-prefer-server-ciphers</code> key in the <code>nginx-config</code> ConfigMap instead.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/ssl-redirect</code></td>
@@ -3896,19 +4261,46 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"</code></pre></div>
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    # Match the community controller's 308 default
-    # (preserves request method and body)
-    nginx.org/http-redirect-code: "308"  # ssl-redirect (redirect status code)
-    # Option 1: For TLS terminated at load balancer
-    nginx.org/redirect-to-https: "true"  # ssl-redirect
-    # OR Option 2: For unconditional redirect
-    nginx.org/ssl-redirect: "true"  # ssl-redirect</code></pre></div>
+    nginx.org/ssl-redirect: "true"  # ssl-redirect
+    nginx.org/http-redirect-code: "308"  # the community redirect code (308 keeps the method and body; NIC defaults to 301)
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -3918,19 +4310,37 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"</code></pre></div>
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                     <div class="comparison-block new"><h4>F5 NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
+metadata:
+  name: my-app
 spec:
   host: app.example.com
   tls:
     secret: app-tls
-    redirect:
+    redirect:  # ssl-redirect
       enable: true
-      code: 308  # ssl-redirect (matches community 308 default)
+      code: 308  # the community redirect code
   upstreams:
     - name: backend
-      service: my-service
+      service: backend-svc
       port: 80
   routes:
     - path: /
@@ -3944,7 +4354,7 @@ spec:
                                     <li><code>nginx.org/ssl-redirect</code> performs an unconditional redirect for all incoming HTTP traffic. Use this when NGINX handles TLS termination directly. Default: <code>true</code>.</li>
                                 </ul>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller's <code>ssl-redirect</code> defaults to a <strong>308 Permanent Redirect</strong>, which preserves the original request method and body. The F5 NGINX Ingress Controller defaults to <strong>301</strong>, which clients may downgrade to <code>GET</code> and drop the request body. To match the community behavior exactly, set <code>nginx.org/http-redirect-code: "308"</code> on the Ingress, or <code>tls.redirect.code: 308</code> on the VirtualServer.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller's <code>ssl-redirect</code> defaults to a <strong>308 Permanent Redirect</strong>, which preserves the original request method and body. The F5 NGINX Ingress Controller defaults to <strong>301</strong>, which clients may downgrade to <code>GET</code> and drop the request body. To match the community behavior exactly, set <code>nginx.org/http-redirect-code: "308"</code> on the Ingress, or <code>tls.redirect.code: 308</code> on the VirtualServer. Both controllers redirect only on a host with a TLS certificate, which is why the example carries a <code>tls</code> block; where TLS ends at a load balancer instead, use <code>nginx.org/redirect-to-https</code>.</div>
                             <div class="info-box note"><strong>New in v5.4.0:</strong> The <code>nginx.org/ssl-redirect</code> and <code>nginx.org/http-redirect-code</code> annotations are new. Previously, only <code>nginx.org/redirect-to-https</code> was available, with a fixed 301 response code. Use <code>ssl-redirect</code> as the direct 1:1 mapping from the community annotation.</div>
                         </div></td></tr>
                         <tr class="expandable"><td>No direct equivalent</td><td><code>nginx.org/http-redirect-code</code> (used with <code>nginx.org/redirect-to-https</code>) <span class="badge badge-new">New v5.4.0</span></td></tr>
@@ -5762,8 +6172,10 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  otel-trace-in-http: "true"  # enable-opentelemetry</code></pre></div>
+  otel-trace-in-http: "true"  # enable-opentelemetry
+  otel-exporter-endpoint: "otel-collector:4317"  # required: your collector (the community read otlp-collector-host, port 4317)</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>otel-trace-in-http</code> needs <code>otel-exporter-endpoint</code>: without it, NGINX Ingress Controller reports the ConfigMap invalid and leaves tracing off.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>otlp-collector-host</code><br><code>otlp-collector-port</code></td>

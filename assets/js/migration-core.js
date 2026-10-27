@@ -114,83 +114,600 @@
             return warnings;
         }
 
-        // Inject "  # <source-name>" comments into generated YAML so each line can be
-        // traced back to the finding it came from. Two passes: value-based matching,
-        // then field-name matching for whatever is still unmatched.
-        function annotateYamlWithSources(yaml, foundAnnotations) {
-            let crdYamlLines = yaml.split('\n');
-            let usedAnnotations = {};
-            // First pass: value-based matching
-            let annotatedLines = crdYamlLines.map(function(line) {
-                // Skip comment lines, lines the generator already attributed, and top-level structural keys
-                if (/^\s*#/.test(line) || /  # \S/.test(line) || /^(apiVersion|kind|metadata|spec):/.test(line.trim())) return line;
-                // Skip metadata name (shallow indent ≤4 spaces)
-                let nameCheck = line.match(/^(\s+)name:\s/);
-                if (nameCheck && nameCheck[1].length <= 4) return line;
-                // Extract value from "key: value" lines
-                let kvMatch = line.match(/^(\s+\S+:\s*)(.+)$/);
-                if (!kvMatch) return line;
-                let lineVal = kvMatch[2].replace(/^["']|["']$/g, '').trim();
-                let matched = null;
-                foundAnnotations.forEach(function(a) {
-                    if (matched) return;
-                    if (usedAnnotations[a.annotation]) return;
-                    let v = a.value != null ? String(a.value) : '';
-                    let cleaned = v.replace(/^[^/]+\//, '');
-                    if (lineVal && (lineVal === v || lineVal === cleaned || v.indexOf(lineVal) !== -1 || lineVal.indexOf(cleaned) !== -1)) {
-                        matched = a.annotation;
-                    }
-                    // Boolean transforms: on/off → true/false
-                    if (!matched && ((v === 'on' && lineVal === 'true') || (v === 'off' && lineVal === 'false'))) {
-                        matched = a.annotation;
-                    }
-                });
-                if (matched) {
-                    usedAnnotations[matched] = true;
-                    return line + '  # ' + matched;
-                }
-                return line;
-            });
-            // Second pass: field-name matching for remaining unmatched annotations
-            let unmatched = foundAnnotations.filter(function(a) { return !usedAnnotations[a.annotation]; });
-            if (unmatched.length > 0) {
-                annotatedLines = annotatedLines.map(function(line) {
-                    if (/  # \S/.test(line)) return line;
-                    if (/^\s*#/.test(line) || /^(apiVersion|kind|metadata|spec):/.test(line.trim())) return line;
-                    let nameCheck = line.match(/^(\s+)name:\s/);
-                    if (nameCheck && nameCheck[1].length <= 4) return line;
-                    let keyMatch = line.match(/^\s+(\S+):/);
-                    if (!keyMatch) return line;
-                    // Normalize camelCase to hyphenated: sessionCookie → session-cookie
-                    let fieldKey = keyMatch[1].replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-                    let matched = null;
-                    unmatched.forEach(function(a) {
-                        if (matched) return;
-                        if (usedAnnotations[a.annotation]) return;
-                        let parts = a.annotation.toLowerCase().split('-');
-                        let last1 = parts[parts.length - 1];
-                        let last2 = parts.length >= 2 ? parts.slice(-2).join('-') : '';
-                        // Match last segment (min 3 chars) or last two segments against field key
-                        if ((last1.length > 2 && fieldKey === last1) || (last2 && fieldKey === last2)) {
-                            matched = a.annotation;
-                        }
-                        // For key-only lines, check if annotation value appears in field name
-                        if (!matched && /:\s*$/.test(line)) {
-                            let v = a.value != null ? String(a.value).toLowerCase() : '';
-                            if (v.length > 3 && fieldKey.indexOf(v) !== -1) {
-                                matched = a.annotation;
-                            }
-                        }
-                    });
-                    if (matched) {
-                        usedAnnotations[matched] = true;
-                        return line + '  # ' + matched;
-                    }
-                    return line;
-                });
-            }
-            return annotatedLines.join('\n');
+
+        // --- YAML ------------------------------------------------------------
+        // A Kubernetes-manifest subset of YAML, shared by the page and by
+        // nic-migrate (which used to carry its own copy). The analyzer once read
+        // manifests with line regexes; that truncated kubectl's wrapped values,
+        // kept escape sequences literal and took a Deployment's probe path for a
+        // route. One parser, so both tools read a manifest the same way.
+        //
+        // Supported: multi-document streams, block mappings and sequences, plain
+        // and quoted scalars (folded across lines, as kubectl wraps anything past
+        // ~80 columns), block scalars with chomping and indentation indicators,
+        // comments, flow collections on one line, and the scalar types manifests
+        // use. Refused rather than half-read: anchors and aliases, merge keys,
+        // tags other than the standard !!str/!!int/!!bool/!!null, and any line
+        // the parser does not consume. Every error names its line.
+
+        function yamlError(message, line) {
+            let err = new Error(line ? 'line ' + line + ': ' + message : message);
+            err.yamlLine = line || null;
+            return err;
         }
+
+        // Index of a trailing comment's '#', honouring both quote styles and
+        // their escapes, or -1. A '#' opens a comment only at the start or after
+        // whitespace.
+        function yamlCommentStart(s) {
+            let quote = null;
+            let prev = '';
+            for (let i = 0; i < s.length; i++) {
+                let c = s[i];
+                if (quote) {
+                    if (quote === '"' && c === '\\') { i++; continue; }
+                    if (c === quote) {
+                        if (quote === "'" && s[i + 1] === "'") { i++; continue; }
+                        quote = null;
+                        prev = c;
+                    }
+                    continue;
+                }
+                // A quote opens a scalar only where one can start: a plain
+                // scalar such as `it's` or `say "hi"` keeps its quotes literal.
+                if ((c === '"' || c === "'") && (prev === '' || /[\[{,]/.test(prev) || (/[:?-]/.test(prev) && /\s/.test(s[i - 1])))) { quote = c; continue; }
+                if (c === '#' && (i === 0 || /\s/.test(s[i - 1]))) return i;
+                if (!/\s/.test(c)) prev = c;
+            }
+            return -1;
+        }
+
+        function yamlStripComment(s) {
+            let i = yamlCommentStart(s);
+            return i === -1 ? s : s.slice(0, i);
+        }
+
+        function yamlIndent(line) {
+            let n = 0;
+            while (n < line.length && line[n] === ' ') n++;
+            return n;
+        }
+
+        // Split a stream into documents of raw lines, normalising CRLF/CR and a
+        // BOM. `---` may carry a comment (`--- # Source: …` from helm template)
+        // or content after it; `...` ends a document.
+        function yamlSplitStream(text) {
+            let lines = String(text).replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '').split('\n');
+            // A final newline ends the last line; it does not open another. Without
+            // one, a block scalar ending the stream has no final line break.
+            let finalNewline = lines.length > 1 && lines[lines.length - 1] === '';
+            if (finalNewline) lines.pop();
+            let docs = [];
+            let cur = { lines: [], start: 1 };
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                let m = line.match(/^---(?:\s+(.*))?\s*$/);
+                if (m || /^---\s/.test(line)) {
+                    docs.push(cur);
+                    cur = { lines: [], start: i + 2 };
+                    let rest = line.slice(3).trim();
+                    if (rest && rest[0] !== '#') { cur.lines.push(rest); cur.start = i + 1; }
+                    continue;
+                }
+                if (/^\.\.\.\s*$/.test(line)) { docs.push(cur); cur = { lines: [], start: i + 2 }; continue; }
+                cur.lines.push(line);
+            }
+            cur.noFinalNewline = !finalNewline;
+            docs.push(cur);
+            return docs.filter(function(d) { return d.lines.some(function(l) { return l.trim() !== '' && !/^\s*#/.test(l); }); });
+        }
+
+        // Index of the quote closing a scalar that opens at s[0], or -1.
+        function yamlQuoteEnd(s) {
+            let q = s[0];
+            for (let i = 1; i < s.length; i++) {
+                if (q === '"' && s[i] === '\\') { i++; continue; }
+                if (s[i] !== q) continue;
+                if (q === "'" && s[i + 1] === "'") { i++; continue; }
+                return i;
+            }
+            return -1;
+        }
+
+        let YAML_ESCAPES = { '0': '\0', a: '\x07', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\v', f: '\f', r: '\r', e: '\x1b', ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\u0085', _: '\u00a0', L: '\u2028', P: '\u2029' };
+
+        function yamlUnescapeDouble(body, line) {
+            return body.replace(/\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)/g, function(_, e) {
+                if (e.length > 1) return String.fromCodePoint(parseInt(e.slice(1), 16));
+                if (Object.prototype.hasOwnProperty.call(YAML_ESCAPES, e)) return YAML_ESCAPES[e];
+                throw yamlError('unknown escape \\' + e + ' in a double-quoted string', line);
+            });
+        }
+
+        // A YAML 1.2 core-schema scalar, as Kubernetes reads one. Quoted scalars
+        // are always strings; plain ones resolve to null, booleans and decimal
+        // numbers, and stay strings otherwise (0755 and 1:30 included — callers
+        // that care about YAML 1.1's readings quote on output, see yamlNeedsQuotes).
+        function yamlScalar(raw, line) {
+            let t = String(raw).trim();
+            if (t === '') return null;
+            if (t[0] === '&' || t[0] === '*') throw yamlError('anchors and aliases are not supported (found "' + t.split(/\s/)[0] + '")', line);
+            if (t === '<<') throw yamlError('merge keys (<<) are not supported', line);
+            if (t[0] === '!') {
+                let tag = t.match(/^(!\S*)\s*([\s\S]*)$/);
+                let value = tag[2];
+                if (tag[1] === '!!str') { let s = yamlScalar(value, line); return s === null ? '' : String(s); }
+                if (tag[1] === '!!int' || tag[1] === '!!float' || tag[1] === '!!bool' || tag[1] === '!!null') return yamlScalar(value, line);
+                throw yamlError('the tag ' + tag[1] + ' is not supported', line);
+            }
+            if (t[0] === '"') {
+                if (yamlQuoteEnd(t) !== t.length - 1) throw yamlError('unterminated or malformed double-quoted string', line);
+                return yamlUnescapeDouble(t.slice(1, -1), line);
+            }
+            if (t[0] === "'") {
+                if (yamlQuoteEnd(t) !== t.length - 1) throw yamlError('unterminated or malformed single-quoted string', line);
+                return t.slice(1, -1).replace(/''/g, "'");
+            }
+            if (t[0] === '{' || t[0] === '[') return yamlFlow(t, line);
+            if (/^(null|Null|NULL|~)$/.test(t)) return null;
+            if (/^(true|True|TRUE)$/.test(t)) return true;
+            if (/^(false|False|FALSE)$/.test(t)) return false;
+            if (/^[-+]?(0|[1-9][0-9]*)$/.test(t)) return Number(t);
+            if (/^[-+]?(0|[1-9][0-9]*)\.[0-9]+([eE][-+]?[0-9]+)?$/.test(t)) return Number(t);
+            return t;
+        }
+
+        // Split at `sep` on flow depth 0, outside quotes.
+        function yamlSplitFlow(body, sep) {
+            let out = [], depth = 0, quote = null, cur = '';
+            for (let i = 0; i < body.length; i++) {
+                let c = body[i];
+                if (quote) {
+                    cur += c;
+                    if (quote === '"' && c === '\\') { cur += body[++i] || ''; continue; }
+                    if (c === quote) {
+                        if (quote === "'" && body[i + 1] === "'") { cur += body[++i]; continue; }
+                        quote = null;
+                    }
+                    continue;
+                }
+                if ((c === '"' || c === "'") && /(^|[\[{,:?])\s*$/.test(cur)) { quote = c; cur += c; continue; }
+                if (c === '{' || c === '[') depth++;
+                if (c === '}' || c === ']') depth--;
+                if (depth < 0) return null;
+                if (c === sep && depth === 0) { out.push(cur); cur = ''; continue; }
+                cur += c;
+            }
+            if (depth !== 0 || quote) return null;
+            if (cur.trim() !== '') out.push(cur);
+            return out;
+        }
+
+        // A flow mapping key ends at the first ': ' (or a ':' before the end)
+        // outside quotes. Unquoted values never swallow the next key — `{a: b,
+        // c: d}` is two pairs — which is how inline annotations used to merge.
+        function yamlFlow(t, line) {
+            let open = t[0], close = open === '{' ? '}' : ']';
+            if (t[t.length - 1] !== close) throw yamlError('unterminated flow collection', line);
+            let parts = yamlSplitFlow(t.slice(1, -1), ',');
+            if (parts === null) throw yamlError('unbalanced brackets or quotes in a flow collection', line);
+            if (open === '[') return parts.map(function(p) { return yamlScalar(p, line); });
+            let out = {};
+            parts.forEach(function(pair) {
+                let p = pair.trim();
+                if (p === '') return;
+                let key, rest;
+                if (p[0] === '"' || p[0] === "'") {
+                    let end = yamlQuoteEnd(p);
+                    if (end === -1) throw yamlError('unterminated quoted key in a flow mapping', line);
+                    key = yamlScalar(p.slice(0, end + 1), line);
+                    rest = p.slice(end + 1).replace(/^\s*:/, '');
+                } else {
+                    let m = p.match(/^([^:]*?)\s*:(?:\s+|$)([\s\S]*)$/);
+                    if (!m) throw yamlError('flow mapping entry "' + p + '" has no "key: value" form', line);
+                    key = yamlScalar(m[1], line);
+                    rest = m[2];
+                }
+                out[String(key)] = yamlScalar(rest, line);
+            });
+            return out;
+        }
+
+        // Fold a multi-line plain or quoted scalar the way YAML does: a single
+        // line break between two non-empty lines is a space, each empty line a
+        // newline. kubectl wraps long annotation values onto such lines.
+        function yamlFold(lines, quote) {
+            let out = lines[0].replace(/[ \t]+$/, '');
+            let breaks = 0;
+            for (let i = 1; i < lines.length; i++) {
+                let t = lines[i].trim();
+                if (t === '') { breaks++; continue; }
+                // Inside double quotes a trailing backslash escapes the line break.
+                if (quote === '"' && !breaks && /(^|[^\\])(\\\\)*\\$/.test(out)) { out = out.slice(0, -1) + t; continue; }
+                out += breaks ? '\n'.repeat(breaks) : ' ';
+                breaks = 0;
+                out += t;
+            }
+            return out;
+        }
+
+        function YamlReader(lines, firstLine, noFinalNewline) {
+            this.noFinalNewline = !!noFinalNewline;
+            this.raw = lines.map(function(l) { return l; });
+            this.first = firstLine || 1;
+            this.i = 0;
+            this.entries = this.raw.map(function(l, idx) {
+                // A tab may not indent YAML structure; inside a block scalar it is content.
+                return { indent: yamlIndent(l), content: yamlStripComment(l).trim(), raw: l };
+            });
+        }
+        YamlReader.prototype.lineNo = function(i) { return this.first + (i === undefined ? this.i : i); };
+        YamlReader.prototype.blank = function(i) { let r = this.raw[i]; return r.trim() === '' || /^\s*#/.test(r); };
+        YamlReader.prototype.peek = function() {
+            while (this.i < this.raw.length && this.blank(this.i)) this.i++;
+            if (this.i >= this.raw.length) return null;
+            if (/^ *\t/.test(this.raw[this.i])) throw yamlError('a tab is used for indentation', this.lineNo());
+            return this.entries[this.i];
+        };
+        YamlReader.prototype.respan = function(indent, content) {
+            this.entries[this.i] = { indent: indent, content: content, raw: this.raw[this.i] };
+        };
+
+        let YAML_KEY = /^((?:[^:]|:(?=\S))+?)\s*:(\s+[\s\S]*|\s*)$/;
+
+        // `key: rest` from a line, or null when the line is a scalar.
+        function yamlKeyLine(content, line) {
+            if (content[0] === '"' || content[0] === "'") {
+                let end = yamlQuoteEnd(content);
+                if (end === -1) return null;
+                let m = content.slice(end + 1).match(/^\s*:(\s+[\s\S]*|\s*)$/);
+                if (!m) return null;
+                return { key: String(yamlScalar(content.slice(0, end + 1), line)), rest: m[1].trim() };
+            }
+            if (content[0] === '[' || content[0] === '{' || content[0] === '-' && /^-(\s|$)/.test(content)) return null;
+            let m = content.match(YAML_KEY);
+            if (!m) return null;
+            let key = yamlScalar(m[1].trim(), line);
+            return { key: key === null ? '' : String(key), rest: m[2].trim() };
+        }
+
+        function yamlValue(r, minIndent) {
+            let e = r.peek();
+            if (!e || e.indent < minIndent) return null;
+            if (/^-(\s|$)/.test(e.content)) return yamlSequence(r, e.indent);
+            if (yamlKeyLine(e.content, r.lineNo())) return yamlMapping(r, e.indent);
+            return yamlMultiScalar(r, e.indent - 1);
+        }
+
+        // A scalar that starts on its own line and may continue on more-indented
+        // lines (a bare document, or a sequence item's wrapped value).
+        function yamlMultiScalar(r, parentIndent) {
+            let startIdx = r.i;
+            let first = r.entries[r.i].content;
+            r.i++;
+            return yamlContinue(r, first, parentIndent, startIdx);
+        }
+
+        // Read continuation lines for a plain or quoted scalar that began with
+        // `first` on line `startIdx`. Continuation lines are anything indented
+        // deeper than the parent; a quoted scalar continues until its quote closes.
+        function yamlContinue(r, first, parentIndent, startIdx) {
+            let parts = [first];
+            let quote = (first[0] === '"' || first[0] === "'") ? first[0] : null;
+            let closed = quote ? yamlQuoteEnd(first) !== -1 : true;
+            if (quote && closed) return yamlScalar(first, r.lineNo(startIdx));
+            if (!quote && /^[\[{]/.test(first)) {
+                // A flow collection may wrap too; join until brackets balance.
+                while (yamlSplitFlow(parts.join(' ').slice(1, -1), ',') === null || !/[\]}]\s*$/.test(parts.join(' '))) {
+                    if (r.i >= r.raw.length) throw yamlError('unterminated flow collection', r.lineNo(startIdx));
+                    parts.push(r.raw[r.i].trim());
+                    r.i++;
+                }
+                return yamlScalar(parts.join(' '), r.lineNo(startIdx));
+            }
+            while (r.i < r.raw.length) {
+                let raw = r.raw[r.i];
+                if (raw.trim() === '') { parts.push(''); r.i++; continue; }
+                if (quote) {
+                    parts.push(raw);
+                    r.i++;
+                    if (yamlQuoteEnd(parts.map(function(p, k) { return k === 0 ? p : p.trim(); }).join(' ')) !== -1) {
+                        closed = true;
+                        break;
+                    }
+                    continue;
+                }
+                if (/^\s*#/.test(raw)) break;
+                if (yamlIndent(raw) <= parentIndent) break;
+                let content = yamlStripComment(raw).trim();
+                // A plain scalar cannot hold ": " — a deeper line that does is
+                // mis-indented structure, and folding it in would hide that.
+                if (/:(\s|$)/.test(content) || /^-(\s|$)/.test(content)) throw yamlError('mapping or sequence entry inside a value — check the indentation', r.lineNo());
+                parts.push(content);
+                r.i++;
+                if (yamlCommentStart(raw) !== -1) break;
+            }
+            while (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
+            if (quote) {
+                if (!closed) throw yamlError('unterminated ' + (quote === '"' ? 'double' : 'single') + '-quoted string', r.lineNo(startIdx));
+                // Fold inside the quotes, then hand the single-line form to the scalar parser.
+                let joined = yamlFold(parts, quote);
+                let end = yamlQuoteEnd(joined);
+                let after = yamlStripComment(joined.slice(end + 1)).trim();
+                if (after !== '') throw yamlError('unexpected text after a quoted string: ' + after, r.lineNo(startIdx));
+                return yamlScalar(joined.slice(0, end + 1), r.lineNo(startIdx));
+            }
+            if (parts.length === 1) return yamlScalar(parts[0], r.lineNo(startIdx));
+            return yamlFold(parts);
+        }
+
+        function yamlMapping(r, indent) {
+            let out = {};
+            for (;;) {
+                let e = r.peek();
+                if (!e || e.indent < indent) break;
+                if (e.indent > indent) throw yamlError('unexpected indentation', r.lineNo());
+                let kv = yamlKeyLine(e.content, r.lineNo());
+                if (!kv) {
+                    if (/^-(\s|$)/.test(e.content)) break;
+                    throw yamlError('expected "key: value", found "' + e.content.slice(0, 40) + '"', r.lineNo());
+                }
+                if (Object.prototype.hasOwnProperty.call(out, kv.key)) throw yamlError('duplicate key "' + kv.key + '"', r.lineNo());
+                let idx = r.i;
+                r.i++;
+                out[kv.key] = yamlNodeValue(r, kv.rest, indent, idx);
+            }
+            return out;
+        }
+
+        function yamlSequence(r, indent) {
+            let out = [];
+            for (;;) {
+                let e = r.peek();
+                if (!e || e.indent < indent) break;
+                if (e.indent > indent) throw yamlError('unexpected indentation', r.lineNo());
+                if (!/^-(\s|$)/.test(e.content)) break;
+                let rest = e.content.replace(/^-\s*/, '');
+                let idx = r.i;
+                if (rest === '') {
+                    r.i++;
+                    let next = r.peek();
+                    out.push(next && next.indent > indent ? yamlValue(r, indent + 1) : null);
+                    continue;
+                }
+                let dash = e.raw.indexOf('-', indent);
+                let contentIndent = dash + 1 + (e.raw.slice(dash + 1).match(/^ */) || [''])[0].length;
+                if (/^-(\s|$)/.test(rest)) {
+                    r.respan(contentIndent, rest);
+                    out.push(yamlSequence(r, contentIndent));
+                } else if (yamlKeyLine(rest, r.lineNo())) {
+                    r.respan(contentIndent, rest);
+                    out.push(yamlMapping(r, contentIndent));
+                } else {
+                    r.i++;
+                    out.push(yamlNodeValue(r, rest, indent, idx));
+                }
+            }
+            return out;
+        }
+
+        function yamlNodeValue(r, rest, parentIndent, lineIdx) {
+            let block = rest.match(/^([|>])([-+]?)([1-9]?)([-+]?)$/);
+            if (block) return yamlBlockScalar(r, block[1], block[2] || block[4], block[3], parentIndent);
+            if (/^[|>]/.test(rest)) throw yamlError('malformed block scalar header "' + rest + '"', r.lineNo(lineIdx));
+            if (rest !== '') return yamlContinue(r, rest, parentIndent, lineIdx);
+            let next = r.peek();
+            if (!next) return null;
+            if (next.indent > parentIndent) return yamlValue(r, next.indent);
+            // A sequence may sit at its key's own indent.
+            if (next.indent === parentIndent && /^-(\s|$)/.test(next.content)) return yamlSequence(r, next.indent);
+            return null;
+        }
+
+        function yamlBlockScalar(r, style, chomp, explicit, parentIndent) {
+            let lines = [];
+            let contentIndent = explicit ? parentIndent + Number(explicit) : null;
+            for (; r.i < r.raw.length; r.i++) {
+                let raw = r.raw[r.i];
+                if (raw.trim() === '') { lines.push(raw.length > (contentIndent || 0) ? raw.slice(contentIndent || 0) : ''); continue; }
+                let ind = yamlIndent(raw);
+                if (contentIndent === null) {
+                    if (ind <= parentIndent) break;
+                    contentIndent = ind;
+                }
+                if (ind < contentIndent) break;
+                lines.push(raw.slice(contentIndent));
+            }
+            if (contentIndent === null && lines.every(function(l) { return l === ''; })) lines = lines.map(function() { return ''; });
+            let trailing = 0;
+            while (lines.length && lines[lines.length - 1].trim() === '') { lines.pop(); trailing++; }
+            // Line breaks after the last content line: one per trailing blank
+            // line, plus the content line's own unless it ends the stream bare.
+            let breaks = trailing + (r.i >= r.raw.length && r.noFinalNewline ? 0 : 1);
+            let body;
+            if (style === '|') {
+                body = lines.join('\n');
+            } else {
+                // Folded: a break between two plain lines is a space, each empty
+                // line a newline, and breaks around more-indented lines stay.
+                let lead = 0;
+                while (lead < lines.length && lines[lead] === '') lead++;
+                body = '\n'.repeat(lead) + (lead < lines.length ? lines[lead] : '');
+                for (let i = lead + 1; i < lines.length; i++) {
+                    let empties = 0;
+                    while (lines[i] === '') { empties++; i++; }
+                    let more = /^\s/.test(lines[i]) || /^\s/.test(lines[i - 1 - empties]);
+                    body += empties ? '\n'.repeat(empties + (more ? 1 : 0)) : (more ? '\n' : ' ');
+                    body += lines[i];
+                }
+            }
+            if (chomp === '-') return body;
+            if (chomp === '+') return body + '\n'.repeat(lines.length ? breaks : trailing);
+            return body === '' || breaks === 0 ? body : body + '\n';
+        }
+
+        // Parse one document's lines; throws on anything not consumed.
+        function yamlParseLines(lines, firstLine, noFinalNewline) {
+            let r = new YamlReader(lines, firstLine, noFinalNewline);
+            let value = yamlValue(r, 0);
+            let left = r.peek();
+            if (left) throw yamlError('could not parse "' + left.content.slice(0, 40) + '"', r.lineNo());
+            return value;
+        }
+
+        function yamlParse(text) {
+            let docs = yamlSplitStream(text);
+            if (docs.length === 0) return null;
+            if (docs.length > 1) throw yamlError('expected one document, found ' + docs.length);
+            return yamlParseLines(docs[0].lines, docs[0].start, docs[0].noFinalNewline);
+        }
+
+        function yamlParseAll(text) {
+            return yamlSplitStream(text).map(function(d) { return yamlParseLines(d.lines, d.start, d.noFinalNewline); }).filter(function(d) { return d !== null; });
+        }
+
+        // --- emitting ---
+
+        let YAML_RESERVED = /^(true|false|null|~|yes|no|on|off|y|n)$/i;
+
+        // Quote anything a YAML 1.1 or 1.2 reader would not read back as this
+        // string. Kubernetes reads YAML 1.1 in places, where 0755 is 493 and
+        // 1:30 is 90, so anything starting like a number is quoted: over-quoting
+        // is cosmetic, under-quoting is a wrong value.
+        function yamlNeedsQuotes(s) {
+            if (s === '') return true;
+            if (/[\n\r\t\x00-\x08\x0b\x0c\x0e-\x1f\u0085\u2028\u2029]/.test(s)) return true;
+            if (/^\s|\s$/.test(s)) return true;
+            if (/^[-?:,\[\]{}#&*!|>'"%@`]/.test(s)) return true;
+            if (YAML_RESERVED.test(s)) return true;
+            if (/:\s|\s#|:$/.test(s)) return true;
+            if (/^[-+.0-9]/.test(s)) return true;
+            return false;
+        }
+
+        function yamlQuote(s) {
+            return '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\t/g, '\\t')
+                .replace(/\r/g, '\\r').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, function(c) { return '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0'); }) + '"';
+        }
+
+        // One-line form of a scalar for `key: <here>`, or null when the value
+        // needs a block scalar. `opts.quote` forces quotes on any string.
+        function yamlFormatScalar(v, quoteAlways) {
+            if (v === null || v === undefined) return 'null';
+            if (typeof v === 'boolean' || typeof v === 'number') return String(v);
+            let s = String(v);
+            if (s.indexOf('\n') !== -1) return yamlBlockSafe(s) ? null : yamlQuote(s);
+            return quoteAlways || yamlNeedsQuotes(s) ? yamlQuote(s) : s;
+        }
+
+        // A literal block reads back exactly when the text has content, ends in
+        // at most one newline, has no whitespace-only line and no control
+        // characters. Anything else is double-quoted: uglier, never wrong.
+        function yamlBlockSafe(s) {
+            let body = s.replace(/\n$/, '');
+            if (/\n$/.test(body) || body === '' || /^\n/.test(body)) return false;
+            if (/[\x00-\x08\x0b-\x1f\x7f\u0085\u2028\u2029]/.test(s.replace(/\n/g, ''))) return false;
+            return body.split('\n').every(function(l) { return l === '' || l.trim() !== ''; });
+        }
+
+        // Lines for a block scalar holding `s`, indented by `pad`. Chomping and
+        // the indentation indicator are chosen so the value reads back exactly.
+        function yamlBlockLines(s, pad) {
+            let keep = /\n$/.test(s);
+            let body = s.replace(/\n$/, '').split('\n');
+            let indicator = /^\s/.test(body[0]) ? '2' : '';
+            return { header: '|' + indicator + (keep ? '' : '-'), lines: body.map(function(l) { return l === '' ? '' : pad + l; }) };
+        }
+
+        function yamlIsMap(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+
+        // Emit `value` at `indent`. `comments` maps a dotted path ('spec.host',
+        // 'spec.routes.0.path') to a trailing comment, which is how each
+        // generated line names the community annotation it came from.
+        function yamlEmitNode(value, indent, lines, path, comments, opts) {
+            let pad = ' '.repeat(indent);
+            let note = function(p) { return comments && comments[p] ? '  # ' + comments[p] : ''; };
+            if (Array.isArray(value)) {
+                value.forEach(function(item, i) {
+                    let p = path + '.' + i;
+                    if (yamlIsMap(item) || Array.isArray(item)) {
+                        if ((yamlIsMap(item) && Object.keys(item).length === 0) || (Array.isArray(item) && item.length === 0)) {
+                            lines.push(pad + '- ' + (Array.isArray(item) ? '[]' : '{}') + note(p));
+                            return;
+                        }
+                        let before = lines.length;
+                        yamlEmitNode(item, indent + 2, lines, p, comments, opts);
+                        lines[before] = pad + '- ' + lines[before].slice(indent + 2);
+                    } else {
+                        let one = yamlFormatScalar(item);
+                        if (one === null) {
+                            let b = yamlBlockLines(String(item), pad + '  ');
+                            lines.push(pad + '- ' + b.header + note(p));
+                            b.lines.forEach(function(l) { lines.push(l); });
+                        } else {
+                            lines.push(pad + '- ' + one + note(p));
+                        }
+                    }
+                });
+                return;
+            }
+            if (yamlIsMap(value)) {
+                Object.keys(value).forEach(function(key) {
+                    let v = value[key];
+                    let p = path ? path + '.' + key : key;
+                    let k = yamlNeedsQuotes(key) ? yamlQuote(key) : key;
+                    if (yamlIsMap(v) || Array.isArray(v)) {
+                        let empty = Array.isArray(v) ? v.length === 0 : Object.keys(v).length === 0;
+                        if (empty) { lines.push(pad + k + ': ' + (Array.isArray(v) ? '[]' : '{}') + note(p)); return; }
+                        lines.push(pad + k + ':' + note(p));
+                        yamlEmitNode(v, indent + 2, lines, p, comments, opts);
+                        return;
+                    }
+                    let one = yamlFormatScalar(v, opts && opts.quote && opts.quote(p));
+                    if (one === null) {
+                        let b = yamlBlockLines(String(v), pad + '  ');
+                        lines.push(pad + k + ': ' + b.header + note(p));
+                        b.lines.forEach(function(l) { lines.push(l); });
+                    } else {
+                        lines.push(pad + k + ': ' + one + note(p));
+                    }
+                });
+                return;
+            }
+            let one = yamlFormatScalar(value);
+            lines.push(pad + (one === null ? yamlQuote(String(value)) : one));
+        }
+
+        // `comments` maps a dotted path to a trailing comment; `opts.quote(path)`
+        // forces quotes on a string (annotation values read better quoted).
+        function yamlStringify(value, comments, opts) {
+            let lines = [];
+            yamlEmitNode(value, 0, lines, '', comments, opts);
+            return lines.join('\n') + '\n';
+        }
+
+        function yamlStringifyAll(docs) {
+            return docs.map(function(d) { return yamlStringify(d); }).join('---\n');
+        }
+
+        let YAML = {
+            parse: yamlParse,
+            parseAll: yamlParseAll,
+            parseDocuments: function(text) {
+                // Each document parsed on its own, so one broken document does not
+                // hide the others: [{ value, error, start }].
+                return yamlSplitStream(text).map(function(d) {
+                    try { return { value: yamlParseLines(d.lines, d.start, d.noFinalNewline), error: null, start: d.start }; }
+                    catch (e) { return { value: null, error: e.message, start: d.start }; }
+                });
+            },
+            stringify: yamlStringify,
+            stringifyAll: yamlStringifyAll,
+            scalar: yamlFormatScalar,
+            needsQuotes: yamlNeedsQuotes,
+            quote: yamlQuote,
+            splitStream: yamlSplitStream
+        };
 
         // Shared utilities the SOURCE modules call (call-time only — they load first).
         window.MigrationTool = {
@@ -200,9 +717,9 @@
                 stripInlineComment: stripInlineComment,
                 sanitizeSnippetValue: sanitizeSnippetValue,
                 formatYamlKV: formatYamlKV,
-                detectGenericSyntaxWarnings: detectGenericSyntaxWarnings,
-                annotateYamlWithSources: annotateYamlWithSources
-            }
+                detectGenericSyntaxWarnings: detectGenericSyntaxWarnings
+            },
+            yaml: YAML
         };
 
         // The page's source module (loaded before this file) supplies all
@@ -866,10 +1383,15 @@
             let warnings = detectGenericSyntaxWarnings(yamlText);
             let parsed = SOURCE.analyzer.parseInput(yamlText);
             warnings = warnings.concat(parsed.warnings || []);
-            if (!parsed.findings || parsed.findings.length === 0) {
+            // A source can say why nothing is analyzable (a parse error, no
+            // Ingress in the paste) through parsed.empty; and a source that
+            // can migrate an input with no findings (an Ingress with no
+            // community annotations still needs a new class) leaves it unset.
+            let empty = parsed.empty || ((!parsed.findings || parsed.findings.length === 0) && !(parsed.ingresses && parsed.ingresses.length) ? SOURCE.strings.noFindings : null);
+            if (empty) {
                 resultsDiv.textContent = '';
                 renderParserWarnings(resultsDiv, warnings);
-                showAnalyzerMessage(resultsDiv, 'info', SOURCE.strings.noFindings.title, SOURCE.strings.noFindings.message, { append: true });
+                showAnalyzerMessage(resultsDiv, 'info', empty.title, empty.message, { append: true });
                 return;
             }
             let plan = SOURCE.analyzer.buildPlan(parsed, _migrationStrategy);

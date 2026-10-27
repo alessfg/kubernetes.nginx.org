@@ -101,9 +101,10 @@ its text, whether it is clipped (`scrollWidth > width`), the viewport, and
 whether the document overflows horizontally.
 
 That is how the sidebar label question was settled: "Phased migration strategy"
-measures 150.5px against ~226px of usable rail, so it fits; "Ingress NGINX
-config analyzer" would be ~285px, so it does not, and the sidebar shortens it.
-Both facts are in the `f5ds-design` skill because they were measured, not guessed.
+measures 150.5px against the usable rail, so it fits. Measure again after a type
+or rail change: "Ingress-NGINX config analyzer" was ~285px before the F5DS
+restyle and is 208px against ~215px usable now (2026-10-27). Both facts are in
+the `f5ds-design` skill because they were measured, not guessed.
 
 Structured output also **diffs**. For a change that should not alter layout,
 measure before and after and compare the JSON — far more reliable than

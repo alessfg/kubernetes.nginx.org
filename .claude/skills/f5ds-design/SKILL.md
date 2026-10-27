@@ -164,10 +164,12 @@ values that `tokens.css` does not contain.
 ### Sidebar labels are the headings they link to
 
 The sidebar labels *are* the `<h2>` headings they link to, so they match those
-headings verbatim — with one measured exception. `.sidebar-link-name` is
-`white-space: nowrap` inside a 264px rail (~226px usable), so a heading that
-would clip is shortened instead. Today that is "Config analyzer" for "Ingress
-NGINX config analyzer", which measures ~285px.
+headings verbatim — with one exception. "Config analyzer" stands for
+"Ingress-NGINX config analyzer". It was shortened when `.sidebar-link-name` was
+`white-space: nowrap` and the heading measured ~285px against ~226px of rail.
+Neither holds now: the label wraps (`overflow-wrap: anywhere`, for 200% zoom),
+and the full heading measures 208px against ~215px usable (2026-10-27), so it
+would fit on one line. The short label is a choice, not a clip.
 
 **Measure rather than assume**, with `shot.sh --measure '.sidebar-link-name'`:
 "Phased migration strategy" is 150.5px and fits, which is why it is spelled out

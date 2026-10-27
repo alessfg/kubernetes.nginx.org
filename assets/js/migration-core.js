@@ -10,7 +10,7 @@
        year) lives in shared.js, which loads first and exposes those globals. */
     (function() {
         'use strict';
-        // Single source of truth for the F5 NGINX Ingress Controller (the migration
+        // Single source of truth for the NGINX Ingress Controller (the migration
         // TARGET) versions the tool pages are documented against. Bump these when
         // updating the Version Reference (see .claude/skills/release-update/SKILL.md;
         // also update the version pills/install URLs in index.html). The source
@@ -913,7 +913,7 @@
             // became part of the heading's accessible name, so ~350 headings
             // read "… Copy code snippet". And every one of those buttons had
             // that same name; each now says which row, side and approach it
-            // copies, e.g. "Copy: proxy-body-size, CRD Approach, F5 NGINX
+            // copies, e.g. "Copy: proxy-body-size, CRD Approach, NGINX
             // Ingress Controller".
             document.querySelectorAll('.comparison-block').forEach(function(block) {
                 let h5 = block.querySelector('h4');

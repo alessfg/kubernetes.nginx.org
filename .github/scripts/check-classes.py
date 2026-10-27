@@ -317,11 +317,10 @@ def check_load_order():
     return failures
 
 
-# The sidebar label is the <h2> it links to, verbatim — except where the heading
-# would clip. `.sidebar-link-name` is `white-space: nowrap` inside a 264px rail
-# (~226px usable), so a long heading gets a short label instead. Measured, not
-# guessed: "Ingress NGINX config analyzer" is ~285px, while "Phased migration
-# strategy" is 150.5px and is therefore spelled out in full.
+# The sidebar label is the <h2> it links to, verbatim — with one exception,
+# recorded in the f5ds-design skill. "Config analyzer" was shortened when the
+# label did not wrap and the heading measured ~285px; it wraps now, and the full
+# heading measures 208px against ~215px usable, so the short label is a choice.
 LABEL_EXCEPTIONS = {
     'yaml-analyzer': 'Config analyzer',
 }

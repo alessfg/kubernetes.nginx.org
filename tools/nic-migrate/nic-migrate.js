@@ -26,7 +26,7 @@ const { renderReport, toJson, fileHeader, makeStyle } = require('./lib/render');
 const yaml = require('./lib/yaml');
 const { toModel, convertAll, configMapDoc } = require('./lib/convert');
 
-const USAGE = `nic-migrate — ingress-nginx -> F5 NGINX Ingress Controller  (beta)
+const USAGE = `nic-migrate — Ingress-NGINX -> NGINX Ingress Controller  (beta)
 
   node tools/nic-migrate/nic-migrate.js report [options]     what would change, and what the analyzer cannot do
   node tools/nic-migrate/nic-migrate.js convert [options]    merged, applyable manifests

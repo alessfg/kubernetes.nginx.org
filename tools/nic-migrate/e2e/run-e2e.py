@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """End-to-end migration test: deploy a real ingress-nginx Ingress, convert it
-with nic-migrate, and prove the F5 NGINX Ingress Controller serves it the same.
+with nic-migrate, and prove the NGINX Ingress Controller serves it the same.
 
 =============================================================================
 The assertion is EQUIVALENCE, not a hardcoded expectation. Each case is sent to
@@ -289,7 +289,7 @@ def install_nic(args):
     # subscription. Nothing currently asserted needs Plus. A Plus run would set controller.nginxplus=true
     # and an image pull secret, and could add cases for JWT, OIDC and WAF, which
     # genuinely have no community equivalent.
-    say('  installing F5 NGINX Ingress Controller, OSS (class %s)' % NIC_CLASS)
+    say('  installing NGINX Ingress Controller, OSS (class %s)' % NIC_CLASS)
     helm('upgrade', '--install', 'nic', NIC_CHART, '--version', NIC_CHART_VERSION,
          '-n', NIC_NS, '--create-namespace', '--wait', '--timeout', '10m',
          '--set', 'controller.service.type=ClusterIP',

@@ -74,7 +74,7 @@
               nicMapping: { annotations: { "connection-proxy-header": { key: "nginx.org/keepalive", transform: "connectionKeepalive", vsField: "keepalive" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
             { community: ["custom-headers"], nic: "VirtualServer CRD responseHeaders.add", type: "virtualserver", category: "Headers", anchor: "headers", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { crdKind: "VirtualServer", crdInstall: true, templateFn: "generateCustomHeadersVS" } },
-            // proxy-hide-headers & proxy-pass-headers: F5 NGINX Ingress Controller-only annotations (nginx.org/) — no community equivalent
+            // proxy-hide-headers & proxy-pass-headers: NGINX Ingress Controller-only annotations (nginx.org/) — no community equivalent
             { community: ["upstream-vhost", "x-forwarded-prefix"], nic: "nginx.org/upstream-vhost, nginx.org/proxy-set-headers — or — VirtualServer CRD requestHeaders.set", type: "virtualserver", category: "Headers", anchor: "headers", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
               nicMapping: { annotations: { "upstream-vhost": { key: "nginx.org/upstream-vhost", transform: "upstreamVhost" }, "x-forwarded-prefix": { key: "nginx.org/proxy-set-headers", transform: "proxySetHeader", template: "X-Forwarded-Prefix: ${value}" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateRequestHeadersVS" } },
             // Load Balancing
@@ -100,7 +100,7 @@
             // Deprecated
             { community: ["http2-push-preload"], nic: "Not supported (HTTP/2 Server Push was removed from NGINX 1.25.1)", type: "unsupported", category: "Deprecated", anchor: "deprecated", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: {} },
-            // server-tokens: F5 NGINX Ingress Controller-only annotation (nginx.org/server-tokens) — no community equivalent, not in YAML analyzer
+            // server-tokens: NGINX Ingress Controller-only annotation (nginx.org/server-tokens) — no community equivalent, not in YAML analyzer
             // Request Mirroring
             { community: ["mirror-host", "mirror-request-body", "mirror-target"], nic: "Annotations nginx.org/location-snippets (mirror directive) + nginx.org/server-snippets (internal /mirror location)", type: "annotation", category: "Request mirroring", anchor: "mirroring", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "mirror-target": { key: "nginx.org/location-snippets", transform: "mirrorSnippet" } }, templateFn: "generateMirrorSnippets" } },
@@ -161,7 +161,7 @@
               nicMapping: { templateFn: "generateAuthKeepaliveNote" } },
             { community: ["auth-always-set-cookie"], nic: "Annotation nginx.org/location-snippets (auth_request_set directive)", type: "annotation", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { templateFn: "generateAuthCookieNote" } },
-            { community: ["enable-global-auth"], nic: "Not applicable (F5 NGINX Ingress Controller has no global external auth)", type: "unsupported", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
+            { community: ["enable-global-auth"], nic: "Not applicable (NGINX Ingress Controller has no global external auth)", type: "unsupported", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: {} },
             // Session Affinity (OSS + Plus)
             { community: ["affinity", "affinity-mode", "session-cookie-change-on-failure", "session-cookie-conditional-samesite-none", "session-cookie-domain", "session-cookie-expires", "session-cookie-max-age", "session-cookie-name", "session-cookie-path", "session-cookie-samesite", "session-cookie-secure"], nic: "VirtualServer CRD sessionCookie", type: "virtualserver", category: "Session affinity / sticky sessions", anchor: "session-affinity", section: "oss", dualApproach: false, plusRequired: false,
@@ -322,8 +322,8 @@
 
         // backend-protocol values with nothing to emit, in either form.
         function backendProtocolNote(upper) {
-            if (upper === 'HTTP') return 'HTTP is the default protocol in F5 NGINX Ingress Controller. Remove this annotation — no replacement is needed.';
-            if (upper === 'AUTO_HTTP' || upper === 'FCGI') return upper + ' has no direct equivalent in F5 NGINX Ingress Controller. Review your backend protocol strategy before migrating.';
+            if (upper === 'HTTP') return 'HTTP is the default protocol in NGINX Ingress Controller. Remove this annotation — no replacement is needed.';
+            if (upper === 'AUTO_HTTP' || upper === 'FCGI') return upper + ' has no direct equivalent in NGINX Ingress Controller. Review your backend protocol strategy before migrating.';
             return null;
         }
 
@@ -2017,7 +2017,7 @@
                     countCls: '',
                     desc: 'Replace the community annotations with these NGINX Ingress Controller ones. Every rule, TLS entry and backend is kept.',
                     blocks: ingressDocs.map(function(r) {
-                        return { type: 'comparison', old: { title: 'Kubernetes Ingress NGINX (Ingress-NGINX) ', badge: 'current', yaml: communityYaml(r.model) }, new: { title: 'NGINX Ingress Controller ', badge: 'migrated', yaml: docYaml(r.doc, r.comments), collapsible: true } };
+                        return { type: 'comparison', old: { title: 'Ingress-NGINX ', badge: 'current', yaml: communityYaml(r.model) }, new: { title: 'NGINX Ingress Controller ', badge: 'migrated', yaml: docYaml(r.doc, r.comments), collapsible: true } };
                     })
                 });
             }
@@ -2033,7 +2033,7 @@
                     countText: Object.keys(cmDoc.doc.data).length + ' entr' + (Object.keys(cmDoc.doc.data).length !== 1 ? 'ies' : 'y'),
                     countCls: 'configmap',
                     desc: 'These settings are global in NGINX Ingress Controller: merge them into the nginx-config ConfigMap. They apply to every Ingress and VirtualServer, not just this one.',
-                    blocks: [{ type: 'comparison', old: { title: 'Kubernetes Ingress NGINX (Ingress-NGINX) (current)', badge: null, yaml: Object.keys(oldAnn).length ? MigrationTool.yaml.stringify({ metadata: { annotations: oldAnn } }, null, { quote: function() { return true; } }).replace(/\n$/, '') : '# (no annotation: required by the migrated resources)' }, new: { title: 'NGINX Ingress Controller (migrated)', badge: null, yaml: docYaml(cmDoc.doc, cmDoc.comments) } }]
+                    blocks: [{ type: 'comparison', old: { title: 'Ingress-NGINX (current)', badge: null, yaml: Object.keys(oldAnn).length ? MigrationTool.yaml.stringify({ metadata: { annotations: oldAnn } }, null, { quote: function() { return true; } }).replace(/\n$/, '') : '# (no annotation: required by the migrated resources)' }, new: { title: 'NGINX Ingress Controller (migrated)', badge: null, yaml: docYaml(cmDoc.doc, cmDoc.comments) } }]
                 });
             }
             let crd = resources.filter(function(r) { return r.doc.kind !== 'Ingress'; });
@@ -2052,7 +2052,7 @@
                                 category: r.doc.metadata.name + (r.doc.spec && r.doc.spec.host ? ' — ' + r.doc.spec.host : ''),
                                 plusRequired: false,
                                 dualSuffix: null,
-                                old: { title: 'Kubernetes Ingress NGINX (Ingress-NGINX) (current)', badge: null, yaml: communityYaml(r.model) },
+                                old: { title: 'Ingress-NGINX (current)', badge: null, yaml: communityYaml(r.model) },
                                 new: { title: 'NGINX Ingress Controller (migrated)', badge: null, yaml: docYaml(r.doc, r.comments), collapsible: true }
                             };
                         })
@@ -2289,7 +2289,7 @@
             storage: { checklist: 'migrationChecklist', eolCollapsed: 'eolWarningCollapsed' },
             eolCompact: {
                 strongText: 'ingress-nginx has reached end of maintenance',
-                restText: ' — this tool migrates you to the F5 NGINX Ingress Controller. '
+                restText: ' — this tool migrates you to the NGINX Ingress Controller. '
             },
             analyzer: {
                 strategies: {

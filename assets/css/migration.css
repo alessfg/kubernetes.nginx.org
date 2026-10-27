@@ -1482,10 +1482,10 @@ button.analyzer-pill { font-family: var(--font); }
         line-height: var(--lh-caption);
         font-weight: 700;
     }
-    tr.expandable td:first-child::before { content: "\2193 Kubernetes Ingress NGINX (Ingress-NGINX)"; color: var(--text-secondary); }
+    tr.expandable td:first-child::before { content: "\2193 Ingress-NGINX"; color: var(--text-secondary); }
     tr.expandable td:first-child::after { left: var(--space-base); }
     tr.expandable td:last-child { padding-top: var(--space-base); border-top: 1px dashed var(--border); }
-    tr.expandable td:last-child::before { content: "\2193 F5 NGINX Ingress Controller"; color: var(--green-text); }
+    tr.expandable td:last-child::before { content: "\2193 NGINX Ingress Controller"; color: var(--green-text); }
 
     /* Key Differences (the one plain three-column table) stacks into cards. */
     .diff-table thead { display: none; }

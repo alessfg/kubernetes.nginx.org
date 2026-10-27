@@ -1257,6 +1257,23 @@
                 if (om.templateFn && TRANSLATORS[om.templateFn]) entry.translator = om.templateFn;
                 else simple.push(entry);
             });
+            // What each mapping wrote, so a card shows the annotations behind
+            // the resource beside it: a new Policy is the mapping's own; any
+            // other change lands in the VirtualServer / migrated Ingress; a
+            // mapping that changed nothing only left a note.
+            let hostState = function() {
+                let c = {};
+                Object.keys(f).forEach(function(k) { if (k !== 'policies' && k !== 'cm' && k !== 'cmComments') c[k] = f[k]; });
+                return JSON.stringify(c);
+            };
+            let track = function(entry, run) {
+                let h = hostState(), p = f.policies.length;
+                run();
+                entry.toHost = hostState() !== h;
+                let own = entry.found.map(function(x) { return x.annotation; });
+                f.policies.slice(p).forEach(function(pol) { pol.sources = own; });
+                entry.toPolicy = f.policies.length > p;
+            };
             let order = ['generateRewriteVirtualServer'];
             let entries = Array.from(matched.values()).filter(function(e) { return e.translator; });
             entries.sort(function(x, y) { return (order.indexOf(y.translator) - order.indexOf(x.translator)); });
@@ -1274,15 +1291,17 @@
                 if (entry.mapping.preferAnnotation && strategy === 'crd' && !options.ignorePreferAnnotation) {
                     ctx.note(entry.found[0].annotation, 'Annotation-first is recommended for this Ingress: ' + entry.mapping.preferAnnotation, 'warning');
                 }
-                try {
-                    TRANSLATORS[entry.translator](a, f, ctx, entry);
-                } catch (e) {
-                    console.warn('Translator failed for ' + entry.mapping.category + ' (' + entry.translator + '):', e);
-                }
+                track(entry, function() {
+                    try {
+                        TRANSLATORS[entry.translator](a, f, ctx, entry);
+                    } catch (e) {
+                        console.warn('Translator failed for ' + entry.mapping.category + ' (' + entry.translator + '):', e);
+                    }
+                });
             });
 
             // Value-level mappings with no translator of their own.
-            simple.forEach(function(entry) { translateValueEntry(entry, f, ctx, model, strategy, allFound); });
+            simple.forEach(function(entry) { track(entry, function() { translateValueEntry(entry, f, ctx, model, strategy, allFound); }); });
 
             // proxy-buffer-size beside the default buffers: the community sized
             // four buffers with it, and NGINX rejects a large buffer-size alone.
@@ -1330,6 +1349,27 @@
             out.unrecognized = unrecognized;
             out.matched = matched;
             out.configMap = Object.keys(f.cm).length ? { data: f.cm, comments: f.cmComments } : null;
+            // Which community annotations each document answers for, so its
+            // card shows those rather than the whole Ingress. A mapping that
+            // also made a Policy keeps, here, only the annotations this
+            // document's comments name (limit-connections' snippet, not
+            // limit-rps' Policy).
+            out.sources = out.docs.map(function(d, i) {
+                if (d.kind === 'Policy') {
+                    let p = f.policies.find(function(x) { return x.name === d.metadata.name; });
+                    return p && p.sources ? p.sources.slice() : [];
+                }
+                let named = {};
+                Object.keys(out.comments[i] || {}).forEach(function(k) { String(out.comments[i][k]).split(/[^a-z0-9-]+/).forEach(function(w) { if (w) named[w] = true; }); });
+                let keys = [];
+                matched.forEach(function(entry) {
+                    if (!entry.toHost) return;
+                    let own = entry.found.map(function(x) { return x.annotation; });
+                    let mine = entry.toPolicy ? own.filter(function(k) { return named[k]; }) : own;
+                    (mine.length ? mine : own).forEach(function(k) { if (keys.indexOf(k) === -1) keys.push(k); });
+                });
+                return Object.keys(a).filter(function(k) { return keys.indexOf(k) !== -1; });
+            });
             return out;
         }
 
@@ -1924,6 +1964,11 @@
                     let c = results.find(function(r) { return r.model === canary; });
                     mergeCanary(s.out, c.out, stable, canary);
                     c.mergedInto = s;
+                    // The merged VirtualServer's card shows the canary Ingress too.
+                    s.out.docs.forEach(function(d, i) {
+                        if (d.kind !== 'VirtualServer') return;
+                        (s.out.canaryOf = s.out.canaryOf || {})[i] = { model: canary, sources: (c.out.sources || [])[c.out.docs.findIndex(function(x) { return x.kind === 'VirtualServer' && x.spec.host === d.spec.host; })] || null };
+                    });
                 });
             }
             return results;
@@ -1938,13 +1983,20 @@
             }).replace(/\n$/, '');
         }
 
-        function communityYaml(model) {
+        // The community Ingress a card migrates, cut to the annotations that
+        // produced the resource beside it (`only`), as a card always showed.
+        // A resource no annotation produced (a VirtualServer for an Ingress
+        // whose annotations all went to Policies, or that had none) came from
+        // the Ingress's rules, so the card shows its spec instead.
+        function communityYaml(model, only) {
             let ann = {};
-            Object.keys(model.community).forEach(function(k) { ann[COMMUNITY_PREFIX + k] = model.community[k]; });
+            Object.keys(model.community).forEach(function(k) { if (!only || only.indexOf(k) !== -1) ann[COMMUNITY_PREFIX + k] = model.community[k]; });
             let md = { name: model.name || 'my-app' };
             if (model.namespace) md.namespace = model.namespace;
-            md.annotations = ann;
-            return MigrationTool.yaml.stringify({ apiVersion: model.apiVersion || 'networking.k8s.io/v1', kind: 'Ingress', metadata: md }, null, { quote: function(p) { return /^metadata\.annotations\./.test(p); } }).replace(/\n$/, '');
+            let doc = { apiVersion: model.apiVersion || 'networking.k8s.io/v1', kind: 'Ingress', metadata: md };
+            if (Object.keys(ann).length) md.annotations = ann;
+            else if (model.doc && isMap(model.doc.spec)) doc.spec = model.doc.spec;
+            return MigrationTool.yaml.stringify(doc, null, { quote: function(p) { return /^metadata\.annotations\./.test(p); } }).replace(/\n$/, '');
         }
 
         function configMapDoc(cm, httpSnippets) {
@@ -1991,7 +2043,7 @@
                 });
                 r.out.unrecognized.forEach(function(k) { if (!unrecognized.some(function(u) { return u.annotation === k; })) unrecognized.push({ annotation: k, value: r.model.community[k] }); });
                 r.out.matched.forEach(function(e) { categories[e.mapping.category] = e; });
-                if (!r.mergedInto) r.out.docs.forEach(function(d, i) { resources.push({ doc: d, comments: r.out.comments[i], model: r.model }); });
+                if (!r.mergedInto) r.out.docs.forEach(function(d, i) { resources.push({ doc: d, comments: r.out.comments[i], model: r.model, sources: r.out.sources ? r.out.sources[i] : null, canary: r.out.canaryOf ? r.out.canaryOf[i] : null }); });
             });
 
             // Every Ingress needs one change whatever its annotations: the class.
@@ -2017,7 +2069,7 @@
                     countCls: '',
                     desc: 'Replace the community annotations with these NGINX Ingress Controller ones. Every rule, TLS entry and backend is kept.',
                     blocks: ingressDocs.map(function(r) {
-                        return { type: 'comparison', old: { title: 'Ingress-NGINX ', badge: 'current', yaml: communityYaml(r.model) }, new: { title: 'NGINX Ingress Controller ', badge: 'migrated', yaml: docYaml(r.doc, r.comments), collapsible: true } };
+                        return { type: 'comparison', old: { title: 'Ingress-NGINX ', badge: 'current', yaml: communityYaml(r.model, r.sources) }, new: { title: 'NGINX Ingress Controller ', badge: 'migrated', yaml: docYaml(r.doc, r.comments), collapsible: true } };
                     })
                 });
             }
@@ -2052,7 +2104,7 @@
                                 category: r.doc.metadata.name + (r.doc.spec && r.doc.spec.host ? ' — ' + r.doc.spec.host : ''),
                                 plusRequired: false,
                                 dualSuffix: null,
-                                old: { title: 'Ingress-NGINX (current)', badge: null, yaml: communityYaml(r.model) },
+                                old: { title: 'Ingress-NGINX (current)', badge: null, yaml: communityYaml(r.model, r.sources) + (r.canary ? '\n---\n' + communityYaml(r.canary.model, r.canary.sources) : '') },
                                 new: { title: 'NGINX Ingress Controller (migrated)', badge: null, yaml: docYaml(r.doc, r.comments), collapsible: true }
                             };
                         })
@@ -2295,8 +2347,8 @@
                 strategies: {
                     initial: 'crd',
                     descriptions: {
-                        annotation: 'Swap annotations where possible, use CRDs only when needed',
-                        crd: 'Prefer Policy CRDs and VirtualServer, fall back to annotations when no CRD path exists'
+                        annotation: 'Keep the Ingress with NGINX annotations, plus the Policies it references',
+                        crd: 'A VirtualServer per host plus Policies; settings with no VirtualServer field go into its snippets'
                     }
                 },
                 samplePresets: SAMPLE_PRESETS,

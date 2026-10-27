@@ -454,3 +454,24 @@ test('auth-keepalive says what each target does with the auth connection', () =>
     assert.match(notes(run(ingress(ann), 'crd')), /new connection to the auth Service for each check/);
     assert.match(notes(run(ingress(ann), 'annotation')), /shares nginx\.org\/keepalive/);
 });
+
+test('each card shows the community annotations behind its own resource', () => {
+    /* Every card used to repeat the whole Ingress (24 annotations beside a
+       three-line mTLS Policy); a card shows what produced the resource beside it. */
+    const cardKeys = (r) => r.plan.steps.flatMap((s) => s.blocks.flatMap((b) => b.items || (b.old ? [b] : [])))
+        .map((it) => ({ name: it.category || '', keys: (it.old.yaml.match(/nginx\.ingress\.kubernetes\.io\/([a-z0-9-]+)/g) || []).map((x) => x.split('/')[1]) }));
+    const cards = cardKeys(run(source.analyzer.samplePresets.advanced));
+    const card = (re) => cards.find((c) => re.test(c.name)).keys.sort();
+    assert.deepEqual(card(/ingress-mtls$/), ['auth-tls-secret', 'auth-tls-verify-client', 'auth-tls-verify-depth']);
+    assert.deepEqual(card(/rate-limit$/), ['limit-connections', 'limit-rps']);
+    const vs = card(/secure\.example\.com/);
+    assert.ok(vs.includes('proxy-body-size') && vs.includes('affinity') && vs.includes('limit-connections'));
+    assert.ok(!vs.includes('cors-allow-origin') && !vs.includes('limit-rps') && !vs.includes('enable-modsecurity'), vs.join(' '));
+    // A canary pair: the merged VirtualServer shows both Ingresses' annotations.
+    const pair = Y.stringifyAll([ingress({ 'proxy-body-size': '8m' }), Object.assign(ingress({ canary: 'true', 'canary-weight': '20' }), { metadata: { name: 'app-canary', annotations: { 'nginx.ingress.kubernetes.io/canary': 'true', 'nginx.ingress.kubernetes.io/canary-weight': '20' } } })]);
+    assert.deepEqual(cardKeys(run(pair)).find((c) => /a\.example\.com/.test(c.name)).keys.sort(), ['canary', 'canary-weight', 'proxy-body-size']);
+    // Nothing behind the VirtualServer but the rules: the card shows the spec.
+    const bare = run(ingress({ 'enable-modsecurity': 'true' })).plan.steps.find((s) => s.id === 'analyzer-step-3').blocks.find((b) => b.items).items[0];
+    assert.match(bare.old.yaml, /spec:\n  tls:/);
+    assert.doesNotMatch(bare.old.yaml, /annotations: \{\}/);
+});

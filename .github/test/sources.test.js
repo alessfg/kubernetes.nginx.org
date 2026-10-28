@@ -128,3 +128,47 @@ test('haproxy: hard no-equivalents surface as unsupported cards, not silently dr
     assert.ok(plan.unsupported, 'expected unsupported section');
     assert.equal(plan.unsupported.cards.length, 3);
 });
+
+test('haproxy: what a reader sees names each product in full', () => {
+    /* The same rule as analyzer.test.js holds for ingress-nginx: page copy and
+       analyzer output say "NGINX Ingress Controller", never "NIC" or the F5
+       prefix, since the HAProxy controller is always in play too. The module
+       does not export its mapping table, so every key it lists goes through
+       the analyzer as an annotation or a ConfigMap entry, plus the presets. */
+    const fs = require('node:fs'), path = require('node:path');
+    const { ROOT } = require('./lib/load.js');
+    const { source } = loadAnalyzer('assets/js/migration-haproxy.js');
+    const BAD = /\b(NIC|NGF)\b|F5 NGINX Ingress Controller|behaviour/;
+    const found = new Set();
+    const walk = (o, where) => {
+        if (typeof o === 'string') { if (BAD.test(o)) found.add(where + ': ' + o.match(new RegExp('.{0,40}' + BAD.source + '.{0,20}'))[0]); return; }
+        if (o && typeof o === 'object') for (const k of Object.keys(o)) walk(o[k], where);
+    };
+    const mod = fs.readFileSync(path.join(ROOT, 'assets/js/migration-haproxy.js'), 'utf8');
+    const keys = [...mod.matchAll(/'(annotation|configmap):([\w.-]+)'/g)].map((m) => [m[1], m[2]]);
+    assert.ok(keys.length > 60, 'mapping keys found: ' + keys.length);
+    const backend = ['spec:', '  tls:', '    - hosts: [a.example.com]', '      secretName: a-tls', '  rules:', '    - host: a.example.com',
+        '      http:', '        paths:', '          - path: /', '            pathType: Prefix', '            backend:',
+        '              service:', '                name: web', '                port:', '                  number: 80'];
+    const inputs = Object.values(source.analyzer.samplePresets).map((p) => p.yaml || p);
+    // Several values per key, since many branches fire only on "false", a
+    // number or a duration.
+    for (const [kind, k] of keys) for (const v of ['true', 'false', '10', '30s', 'h2']) {
+        inputs.push(kind === 'annotation'
+            ? ['apiVersion: networking.k8s.io/v1', 'kind: Ingress', 'metadata:', '  name: app', '  annotations:',
+               '    haproxy.org/' + k + ': "' + v + '"', ...backend].join('\n')
+            : ['apiVersion: v1', 'kind: ConfigMap', 'metadata:', '  name: haproxy-kubernetes-ingress', 'data:', '  ' + k + ': "' + v + '"'].join('\n'));
+    }
+    // And every string literal in the module, so a branch no input reaches is
+    // still read. Comments are skipped: they are for maintainers, not readers.
+    mod.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+        .forEach((l, i) => { for (const m of l.matchAll(/'((?:[^'\\]|\\.)*)'/g)) walk(m[1], 'migration-haproxy.js line ' + (i + 1)); });
+    walk(source.strings, 'strings');
+    walk(source.analyzer.strategies, 'strategies');
+    for (const y of inputs) for (const s of ['annotation', 'crd']) walk(analyze(source, y, s).plan, 'plan');
+    const html = fs.readFileSync(path.join(ROOT, 'haproxy-migration.html'), 'utf8').replace(/<!--[\s\S]*?-->|<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>/g, '');
+    // Line by line, so every offending line is reported rather than the first.
+    const text = html.replace(/<[^>]+>/g, ' ') + '\n' + [...html.matchAll(/(?:aria-label|title|alt|content)="([^"]*)"/g)].map((m) => m[1]).join('\n');
+    text.split('\n').forEach((l, i) => walk(l, 'haproxy-migration.html text line ' + (i + 1)));
+    assert.deepEqual([...found], []);
+});

@@ -381,8 +381,11 @@ body {
 
 
 /* ── Event banner ─────────────────────────────────────────────────────────
-   Dormant by design. It was live for three weeks in 2026-03/04 for a
-   conference and is kept for the next one; `git log -S` before deleting. */
+   Shown only for a conference: KubeCon EU 2026-03/04, and KubeCon North
+   America (Salt Lake City, 9-12 November 2026, booth 100). To show it, add the
+   <p class="event-banner" id="eventBanner"> after #page-announce and
+   class="has-banner" on <body>, on both pages; to retire it, remove both. The
+   classes stay on check-classes.py's DORMANT list for the weeks in between. */
 .event-banner {
     position: fixed;
     top: 0; left: 0; right: 0;
@@ -391,18 +394,34 @@ body {
     background: var(--green-text);
     color: var(--n0);
     text-align: center;
-    font-size: var(--fs-caption);
-    line-height: var(--lh-caption);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
     font-weight: 500;
 }
 .event-banner strong { font-weight: 700; }
 .event-banner .banner-highlight { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .event-banner a { color: var(--n0); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .event-banner a:hover { text-decoration-thickness: 2px; }
-/* Showing the banner overrides --banner-h so every offset that depends on it recomputes. */
-body.has-banner { --banner-h: 36px; }
-@media (max-width: 600px) {
-    body.has-banner { --banner-h: 48px; }
+/* Dark --green-text is #00B244, and white on it is 2.82:1: the dark-theme
+   pairing of the filled green buttons instead (--n700 on --green, 6.19:1). */
+:is(html, body).dark-mode .event-banner { background: var(--green); color: var(--n700); }
+:is(html, body).dark-mode .event-banner a { color: var(--n700); }
+/* Showing the banner overrides --banner-h so every offset that depends on it
+   recomputes. It is the banner's own height — its lines of --lh-body plus
+   its padding — so the top bar sits just below it. The fixed 36px/48px this
+   replaced fit one line and less than two, and a two-line banner slid 4px
+   under the top bar on phones. The KubeCon copy wraps below 710px and
+   400px; re-measure the breakpoints whenever the copy changes.
+   Set on the root, not on body: a custom property holding var() resolves where
+   it is declared, so --fixed-top-h, and html's scroll-padding, see this value
+   only if it is the root's. Set on body, the sidebar and content started under
+   the top bar and in-page jumps landed behind the banner. */
+:root:has(body.has-banner) { --banner-h: calc(var(--lh-body) + 2 * var(--space-base)); }
+@media (max-width: 720px) {
+    :root:has(body.has-banner) { --banner-h: calc(2 * var(--lh-body) + 2 * var(--space-base)); }
+}
+@media (max-width: 400px) {
+    :root:has(body.has-banner) { --banner-h: calc(3 * var(--lh-body) + 2 * var(--space-base)); }
 }
 
 

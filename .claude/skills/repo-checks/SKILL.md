@@ -94,7 +94,7 @@ times out. Save and restore through Python, or call `/bin/cp` directly.
 |---|---|
 | `check-syntax.py` | every script parses — one `node --check` per file, never a glob |
 | `check-tokens.py` | token invariants in px, rem and em, literal line-heights and durations, retired colours/typefaces, hex/rgb/hsl/named colours at call sites, undefined `var()`, inline `style=`, JS `style.X =` and `cssText`, content-link scoping, type pairing, the manifest, webfont coverage. An `EXEMPT` value blanks only itself, so the rest of its line is still checked; a missing font list or manifest fails |
-| `check-contrast.py` | every pairing against WCAG 2.1 AA in both themes, plus pairings derived from the CSS (white labels included), plus the measured-ratio comments |
+| `check-contrast.py` | every pairing against WCAG 2.1 AA in both themes, plus pairings derived from the CSS (white labels included, and a rule with no dark override measured in dark too), plus the measured-ratio comments |
 | `check-classes.py` | classes resolve to rules; load order, asset paths, sitemap and navigation labels hold |
 | `check-versions.py` | every version string agrees with its source of truth, including the NIC chart the e2e runner installs |
 | `check-markup.py` | tag balance, duplicate ids, anchors, JSON-LD |

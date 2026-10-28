@@ -195,6 +195,17 @@ function showCopyFailed(btn) {
 document.addEventListener('DOMContentLoaded', function() {
     initDarkMode();
 
+    // Event banner: the top bar sits at --banner-h, so that has to be the
+    // banner's real height. shared.css gives a per-breakpoint estimate for
+    // readers without JS; the copy wraps at widths no breakpoint can predict,
+    // so it is measured here and kept current as the viewport changes.
+    let banner = document.getElementById('eventBanner');
+    if (banner && document.body.classList.contains('has-banner') && 'ResizeObserver' in window) {
+        new ResizeObserver(function() {
+            document.documentElement.style.setProperty('--banner-h', banner.getBoundingClientRect().height + 'px');
+        }).observe(banner);
+    }
+
     // Copyright year
     let yearEl = document.getElementById('copyright-year');
     if (yearEl) yearEl.textContent = new Date().getFullYear();

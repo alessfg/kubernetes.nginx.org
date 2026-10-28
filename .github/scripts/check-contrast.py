@@ -275,11 +275,15 @@ def derived_pairs():
     is how .version-pill.i2g sat at 4.25:1 in dark.
     """
     backgrounds = {}
+    overridden = set()
     for _, selectors, body in _rules():
         bg = re.search(r'background(?:-color)?:\s*var\((--[\w-]+)\)', body)
         if bg:
             for sel in selectors:
                 backgrounds[sel] = bg.group(1)
+        for sel in selectors:
+            if 'dark-mode' in sel:
+                overridden.add(DARK_PREFIX.sub('', sel))
 
     found = {}
     for name, selectors, body in _rules():
@@ -300,6 +304,18 @@ def derived_pairs():
                 continue
             key = (fg.group(1), bg_token, 'dark' if dark else 'light')
             found.setdefault(key, f'{name}  {sel[:60]}')
+            # A light rule no .dark-mode rule overrides applies in dark too,
+            # with the dark values of the same tokens. Measuring every rule in
+            # both themes gave false positives from rules that ARE overridden;
+            # measuring none missed the event banner, white on dark
+            # --green-text at 2.82:1.
+            # A state of the same element (:hover, :visited, :focus…) is
+            # covered by the dark rule for its base selector: that rule adds
+            # .dark-mode plus the html/body type, which out-specifies one
+            # pseudo-class, so it wins in dark whatever the state.
+            base = re.sub(r':(hover|visited|link|focus|focus-visible|active)\b', '', sel)
+            if not dark and sel not in overridden and base not in overridden:
+                found.setdefault((fg.group(1), bg_token, 'dark'), f'{name}  {sel[:60]} (no dark override)')
     return found
 
 

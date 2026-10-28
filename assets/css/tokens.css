@@ -432,8 +432,10 @@
        states the fixed grid's maximum width, so the site's breakpoints and
        max-widths are local conventions, not spec values.
 
-       --banner-h is overridden by body.has-banner; --fixed-top-h composes the two
-       so components never repeat the arithmetic.
+       --banner-h is overridden on this same root element when the body has
+       .has-banner (shared.css, and shared.js measures it); --fixed-top-h
+       composes the two so components never repeat the arithmetic. It must be
+       the root: a var() inside a custom property resolves where it is declared.
 
        --topbar-h is 52px, matching the bar this site already shipped. F5DS
        publishes no top-bar height; 64px was chosen here and read as loose

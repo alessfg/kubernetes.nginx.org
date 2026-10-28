@@ -433,6 +433,17 @@
 
         function nicDuration(v) { let s = String(v).trim(); return /^\d+$/.test(s) ? s + 's' : s; }
 
+        // A community integer annotation as the community controller read it:
+        // strconv.Atoi, so "10m" or "2.5" is not a number, and on an invalid
+        // value it kept its default. Returns null for those, after a note, so
+        // the caller emits nothing rather than parseInt's partial read or NaN.
+        function communityInt(a, name, ctx) {
+            let s = str(a[name]).trim();
+            if (/^[-+]?\d+$/.test(s)) return parseInt(s, 10);
+            ctx.note(name, name + ' "' + s + '" is not a whole number, so the community controller ignored it and kept its default; nothing was migrated.', 'warning');
+            return null;
+        }
+
         // Community header lists are comma-separated; CORS also accepts "*".
         function commaList(v) { return String(v || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean); }
 
@@ -581,7 +592,9 @@
                 let verify = a['auth-tls-verify-client'];
                 spec.verifyClient = verify ? String(verify) : 'on';
                 if (verify === 'optional_no_ca') ctx.note('auth-tls-verify-client', 'optional_no_ca keeps the connection without verifying the chain; NGINX Ingress Controller accepts it, but it is rarely what a migration wants.');
-                if (a['auth-tls-verify-depth']) spec.verifyDepth = parseInt(a['auth-tls-verify-depth'], 10);
+                // Depth 0 meant the community default of 1; NGINX Ingress Controller would take 0 as given.
+                let tlsDepth = a['auth-tls-verify-depth'] ? communityInt(a, 'auth-tls-verify-depth', ctx) : null;
+                if (tlsDepth !== null) spec.verifyDepth = tlsDepth || 1;
                 f.policies.push({ name: ctx.name('ingress-mtls'), spec: { ingressMTLS: spec }, onIngress: true, needsTls: true,
                     comments: { 'spec.ingressMTLS.clientCertSecret': 'auth-tls-secret', 'spec.ingressMTLS.verifyClient': a['auth-tls-verify-client'] ? 'auth-tls-verify-client' : 'auth-tls-verify-client (community default on)', 'spec.ingressMTLS.verifyDepth': 'auth-tls-verify-depth' } });
                 ctx.note('auth-tls-secret', 'NGINX Ingress Controller reads the CA from the Secret\'s ca.crt key, as the community controller did, so the same Secret works as it is (v' + ctx.nicVersion + ' accepts an Opaque Secret). NGINX Ingress Controller reads the Secret from the Policy\'s namespace' + (/\//.test(raw) ? ', so the namespace prefix was dropped' : '') + '. The Policy only takes effect on a host that terminates TLS.');
@@ -620,7 +633,8 @@
                     comments['spec.egressMTLS.trustedCertSecret'] = 'proxy-ssl-secret (its ca.crt)';
                     if (!secret) ctx.todo('spec.egressMTLS.trustedCertSecret', 'name the Secret holding the backend CA (ca.crt)');
                 }
-                if (a['proxy-ssl-verify-depth']) { spec.verifyDepth = parseInt(a['proxy-ssl-verify-depth'], 10); comments['spec.egressMTLS.verifyDepth'] = 'proxy-ssl-verify-depth'; }
+                let sslDepth = a['proxy-ssl-verify-depth'] ? communityInt(a, 'proxy-ssl-verify-depth', ctx) : null;
+                if (sslDepth !== null) { spec.verifyDepth = sslDepth || 1; comments['spec.egressMTLS.verifyDepth'] = 'proxy-ssl-verify-depth'; }
                 if (a['proxy-ssl-ciphers']) { spec.ciphers = a['proxy-ssl-ciphers']; comments['spec.egressMTLS.ciphers'] = 'proxy-ssl-ciphers'; }
                 if (a['proxy-ssl-protocols']) { spec.protocols = a['proxy-ssl-protocols']; comments['spec.egressMTLS.protocols'] = 'proxy-ssl-protocols'; }
                 if (truthy(a['proxy-ssl-server-name'])) { spec.serverName = true; comments['spec.egressMTLS.serverName'] = 'proxy-ssl-server-name'; }
@@ -673,8 +687,10 @@
                         ctx.snippetSource('limit_conn_zone', 'limit-connections (zone for the location snippet)');
                     }
                 }
-                if (a['limit-rate']) { f.location.push('limit_rate ' + parseInt(a['limit-rate'], 10) + 'k;'); ctx.snippetSource('limit_rate ', 'limit-rate (KB/s)'); }
-                if (a['limit-rate-after']) { f.location.push('limit_rate_after ' + parseInt(a['limit-rate-after'], 10) + 'k;'); ctx.snippetSource('limit_rate_after', 'limit-rate-after (KB)'); }
+                let rate = a['limit-rate'] ? communityInt(a, 'limit-rate', ctx) : null;
+                let rateAfter = a['limit-rate-after'] ? communityInt(a, 'limit-rate-after', ctx) : null;
+                if (rate !== null) { f.location.push('limit_rate ' + rate + 'k;'); ctx.snippetSource('limit_rate ', 'limit-rate (KB/s)'); }
+                if (rateAfter !== null) { f.location.push('limit_rate_after ' + rateAfter + 'k;'); ctx.snippetSource('limit_rate_after', 'limit-rate-after (KB)'); }
             },
 
             // canary-* describe a SECOND Ingress that shares the main one's host
@@ -738,6 +754,12 @@
 
             generateSessionAffinityVS: function(a, f, ctx) {
                 ctx.use('affinity', 'affinity-mode', 'session-cookie-name', 'session-cookie-expires', 'session-cookie-max-age', 'session-cookie-path', 'session-cookie-domain', 'session-cookie-secure', 'session-cookie-samesite', 'session-cookie-conditional-samesite-none', 'session-cookie-change-on-failure');
+                if (a.affinity === undefined) {
+                    // session-cookie-* alone: the community controller read them only under affinity: cookie.
+                    let set = Object.keys(a).filter(function(k) { return /^session-cookie-|^affinity-mode$/.test(k); });
+                    ctx.note(set[0], set.join(', ') + ' without affinity: "cookie" set nothing in the community controller, so nothing was migrated.');
+                    return;
+                }
                 if (a.affinity !== 'cookie') {
                     ctx.note('affinity', 'The community controller supports only affinity "cookie"; "' + a.affinity + '" set nothing.');
                     return;
@@ -975,9 +997,10 @@
                     f.upstream['next-upstream-timeout'] = nicDuration(a['proxy-next-upstream-timeout']); f.upstreamComments['next-upstream-timeout'] = 'proxy-next-upstream-timeout';
                     f.ann['nginx.org/proxy-next-upstream-timeout'] = nicDuration(a['proxy-next-upstream-timeout']); ctx.annComment('nginx.org/proxy-next-upstream-timeout', 'proxy-next-upstream-timeout'); ctx.annCovered('nginx.org/proxy-next-upstream-timeout');
                 }
-                if (a['proxy-next-upstream-tries']) {
-                    f.upstream['next-upstream-tries'] = parseInt(a['proxy-next-upstream-tries'], 10); f.upstreamComments['next-upstream-tries'] = 'proxy-next-upstream-tries';
-                    f.ann['nginx.org/proxy-next-upstream-tries'] = String(parseInt(a['proxy-next-upstream-tries'], 10)); ctx.annComment('nginx.org/proxy-next-upstream-tries', 'proxy-next-upstream-tries'); ctx.annCovered('nginx.org/proxy-next-upstream-tries');
+                let tries = a['proxy-next-upstream-tries'] ? communityInt(a, 'proxy-next-upstream-tries', ctx) : null;
+                if (tries !== null) {
+                    f.upstream['next-upstream-tries'] = tries; f.upstreamComments['next-upstream-tries'] = 'proxy-next-upstream-tries';
+                    f.ann['nginx.org/proxy-next-upstream-tries'] = String(tries); ctx.annComment('nginx.org/proxy-next-upstream-tries', 'proxy-next-upstream-tries'); ctx.annCovered('nginx.org/proxy-next-upstream-tries');
                 }
             },
 

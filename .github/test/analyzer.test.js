@@ -624,3 +624,25 @@ test('what a reader sees names each product in full', () => {
     }
     assert.deepEqual([...found], []);
 });
+
+test('an integer annotation the community controller would have ignored migrates to nothing, not NaN', () => {
+    /* The community controller read these with strconv.Atoi and, on an
+       invalid value, kept its default; parseInt read "10m" as 10 and "abc" as
+       NaN, which reached the YAML. A depth of 0 also meant the default, 1. */
+    for (const [ann, extra] of [['auth-tls-verify-depth', { 'auth-tls-secret': 'ns/ca' }], ['proxy-ssl-verify-depth', { 'proxy-ssl-secret': 'ns/s' }],
+        ['limit-rate', {}], ['limit-rate-after', {}], ['proxy-next-upstream-tries', {}]]) {
+        for (const strategy of ['annotation', 'crd']) {
+            const r = run(ingress(Object.assign({ [ann]: '10m' }, extra)), strategy);
+            assert.doesNotMatch(r.text, /NaN|\b10k;|verifyDepth: 10\b|tries: "?10\b/, ann + ' under ' + strategy);
+            assert.match(notes(r), new RegExp(ann + ' "10m" is not a whole number'), ann + ' under ' + strategy);
+        }
+    }
+    assert.equal(kinds(run(ingress({ 'auth-tls-secret': 'ns/ca', 'auth-tls-verify-depth': '0' })), 'Policy')[0].spec.ingressMTLS.verifyDepth, 1);
+    assert.match(run(ingress({ 'limit-rate': '100' })).text, /limit_rate 100k;/);
+});
+
+test('session-cookie annotations without affinity say so, rather than quoting "undefined"', () => {
+    const n = notes(run(ingress({ 'session-cookie-name': 'x', 'affinity-mode': 'persistent' })));
+    assert.doesNotMatch(n, /undefined/);
+    assert.match(n, /session-cookie-name, affinity-mode without affinity: "cookie" set nothing in the community controller/);
+});

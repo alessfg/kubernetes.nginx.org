@@ -157,7 +157,7 @@
             // OIDC itself (Plus: oidcNative or oidc Policy) is documented as an alternative in the OIDC authentication section.
             { community: ["auth-cache-duration", "auth-cache-key", "auth-method", "auth-proxy-set-headers", "auth-request-redirect", "auth-response-headers", "auth-signin", "auth-signin-redirect-param", "auth-snippet", "auth-url"], nic: "Policy CRD externalAuth (+ nginx.org/policies annotation)", type: "policy", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { crdKind: "Policy", crdInstall: true, templateFn: "generateExternalAuthPolicy" } },
-            { community: ["auth-keepalive", "auth-keepalive-requests", "auth-keepalive-share-vars", "auth-keepalive-timeout"], nic: "No direct equivalent — NIC has no keepalive setting for the external-auth Service alone", type: "annotation", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
+            { community: ["auth-keepalive", "auth-keepalive-requests", "auth-keepalive-share-vars", "auth-keepalive-timeout"], nic: "No direct equivalent — NGINX Ingress Controller has no keepalive setting for the external-auth Service alone", type: "annotation", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { templateFn: "generateAuthKeepaliveNote" } },
             { community: ["auth-always-set-cookie"], nic: "Annotation nginx.org/location-snippets (auth_request_set directive)", type: "annotation", category: "Authentication (external)", anchor: "authentication-external", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { templateFn: "generateAuthCookieNote" } },
@@ -208,7 +208,7 @@
                 case 'nicOffset': return String(value).trim().replace(/^(\d+)[bB]$/, '$1');
                 case 'nicSize': {
                     let v = String(value).trim().replace(/^(\d+)[bB]$/, '$1');
-                    if (/^\d+[gG]$/.test(v)) return { value: (parseInt(v, 10) * 1024) + 'm', note: v + ' rewritten in megabytes — NIC sizes take k or m only' };
+                    if (/^\d+[gG]$/.test(v)) return { value: (parseInt(v, 10) * 1024) + 'm', note: v + ' rewritten in megabytes — NGINX Ingress Controller sizes take k or m only' };
                     return v;
                 }
                 // NIC parses nginx.org/proxy-buffering as a bool and rejects the
@@ -258,7 +258,7 @@
                         return { value: lbAliases[trimmed], note: trimmed + ' has no NGINX equivalent of that name; ' + lbAliases[trimmed] + ' also picks the backend with the lowest average response time, and weighs active connections too' };
                     }
                     if (/^(chash|chashsubset|sticky_balanced|sticky_persistent)$/.test(trimmed)) {
-                        return { value: null, note: trimmed + ' is set by upstream-hash-by or affinity, which migrate separately; NIC has no lb-method by that name.' };
+                        return { value: null, note: trimmed + ' is set by upstream-hash-by or affinity, which migrate separately; NGINX Ingress Controller has no lb-method by that name.' };
                     }
                     // The community controller accepts only these names; anything
                     // else fell back to round_robin there, and NIC rejects it.
@@ -273,15 +273,15 @@
                     // community annotation also took ports and $variables.
                     let host = String(value).trim().toLowerCase();
                     if (host.length <= 253 && /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/.test(host)) {
-                        return host === value ? value : { value: host, note: 'lowercased — NIC accepts only a lowercase hostname' };
+                        return host === value ? value : { value: host, note: 'lowercased — NGINX Ingress Controller accepts only a lowercase hostname' };
                     }
-                    return { value: null, note: 'nginx.org/upstream-vhost takes only a literal lowercase hostname, with no port or variables, and NIC rejects the Ingress otherwise. Switch the migration strategy to CRD-first: VirtualServer requestHeaders.set accepts it.' };
+                    return { value: null, note: 'nginx.org/upstream-vhost takes only a literal lowercase hostname, with no port or variables, and NGINX Ingress Controller rejects the Ingress otherwise. Switch the migration strategy to CRD-first: VirtualServer requestHeaders.set accepts it.' };
                 }
                 case 'proxySetHeader': {
                     // nginx.org/proxy-set-headers is a comma-separated list of
                     // literal values: NIC rejects $, and a comma splits the entry.
                     if (/[$,"\\\r\n]/.test(value)) {
-                        return { value: null, note: 'nginx.org/proxy-set-headers takes only literal values, and NIC rejects $ in them, so capture groups such as $1 have no annotation equivalent. Switch the migration strategy to CRD-first.' };
+                        return { value: null, note: 'nginx.org/proxy-set-headers takes only literal values, and NGINX Ingress Controller rejects $ in them, so capture groups such as $1 have no annotation equivalent. Switch the migration strategy to CRD-first.' };
                     }
                     return template ? template.replace('${value}', String(value).trim()) : value;
                 }
@@ -290,11 +290,11 @@
                     let codes = String(value).split(',').map(function(c) { return c.trim(); }).filter(Boolean);
                     let kept = codes.filter(function(c) { return c !== '499'; });
                     let notes = [];
-                    if (kept.length < codes.length) notes.push('499 dropped — NIC rejects it in error_page');
+                    if (kept.length < codes.length) notes.push('499 dropped — NGINX Ingress Controller rejects it in error_page');
                     if (!getAnnotationValue(found || [], 'default-backend')) {
                         notes.push('errors go to this Ingress\'s spec.defaultBackend, so set one — the community controller fell back to its global default backend');
                     }
-                    if (kept.length === 0) return { value: null, note: 'No status code survives: NIC rejects 499 in error_page.' };
+                    if (kept.length === 0) return { value: null, note: 'No status code survives: NGINX Ingress Controller rejects 499 in error_page.' };
                     let joined = kept.join(',');
                     return notes.length || joined !== value ? { value: joined, note: notes.join('; ') || null } : value;
                 }
@@ -305,7 +305,7 @@
                     if (getAnnotationValue(found || [], 'custom-http-errors')) {
                         return { value: null, note: 'Set the Ingress spec.defaultBackend to Service "' + svc + '" (with its port) — it is the only place nginx.org/custom-http-errors sends intercepted errors, and it also serves requests that match no rule.' };
                     }
-                    return { value: null, note: 'Set the Ingress spec.defaultBackend to Service "' + svc + '" for requests that match no rule. NIC has no annotation for the community fallback used when a Service has no ready endpoints; on NGINX Plus, VirtualServer upstreams[].backup is the closest equivalent.' };
+                    return { value: null, note: 'Set the Ingress spec.defaultBackend to Service "' + svc + '" for requests that match no rule. NGINX Ingress Controller has no annotation for the community fallback used when a Service has no ready endpoints; on NGINX Plus, VirtualServer upstreams[].backup is the closest equivalent.' };
                 }
                 default: return value;
             }
@@ -497,7 +497,7 @@
                         // allowed range gets 403, the rest of the range 200.
                         let inside = deny.filter(function(d) { return allow.some(function(al) { return cidrContains(al, d); }); });
                         inside.forEach(function(d) { f.location.push('deny ' + d + ';'); ctx.snippetSource('deny ' + d + ';', 'denylist-source-range'); });
-                        ctx.note('denylist-source-range', 'NIC applies only the allow list when a resource references allow and deny Policies, so the deny list is not a Policy here. '
+                        ctx.note('denylist-source-range', 'NGINX Ingress Controller applies only the allow list when a resource references allow and deny Policies, so the deny list is not a Policy here. '
                             + (inside.length ? 'The denied addresses inside the allowed ranges (' + inside.join(', ') + ') are denied in a location snippet, which NGINX checks before the Policy\'s allow rules.' : 'None of the denied ranges falls inside an allowed one, so allow-only already blocks them.'));
                     }
                 } else {
@@ -537,7 +537,7 @@
                 let dropped = headers.filter(function(h) { return forbidden.test(h); });
                 spec.allowHeaders = headers.filter(function(h) { return !forbidden.test(h); });
                 comments['spec.cors.allowHeaders'] = 'cors-allow-headers' + (a['cors-allow-headers'] ? '' : ' (community default)');
-                if (dropped.length) ctx.note('cors-allow-headers', 'Dropped ' + dropped.join(', ') + ' from allowHeaders — browsers send these themselves and NIC rejects them there.');
+                if (dropped.length) ctx.note('cors-allow-headers', 'Dropped ' + dropped.join(', ') + ' from allowHeaders — browsers send these themselves and NGINX Ingress Controller rejects them there.');
                 if (creds) { spec.allowCredentials = true; comments['spec.cors.allowCredentials'] = 'cors-allow-credentials' + (a['cors-allow-credentials'] === undefined ? ' (community default true)' : ''); }
                 if (a['cors-expose-headers']) { spec.exposeHeaders = commaList(a['cors-expose-headers']); comments['spec.cors.exposeHeaders'] = 'cors-expose-headers'; }
                 if (!isNaN(maxAge)) { spec.maxAge = maxAge; comments['spec.cors.maxAge'] = 'cors-max-age' + (a['cors-max-age'] ? '' : ' (community default 20 days)'); }
@@ -547,15 +547,15 @@
             generateBasicAuthPolicy: function(a, f, ctx) {
                 ctx.use('auth-type', 'auth-secret', 'auth-secret-type', 'auth-realm');
                 if (a['auth-type'] && a['auth-type'] !== 'basic') {
-                    ctx.note('auth-type', 'auth-type "' + a['auth-type'] + '" (digest) has no NIC equivalent — NIC supports basic authentication only.', 'warning');
+                    ctx.note('auth-type', 'auth-type "' + a['auth-type'] + '" (digest) has no NGINX Ingress Controller equivalent: NGINX Ingress Controller supports basic authentication only.', 'warning');
                     return;
                 }
                 let secret = String(a['auth-secret'] || '').replace(/^[^/]+\//, '');
-                if (/\//.test(String(a['auth-secret'] || ''))) ctx.note('auth-secret', 'NIC reads the Secret from the resource\'s own namespace; the namespace prefix was dropped.');
+                if (/\//.test(String(a['auth-secret'] || ''))) ctx.note('auth-secret', 'NGINX Ingress Controller reads the Secret from the resource\'s own namespace; the namespace prefix was dropped.');
                 // NIC v5.7.0 validates a Secret by its role's keys, not its type,
                 // so the community's Opaque Secret works once its key is renamed.
-                let secretNote = 'NIC reads the htpasswd content from a key named htpasswd; the community controller read it from a key named auth. Rename the key (the Secret can stay Opaque).';
-                if (a['auth-secret-type'] === 'auth-map') secretNote += ' auth-secret-type auth-map (one user per key) has no NIC form: build one htpasswd file from the entries.';
+                let secretNote = 'NGINX Ingress Controller reads the htpasswd content from a key named htpasswd; the community controller read it from a key named auth. Rename the key (the Secret can stay Opaque).';
+                if (a['auth-secret-type'] === 'auth-map') secretNote += ' auth-secret-type auth-map (one user per key) has no NGINX Ingress Controller form: build one htpasswd file from the entries.';
                 ctx.note('auth-secret', secretNote);
                 if (ctx.strategy === 'annotation') {
                     // basicAuth is not on NIC's list of Policies an Ingress accepts;
@@ -580,11 +580,11 @@
                 if (!secret) ctx.todo('spec.ingressMTLS.clientCertSecret', 'name the CA Secret');
                 let verify = a['auth-tls-verify-client'];
                 spec.verifyClient = verify ? String(verify) : 'on';
-                if (verify === 'optional_no_ca') ctx.note('auth-tls-verify-client', 'optional_no_ca keeps the connection without verifying the chain; NIC accepts it, but it is rarely what a migration wants.');
+                if (verify === 'optional_no_ca') ctx.note('auth-tls-verify-client', 'optional_no_ca keeps the connection without verifying the chain; NGINX Ingress Controller accepts it, but it is rarely what a migration wants.');
                 if (a['auth-tls-verify-depth']) spec.verifyDepth = parseInt(a['auth-tls-verify-depth'], 10);
                 f.policies.push({ name: ctx.name('ingress-mtls'), spec: { ingressMTLS: spec }, onIngress: true, needsTls: true,
                     comments: { 'spec.ingressMTLS.clientCertSecret': 'auth-tls-secret', 'spec.ingressMTLS.verifyClient': a['auth-tls-verify-client'] ? 'auth-tls-verify-client' : 'auth-tls-verify-client (community default on)', 'spec.ingressMTLS.verifyDepth': 'auth-tls-verify-depth' } });
-                ctx.note('auth-tls-secret', 'NIC reads the CA from the Secret\'s ca.crt key, as the community controller did, so the same Secret works as it is (NIC v' + ctx.nicVersion + ' accepts an Opaque Secret). NIC reads it from the Policy\'s namespace' + (/\//.test(raw) ? ', so the namespace prefix was dropped' : '') + '. The Policy only takes effect on a host that terminates TLS.');
+                ctx.note('auth-tls-secret', 'NGINX Ingress Controller reads the CA from the Secret\'s ca.crt key, as the community controller did, so the same Secret works as it is (v' + ctx.nicVersion + ' accepts an Opaque Secret). NGINX Ingress Controller reads the Secret from the Policy\'s namespace' + (/\//.test(raw) ? ', so the namespace prefix was dropped' : '') + '. The Policy only takes effect on a host that terminates TLS.');
                 // Headers the community controller always sent upstream when
                 // verifying, plus the certificate itself on request.
                 f.location.push('proxy_set_header ssl-client-verify $ssl_client_verify;');
@@ -627,7 +627,7 @@
                 if (a['proxy-ssl-name']) { spec.sslName = a['proxy-ssl-name']; comments['spec.egressMTLS.sslName'] = 'proxy-ssl-name'; }
                 if (!Object.keys(spec).length) return;
                 f.policies.push({ name: ctx.name('egress-mtls'), spec: { egressMTLS: spec }, onIngress: true, comments: comments });
-                if (secret) ctx.note('proxy-ssl-secret', 'NIC reads tls.crt and tls.key' + (verify ? ', and ca.crt for trustedCertSecret,' : '') + ' from the same Secret the community controller did, in the Policy\'s namespace' + (/\//.test(raw) ? ' (the namespace prefix was dropped)' : '') + '.');
+                if (secret) ctx.note('proxy-ssl-secret', 'NGINX Ingress Controller reads tls.crt and tls.key' + (verify ? ', and ca.crt for trustedCertSecret,' : '') + ' from the same Secret the community controller did, in the Policy\'s namespace' + (/\//.test(raw) ? ' (the namespace prefix was dropped)' : '') + '.');
                 ctx.note('proxy-ssl-secret', 'The upstream connection must already be TLS: set backend-protocol HTTPS (or GRPCS), which this tool turns into ssl-services / upstream tls.');
             },
 
@@ -650,7 +650,7 @@
                     f.ann['nginx.org/limit-req-burst'] = String(r.n * mult); ctx.annComment('nginx.org/limit-req-burst', r.src + ' × limit-burst-multiplier (' + mult + ')');
                     f.ann['nginx.org/limit-req-no-delay'] = 'true'; ctx.annComment('nginx.org/limit-req-no-delay', 'the community controller always used nodelay');
                     f.ann['nginx.org/limit-req-reject-code'] = '503'; ctx.annComment('nginx.org/limit-req-reject-code', 'the community limit-req-status-code default');
-                    if (rates.length > 1) ctx.note('limit-rpm', 'NIC takes one limit-req-rate per Ingress; ' + rates[1].src + ' is not migrated. CRD-first emits one rateLimit Policy per rate.', 'warning');
+                    if (rates.length > 1) ctx.note('limit-rpm', 'NGINX Ingress Controller takes one limit-req-rate per Ingress; ' + rates[1].src + ' is not migrated. CRD-first emits one rateLimit Policy per rate.', 'warning');
                 } else if (rates.length) {
                     rates.forEach(function(r) {
                         f.policies.push({ name: ctx.name('rate-limit' + (rates.length > 1 ? '-' + r.unit.replace('r/', 'r') : '')), onIngress: false,
@@ -658,7 +658,7 @@
                             comments: { 'spec.rateLimit.rate': r.src, 'spec.rateLimit.burst': r.src + ' × limit-burst-multiplier (' + mult + ')', 'spec.rateLimit.noDelay': 'the community controller always used nodelay', 'spec.rateLimit.rejectCode': 'the community limit-req-status-code default' } });
                     });
                 }
-                if (allow.length && rates.length) ctx.note('limit-whitelist', 'NIC has no rate-limit exemption list. To keep ' + allow.join(', ') + ' unlimited, set the rateLimit key from a geo map (ConfigMap http-snippets) that yields an empty key for them — NGINX does not count an empty key.', 'warning');
+                if (allow.length && rates.length) ctx.note('limit-whitelist', 'NGINX Ingress Controller has no rate-limit exemption list. To keep ' + allow.join(', ') + ' unlimited, set the rateLimit key from a geo map (ConfigMap http-snippets) that yields an empty key for them — NGINX does not count an empty key.', 'warning');
                 else if (allow.length) ctx.note('limit-whitelist', 'limit-whitelist only exempts addresses from limit-rps / limit-rpm / limit-connections, and none is set; nothing to migrate.');
                 // limit_conn needs a zone defined in the http context, which only
                 // the ConfigMap can add; without it NGINX refuses the config.
@@ -698,7 +698,7 @@
                     // Value beats pattern; with neither, "always" routes to the canary.
                     let value = a['canary-by-header-value'] || (a['canary-by-header-pattern'] ? '~' + a['canary-by-header-pattern'] : 'always');
                     matches.push({ conditions: [{ header: a['canary-by-header'], value: value }], action: { pass: '__canary__' } });
-                    if (!a['canary-by-header-value'] && !a['canary-by-header-pattern']) ctx.note('canary-by-header', 'The community controller also sent requests with this header set to "never" to the stable backend even under a weight; NIC matches only "always" here.');
+                    if (!a['canary-by-header-value'] && !a['canary-by-header-pattern']) ctx.note('canary-by-header', 'The community controller also sent requests with this header set to "never" to the stable backend even under a weight; NGINX Ingress Controller matches only "always" here.');
                 }
                 if (a['canary-by-cookie']) matches.push({ conditions: [{ cookie: a['canary-by-cookie'], value: 'always' }], action: { pass: '__canary__' } });
                 f.canary = { weight: pct, rounded: (weight / total * 100) !== pct ? weight + '/' + total : null, matches: matches, weightSet: a['canary-weight'] !== undefined,
@@ -711,9 +711,9 @@
                 let url = a['permanent-redirect'] || a['temporal-redirect'];
                 if (url) {
                     let code = parseInt(a['permanent-redirect'] ? (a['permanent-redirect-code'] || '301') : (a['temporal-redirect-code'] || '302'), 10);
-                    if ([301, 302, 307, 308].indexOf(code) === -1) { ctx.note(a['permanent-redirect'] ? 'permanent-redirect-code' : 'temporal-redirect-code', 'NIC accepts only 301, 302, 307 and 308; using ' + (a['permanent-redirect'] ? 301 : 302) + '.', 'warning'); code = a['permanent-redirect'] ? 301 : 302; }
+                    if ([301, 302, 307, 308].indexOf(code) === -1) { ctx.note(a['permanent-redirect'] ? 'permanent-redirect-code' : 'temporal-redirect-code', 'NGINX Ingress Controller accepts only 301, 302, 307 and 308; using ' + (a['permanent-redirect'] ? 301 : 302) + '.', 'warning'); code = a['permanent-redirect'] ? 301 : 302; }
                     let target = braceVariables(url);
-                    if (!/:\/\//.test(target)) { target = '${scheme}://${host}' + (target[0] === '/' ? '' : '/') + target; ctx.note(a['permanent-redirect'] ? 'permanent-redirect' : 'temporal-redirect', 'NIC requires a scheme in a redirect URL; the relative target was made absolute against the request host.'); }
+                    if (!/:\/\//.test(target)) { target = '${scheme}://${host}' + (target[0] === '/' ? '' : '/') + target; ctx.note(a['permanent-redirect'] ? 'permanent-redirect' : 'temporal-redirect', 'NGINX Ingress Controller requires a scheme in a redirect URL; the relative target was made absolute against the request host.'); }
                     let codeSrc = a['permanent-redirect'] ? 'permanent-redirect-code' : 'temporal-redirect-code';
                     f.redirect = { url: target, code: code, source: (a['permanent-redirect'] ? 'permanent-redirect' : 'temporal-redirect') + (a[codeSrc] ? ' + ' + codeSrc : '') };
                     if (a['permanent-redirect'] && a['temporal-redirect']) ctx.note('temporal-redirect', 'permanent-redirect takes precedence, as in the community controller; temporal-redirect is not migrated.');
@@ -753,8 +753,8 @@
                 cookie.httpOnly = true; comments['sessionCookie.httpOnly'] = 'the community controller always set HttpOnly';
                 if (a['session-cookie-secure'] !== undefined) { cookie.secure = truthy(a['session-cookie-secure']); comments['sessionCookie.secure'] = 'session-cookie-secure'; }
                 if (a['session-cookie-samesite']) { cookie.samesite = String(a['session-cookie-samesite']).toLowerCase(); comments['sessionCookie.samesite'] = 'session-cookie-samesite'; }
-                if (a['affinity-mode'] === 'persistent') ctx.note('affinity-mode', 'NGINX sticky cookies never rebalance existing sessions, which matches persistent; balanced (the community default) also shifted sessions when Pods scaled, and has no NIC equivalent.');
-                if (truthy(a['session-cookie-change-on-failure'])) ctx.note('session-cookie-change-on-failure', 'NGINX re-picks a server when the bound one fails without rewriting the cookie until the next response — close to, not the same as, the community behaviour.');
+                if (a['affinity-mode'] === 'persistent') ctx.note('affinity-mode', 'NGINX sticky cookies never rebalance existing sessions, which matches persistent; balanced (the community default) also shifted sessions when Pods scaled, and has no NGINX Ingress Controller equivalent.');
+                if (truthy(a['session-cookie-change-on-failure'])) ctx.note('session-cookie-change-on-failure', 'NGINX re-picks a server when the bound one fails without rewriting the cookie until the next response — close to, not the same as, what the community controller did.');
                 if (truthy(a['session-cookie-conditional-samesite-none'])) ctx.note('session-cookie-conditional-samesite-none', 'NGINX cannot drop SameSite=None for incompatible browsers; samesite is applied to every client.');
                 if (a['session-cookie-max-age'] && a['session-cookie-expires'] && a['session-cookie-max-age'] !== a['session-cookie-expires']) ctx.note('session-cookie-expires', 'NGINX sets one expiry; session-cookie-max-age was used.');
                 f.upstream.sessionCookie = cookie;
@@ -781,7 +781,7 @@
                     spec.authServiceName = 'auth-svc';
                     // NIC resolves an ExternalName Service only on NGINX Plus
                     // (v5.6.3 and v5.7.0 getEndpointsForIngressBackend), auth Service included.
-                    ctx.todo('spec.externalAuth.authServiceName', 'NIC sends the auth request to a Service in the cluster; ' + u.host + ' is not one. Run the auth service in the cluster and name its Service here (an ExternalName Service in front of ' + u.host + ' works only on NGINX Plus)');
+                    ctx.todo('spec.externalAuth.authServiceName', 'NGINX Ingress Controller sends the auth request to a Service in the cluster; ' + u.host + ' is not one. Run the auth service in the cluster and name its Service here (an ExternalName Service in front of ' + u.host + ' works only on NGINX Plus)');
                 } else {
                     spec.authServiceName = (u.namespace && u.namespace !== ctx.namespace ? u.namespace + '/' : '') + u.service;
                 }
@@ -801,23 +801,23 @@
                     // there too; a top-level /login is its own base. "/" would
                     // duplicate the route's location "/" and fail the reload.
                     let base = path.replace(/\/[^/]*$/, '') || (path !== '/' ? path : null);
-                    if (!base) ctx.note('auth-signin', 'The sign-in path is "/", which NIC would have to serve from the auth Service instead of the application. Give the sign-in endpoint a path of its own (oauth2-proxy uses /oauth2/start).', 'warning');
-                    else if (base !== '/oauth2') { spec.authSigninRedirectBasePath = base; comments['spec.externalAuth.authSigninRedirectBasePath'] = 'auth-signin (NIC serves this path from the auth Service)'; }
+                    if (!base) ctx.note('auth-signin', 'The sign-in path is "/", which NGINX Ingress Controller would have to serve from the auth Service instead of the application. Give the sign-in endpoint a path of its own (oauth2-proxy uses /oauth2/start).', 'warning');
+                    else if (base !== '/oauth2') { spec.authSigninRedirectBasePath = base; comments['spec.externalAuth.authSigninRedirectBasePath'] = 'auth-signin (NGINX Ingress Controller serves this path from the auth Service)'; }
                     let clash = base && !f.regexPaths && (ctx.model && ctx.model.hosts || []).some(function(h) { return h.paths.some(function(p) { return p.pathType !== 'Exact' && p.path === base; }); });
-                    if (clash) ctx.note('auth-signin', 'NIC adds a location at ' + base + ' for the sign-in, and this Ingress already routes ' + base + ': NGINX rejects the duplicate location. Move the sign-in endpoint under a path of its own.', 'warning');
-                    if (s && s.query) ctx.note('auth-signin', 'authSigninURI is a path; the query ' + s.query + ' is not carried over. NIC appends nothing either, so the sign-in endpoint redirects back using X-Auth-Request-Redirect, which NIC sets to $request_uri.');
+                    if (clash) ctx.note('auth-signin', 'NGINX Ingress Controller adds a location at ' + base + ' for the sign-in, and this Ingress already routes ' + base + ': NGINX rejects the duplicate location. Move the sign-in endpoint under a path of its own.', 'warning');
+                    if (s && s.query) ctx.note('auth-signin', 'authSigninURI is a path; the query ' + s.query + ' is not carried over. NGINX Ingress Controller appends nothing either, so the sign-in endpoint redirects back using X-Auth-Request-Redirect, which NGINX Ingress Controller sets to $request_uri.');
                     // `$host` (or the Ingress's own host) is this host; only a
                     // different host is lost by reducing the URL to its path.
-                    if (s && s.external && !/^\$/.test(s.host) && s.host !== (ctx.host || '')) ctx.note('auth-signin', 'authSigninURI is a path on this host; a sign-in page on ' + s.host + ' cannot be expressed, so NIC serves the sign-in path from the auth service on this host instead.', 'warning');
+                    if (s && s.external && !/^\$/.test(s.host) && s.host !== (ctx.host || '')) ctx.note('auth-signin', 'authSigninURI is a path on this host; a sign-in page on ' + s.host + ' cannot be expressed, so NGINX Ingress Controller serves the sign-in path from the auth service on this host instead.', 'warning');
                 }
                 if (a['auth-snippet']) { spec.authSnippets = a['auth-snippet'].replace(/\n?$/, '\n'); comments['spec.externalAuth.authSnippets'] = 'auth-snippet'; }
                 if (a['auth-method']) {
                     spec.authSnippets = (spec.authSnippets || '') + 'proxy_method ' + sanitizeSnippetValue(a['auth-method']) + ';\n';
                     comments['spec.externalAuth.authSnippets'] = (comments['spec.externalAuth.authSnippets'] ? comments['spec.externalAuth.authSnippets'] + ' + ' : '') + 'auth-method';
                 }
-                if (a['auth-request-redirect']) ctx.note('auth-request-redirect', 'NIC always sends X-Auth-Request-Redirect: $request_uri to the sign-in location; a custom value cannot be set.');
-                if (a['auth-signin-redirect-param']) ctx.note('auth-signin-redirect-param', 'NIC does not append a redirect parameter to authSigninURI; the auth server reads X-Auth-Request-Redirect instead.');
-                if (a['auth-cache-key'] || a['auth-cache-duration']) ctx.note(a['auth-cache-key'] ? 'auth-cache-key' : 'auth-cache-duration', 'NIC does not cache external auth responses; every request is checked.');
+                if (a['auth-request-redirect']) ctx.note('auth-request-redirect', 'NGINX Ingress Controller always sends X-Auth-Request-Redirect: $request_uri to the sign-in location; a custom value cannot be set.');
+                if (a['auth-signin-redirect-param']) ctx.note('auth-signin-redirect-param', 'NGINX Ingress Controller does not append a redirect parameter to authSigninURI; the auth server reads X-Auth-Request-Redirect instead.');
+                if (a['auth-cache-key'] || a['auth-cache-duration']) ctx.note(a['auth-cache-key'] ? 'auth-cache-key' : 'auth-cache-duration', 'NGINX Ingress Controller does not cache external auth responses; every request is checked.');
                 if (a['auth-proxy-set-headers']) ctx.note('auth-proxy-set-headers', 'Headers from ConfigMap ' + a['auth-proxy-set-headers'] + ' must be copied into authSnippets as proxy_set_header lines.', 'warning');
                 if (a['auth-response-headers']) {
                     // auth_request_set lives in the PROTECTED location: authSnippets
@@ -844,7 +844,7 @@
                     ctx.snippetSource('auth_request_set $auth_cookie ', 'auth-always-set-cookie');
                     ctx.snippetSource('add_header Set-Cookie ', 'auth-always-set-cookie (always: with every response status)');
                 } else {
-                    ctx.note('auth-url', 'The community controller passed any Set-Cookie from the auth response on to the client; NIC does not. If your auth server sets or refreshes a cookie there (oauth2-proxy does with --cookie-refresh), add auth_request_set $auth_cookie $upstream_http_set_cookie; and add_header Set-Cookie $auth_cookie; as location snippets.');
+                    ctx.note('auth-url', 'The community controller passed any Set-Cookie from the auth response on to the client; NGINX Ingress Controller does not. If your auth server sets or refreshes a cookie there (oauth2-proxy does with --cookie-refresh), add auth_request_set $auth_cookie $upstream_http_set_cookie; and add_header Set-Cookie $auth_cookie; as location snippets.');
                 }
                 f.policies.push({ name: ctx.name('external-auth'), spec: { externalAuth: spec }, onIngress: true, comments: comments });
             },
@@ -889,7 +889,7 @@
                 let hostPart = ((target.split('://')[1] || '').match(/^[^\/?#:$]*/) || [''])[0];
                 // The community controller always configured one; NIC does not,
                 // and its resolver-addresses ConfigMap key is NGINX Plus only.
-                if (/\$/.test(target) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(hostPart)) ctx.note('mirror-target', 'The target has NGINX variables, so NGINX resolves ' + (hostPart || 'its host') + ' per request and needs a resolver, which NIC does not configure: add a resolver line (your cluster DNS) to the server snippet, or the mirror requests fail. On NGINX Plus, the resolver-addresses ConfigMap key also works.', 'warning');
+                if (/\$/.test(target) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(hostPart)) ctx.note('mirror-target', 'The target has NGINX variables, so NGINX resolves ' + (hostPart || 'its host') + ' per request and needs a resolver, which NGINX Ingress Controller does not configure: add a resolver line (your cluster DNS) to the server snippet, or the mirror requests fail. On NGINX Plus, the resolver-addresses ConfigMap key also works.', 'warning');
             },
 
             // The community controller held keepalive connections open to the
@@ -903,7 +903,7 @@
                 let how = ctx.strategy === 'crd'
                     ? 'a VirtualServer opens a new connection to the auth Service for each check'
                     : 'the Ingress\'s auth Service shares nginx.org/keepalive (or the ConfigMap\'s keepalive) with every other upstream';
-                ctx.note(names[0], names.join(', ') + ': NIC has no keepalive setting for the external-auth Service alone, so ' + (names.length === 1 ? 'this has' : 'these have') + ' no equivalent: ' + how + '. Size the auth Service for the extra connections.');
+                ctx.note(names[0], names.join(', ') + ': NGINX Ingress Controller has no keepalive setting for the external-auth Service alone, so ' + (names.length === 1 ? 'this has' : 'these have') + ' no equivalent: ' + how + '. Size the auth Service for the extra connections.');
             },
 
             // auth-always-set-cookie belongs to auth-url: generateExternalAuthPolicy
@@ -924,24 +924,24 @@
             generateOtelConfigMap: function(a, f, ctx) {
                 ctx.use('enable-opentelemetry', 'opentelemetry-trust-incoming-span');
                 if (a['enable-opentelemetry'] === undefined) {
-                    ctx.note('opentelemetry-trust-incoming-span', 'Without enable-opentelemetry on this Ingress, this applied only where the community ConfigMap turned tracing on. In NIC, set otel-trace-context in the nginx-config ConfigMap: propagate to trust incoming spans, inject to start a new trace. It is global, not per Ingress.');
+                    ctx.note('opentelemetry-trust-incoming-span', 'Without enable-opentelemetry on this Ingress, this applied only where the community ConfigMap turned tracing on. In NGINX Ingress Controller, set otel-trace-context in the nginx-config ConfigMap: propagate to trust incoming spans, inject to start a new trace. It is global, not per Ingress.');
                     return;
                 }
-                if (!truthy(a['enable-opentelemetry'])) { ctx.note('enable-opentelemetry', 'This opted the Ingress out of tracing. NIC traces all requests or none (otel-trace-in-http), so there is no per-Ingress opt-out; with tracing off, the NIC default, nothing is needed.'); return; }
+                if (!truthy(a['enable-opentelemetry'])) { ctx.note('enable-opentelemetry', 'This opted the Ingress out of tracing. NGINX Ingress Controller traces all requests or none (otel-trace-in-http), so there is no per-Ingress opt-out; tracing is off by default in NGINX Ingress Controller, so nothing is needed.'); return; }
                 f.cm['otel-trace-in-http'] = 'true';
                 f.cmComments['otel-trace-in-http'] = 'enable-opentelemetry';
                 f.cm['otel-exporter-endpoint'] = 'otel-collector:4317';
-                f.cmComments['otel-exporter-endpoint'] = 'TODO: your collector — NIC turns tracing off without it (the community read otlp-collector-host, port 4317)';
-                ctx.todo('data.otel-exporter-endpoint', 'the OpenTelemetry collector address (host:port), which NIC requires before it traces anything');
+                f.cmComments['otel-exporter-endpoint'] = 'TODO: your collector — NGINX Ingress Controller keeps tracing off without it (the community controller read otlp-collector-host, port 4317)';
+                ctx.todo('data.otel-exporter-endpoint', 'the OpenTelemetry collector address (host:port), which NGINX Ingress Controller requires before tracing anything');
                 f.cm['otel-service-name'] = 'nginx';
                 f.cmComments['otel-service-name'] = 'the community default service name';
                 let trust = a['opentelemetry-trust-incoming-span'] === undefined || truthy(a['opentelemetry-trust-incoming-span']);
                 f.cm['otel-trace-context'] = trust ? 'propagate' : 'inject';
                 f.cmComments['otel-trace-context'] = trust
-                    ? (a['opentelemetry-trust-incoming-span'] === undefined ? 'the community controller propagated trace context (NIC defaults to ignore)' : 'opentelemetry-trust-incoming-span')
+                    ? (a['opentelemetry-trust-incoming-span'] === undefined ? 'the community controller propagated trace context (NGINX Ingress Controller defaults to ignore)' : 'opentelemetry-trust-incoming-span')
                     : 'opentelemetry-trust-incoming-span: false — a new trace, passed on';
-                if (a['opentelemetry-trust-incoming-span'] !== undefined) ctx.note('opentelemetry-trust-incoming-span', 'otel-trace-context is global in NIC: it applies to every Ingress and VirtualServer, not just this one.');
-                ctx.note('enable-opentelemetry', 'NIC traces every request once otel-trace-in-http is on: there is no per-Ingress switch, so this applies to all Ingresses and VirtualServers.');
+                if (a['opentelemetry-trust-incoming-span'] !== undefined) ctx.note('opentelemetry-trust-incoming-span', 'otel-trace-context is global in NGINX Ingress Controller: it applies to every Ingress and VirtualServer, not just this one.');
+                ctx.note('enable-opentelemetry', 'NGINX Ingress Controller traces every request once otel-trace-in-http is on: there is no per-Ingress switch, so this applies to all Ingresses and VirtualServers.');
             },
 
             // affinity-canary-behavior chose whether a canary request carrying a
@@ -951,15 +951,15 @@
             // client can cross between stable and canary either way.
             generateCanaryAffinityNote: function(a, f, ctx) {
                 ctx.use('affinity-canary-behavior');
-                ctx.note('affinity-canary-behavior', 'No equivalent: NIC picks the split for every request, and sessionCookie keeps a client on one Pod within the chosen upstream, not on the canary. To pin a client to the canary, route it with a cookie or header match (canary-by-cookie / canary-by-header).');
+                ctx.note('affinity-canary-behavior', 'No equivalent: NGINX Ingress Controller picks the split for every request, and sessionCookie keeps a client on one Pod within the chosen upstream, not on the canary. To pin a client to the canary, route it with a cookie or header match (canary-by-cookie / canary-by-header).');
             },
 
             generateHashLBVirtualServer: function(a, f, ctx) {
                 ctx.use('upstream-hash-by', 'upstream-hash-by-subset', 'upstream-hash-by-subset-size');
                 let by = String(a['upstream-hash-by'] || '').trim();
                 if (!by) return;
-                if (truthy(a['upstream-hash-by-subset'])) ctx.note('upstream-hash-by-subset', 'NIC has no subset hashing; the whole upstream is hashed consistently.');
-                if (a['upstream-hash-by-subset-size']) ctx.note('upstream-hash-by-subset-size', 'No NIC equivalent (subset hashing is community-only).');
+                if (truthy(a['upstream-hash-by-subset'])) ctx.note('upstream-hash-by-subset', 'NGINX Ingress Controller has no subset hashing; the whole upstream is hashed consistently.');
+                if (a['upstream-hash-by-subset-size']) ctx.note('upstream-hash-by-subset-size', 'No NGINX Ingress Controller equivalent: only the community controller has subset hashing.');
                 let method = 'hash ' + braceVariables(by).replace(/^\$\{([^}]+)\}$/, '$$$1') + ' consistent';
                 f.upstream['lb-method'] = method; f.upstreamComments['lb-method'] = 'upstream-hash-by';
                 f.ann['nginx.org/lb-method'] = method; ctx.annComment('nginx.org/lb-method', 'upstream-hash-by'); ctx.annCovered('nginx.org/lb-method');
@@ -1051,7 +1051,7 @@
                 ctx.use('custom-http-errors', 'default-backend');
                 let codes = commaList(a['custom-http-errors']).map(function(c) { return parseInt(c, 10); }).filter(function(c) { return !isNaN(c); });
                 let kept = codes.filter(function(c) { return c !== 499 && c >= 300 && c <= 599; });
-                if (kept.length < codes.length) ctx.note('custom-http-errors', 'Dropped ' + codes.filter(function(c) { return kept.indexOf(c) === -1; }).join(', ') + ' — NIC accepts error pages for 300–599 only, and rejects 499.');
+                if (kept.length < codes.length) ctx.note('custom-http-errors', 'Dropped ' + codes.filter(function(c) { return kept.indexOf(c) === -1; }).join(', ') + ' — NGINX Ingress Controller accepts error pages for 300–599 only, and rejects 499.');
                 f.errorCodes = kept;
                 // A Service name or nothing: the community controller rejected
                 // anything but a DNS-1035 label, and under nic-migrate --kubectl
@@ -1064,7 +1064,7 @@
                 f.defaultBackendService = backend || null;
                 if (!kept.length) return;
                 if (ctx.strategy === 'annotation') {
-                    if (!a['default-backend'] && !ctx.hasDefaultBackend) ctx.note('custom-http-errors', 'NIC sends these errors to this Ingress\'s spec.defaultBackend and ignores the annotation without one — the community controller fell back to its global default backend. Set spec.defaultBackend to your error-page Service.', 'warning');
+                    if (!a['default-backend'] && !ctx.hasDefaultBackend) ctx.note('custom-http-errors', 'NGINX Ingress Controller sends these errors to this Ingress\'s spec.defaultBackend and ignores the annotation without one — the community controller fell back to its global default backend. Set spec.defaultBackend to your error-page Service.', 'warning');
                 } else if (a['default-backend']) {
                     ctx.note('default-backend', 'errorPages can only redirect or return a canned body, so the error pages Service ' + a['default-backend'] + ' served are replaced by a minimal body. To keep serving them from the Service, use annotation-first (nginx.org/custom-http-errors).', 'warning');
                 }
@@ -1332,11 +1332,11 @@
             // four buffers with it, and NGINX rejects a large buffer-size alone.
             if (f.upstream['buffer-size'] && !f.upstream.buffers) {
                 f.upstream.buffers = { number: 4, size: f.upstream['buffer-size'] };
-                f.upstreamComments.buffers = 'proxy-buffer-size — the community sized 4 proxy buffers with it';
+                f.upstreamComments.buffers = 'proxy-buffer-size — the community controller sized 4 proxy buffers with it';
             }
             if (f.ann['nginx.org/proxy-buffer-size'] && !f.ann['nginx.org/proxy-buffers']) {
                 f.ann['nginx.org/proxy-buffers'] = '4 ' + f.ann['nginx.org/proxy-buffer-size'];
-                ctx.annComment('nginx.org/proxy-buffers', 'proxy-buffer-size — the community sized 4 proxy buffers with it');
+                ctx.annComment('nginx.org/proxy-buffers', 'proxy-buffer-size — the community controller sized 4 proxy buffers with it');
             }
 
             // Whatever a matched entry did not consume is named, not dropped.
@@ -1420,11 +1420,11 @@
                 // Over TLS that is enough; cleartext HTTP/2 (h2c) on the default
                 // listeners follows the http2 ConfigMap key, because NGINX takes
                 // it from the port's default server.
-                f.http2 = 'backend-protocol ' + p + ' — NIC serves gRPC only with HTTP/2 on';
+                f.http2 = 'backend-protocol ' + p + ' — NGINX Ingress Controller serves gRPC only with HTTP/2 on';
                 f.ann['nginx.org/http2'] = 'true'; ctx.annComment('nginx.org/http2', f.http2); ctx.annCovered('nginx.org/http2');
                 if (model.hosts.some(function(h) { return h.tlsSecret === null || h.tlsSecret === undefined; })) {
                     f.cm.http2 = 'true'; f.cmComments.http2 = 'backend-protocol ' + p + ' — cleartext HTTP/2 on the default listeners follows this key';
-                    ctx.note(x.annotation, 'A host without TLS gets gRPC over cleartext HTTP/2 (h2c), which on NIC\'s default listeners follows the http2 ConfigMap key rather than the per-host setting; it turns HTTP/2 on for every plaintext server.');
+                    ctx.note(x.annotation, 'A host without TLS gets gRPC over cleartext HTTP/2 (h2c), which on NGINX Ingress Controller\'s default listeners follows the http2 ConfigMap key rather than the per-host setting; it turns HTTP/2 on for every plaintext server.');
                 }
             }
             if (backendProtocolNote(p)) ctx.note(x.annotation, backendProtocolNote(p));
@@ -1529,7 +1529,7 @@
                 if (h.tlsSecret !== null && h.tlsSecret !== undefined) {
                     spec.tls = {};
                     if (h.tlsSecret) spec.tls.secret = h.tlsSecret;
-                    else ctx.note('tls', 'Host ' + h.host + ' is in spec.tls without a secretName; NIC then serves it only with a -wildcard-tls-secret.', 'note');
+                    else ctx.note('tls', 'Host ' + h.host + ' is in spec.tls without a secretName; NGINX Ingress Controller then serves it only with a -wildcard-tls-secret.', 'note');
                     c['spec.tls'] = 'spec.tls';
                     // The community controller redirects when the request scheme is
                     // http: $scheme, or X-Forwarded-Proto under its global
@@ -1552,7 +1552,7 @@
                 }
                 if (f.http2) { spec.http2 = true; c['spec.http2'] = f.http2; }
                 if (policyRefs.length) { spec.policies = policyRefs.slice(); c['spec.policies'] = 'the Policies above'; }
-                if (f.policies.some(function(p) { return p.needsTls; }) && !spec.tls) ctx.note('auth-tls-secret', 'Host ' + h.host + ' does not terminate TLS, so NIC answers every request with 500 for the ingressMTLS Policy. Add TLS for it.', 'warning');
+                if (f.policies.some(function(p) { return p.needsTls; }) && !spec.tls) ctx.note('auth-tls-secret', 'Host ' + h.host + ' does not terminate TLS, so NGINX Ingress Controller answers every request with 500 for the ingressMTLS Policy. Add TLS for it.', 'warning');
                 if (f.server.length) { spec['server-snippets'] = snippetBlock(f.server); c['spec.server-snippets'] = snippetSourcesFor(f.server, ctx); }
 
                 let upstreams = [];
@@ -1729,7 +1729,7 @@
                 spec.action = { pass: dnsName(p.backend.service) };
                 docs.push({ apiVersion: NIC_API, kind: 'TransportServer', metadata: md, spec: spec });
             });
-            ctx.note('ssl-passthrough', 'TLS passthrough is off by default in NIC: install with controller.enableTLSPassthrough=true (Helm) or -enable-tls-passthrough. The built-in tls-passthrough listener needs no GlobalConfiguration. As with the community controller, every other annotation on this Ingress stops applying.', 'warning');
+            ctx.note('ssl-passthrough', 'TLS passthrough is off by default in NGINX Ingress Controller: install with controller.enableTLSPassthrough=true (Helm) or -enable-tls-passthrough. The built-in tls-passthrough listener needs no GlobalConfiguration. As with the community controller, every other annotation on this Ingress stops applying.', 'warning');
             Object.keys(model.community).forEach(function(k) { if (k !== 'ssl-passthrough') ctx.consumed[k] = true; });
             return { docs: docs, comments: docs.map(function() { return { 'spec.listener': 'ssl-passthrough' }; }), swaps: {} };
         }
@@ -1768,7 +1768,7 @@
             });
             let unsupportedPolicies = f.policies.filter(function(p) { return !p.onIngress; });
             unsupportedPolicies.forEach(function(p) {
-                ctx.note(Object.keys(p.spec)[0], 'A ' + Object.keys(p.spec)[0] + ' Policy cannot be referenced from an Ingress in NIC ' + MigrationTool.NIC.VERSION + '; switch the strategy to CRD-first to use it.', 'warning');
+                ctx.note(Object.keys(p.spec)[0], 'A ' + Object.keys(p.spec)[0] + ' Policy cannot be referenced from an Ingress in NGINX Ingress Controller ' + MigrationTool.NIC.VERSION + '; switch the strategy to CRD-first to use it.', 'warning');
             });
             let ann = {};
             let annComments = {};
@@ -1802,7 +1802,7 @@
             let tlsDefault = model.tls.length && model.community['ssl-redirect'] === undefined;
             if ((ann['nginx.org/ssl-redirect'] === 'true' || ann['nginx.org/redirect-to-https'] === 'true' || tlsDefault) && !ann['nginx.org/http-redirect-code']) {
                 ann['nginx.org/http-redirect-code'] = '308';
-                annComments['nginx.org/http-redirect-code'] = 'the community redirect code (308 keeps the method and body; NIC defaults to 301)';
+                annComments['nginx.org/http-redirect-code'] = 'the community redirect code (308 keeps the method and body; NGINX Ingress Controller defaults to 301)';
             }
             if (f.redirect) ctx.note(f.redirect.source, 'A redirect action has no Ingress annotation; switch the strategy to CRD-first, which emits a VirtualServer redirect.', 'warning');
             if (f.canary) ctx.note('canary', 'Traffic splitting has no Ingress annotation; switch the strategy to CRD-first, which emits VirtualServer splits and matches.', 'warning');
@@ -1859,10 +1859,10 @@
                     spec.defaultBackend = { service: { name: f.defaultBackendService, port: { number: 80 } } };
                     ctx.todo('spec.defaultBackend.service.port', 'the port of Service ' + f.defaultBackendService + ' (the community controller used its first port)');
                 } else if (spec.defaultBackend.service && spec.defaultBackend.service.name !== f.defaultBackendService) {
-                    ctx.note('default-backend', 'default-backend names Service ' + f.defaultBackendService + ' but spec.defaultBackend is already ' + spec.defaultBackend.service.name + ' — NIC sends custom-http-errors there.', 'warning');
+                    ctx.note('default-backend', 'default-backend names Service ' + f.defaultBackendService + ' but spec.defaultBackend is already ' + spec.defaultBackend.service.name + ' — NGINX Ingress Controller sends custom-http-errors there.', 'warning');
                 }
             } else if (f.defaultBackendService) {
-                ctx.note('default-backend', 'Service ' + f.defaultBackendService + ' was the community fallback for a Service with no ready endpoints; NIC has no such fallback (on NGINX Plus, a VirtualServer upstreams[].backup is the closest). spec.defaultBackend is not the same thing, so it is not set.');
+                ctx.note('default-backend', 'Service ' + f.defaultBackendService + ' was the community fallback for a Service with no ready endpoints; NGINX Ingress Controller has no such fallback (on NGINX Plus, a VirtualServer upstreams[].backup is the closest). spec.defaultBackend is not the same thing, so it is not set.');
             }
             let md = { name: dnsName((model.name || 'my-app') + (options.nameSuffix || '')) };
             if (model.namespace) md.namespace = model.namespace;
@@ -1874,7 +1874,7 @@
             if (Object.keys(spec).length) ing.spec = spec;
             let c = {};
             Object.keys(annComments).forEach(function(k) { if (annComments[k]) c['metadata.annotations.' + k] = annComments[k]; });
-            if (cls && cls !== model.ingressClassName) c['spec.ingressClassName'] = 'the NIC IngressClass';
+            if (cls && cls !== model.ingressClassName) c['spec.ingressClassName'] = 'the NGINX Ingress Controller IngressClass';
             docs.push(ing);
             comments.push(c);
             return { docs: docs, comments: comments, swaps: ann };
@@ -2090,7 +2090,7 @@
                 let ann = (r.doc.metadata && r.doc.metadata.annotations) || {};
                 return s['server-snippets'] || (s.routes || []).some(function(rt) { return rt['location-snippets']; }) || ann['nginx.org/location-snippets'] || ann['nginx.org/server-snippets'];
             });
-            if (usesSnippets) infoNotes.unshift({ code: 'snippets', message: 'This output uses snippets, which NGINX Ingress Controller rejects unless it runs with -enable-snippets (Helm: controller.enableSnippets=true). Directives from community-only modules — more_set_headers (headers-more) and Lua — do not exist in NIC and fail the reload; rewrite them with add_header / proxy_set_header.', severity: 'warning' });
+            if (usesSnippets) infoNotes.unshift({ code: 'snippets', message: 'This output uses snippets, which NGINX Ingress Controller rejects unless NGINX Ingress Controller runs with -enable-snippets (Helm: controller.enableSnippets=true). Directives from community-only modules — more_set_headers (headers-more) and Lua — do not exist in NGINX Ingress Controller and fail the reload; rewrite them with add_header / proxy_set_header.', severity: 'warning' });
 
             // Steps ------------------------------------------------------------
             let steps = [];
@@ -2348,7 +2348,7 @@
             id: 'ingress-nginx',
             strings: {
                 analyzeEmpty: { title: 'No input.', message: 'Paste a Kubernetes Ingress YAML manifest to analyze.' },
-                noFindings: { title: 'No community NGINX annotations found.', message: 'Make sure your YAML contains annotations with the nginx.ingress.kubernetes.io/ prefix.' },
+                noFindings: { title: 'No Ingress-NGINX annotations found.', message: 'Make sure your YAML contains annotations with the nginx.ingress.kubernetes.io/ prefix.' },
                 emptyStateLead: 'Paste your Ingress YAML above and click Analyze',
                 emptyStateHint: 'Drag & drop a .yaml file, or try "Load Sample" for an example',
                 pageNames: { 'getting-started': 'Getting started', analyzer: 'Config analyzer', reference: 'Reference guide' }

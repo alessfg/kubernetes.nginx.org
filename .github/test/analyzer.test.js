@@ -580,7 +580,7 @@ test('5.7: tracing keeps the community trace context, and trust-incoming-span ma
     assert.equal(cm({ 'enable-opentelemetry': 'true' })['otel-trace-context'], 'propagate');
     assert.equal(cm({ 'enable-opentelemetry': 'true', 'opentelemetry-trust-incoming-span': 'false' })['otel-trace-context'], 'inject');
     assert.equal(cm({ 'enable-opentelemetry': 'true', 'opentelemetry-trust-incoming-span': 'true' })['otel-trace-context'], 'propagate');
-    assert.match(notes(run(ingress({ 'enable-opentelemetry': 'true', 'opentelemetry-trust-incoming-span': 'false' }))), /global in NIC/);
+    assert.match(notes(run(ingress({ 'enable-opentelemetry': 'true', 'opentelemetry-trust-incoming-span': 'false' }))), /global in NGINX Ingress Controller/);
 });
 
 test('5.7: ewma becomes least_time last_byte, which NGINX Open Source has since 1.31.0', () => {
@@ -589,4 +589,38 @@ test('5.7: ewma becomes least_time last_byte, which NGINX Open Source has since 
        OSS ParseLBMethod accepts it; 5.6.3 allowed it on Plus only. */
     assert.equal(kinds(run(ingress({ 'load-balance': 'ewma' })), 'VirtualServer')[0].spec.upstreams[0]['lb-method'], 'least_time last_byte');
     assert.equal(kinds(run(ingress({ 'load-balance': 'ewma' }), 'annotation'), 'Ingress')[0].metadata.annotations['nginx.org/lb-method'], 'least_time last_byte');
+});
+
+/* ----------------------------------------------------------------- naming */
+
+test('what a reader sees names each product in full', () => {
+    /* AGENTS.md: "NGINX Ingress Controller", "Ingress-NGINX" in titles. The
+       notes and YAML comments had drifted to "NIC" in 40-odd places. Runs the
+       presets and every mapped annotation, under both strategies, and reads
+       every string the plan holds, the mapping text and the page's own copy. */
+    const BAD = /\b(NIC|NGF)\b|F5 NGINX Ingress Controller|community NGINX|behaviour/;
+    const found = new Set();
+    const walk = (o, where) => {
+        if (typeof o === 'string') { if (BAD.test(o)) found.add(where + ': ' + o.match(new RegExp('.{0,40}' + BAD.source + '.{0,20}'))[0]); return; }
+        if (o && typeof o === 'object') for (const k of Object.keys(o)) walk(o[k], where);
+    };
+    const inputs = Object.values(source.analyzer.samplePresets).map((p) => p.yaml || p);
+    for (const m of source.analyzer.mappings) {
+        walk(m.nic, 'mapping ' + m.community[0]);
+        for (const a of m.community) inputs.push(Y.stringify(ingress({ [a]: 'true', 'auth-url': 'https://auth.example.com/verify' })));
+    }
+    // Notes that need a companion annotation to fire at all.
+    inputs.push(Y.stringify(ingress({ affinity: 'cookie', 'session-cookie-change-on-failure': 'true' })));
+    // The strings the page shows around the analyzer, such as the no-findings title.
+    walk(source.strings, 'strings');
+    walk(source.analyzer.strategies, 'strategies');
+    for (const y of inputs) for (const s of ['annotation', 'crd']) walk(analyze(source, y, s).plan, 'plan');
+    const fs = require('node:fs'), path = require('node:path');
+    const { ROOT } = require('./lib/load.js');
+    for (const page of ['index.html', 'ingress-nginx-migration.html']) {
+        const html = fs.readFileSync(path.join(ROOT, page), 'utf8').replace(/<!--[\s\S]*?-->|<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>/g, '');
+        const text = html.replace(/<[^>]+>/g, ' ') + ' ' + [...html.matchAll(/(?:aria-label|title|alt)="([^"]*)"/g)].map((m) => m[1]).join(' ');
+        walk(text, page);
+    }
+    assert.deepEqual([...found], []);
 });

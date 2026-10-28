@@ -564,8 +564,9 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/denylist-source-range: "10.1.2.3"
     nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
-                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. One allow Policy — NIC applies only the allow list when a resource
-#    references allow and deny Policies, so the deny list is not a Policy.
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. One allow Policy — NGINX Ingress Controller applies only the allow
+#    list when a resource references allow and deny Policies,
+#    so the deny list is not a Policy.
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
@@ -599,8 +600,9 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/denylist-source-range: "10.1.2.3"
     nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"</code></pre></div>
-                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. One allow Policy — NIC applies only the allow list when a resource
-#    references allow and deny Policies, so the deny list is not a Policy.
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. One allow Policy — NGINX Ingress Controller applies only the allow
+#    list when a resource references allow and deny Policies,
+#    so the deny list is not a Policy.
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
@@ -917,7 +919,7 @@ spec:
     authURI: "/auth"  # auth-url (path)
     authServiceName: "default/auth-svc"  # auth-url (service)
     authSigninURI: "/login"  # auth-signin (path only — authSigninURI is relative)
-    authSigninRedirectBasePath: "/login"  # auth-signin (NIC serves this path from the auth Service)
+    authSigninRedirectBasePath: "/login"  # auth-signin (NGINX Ingress Controller serves this path from the auth Service)
     authSnippets: |  # auth-snippet + auth-method
       proxy_set_header X-Original-URI $request_uri;
       proxy_method GET;
@@ -930,7 +932,7 @@ metadata:
   annotations:
     nginx.org/policies: "my-app-external-auth"  # attaches the Policy above</code></pre></div>
                                 </div>
-                                <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>externalAuth</code> Policy CRD can be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. <code>auth-url</code> is split into <code>authURI</code> (path) and <code>authServiceName</code> (<code>&lt;namespace&gt;/&lt;service&gt;</code>). The community's <code>auth-method</code>, <code>auth-response-headers</code>, <code>auth-cache-duration</code>, <code>auth-cache-key</code>, <code>auth-proxy-set-headers</code>, <code>auth-request-redirect</code>, and <code>auth-signin-redirect-param</code> annotations have no dedicated Policy fields — express these through <code>authSnippets</code> when needed. If you are not adopting a Policy, place the same directives directly in <code>nginx.org/location-snippets</code> alongside the <code>auth_request</code> directive instead. NIC's <code>authSigninURI</code> is a <em>relative</em> URI (validated <code>^/.*$</code>): a full <code>auth-signin</code> URL is reduced to its path, and a sign-in page on a different host cannot be expressed by this field. NIC proxies sign-in requests to the auth Service from a location at <code>authSigninRedirectBasePath</code> (default <code>/oauth2</code>); never set it to <code>/</code> or to a path a route already uses, because NGINX rejects the duplicate location. The analyzer sets it to the sign-in path's parent directory, or to the path itself when that parent is <code>/</code>, as for <code>/login</code> here.</div>
+                                <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>externalAuth</code> Policy CRD can be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. <code>auth-url</code> is split into <code>authURI</code> (path) and <code>authServiceName</code> (<code>&lt;namespace&gt;/&lt;service&gt;</code>). The community's <code>auth-method</code>, <code>auth-response-headers</code>, <code>auth-cache-duration</code>, <code>auth-cache-key</code>, <code>auth-proxy-set-headers</code>, <code>auth-request-redirect</code>, and <code>auth-signin-redirect-param</code> annotations have no dedicated Policy fields — express these through <code>authSnippets</code> when needed. If you are not adopting a Policy, place the same directives directly in <code>nginx.org/location-snippets</code> alongside the <code>auth_request</code> directive instead. NGINX Ingress Controller's <code>authSigninURI</code> is a <em>relative</em> URI (validated <code>^/.*$</code>): a full <code>auth-signin</code> URL is reduced to its path, and a sign-in page on a different host cannot be expressed by this field. NGINX Ingress Controller proxies sign-in requests to the auth Service from a location at <code>authSigninRedirectBasePath</code> (default <code>/oauth2</code>); never set it to <code>/</code> or to a path a route already uses, because NGINX rejects the duplicate location. The analyzer sets it to the sign-in path's parent directory, or to the path itself when that parent is <code>/</code>, as for <code>/login</code> here.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
                                 <div class="comparison">
@@ -954,7 +956,7 @@ spec:
     authURI: "/auth"  # auth-url (path)
     authServiceName: "default/auth-svc"  # auth-url (service)
     authSigninURI: "/login"  # auth-signin (path only — authSigninURI is relative)
-    authSigninRedirectBasePath: "/login"  # auth-signin (NIC serves this path from the auth Service)
+    authSigninRedirectBasePath: "/login"  # auth-signin (NGINX Ingress Controller serves this path from the auth Service)
     authSnippets: |  # auth-snippet + auth-method
       proxy_set_header X-Original-URI $request_uri;
       proxy_method GET;
@@ -1289,7 +1291,7 @@ spec:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller sizes its 4 proxy buffers with <code>proxy-buffer-size</code> too. NIC does not, and NGINX rejects a buffer size larger than its default buffers allow, so the migration also sets the buffers.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller sizes its 4 proxy buffers with <code>proxy-buffer-size</code> too. NGINX Ingress Controller does not, and NGINX rejects a buffer size larger than its default buffers allow, so the migration also sets the buffers.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-buffering</code></td>
@@ -1341,7 +1343,7 @@ spec:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/proxy-buffering</code> takes <code>true</code> or <code>false</code>. NIC rejects the Ingress for <code>on</code> or <code>off</code>, the values the community controller uses.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/proxy-buffering</code> takes <code>true</code> or <code>false</code>. NGINX Ingress Controller rejects the Ingress for <code>on</code> or <code>off</code>, the values the community controller uses.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-buffers-number</code></td>
@@ -2066,8 +2068,8 @@ spec:
                                 </div>
                             </div>
                             <div class="info-box tip"><strong>Recommended: Annotation Approach.</strong> This is the one construct in this guide where the annotation is preferred over the CRD. <code>nginx.org/custom-http-errors</code> serves error pages from a Service, as the community controller does, while VirtualServer <code>errorPages</code> can only <code>return</code> a canned response or <code>redirect</code> to a URL. Under CRD-first the analyzer emits <code>errorPages</code> and warns that annotation-first, which keeps the annotation, suits this Ingress better.</div>
-                            <div class="info-box warning"><strong>Not identical to the community controller:</strong> NIC sends intercepted errors only to the Ingress's own <code>spec.defaultBackend</code>, which must be in the same namespace, and none of the community's <code>X-Code</code>, <code>X-Format</code>, or <code>X-Original-URI</code> headers reach it — error pages that branch on them need rework. Clients receive the original upstream status. On its own, <code>default-backend</code> has no annotation equivalent for its fallback when a Service has no ready endpoints; on NGINX Plus, VirtualServer <code>upstreams[].backup</code> is the closest match.</div>
-                            <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/custom-http-errors</code> intercepts upstream responses with the listed status codes and serves them from the Ingress's <code>spec.defaultBackend</code>. It takes codes from 300 to 599 plus the <code>4xx</code> and <code>5xx</code> shorthands. NIC rejects the Ingress for an invalid code, including 499, which NGINX refuses in <code>error_page</code>. Without a <code>spec.defaultBackend</code> the annotation does nothing. The <code>default-backend</code> annotation names only a Service, so set the port in <code>spec.defaultBackend</code> to the one that Service serves on; the community controller used its first port.</div>
+                            <div class="info-box warning"><strong>Not identical to the community controller:</strong> NGINX Ingress Controller sends intercepted errors only to the Ingress's own <code>spec.defaultBackend</code>, which must be in the same namespace, and none of the community's <code>X-Code</code>, <code>X-Format</code>, or <code>X-Original-URI</code> headers reach it — error pages that branch on them need rework. Clients receive the original upstream status. On its own, <code>default-backend</code> has no annotation equivalent for its fallback when a Service has no ready endpoints; on NGINX Plus, VirtualServer <code>upstreams[].backup</code> is the closest match.</div>
+                            <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/custom-http-errors</code> intercepts upstream responses with the listed status codes and serves them from the Ingress's <code>spec.defaultBackend</code>. It takes codes from 300 to 599 plus the <code>4xx</code> and <code>5xx</code> shorthands. NGINX Ingress Controller rejects the Ingress for an invalid code, including 499, which NGINX refuses in <code>error_page</code>. Without a <code>spec.defaultBackend</code> the annotation does nothing. The <code>default-backend</code> annotation names only a Service, so set the port in <code>spec.defaultBackend</code> to the one that Service serves on; the community controller used its first port.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2128,7 +2130,7 @@ spec:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> NIC sets the <code>Connection</code> header itself, from upstream keepalive: empty when keepalive is on, <code>close</code> when it is off. So <code>keep-alive</code> becomes keepalive on (320 connections, the community default) and <code>close</code> becomes <code>0</code>. Setting the header directly, with a snippet or <code>requestHeaders</code>, sends both values to the backend.</div>
+                            <div class="info-box note"><strong>Note:</strong> NGINX Ingress Controller sets the <code>Connection</code> header itself, from upstream keepalive: empty when keepalive is on, <code>close</code> when it is off. So <code>keep-alive</code> becomes keepalive on (320 connections, the community default) and <code>close</code> becomes <code>0</code>. Setting the header directly, with a snippet or <code>requestHeaders</code>, sends both values to the backend.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/custom-headers</code></td>
@@ -2249,8 +2251,8 @@ spec:
                 value: "/api"  # x-forwarded-prefix</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box warning"><strong>Literal values only on the annotation path:</strong> <code>nginx.org/upstream-vhost</code> accepts a lowercase hostname with no port and no NGINX variables, and <code>nginx.org/proxy-set-headers</code> rejects <code>$</code> in a value. NIC rejects the whole Ingress otherwise. For a port or a variable, use the CRD approach, which writes variables in braces (<code>${host}</code>). A capture group such as <code>$1</code> in <code>x-forwarded-prefix</code> has no equivalent in either.</div>
-                            <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/upstream-vhost</code> sets the <code>Host</code> header sent upstream (<code>grpc_set_header</code> for gRPC Services); minion Ingresses inherit it from their master. Don't also set <code>Host</code> in <code>nginx.org/proxy-set-headers</code>: that writes a second directive and NIC warns on the Ingress.</div>
+                            <div class="info-box warning"><strong>Literal values only on the annotation path:</strong> <code>nginx.org/upstream-vhost</code> accepts a lowercase hostname with no port and no NGINX variables, and <code>nginx.org/proxy-set-headers</code> rejects <code>$</code> in a value. NGINX Ingress Controller rejects the whole Ingress otherwise. For a port or a variable, use the CRD approach, which writes variables in braces (<code>${host}</code>). A capture group such as <code>$1</code> in <code>x-forwarded-prefix</code> has no equivalent in either.</div>
+                            <div class="info-box note"><strong>New in v5.6.0:</strong> <code>nginx.org/upstream-vhost</code> sets the <code>Host</code> header sent upstream (<code>grpc_set_header</code> for gRPC Services); minion Ingresses inherit it from their master. Don't also set <code>Host</code> in <code>nginx.org/proxy-set-headers</code>: that writes a second directive and NGINX Ingress Controller warns on the Ingress.</div>
                         </div></td></tr>
                         <tr class="expandable"><td>No direct equivalent</td><td><code>nginx.org/add-header</code> <span class="badge badge-new">New v5.5.0</span><br><code>nginx.org/add-header-inherit</code> <span class="badge badge-new">New v5.5.0</span></td></tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -2289,7 +2291,7 @@ metadata:
   annotations:
     nginx.org/proxy-set-headers: "X-Custom-Header: my-value, X-Request-Source"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/proxy-set-headers</code> takes a comma-separated list of headers inline, each written <code>Name: value</code>. A name without a value forwards the client's own header of that name (<code>X-Request-Source</code> above sends <code>$http_x_request_source</code>). Values are literal: NIC rejects the Ingress for a <code>$</code>, a newline, or an unescaped quote in one. Set the upstream <code>Host</code> with <code>nginx.org/upstream-vhost</code> instead.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/proxy-set-headers</code> takes a comma-separated list of headers inline, each written <code>Name: value</code>. A name without a value forwards the client's own header of that name (<code>X-Request-Source</code> above sends <code>$http_x_request_source</code>). Values are literal: NGINX Ingress Controller rejects the Ingress for a <code>$</code>, a newline, or an unescaped quote in one. Set the upstream <code>Host</code> with <code>nginx.org/upstream-vhost</code> instead.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2374,7 +2376,7 @@ spec:
                                 </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> The community controller sets HSTS only controller-wide, through its ConfigMap. NGINX Ingress Controller sets it per resource. The <code>nginx.org/hsts</code> annotation always adds the <code>preload</code> directive, so the community <code>hsts-preload</code> key has no separate annotation.</div>
-                            <div class="info-box note"><strong>New in v5.6.0:</strong> The <code>hsts</code> Policy CRD adds <code>preload</code> only when asked, which needs <code>includeSubDomains: true</code> and a <code>maxAge</code> of at least 31536000. Reference it from a VirtualServer's <code>spec.policies</code>; NIC returns a 500 for an <code>hsts</code> Policy on a route, a VirtualServerRoute, or an Ingress. It needs TLS on the VirtualServer, or <code>behindProxy: true</code> when TLS terminates upstream.</div>
+                            <div class="info-box note"><strong>New in v5.6.0:</strong> The <code>hsts</code> Policy CRD adds <code>preload</code> only when asked, which needs <code>includeSubDomains: true</code> and a <code>maxAge</code> of at least 31536000. Reference it from a VirtualServer's <code>spec.policies</code>; NGINX Ingress Controller returns a 500 for an <code>hsts</code> Policy on a route, a VirtualServerRoute, or an Ingress. It needs TLS on the VirtualServer, or <code>behindProxy: true</code> when TLS terminates upstream.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -2393,7 +2395,7 @@ metadata:
     nginx.org/hsts: "true"
     nginx.org/hsts-behind-proxy: "true"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/hsts-behind-proxy</code> controls whether HSTS headers are added when NGINX sits behind a proxy or load balancer. When <code>true</code>, HSTS headers are added regardless of the connection protocol. This is an NIC-only feature with no community controller equivalent.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/hsts-behind-proxy</code> controls whether HSTS headers are added when NGINX sits behind a proxy or load balancer. When <code>true</code>, HSTS headers are added regardless of the connection protocol. Only NGINX Ingress Controller has it; the community controller has no equivalent.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2623,7 +2625,7 @@ metadata:
 data:
   access-log-off: "true"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community <code>enable-access-log</code> annotation is <em>per-Ingress</em> (disable access logging for a single Ingress), but NIC's <code>access-log-off</code> is a <strong>global</strong> ConfigMap key applied to the whole controller — there is no per-Ingress equivalent.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community <code>enable-access-log</code> annotation is <em>per-Ingress</em> (disable access logging for a single Ingress), but NGINX Ingress Controller's <code>access-log-off</code> is a <strong>global</strong> ConfigMap key applied to the whole controller — there is no per-Ingress equivalent.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/enable-rewrite-log</code></td>
@@ -3105,9 +3107,9 @@ metadata:
   name: nginx-config
 data:
   otel-trace-in-http: "true"  # enable-opentelemetry
-  otel-exporter-endpoint: "otel-collector:4317"  # TODO: your collector — NIC turns tracing off without it (the community read otlp-collector-host, port 4317)
+  otel-exporter-endpoint: "otel-collector:4317"  # TODO: your collector — NGINX Ingress Controller keeps tracing off without it (the community controller read otlp-collector-host, port 4317)
   otel-service-name: "nginx"  # the community default service name
-  otel-trace-context: "propagate"  # the community controller propagated trace context (NIC defaults to ignore)</code></pre></div>
+  otel-trace-context: "propagate"  # the community controller propagated trace context (NGINX Ingress Controller defaults to ignore)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> <code>otel-trace-in-http</code> is the direct replacement for <code>enable-opentelemetry</code>, but only with <code>otel-exporter-endpoint</code> set: without it, NGINX Ingress Controller reports the ConfigMap invalid and leaves tracing off. <code>otel-service-name</code> keeps the community controller's <code>nginx</code>; without it, NGINX reports <code>unknown_service:nginx</code>. <code>otel-exporter-header-name</code> and <code>otel-exporter-header-value</code> are optional. The community controller continued an incoming trace and passed it on; <code>otel-trace-context: propagate</code> keeps that, where NGINX Ingress Controller would otherwise ignore the trace headers. Unlike the community annotation, this enables tracing globally — not per-Ingress — and there is no per-Ingress opt-out.</div>
                         </div></td></tr>
@@ -3131,7 +3133,7 @@ metadata:
   name: nginx-config
 data:
   otel-trace-in-http: "true"  # enable-opentelemetry
-  otel-exporter-endpoint: "otel-collector:4317"  # TODO: your collector — NIC turns tracing off without it (the community read otlp-collector-host, port 4317)
+  otel-exporter-endpoint: "otel-collector:4317"  # TODO: your collector — NGINX Ingress Controller keeps tracing off without it (the community controller read otlp-collector-host, port 4317)
   otel-service-name: "nginx"  # the community default service name
   otel-trace-context: "inject"  # opentelemetry-trust-incoming-span: false — a new trace, passed on</code></pre></div>
                             </div>
@@ -3156,7 +3158,7 @@ data:
   otel-exporter-header-value: "Bearer token"  # optional: auth header value
   otel-service-name: "my-app"  # optional: service name for traces</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> These ConfigMap keys are NIC-only and configure the OpenTelemetry exporter. <code>otel-exporter-endpoint</code> is required when tracing is enabled. <code>otel-service-name</code> sets the service name in traces; without it, NGINX reports <code>unknown_service:nginx</code>. <code>otel-exporter-header-name</code> and <code>otel-exporter-header-value</code> add custom headers to exporter requests (e.g., for authentication).</div>
+                            <div class="info-box note"><strong>Note:</strong> These ConfigMap keys exist only in NGINX Ingress Controller and configure the OpenTelemetry exporter. <code>otel-exporter-endpoint</code> is required when tracing is enabled. <code>otel-service-name</code> sets the service name in traces; without it, NGINX reports <code>unknown_service:nginx</code>. <code>otel-exporter-header-name</code> and <code>otel-exporter-header-value</code> add custom headers to exporter requests (e.g., for authentication).</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -3516,7 +3518,7 @@ metadata:
     nginx.org/limit-req-dry-run: "false"
     nginx.org/limit-req-scale: "true"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> These NIC-only annotations provide fine-grained rate limiting control. <code>limit-req-key</code> customizes the rate limiting key (default: <code>${binary_remote_addr}</code>). <code>limit-req-scale</code> divides the rate by pod count for consistency during autoscaling. <code>limit-req-reject-code</code> sets the response code for rejected requests (default: 429). <code>limit-req-dry-run</code> enables logging without enforcing limits.</div>
+                            <div class="info-box note"><strong>Note:</strong> These annotations, which only NGINX Ingress Controller has, provide fine-grained rate limiting control. <code>limit-req-key</code> customizes the rate limiting key (default: <code>${binary_remote_addr}</code>). <code>limit-req-scale</code> divides the rate by pod count for consistency during autoscaling. <code>limit-req-reject-code</code> sets the response code for rejected requests (default: 429). <code>limit-req-dry-run</code> enables logging without enforcing limits.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -3802,7 +3804,7 @@ metadata:
   annotations:
     nginx.org/rewrites: "serviceName=tea-svc rewrite=/;serviceName=coffee-svc rewrite=/beans"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/rewrites</code> enables per-service URL rewriting within a single Ingress resource. Each semicolon-separated entry specifies a service name and its rewrite path. This is an NIC-only feature with no community controller equivalent.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>nginx.org/rewrites</code> enables per-service URL rewriting within a single Ingress resource. Each semicolon-separated entry specifies a service name and its rewrite path. Only NGINX Ingress Controller has it; the community controller has no equivalent.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4289,7 +4291,7 @@ metadata:
   name: my-app
   annotations:
     nginx.org/ssl-redirect: "true"  # ssl-redirect
-    nginx.org/http-redirect-code: "308"  # the community redirect code (308 keeps the method and body; NIC defaults to 301)
+    nginx.org/http-redirect-code: "308"  # the community redirect code (308 keeps the method and body; NGINX Ingress Controller defaults to 301)
 spec:
   tls:
     - hosts:
@@ -5009,7 +5011,7 @@ spec:
   appprotect.f5.com/app-protect-security-log: "default/log-config"
   appprotect.f5.com/app-protect-security-log-destination: "syslog:server=syslog:514"
   appprotect.f5.com/app-protect-security-log-enable: "True"</code></pre>
-                                <div class="info-box note"><strong>Note:</strong> The <code>appprotect.f5.com/</code> annotations enable F5 WAF for NGINX directly on the Ingress without a Policy CRD. The Policy + Ingress approach (v5.5.0+) is recommended for new deployments as it provides reusability and a more consistent configuration model with other NIC Policies.</div>
+                                <div class="info-box note"><strong>Note:</strong> The <code>appprotect.f5.com/</code> annotations enable F5 WAF for NGINX directly on the Ingress without a Policy CRD. The Policy + Ingress approach (v5.5.0+) is recommended for new deployments as it provides reusability and a more consistent configuration model with the other NGINX Ingress Controller Policies.</div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> F5 WAF for NGINX provides enterprise WAF capabilities beyond ModSecurity. The Policy CRD approach allows WAF policies to be shared across multiple Ingress / VirtualServer resources. For community ModSecurity annotations, see the <a href="#modsecurity">ModSecurity / WAF</a> section in OSS Mappings. WAF IP Intelligence (threat-feed-based blocking) can also be enabled in v5.5.0 via the <code>-enable-app-protect-ip-intelligence</code> controller flag (or the <code>controller.appprotect.ipIntelligence.enable</code> Helm value) and configured inside the APPolicy resource.</div>
                             <div class="info-box note"><strong>New in v5.6.0:</strong> The <code>waf</code> Policy can fetch compiled bundles itself: <code>apBundleSource</code> for the policy and <code>apLogBundleSource</code> for each security log, from an HTTPS URL, F5 NGINX Instance Manager, or F5 NGINX One Console, optionally polling for updates. Use one of <code>apPolicy</code>, <code>apBundle</code>, or <code>apBundleSource</code>.</div>
@@ -5818,8 +5820,8 @@ metadata:
 data:
   no-auth-locations: "/.well-known/acme-challenge"  # the community default</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No ConfigMap key. cert-manager creates this
-# solver Ingress itself; NIC 5.7.0 and later
-# exempts it from authentication.
+# solver Ingress itself, and NGINX Ingress Controller
+# v5.7.0 and later exempts it from authentication.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -5854,8 +5856,8 @@ metadata:
 data:
   no-tls-redirect-locations: "/.well-known/acme-challenge"  # the community default</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No ConfigMap key. cert-manager creates this
-# solver Ingress itself; NIC 5.7.0 and later
-# exempts it from the HTTPS redirect.
+# solver Ingress itself, and NGINX Ingress Controller
+# v5.7.0 and later exempts it from the HTTPS redirect.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -6262,7 +6264,7 @@ metadata:
   name: nginx-config
 data:
   otel-trace-in-http: "true"  # enable-opentelemetry
-  otel-exporter-endpoint: "otel-collector:4317"  # required: your collector (the community read otlp-collector-host, port 4317)</code></pre></div>
+  otel-exporter-endpoint: "otel-collector:4317"  # required: your collector (the community controller read otlp-collector-host, port 4317)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> <code>otel-trace-in-http</code> needs <code>otel-exporter-endpoint</code>: without it, NGINX Ingress Controller reports the ConfigMap invalid and leaves tracing off.</div>
                         </div></td></tr>
@@ -6294,7 +6296,7 @@ data:
 
             <!-- Snippet-Based Keys -->
             <h3 id="configmap-snippets-required">Snippet-based keys</h3>
-            <p>These community ConfigMap keys have no direct equivalent in NGINX Ingress Controller. Use <code>main-snippets</code>, <code>http-snippets</code>, or <code>server-snippets</code> in the NIC ConfigMap to inject the equivalent NGINX directives.</p>
+            <p>These community ConfigMap keys have no direct equivalent in NGINX Ingress Controller. Use <code>main-snippets</code>, <code>http-snippets</code>, or <code>server-snippets</code> in the NGINX Ingress Controller ConfigMap to inject the equivalent NGINX directives.</p>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="configmap-snippets-required"><thead><tr><th scope="col">Ingress-NGINX</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>

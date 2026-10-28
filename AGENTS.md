@@ -97,7 +97,7 @@ Commit bodies are the record of what was tried and rejected: run `git log --grep
 
 - **British** in agent-facing prose and comments (`colour`), including `tokens.css` comments; **American** in page copy; `color` in CSS regardless. Normalising this is out of scope.
 - Prefixes: community `nginx.ingress.kubernetes.io/`; NIC `nginx.org/` (OSS) or `nginx.com/` (Plus). NIC CRDs: VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration. Only NIC has NGINX Plus features (JWT, OIDC, WAF).
-- **"NGINX Ingress Controller"** — never "F5 NGINX Ingress Controller" (an open source project takes no F5 prefix), "Official NGINX Ingress Controller" or "NGINX Inc.". The other one is "Ingress-NGINX" in titles and headers, "the community controller" or `kubernetes/ingress-nginx` in prose; the tool is the "NGINX Ingress Migration Tool". NGINX Gateway Fabric is the NGINX implementation of the Gateway API.
+- **"NGINX Ingress Controller"** — never "F5 NGINX Ingress Controller" (an open source project takes no F5 prefix), "Official NGINX Ingress Controller" or "NGINX Inc.". The other one is "Ingress-NGINX" in titles and headers, "the community controller" or `kubernetes/ingress-nginx` in prose; the tool is the "NGINX Ingress Migration Tool". NGINX Gateway Fabric is the NGINX implementation of the Gateway API. Page copy and analyzer output never shorten these to NIC or NGF (a test checks), and a sentence about what a controller does names it: not "it reads", "the default is" or "the community", since both controllers are always in play.
 
 ## Deeper references
 

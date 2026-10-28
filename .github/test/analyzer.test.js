@@ -257,18 +257,41 @@ test('B8: snippets carry the enable-snippets warning, and headers-more is called
     assert.match(notes(r), /more_set_headers[^\n]*unknown directive/);
 });
 
-test('B9: the CA secret type NIC requires is stated', () => {
-    assert.match(notes(run(ingress({ 'auth-tls-secret': 'ns/ca' }))), /nginx\.org\/ca/);
+test('B9: what NIC reads from each community Secret is stated', () => {
+    /* NIC 5.7.0 validates a Secret by its role's keys, not its type (5.6.3
+       required nginx.org/ca and nginx.org/htpasswd): the CA Secret works as it
+       is, and basic auth needs its key renamed from auth to htpasswd. */
+    const mtls = notes(run(ingress({ 'auth-tls-secret': 'ns/ca' })));
+    assert.match(mtls, /ca\.crt key[^\n]*same Secret works as it is/);
+    assert.doesNotMatch(mtls, /nginx\.org\/ca/);
+    assert.match(notes(run(ingress({ 'auth-type': 'basic', 'auth-secret': 's' }))), /key named htpasswd[^\n]*key named auth/);
+});
+
+test('5.7: backend mTLS reads its CA from the community proxy-ssl-secret, with no TODO', () => {
+    const r = run(ingress({ 'proxy-ssl-secret': 'ns/backend-certs', 'proxy-ssl-verify': 'on' }));
+    const e = kinds(r, 'Policy')[0].spec.egressMTLS;
+    assert.deepEqual([e.tlsSecret, e.trustedCertSecret], ['backend-certs', 'backend-certs']);
+    assert.doesNotMatch(notes(r), /TODO spec\.egressMTLS/);
 });
 
 test('B10: GRPCS gets TLS, the gRPC type and HTTP/2, in both strategies', () => {
+    /* NIC 5.7.0 turns HTTP/2 on per host (spec.http2, nginx.org/http2), so a
+       TLS host needs no global http2 key; 5.6.3 had only that key. */
     const r = run(ingress({ 'backend-protocol': 'GRPCS' }));
-    const u = kinds(r, 'VirtualServer')[0].spec.upstreams[0];
-    assert.deepEqual([u.type, u.tls], ['grpc', { enable: true }]);
-    assert.equal(kinds(r, 'ConfigMap')[0].data.http2, 'true');
+    const vs = kinds(r, 'VirtualServer')[0];
+    assert.deepEqual([vs.spec.upstreams[0].type, vs.spec.upstreams[0].tls, vs.spec.http2], ['grpc', { enable: true }, true]);
+    assert.equal(kinds(r, 'ConfigMap').length, 0, 'a TLS host needs no global http2 key');
     const ann = run(ingress({ 'backend-protocol': 'GRPCS' }), 'annotation').docs.find((d) => d.kind === 'Ingress').metadata.annotations;
     assert.equal(ann['nginx.org/grpc-services'], 'web');
     assert.equal(ann['nginx.org/ssl-services'], 'web');
+    assert.equal(ann['nginx.org/http2'], 'true');
+    // Cleartext gRPC (h2c) on the default listeners follows the ConfigMap key.
+    const plain = ingress({ 'backend-protocol': 'GRPC' });
+    delete plain.spec.tls;
+    const p = run(plain);
+    assert.equal(kinds(p, 'VirtualServer')[0].spec.http2, true);
+    assert.equal(kinds(p, 'ConfigMap')[0].data.http2, 'true');
+    assert.match(notes(p), /h2c/);
 });
 
 test('B11: TLS passthrough is a TransportServer under both strategies, with the flag named', () => {
@@ -382,7 +405,7 @@ test('C8: the simple sample is not labelled advanced under CRD-first', () => {
 });
 
 test('generated resources pass the checks NIC applies at admission', () => {
-    /* A static subset of NIC v5.6.3's validation: one of action/splits per
+    /* A static subset of NIC's validation (v5.6.3, unchanged at v5.7.0): one of action/splits per
        route, split weights summing to 100, Service-name upstreams, valid
        redirect codes and error-page ranges. */
     const all = ['simple', 'moderate', 'advanced'].flatMap((p) => ['crd', 'annotation'].map((s) => run(source.analyzer.samplePresets[p], s)));
@@ -450,8 +473,8 @@ test('custom-headers marks its placeholder and keeps more_set_headers\' every-st
 });
 
 test('advice that needs NGINX Plus says so', () => {
-    /* ExternalName backends and resolver-addresses are Plus-only in v5.6.3
-       (controller.go getEndpointsForIngressBackend, configmaps.go). */
+    /* ExternalName backends and resolver-addresses are Plus-only in v5.6.3 and
+       v5.7.0 (controller.go getEndpointsForIngressBackend, configmaps.go). */
     assert.match(notes(run(ingress({ 'auth-url': 'https://auth.example.com/verify' }))), /ExternalName Service in front of auth\.example\.com works only on NGINX Plus/);
     assert.match(notes(run(ingress({ 'mirror-target': 'http://mirror.example.com$request_uri' }))), /add a resolver line .*On NGINX Plus, the resolver-addresses/);
 });
@@ -534,4 +557,36 @@ test('the analyzer view keeps its four promises for every annotation and sample'
         }
     }
     assert.deepEqual(broken, [], 'a promise of the analyzer view broke');
+});
+
+/* NIC 5.7.0: constructs that moved from "no equivalent" or a snippet to a
+   native field, each checked against the v5.7.0 tag. */
+
+test('5.7: proxy-http-version is the native annotation and upstream field, not a snippet', () => {
+    /* 5.6.3 rendered proxy_http_version 1.1 itself, so the snippet duplicated
+       it and failed the reload; 5.7.0 renders it only when set. */
+    const crd = run(ingress({ 'proxy-http-version': '1.0' }));
+    assert.equal(kinds(crd, 'VirtualServer')[0].spec.upstreams[0]['proxy-http-version'], '1.0');
+    assert.doesNotMatch(crd.text, /proxy_http_version/);
+    const ann = run(ingress({ 'proxy-http-version': '1.0' }), 'annotation');
+    assert.equal(kinds(ann, 'Ingress')[0].metadata.annotations['nginx.org/proxy-http-version'], '1.0');
+    assert.doesNotMatch(ann.text, /snippets/);
+});
+
+test('5.7: tracing keeps the community trace context, and trust-incoming-span maps to otel-trace-context', () => {
+    /* The community controller emitted opentelemetry_propagate on every traced
+       location; NIC 5.7.0's otel-trace-context defaults to ignore. */
+    const cm = (ann) => kinds(run(ingress(ann)), 'ConfigMap')[0].data;
+    assert.equal(cm({ 'enable-opentelemetry': 'true' })['otel-trace-context'], 'propagate');
+    assert.equal(cm({ 'enable-opentelemetry': 'true', 'opentelemetry-trust-incoming-span': 'false' })['otel-trace-context'], 'inject');
+    assert.equal(cm({ 'enable-opentelemetry': 'true', 'opentelemetry-trust-incoming-span': 'true' })['otel-trace-context'], 'propagate');
+    assert.match(notes(run(ingress({ 'enable-opentelemetry': 'true', 'opentelemetry-trust-incoming-span': 'false' }))), /global in NIC/);
+});
+
+test('5.7: ewma becomes least_time last_byte, which NGINX Open Source has since 1.31.0', () => {
+    /* ewma.lua picks by a decayed average of connect plus response time;
+       least_time last_byte by average time to the full response. NIC 5.7.0's
+       OSS ParseLBMethod accepts it; 5.6.3 allowed it on Plus only. */
+    assert.equal(kinds(run(ingress({ 'load-balance': 'ewma' })), 'VirtualServer')[0].spec.upstreams[0]['lb-method'], 'least_time last_byte');
+    assert.equal(kinds(run(ingress({ 'load-balance': 'ewma' }), 'annotation'), 'Ingress')[0].metadata.annotations['nginx.org/lb-method'], 'least_time last_byte');
 });

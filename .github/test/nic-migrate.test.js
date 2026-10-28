@@ -273,13 +273,13 @@ test('upstream settings become one VirtualServer under CRD-first, in the CLI too
         assert.equal(u['read-timeout'], '120s');
         assert.equal(u['client-max-body-size'], '8m');
         assert.equal(u.buffering, true);
-        assert.equal(u['lb-method'], 'least_conn');
+        assert.equal(u['lb-method'], 'least_time last_byte');   // ewma: latency-based, OSS since NIC 5.7.0
         assert.equal(u.keepalive, 0);
     }
 });
 
 test('annotation values NIC would reject are converted, not passed through', () => {
-    /* Each of these was emitted verbatim before, and NIC v5.6.3 rejects the
+    /* Each of these was emitted verbatim before, and NIC (v5.6.3, v5.7.0) rejects the
        whole Ingress for it: proxy-buffering takes a bool, sizes take no b
        suffix, and chash is not an lb-method. */
     const a = engine.analyze(ing(['proxy-buffering: "off"', 'proxy-body-size: 1048576b', 'load-balance: chash'], ONE_RULE), 'annotation');

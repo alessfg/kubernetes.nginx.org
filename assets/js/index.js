@@ -17,8 +17,8 @@
 
         /* ── Auto-Fetch Versions ── */
         let VERSION_CONFIG = {
-            nic: { repo: 'nginx/kubernetes-ingress',        chartPath: 'charts/nginx-ingress',        fallback: { release: 'v5.6.3', helm: 'v2.7.3' } },
-            ngf: { repo: 'nginx/nginx-gateway-fabric',      chartPath: 'charts/nginx-gateway-fabric', fallback: { release: 'v2.7.2', helm: 'v2.7.2' } },
+            nic: { repo: 'nginx/kubernetes-ingress',        chartPath: 'charts/nginx-ingress',        fallback: { release: 'v5.7.0', helm: 'v2.8.0' } },
+            ngf: { repo: 'nginx/nginx-gateway-fabric',      chartPath: 'charts/nginx-gateway-fabric', fallback: { release: 'v2.8.0', helm: 'v2.8.0' } },
             i2g: { repo: 'kubernetes-sigs/ingress2gateway',  fallback: { release: 'v1.2.0' } }
         };
         // Bump the cache key suffix when VERSION_CONFIG shape or applyVersions logic changes

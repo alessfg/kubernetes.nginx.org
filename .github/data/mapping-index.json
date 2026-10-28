@@ -382,9 +382,9 @@
    "category": "Proxy settings",
    "anchor": "proxy-settings",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "snippetWrap"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "direct"
   },
   {
    "community": [
@@ -414,9 +414,9 @@
    ],
    "category": "OpenTelemetry",
    "anchor": "opentelemetry",
-   "type": "unsupported",
+   "type": "configmap",
    "crdKind": null,
-   "templateFn": null,
+   "templateFn": "generateOtelConfigMap",
    "transform": null
   },
   {

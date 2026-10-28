@@ -34,17 +34,17 @@
             { community: ["auth-realm", "auth-secret", "auth-secret-type", "auth-type"], nic: "Annotation nginx.org/basic-auth-secret, nginx.org/basic-auth-realm or Policy CRD basicAuth", type: "policy", category: "Authentication (basic)", anchor: "authentication-basic", section: "oss", dualApproach: true, plusRequired: false,
               nicMapping: { annotations: { "auth-secret": { key: "nginx.org/basic-auth-secret", transform: "direct" }, "auth-realm": { key: "nginx.org/basic-auth-realm", transform: "direct" } }, crdKind: "Policy", crdInstall: true, templateFn: "generateBasicAuthPolicy" } },
             // Buffering
-            { community: ["client-body-buffer-size"], nic: "nginx.org/client-body-buffer-size — or — VirtualServer CRD upstreams[].client-body-buffer-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["client-body-buffer-size"], nic: "nginx.org/client-body-buffer-size — or — VirtualServer CRD upstreams[].client-body-buffer-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "client-body-buffer-size": { key: "nginx.org/client-body-buffer-size", transform: "nicSize", vsField: "client-body-buffer-size" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
-            { community: ["proxy-body-size"], nic: "nginx.org/client-max-body-size — or — VirtualServer CRD upstreams[].client-max-body-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["proxy-body-size"], nic: "nginx.org/client-max-body-size — or — VirtualServer CRD upstreams[].client-max-body-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "proxy-body-size": { key: "nginx.org/client-max-body-size", transform: "nicOffset", vsField: "client-max-body-size" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
-            { community: ["proxy-buffer-size"], nic: "nginx.org/proxy-buffer-size — or — VirtualServer CRD upstreams[].buffer-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["proxy-buffer-size"], nic: "nginx.org/proxy-buffer-size — or — VirtualServer CRD upstreams[].buffer-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "proxy-buffer-size": { key: "nginx.org/proxy-buffer-size", transform: "nicSize", vsField: "buffer-size" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
-            { community: ["proxy-buffering"], nic: "nginx.org/proxy-buffering — or — VirtualServer CRD upstreams[].buffering", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["proxy-buffering"], nic: "nginx.org/proxy-buffering — or — VirtualServer CRD upstreams[].buffering", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "proxy-buffering": { key: "nginx.org/proxy-buffering", transform: "onOffBool", vsField: "buffering" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
-            { community: ["proxy-buffers-number"], nic: "nginx.org/proxy-buffers — or — VirtualServer CRD upstreams[].buffers", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["proxy-buffers-number"], nic: "nginx.org/proxy-buffers — or — VirtualServer CRD upstreams[].buffers", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "proxy-buffers-number": { key: "nginx.org/proxy-buffers", transform: "appendBufferSize", vsField: "buffers" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
-            { community: ["proxy-busy-buffers-size"], nic: "nginx.org/proxy-busy-buffers-size — or — VirtualServer CRD upstreams[].busy-buffers-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["proxy-busy-buffers-size"], nic: "nginx.org/proxy-busy-buffers-size — or — VirtualServer CRD upstreams[].busy-buffers-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "proxy-busy-buffers-size": { key: "nginx.org/proxy-busy-buffers-size", transform: "nicSize", vsField: "busy-buffers-size" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
             { community: ["proxy-max-temp-file-size"], nic: "Annotation nginx.org/proxy-max-temp-file-size", type: "annotation", category: "Buffering", anchor: "buffering", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "proxy-max-temp-file-size": { key: "nginx.org/proxy-max-temp-file-size", transform: "direct" } } } },
@@ -66,21 +66,21 @@
             { community: ["cors-allow-credentials", "cors-allow-headers", "cors-allow-methods", "cors-allow-origin", "cors-expose-headers", "cors-max-age", "enable-cors"], nic: "Policy CRD cors (+ nginx.org/policies annotation) — or — Annotation snippets — or — VirtualServer CRD responseHeaders", type: "policy", category: "CORS / header manipulation", anchor: "cors", section: "oss", dualApproach: true, plusRequired: false,
               nicMapping: { annotations: { "enable-cors": { key: "nginx.org/server-snippets", transform: "corsSnippet" } }, crdKind: "Policy", crdInstall: true, templateFn: "generateCORSPolicy" } },
             // Error Handling
-            { community: ["custom-http-errors", "default-backend"], nic: "nginx.org/custom-http-errors + Ingress spec.defaultBackend — or — VirtualServer CRD errorPages[]", type: "virtualserver", category: "Error handling", anchor: "error-handling", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["custom-http-errors", "default-backend"], nic: "nginx.org/custom-http-errors + Ingress spec.defaultBackend — or — VirtualServer CRD errorPages[]", type: "virtualserver", category: "Error handling", anchor: "error-handling", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               preferAnnotation: "nginx.org/custom-http-errors serves error pages from a Service, as the community controller does, while VirtualServer errorPages can only return a canned response or redirect.",
               nicMapping: { annotations: { "custom-http-errors": { key: "nginx.org/custom-http-errors", transform: "customHttpErrors" }, "default-backend": { key: "spec.defaultBackend", transform: "defaultBackend" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateErrorPagesVirtualServer" } },
             // Headers
-            { community: ["connection-proxy-header"], nic: "nginx.org/keepalive — or — VirtualServer CRD upstreams[].keepalive", type: "annotation", category: "Headers", anchor: "headers", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["connection-proxy-header"], nic: "nginx.org/keepalive — or — VirtualServer CRD upstreams[].keepalive", type: "annotation", category: "Headers", anchor: "headers", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "connection-proxy-header": { key: "nginx.org/keepalive", transform: "connectionKeepalive", vsField: "keepalive" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
             { community: ["custom-headers"], nic: "VirtualServer CRD responseHeaders.add", type: "virtualserver", category: "Headers", anchor: "headers", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { crdKind: "VirtualServer", crdInstall: true, templateFn: "generateCustomHeadersVS" } },
             // proxy-hide-headers & proxy-pass-headers: NGINX Ingress Controller-only annotations (nginx.org/) — no community equivalent
-            { community: ["upstream-vhost", "x-forwarded-prefix"], nic: "nginx.org/upstream-vhost, nginx.org/proxy-set-headers — or — VirtualServer CRD requestHeaders.set", type: "virtualserver", category: "Headers", anchor: "headers", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["upstream-vhost", "x-forwarded-prefix"], nic: "nginx.org/upstream-vhost, nginx.org/proxy-set-headers — or — VirtualServer CRD requestHeaders.set", type: "virtualserver", category: "Headers", anchor: "headers", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "upstream-vhost": { key: "nginx.org/upstream-vhost", transform: "upstreamVhost" }, "x-forwarded-prefix": { key: "nginx.org/proxy-set-headers", transform: "proxySetHeader", template: "X-Forwarded-Prefix: ${value}" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateRequestHeadersVS" } },
             // Load Balancing
-            { community: ["load-balance"], nic: "nginx.org/lb-method — or — VirtualServer CRD upstreams[].lb-method", type: "annotation", category: "Load balancing", anchor: "load-balancing", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["load-balance"], nic: "nginx.org/lb-method — or — VirtualServer CRD upstreams[].lb-method", type: "annotation", category: "Load balancing", anchor: "load-balancing", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "load-balance": { key: "nginx.org/lb-method", transform: "lbMethod", vsField: "lb-method" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
-            { community: ["service-upstream"], nic: "nginx.org/use-cluster-ip — or — VirtualServer CRD upstreams[].use-cluster-ip", type: "annotation", category: "Load balancing", anchor: "load-balancing", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["service-upstream"], nic: "nginx.org/use-cluster-ip — or — VirtualServer CRD upstreams[].use-cluster-ip", type: "annotation", category: "Load balancing", anchor: "load-balancing", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "service-upstream": { key: "nginx.org/use-cluster-ip", transform: "direct", vsField: "use-cluster-ip" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
             { community: ["upstream-hash-by", "upstream-hash-by-subset", "upstream-hash-by-subset-size"], nic: "nginx.org/lb-method — or — VirtualServer CRD upstreams[].lb-method", type: "virtualserver", category: "Load balancing", anchor: "load-balancing", section: "oss", dualApproach: true, plusRequired: false,
               nicMapping: { annotations: { "upstream-hash-by": { key: "nginx.org/lb-method", transform: "snippetWrap", template: "hash ${value} consistent" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateHashLBVirtualServer" } },
@@ -105,16 +105,16 @@
             { community: ["mirror-host", "mirror-request-body", "mirror-target"], nic: "Annotations nginx.org/location-snippets (mirror directive) + nginx.org/server-snippets (internal /mirror location)", type: "annotation", category: "Request mirroring", anchor: "mirroring", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "mirror-target": { key: "nginx.org/location-snippets", transform: "mirrorSnippet" } }, templateFn: "generateMirrorSnippets" } },
             // Proxy Settings
-            { community: ["proxy-http-version"], nic: "Annotation nginx.org/location-snippets", type: "annotation", category: "Proxy settings", anchor: "proxy-settings", section: "oss", dualApproach: false, plusRequired: false,
-              nicMapping: { annotations: { "proxy-http-version": { key: "nginx.org/location-snippets", transform: "snippetWrap", template: "proxy_http_version ${value};" } } } },
+            { community: ["proxy-http-version"], nic: "nginx.org/proxy-http-version — or — VirtualServer CRD upstreams[].proxy-http-version", type: "annotation", category: "Proxy settings", anchor: "proxy-settings", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
+              nicMapping: { annotations: { "proxy-http-version": { key: "nginx.org/proxy-http-version", transform: "direct", vsField: "proxy-http-version" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
             // Route Delegation
             { community: ["server-alias"], nic: "VirtualServer CRD (one resource per hostname)", type: "virtualserver", category: "Route delegation", anchor: "route-delegation", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { crdKind: "VirtualServer", crdInstall: true, templateFn: "generateServerAliasVS" } },
             // OpenTelemetry
             { community: ["enable-opentelemetry"], nic: "ConfigMap otel-exporter-endpoint, otel-trace-in-http, otel-service-name", type: "configmap", category: "OpenTelemetry", anchor: "opentelemetry", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { templateFn: "generateOtelConfigMap" } },
-            { community: ["opentelemetry-trust-incoming-span"], nic: "No direct equivalent — NIC does not set otel_trace_context, so incoming trace context is not propagated by default (unlike the community default); there is no per-Ingress toggle, so this annotation can be removed during migration", type: "unsupported", category: "OpenTelemetry", anchor: "opentelemetry", section: "oss", dualApproach: false, plusRequired: false,
-              nicMapping: {} },
+            { community: ["opentelemetry-trust-incoming-span"], nic: "ConfigMap otel-trace-context (global, not per Ingress)", type: "configmap", category: "OpenTelemetry", anchor: "opentelemetry", section: "oss", dualApproach: false, plusRequired: false, verified: "v5.7.0",
+              nicMapping: { templateFn: "generateOtelConfigMap" } },
             // Proxy Settings
             { community: ["proxy-next-upstream", "proxy-next-upstream-timeout", "proxy-next-upstream-tries"], nic: "Annotations nginx.org/proxy-next-upstream* — or — VirtualServer CRD upstreams[].next-upstream*", type: "annotation", category: "Proxy settings", anchor: "proxy-settings", section: "oss", dualApproach: true, plusRequired: false,
               nicMapping: { annotations: { "proxy-next-upstream": { key: "nginx.org/proxy-next-upstream", transform: "direct" }, "proxy-next-upstream-timeout": { key: "nginx.org/proxy-next-upstream-timeout", transform: "direct" }, "proxy-next-upstream-tries": { key: "nginx.org/proxy-next-upstream-tries", transform: "direct" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateProxyNextUpstreamVS" } },
@@ -132,7 +132,7 @@
             { community: ["proxy-cookie-domain", "proxy-cookie-path"], nic: "Annotation nginx.org/location-snippets", type: "annotation", category: "Rewrites", anchor: "rewrites", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "proxy-cookie-domain": { key: "nginx.org/location-snippets", transform: "snippetWrap", template: "proxy_cookie_domain ${value};" }, "proxy-cookie-path": { key: "nginx.org/location-snippets", transform: "snippetWrap", template: "proxy_cookie_path ${value};" } } } },
             // SSL/TLS
-            { community: ["backend-protocol"], nic: "nginx.org/ssl-services or nginx.org/grpc-services — or — VirtualServer CRD upstreams[].tls.enable, upstreams[].type", type: "annotation", category: "SSL/TLS", anchor: "ssl-tls", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["backend-protocol"], nic: "nginx.org/ssl-services or nginx.org/grpc-services — or — VirtualServer CRD upstreams[].tls.enable, upstreams[].type", type: "annotation", category: "SSL/TLS", anchor: "ssl-tls", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "backend-protocol": { key: "nginx.org/ssl-services", transform: "backendProtocol", vsField: "type" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
             { community: ["force-ssl-redirect"], nic: "Annotation nginx.org/redirect-to-https", type: "annotation", category: "SSL/TLS", anchor: "ssl-tls", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: { annotations: { "force-ssl-redirect": { key: "nginx.org/redirect-to-https", transform: "direct" } } } },
@@ -147,11 +147,11 @@
             { community: ["preserve-trailing-slash"], nic: "Not needed (trailing slash preserved by default)", type: "unsupported", category: "SSL/TLS", anchor: "ssl-tls", section: "oss", dualApproach: false, plusRequired: false,
               nicMapping: {} },
             // Timeouts
-            { community: ["proxy-connect-timeout"], nic: "nginx.org/proxy-connect-timeout — or — VirtualServer CRD upstreams[].connect-timeout", type: "annotation", category: "Timeouts", anchor: "timeouts", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["proxy-connect-timeout"], nic: "nginx.org/proxy-connect-timeout — or — VirtualServer CRD upstreams[].connect-timeout", type: "annotation", category: "Timeouts", anchor: "timeouts", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "proxy-connect-timeout": { key: "nginx.org/proxy-connect-timeout", transform: "appendTimeUnit", vsField: "connect-timeout" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
-            { community: ["proxy-read-timeout"], nic: "nginx.org/proxy-read-timeout — or — VirtualServer CRD upstreams[].read-timeout", type: "annotation", category: "Timeouts", anchor: "timeouts", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["proxy-read-timeout"], nic: "nginx.org/proxy-read-timeout — or — VirtualServer CRD upstreams[].read-timeout", type: "annotation", category: "Timeouts", anchor: "timeouts", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "proxy-read-timeout": { key: "nginx.org/proxy-read-timeout", transform: "appendTimeUnit", vsField: "read-timeout" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
-            { community: ["proxy-send-timeout"], nic: "nginx.org/proxy-send-timeout — or — VirtualServer CRD upstreams[].send-timeout", type: "annotation", category: "Timeouts", anchor: "timeouts", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.6.3",
+            { community: ["proxy-send-timeout"], nic: "nginx.org/proxy-send-timeout — or — VirtualServer CRD upstreams[].send-timeout", type: "annotation", category: "Timeouts", anchor: "timeouts", section: "oss", dualApproach: true, plusRequired: false, verified: "v5.7.0",
               nicMapping: { annotations: { "proxy-send-timeout": { key: "nginx.org/proxy-send-timeout", transform: "appendTimeUnit", vsField: "send-timeout" } }, crdKind: "VirtualServer", crdInstall: true, templateFn: "generateUpstreamSettingsVS" } },
             // Authentication (External): generic auth_request → externalAuth Policy (OSS, recommended).
             // OIDC itself (Plus: oidcNative or oidc Policy) is documented as an alternative in the OIDC authentication section.
@@ -246,12 +246,16 @@
                     // The community's chash, chashsubset and sticky_* are Lua
                     // balancers that only upstream-hash-by and affinity configure;
                     // NIC rejects the Ingress for any of them.
-                    let lbAliases = { 'ewma': 'least_conn', 'round_robin': 'round_robin' };
+                    // ewma scored each backend by a decayed average of connect plus
+                    // response time (ewma.lua). least_time last_byte also picks by
+                    // average time to the full response, and is NGINX OSS since
+                    // 1.31.0, accepted on OSS by NIC v5.7.0's ParseLBMethod.
+                    let lbAliases = { 'ewma': 'least_time last_byte', 'round_robin': 'round_robin' };
                     let trimmed = (value || '').trim();
                     // hasOwnProperty: "constructor" or "toString" must not reach
                     // Object.prototype (they did, and emitted a function's source).
                     if (Object.prototype.hasOwnProperty.call(lbAliases, trimmed) && lbAliases[trimmed] !== trimmed) {
-                        return { value: lbAliases[trimmed], note: trimmed + ' is not supported, using ' + lbAliases[trimmed] + ' as the closest equivalent' };
+                        return { value: lbAliases[trimmed], note: trimmed + ' has no NGINX equivalent of that name; ' + lbAliases[trimmed] + ' also picks the backend with the lowest average response time, and weighs active connections too' };
                     }
                     if (/^(chash|chashsubset|sticky_balanced|sticky_persistent)$/.test(trimmed)) {
                         return { value: null, note: trimmed + ' is set by upstream-hash-by or affinity, which migrate separately; NIC has no lb-method by that name.' };
@@ -548,7 +552,9 @@
                 }
                 let secret = String(a['auth-secret'] || '').replace(/^[^/]+\//, '');
                 if (/\//.test(String(a['auth-secret'] || ''))) ctx.note('auth-secret', 'NIC reads the Secret from the resource\'s own namespace; the namespace prefix was dropped.');
-                let secretNote = 'The Secret must have type nginx.org/htpasswd and an htpasswd key; the community controller read an auth key from a generic Secret.';
+                // NIC v5.7.0 validates a Secret by its role's keys, not its type,
+                // so the community's Opaque Secret works once its key is renamed.
+                let secretNote = 'NIC reads the htpasswd content from a key named htpasswd; the community controller read it from a key named auth. Rename the key (the Secret can stay Opaque).';
                 if (a['auth-secret-type'] === 'auth-map') secretNote += ' auth-secret-type auth-map (one user per key) has no NIC form: build one htpasswd file from the entries.';
                 ctx.note('auth-secret', secretNote);
                 if (ctx.strategy === 'annotation') {
@@ -578,7 +584,7 @@
                 if (a['auth-tls-verify-depth']) spec.verifyDepth = parseInt(a['auth-tls-verify-depth'], 10);
                 f.policies.push({ name: ctx.name('ingress-mtls'), spec: { ingressMTLS: spec }, onIngress: true, needsTls: true,
                     comments: { 'spec.ingressMTLS.clientCertSecret': 'auth-tls-secret', 'spec.ingressMTLS.verifyClient': a['auth-tls-verify-client'] ? 'auth-tls-verify-client' : 'auth-tls-verify-client (community default on)', 'spec.ingressMTLS.verifyDepth': 'auth-tls-verify-depth' } });
-                ctx.note('auth-tls-secret', 'NIC v' + ctx.nicVersion + ' requires the CA Secret to have type nginx.org/ca with the certificate under ca.crt; the community controller read a generic Secret. NIC reads it from the Policy\'s namespace' + (/\//.test(raw) ? ', so the namespace prefix was dropped' : '') + '. The Policy only takes effect on a host that terminates TLS.');
+                ctx.note('auth-tls-secret', 'NIC reads the CA from the Secret\'s ca.crt key, as the community controller did, so the same Secret works as it is (NIC v' + ctx.nicVersion + ' accepts an Opaque Secret). NIC reads it from the Policy\'s namespace' + (/\//.test(raw) ? ', so the namespace prefix was dropped' : '') + '. The Policy only takes effect on a host that terminates TLS.');
                 // Headers the community controller always sent upstream when
                 // verifying, plus the certificate itself on request.
                 f.location.push('proxy_set_header ssl-client-verify $ssl_client_verify;');
@@ -605,10 +611,14 @@
                 let verify = String(a['proxy-ssl-verify'] || '').trim() === 'on';
                 if (verify) {
                     spec.verifyServer = true;
-                    spec.trustedCertSecret = secret ? secret + '-ca' : 'backend-ca';
+                    // NIC v5.7.0 resolves tlsSecret with the TLS role and
+                    // trustedCertSecret with the CA role, by keys, not type: the
+                    // community proxy-ssl-secret carries tls.crt, tls.key and ca.crt,
+                    // so the one Secret serves both.
+                    spec.trustedCertSecret = secret || 'backend-ca';
                     comments['spec.egressMTLS.verifyServer'] = 'proxy-ssl-verify';
                     comments['spec.egressMTLS.trustedCertSecret'] = 'proxy-ssl-secret (its ca.crt)';
-                    ctx.todo('spec.egressMTLS.trustedCertSecret', 'NIC reads the CA from a separate Secret of type nginx.org/ca (ca.crt); the community controller read ca.crt from proxy-ssl-secret');
+                    if (!secret) ctx.todo('spec.egressMTLS.trustedCertSecret', 'name the Secret holding the backend CA (ca.crt)');
                 }
                 if (a['proxy-ssl-verify-depth']) { spec.verifyDepth = parseInt(a['proxy-ssl-verify-depth'], 10); comments['spec.egressMTLS.verifyDepth'] = 'proxy-ssl-verify-depth'; }
                 if (a['proxy-ssl-ciphers']) { spec.ciphers = a['proxy-ssl-ciphers']; comments['spec.egressMTLS.ciphers'] = 'proxy-ssl-ciphers'; }
@@ -617,7 +627,7 @@
                 if (a['proxy-ssl-name']) { spec.sslName = a['proxy-ssl-name']; comments['spec.egressMTLS.sslName'] = 'proxy-ssl-name'; }
                 if (!Object.keys(spec).length) return;
                 f.policies.push({ name: ctx.name('egress-mtls'), spec: { egressMTLS: spec }, onIngress: true, comments: comments });
-                if (secret) ctx.note('proxy-ssl-secret', 'egressMTLS.tlsSecret must be a Secret of type kubernetes.io/tls in the Policy\'s namespace' + (/\//.test(raw) ? ' (the namespace prefix was dropped)' : '') + '.');
+                if (secret) ctx.note('proxy-ssl-secret', 'NIC reads tls.crt and tls.key' + (verify ? ', and ca.crt for trustedCertSecret,' : '') + ' from the same Secret the community controller did, in the Policy\'s namespace' + (/\//.test(raw) ? ' (the namespace prefix was dropped)' : '') + '.');
                 ctx.note('proxy-ssl-secret', 'The upstream connection must already be TLS: set backend-protocol HTTPS (or GRPCS), which this tool turns into ssl-services / upstream tls.');
             },
 
@@ -770,7 +780,7 @@
                 if (u.external || !u.service || /\$/.test(u.host)) {
                     spec.authServiceName = 'auth-svc';
                     // NIC resolves an ExternalName Service only on NGINX Plus
-                    // (v5.6.3 getEndpointsForIngressBackend), auth Service included.
+                    // (v5.6.3 and v5.7.0 getEndpointsForIngressBackend), auth Service included.
                     ctx.todo('spec.externalAuth.authServiceName', 'NIC sends the auth request to a Service in the cluster; ' + u.host + ' is not one. Run the auth service in the cluster and name its Service here (an ExternalName Service in front of ' + u.host + ' works only on NGINX Plus)');
                 } else {
                     spec.authServiceName = (u.namespace && u.namespace !== ctx.namespace ? u.namespace + '/' : '') + u.service;
@@ -825,7 +835,7 @@
                 // The community controller passed the auth server's Set-Cookie on
                 // to the client, with `always` (every status, not just 2xx/3xx)
                 // under auth-always-set-cookie. NIC's auth_request passes none
-                // (v5.6.3, both templates). Copying it takes snippets, which NIC
+                // (v5.6.3 and v5.7.0, OSS and Plus templates). Copying it takes snippets, which NIC
                 // disables by default, so only the annotation that asks for the
                 // cookie gets them; otherwise a note says how.
                 if (truthy(a['auth-always-set-cookie'])) {
@@ -884,7 +894,7 @@
 
             // The community controller held keepalive connections open to the
             // external-auth backend. NIC has no setting for the auth Service
-            // alone (v5.6.3): a VirtualServer's auth location sends Connection:
+            // alone (v5.6.3, v5.7.0): a VirtualServer's auth location sends Connection:
             // close, and an Ingress's auth upstream shares nginx.org/keepalive
             // with every other upstream.
             generateAuthKeepaliveNote: function(a, f, ctx) {
@@ -903,11 +913,20 @@
                 if (a['auth-url'] === undefined) ctx.note('auth-always-set-cookie', 'Without auth-url this did nothing, so there is nothing to migrate.');
             },
 
-            // NIC traces globally (v5.6.3 has no per-Ingress switch), and only
+            // NIC traces globally (v5.7.0 has no per-Ingress switch), and only
             // with an exporter: otel-trace-in-http without otel-exporter-endpoint
             // makes NIC report the ConfigMap invalid and leave tracing off.
+            // The community controller propagated trace context on every traced
+            // location (opentelemetry_propagate) and trusted incoming spans
+            // unless opentelemetry-trust-incoming-span was false. NIC's
+            // otel-trace-context defaults to ignore, so it is set: propagate to
+            // keep that, inject to start a new trace instead of trusting one.
             generateOtelConfigMap: function(a, f, ctx) {
-                ctx.use('enable-opentelemetry');
+                ctx.use('enable-opentelemetry', 'opentelemetry-trust-incoming-span');
+                if (a['enable-opentelemetry'] === undefined) {
+                    ctx.note('opentelemetry-trust-incoming-span', 'Without enable-opentelemetry on this Ingress, this applied only where the community ConfigMap turned tracing on. In NIC, set otel-trace-context in the nginx-config ConfigMap: propagate to trust incoming spans, inject to start a new trace. It is global, not per Ingress.');
+                    return;
+                }
                 if (!truthy(a['enable-opentelemetry'])) { ctx.note('enable-opentelemetry', 'This opted the Ingress out of tracing. NIC traces all requests or none (otel-trace-in-http), so there is no per-Ingress opt-out; with tracing off, the NIC default, nothing is needed.'); return; }
                 f.cm['otel-trace-in-http'] = 'true';
                 f.cmComments['otel-trace-in-http'] = 'enable-opentelemetry';
@@ -916,6 +935,12 @@
                 ctx.todo('data.otel-exporter-endpoint', 'the OpenTelemetry collector address (host:port), which NIC requires before it traces anything');
                 f.cm['otel-service-name'] = 'nginx';
                 f.cmComments['otel-service-name'] = 'the community default service name';
+                let trust = a['opentelemetry-trust-incoming-span'] === undefined || truthy(a['opentelemetry-trust-incoming-span']);
+                f.cm['otel-trace-context'] = trust ? 'propagate' : 'inject';
+                f.cmComments['otel-trace-context'] = trust
+                    ? (a['opentelemetry-trust-incoming-span'] === undefined ? 'the community controller propagated trace context (NIC defaults to ignore)' : 'opentelemetry-trust-incoming-span')
+                    : 'opentelemetry-trust-incoming-span: false — a new trace, passed on';
+                if (a['opentelemetry-trust-incoming-span'] !== undefined) ctx.note('opentelemetry-trust-incoming-span', 'otel-trace-context is global in NIC: it applies to every Ingress and VirtualServer, not just this one.');
                 ctx.note('enable-opentelemetry', 'NIC traces every request once otel-trace-in-http is on: there is no per-Ingress switch, so this applies to all Ingresses and VirtualServers.');
             },
 
@@ -1390,8 +1415,17 @@
             if (p === 'GRPC' || p === 'GRPCS') {
                 f.upstream.type = 'grpc'; f.upstreamComments.type = 'backend-protocol ' + p;
                 f.ann['nginx.org/grpc-services'] = list; ctx.annComment('nginx.org/grpc-services', 'backend-protocol ' + p); ctx.annCovered('nginx.org/grpc-services');
-                f.cm.http2 = 'true'; f.cmComments.http2 = 'backend-protocol ' + p + ' — NIC serves gRPC only with HTTP/2 on';
-                ctx.note(x.annotation, 'gRPC needs HTTP/2, which NIC ' + MigrationTool.NIC.VERSION + ' turns on only through the http2 ConfigMap key (off by default), and a VirtualServer gRPC upstream also needs TLS on the host.');
+                // gRPC needs HTTP/2. NIC v5.7.0 turns it on per host
+                // (nginx.org/http2, VirtualServer spec.http2), with or without TLS.
+                // Over TLS that is enough; cleartext HTTP/2 (h2c) on the default
+                // listeners follows the http2 ConfigMap key, because NGINX takes
+                // it from the port's default server.
+                f.http2 = 'backend-protocol ' + p + ' — NIC serves gRPC only with HTTP/2 on';
+                f.ann['nginx.org/http2'] = 'true'; ctx.annComment('nginx.org/http2', f.http2); ctx.annCovered('nginx.org/http2');
+                if (model.hosts.some(function(h) { return h.tlsSecret === null || h.tlsSecret === undefined; })) {
+                    f.cm.http2 = 'true'; f.cmComments.http2 = 'backend-protocol ' + p + ' — cleartext HTTP/2 on the default listeners follows this key';
+                    ctx.note(x.annotation, 'A host without TLS gets gRPC over cleartext HTTP/2 (h2c), which on NIC\'s default listeners follows the http2 ConfigMap key rather than the per-host setting; it turns HTTP/2 on for every plaintext server.');
+                }
             }
             if (backendProtocolNote(p)) ctx.note(x.annotation, backendProtocolNote(p));
             if (!services.length) ctx.todo('ann.nginx.org/ssl-services', 'name the backend Services');
@@ -1445,7 +1479,7 @@
             // annotation, which nothing reads once the Ingress is replaced. Each
             // becomes the directive NIC would have rendered, as a snippet the
             // VirtualServer template does not already emit (checked against
-            // v5.6.3's: duplicates fail the reload), or is reported. Never dropped.
+            // v5.6.3's and v5.7.0's: duplicates fail the reload), or is reported. Never dropped.
             let ANN_TO_SNIPPET = {
                 'nginx.org/proxy-max-temp-file-size': function(v) { return { where: 'location', line: 'proxy_max_temp_file_size ' + v + ';' }; },
                 'nginx.org/ssl-ciphers': function(v) { return { where: 'server', line: 'ssl_ciphers "' + String(v).replace(/"/g, '') + '";' }; },
@@ -1516,6 +1550,7 @@
                     // use-forwarded-headers was on — then on X-Forwarded-Proto.
                     ctx.note('force-ssl-redirect', 'Host ' + h.host + ' has no TLS on the Ingress, so TLS ends in front of the controller. If the community ConfigMap had use-forwarded-headers: "true", redirect on the header: add tls with redirect.basedOn x-forwarded-proto (and no secret), or nginx.org/redirect-to-https on an Ingress. Otherwise the community controller redirected every request, including those that arrived over HTTPS, in a loop.', 'warning');
                 }
+                if (f.http2) { spec.http2 = true; c['spec.http2'] = f.http2; }
                 if (policyRefs.length) { spec.policies = policyRefs.slice(); c['spec.policies'] = 'the Policies above'; }
                 if (f.policies.some(function(p) { return p.needsTls; }) && !spec.tls) ctx.note('auth-tls-secret', 'Host ' + h.host + ' does not terminate TLS, so NIC answers every request with 500 for the ingressMTLS Policy. Add TLS for it.', 'warning');
                 if (f.server.length) { spec['server-snippets'] = snippetBlock(f.server); c['spec.server-snippets'] = snippetSourcesFor(f.server, ctx); }

@@ -189,7 +189,7 @@
 
         <div class="tool-page active" id="page-getting-started">
         <div class="info-box warning eol-warning" style="margin: 0 0 var(--space-2x);"><strong>Warning:</strong> The community-maintained <code>kubernetes/ingress-nginx</code> project has <a href="https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/" target="_blank" rel="noopener">reached end of maintenance</a>. <strong><span data-ingress-nginx-version>v1.15.1</span> (March 19, 2026) is the final release</strong> — it will receive no further releases, bugfixes, or security patches. NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>) is actively maintained and is the recommended migration target.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Ingress-NGINX <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.6.3" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.6.3</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Ingress-NGINX <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
 
         <section id="overview">
             <h2 id="migration-overview">Overview</h2>
@@ -242,6 +242,8 @@
             <ul class="doc-list">
                 <li><strong><code>controller.enableSnippets</code></strong> — Off by default. With it off, NGINX Ingress Controller rejects any resource that carries a snippet, so <code>configuration-snippet</code>, <code>server-snippet</code> and every mapping that becomes a snippet fail. Snippets are copied as written: directives from modules the community image included, such as <code>more_set_headers</code> (headers-more) and Lua, do not exist in NGINX Ingress Controller and fail the configuration reload.</li>
                 <li><strong><code>controller.enableTLSPassthrough</code></strong> — Off by default. <code>ssl-passthrough</code> becomes a TransportServer on the built-in <code>tls-passthrough</code> listener, which exists only with this flag.</li>
+                <li><strong><code>controller.enableCertManager</code></strong> — Off by default. cert-manager HTTP-01 challenges for a VirtualServer's host pass its HTTPS redirect and authentication only with this flag (v5.7.0 and later); on an Ingress they do without it. The community controller exempted <code>/.well-known/acme-challenge</code> by default.</li>
+                <li><strong><code>controller.enableTopologyAwareRouting</code></strong> — Off by default, like the community controller's <code>--enable-topology-aware-routing</code>, and new in v5.7.0. With it on, each controller pod sends traffic to the endpoints in its own zone, or on its own node, when the Service sets <code>spec.trafficDistribution</code> (or the older <code>service.kubernetes.io/topology-mode: auto</code>), falling back to every ready endpoint otherwise.</li>
             </ul>
             <div class="info-box note"><strong>Note:</strong> The NGINX Ingress Controller documentation covers this in <a href="https://docs.nginx.com/nginx-ingress-controller/install/multiple-controllers/" target="_blank" rel="noopener">Run multiple Ingress controllers</a> and the <a href="https://docs.nginx.com/nginx-ingress-controller/install/migrate-ingress-nginx/" target="_blank" rel="noopener">ingress-nginx migration guide</a>.</div>
 
@@ -252,13 +254,14 @@
                     <thead><tr><th scope="col">Setting</th><th scope="col">Ingress-NGINX</th><th scope="col">NGINX Ingress Controller</th><th scope="col">What to check</th></tr></thead>
                     <tbody>
                         <tr><td>Response buffering</td><td>Off</td><td>On (<code>proxy-buffering</code>)</td><td>Server-sent events and streamed responses arrive in chunks. Set <code>proxy-buffering: "false"</code> for them.</td></tr>
-                        <tr><td>HTTP/2</td><td>On</td><td>Off (<code>http2</code>)</td><td>gRPC needs HTTP/2. Set <code>http2: "true"</code>.</td></tr>
+                        <tr><td>HTTP/2</td><td>On</td><td>Off (<code>http2</code>)</td><td>gRPC needs HTTP/2. Since v5.7.0, turn it on per host with <code>nginx.org/http2</code> or VirtualServer <code>spec.http2</code>, or for every host with <code>http2: "true"</code>.</td></tr>
                         <tr><td>HSTS</td><td>On</td><td>Off (<code>hsts</code>)</td><td>Browsers stop receiving <code>Strict-Transport-Security</code>.</td></tr>
                         <tr><td>Upstream keepalive connections</td><td>320</td><td>0 (<code>keepalive</code>)</td><td>Each request opens a new connection to the Pod.</td></tr>
                         <tr><td>Upstream connect timeout</td><td>5s</td><td>60s (<code>proxy-connect-timeout</code>)</td><td>An unreachable Pod is retried later.</td></tr>
                         <tr><td>Load-balancing method</td><td>Round robin</td><td><code>random two least_conn</code> (<code>lb-method</code>)</td><td>Request distribution changes.</td></tr>
                         <tr><td>HTTP-to-HTTPS redirect code</td><td>308</td><td>301 (<code>http-redirect-code</code>)</td><td>Clients can turn a redirected POST into a GET. The analyzer sets 308.</td></tr>
                         <tr><td><code>Server</code> header version</td><td>Hidden</td><td>Shown (<code>server-tokens</code>)</td><td>Set <code>server-tokens: "false"</code> to hide the NGINX version.</td></tr>
+                        <tr><td>ACME HTTP-01 challenges</td><td>Exempt from HTTPS redirect and auth</td><td>Exempt for cert-manager since v5.7.0</td><td>Before v5.7.0, a host with a redirect or auth Policy failed HTTP-01 renewal. A VirtualServer needs <code>controller.enableCertManager</code>.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -343,12 +346,12 @@
             <p>CRDs can be installed via Helm or manually using manifests, depending on your deployment method. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/" target="_blank" rel="noopener">NGINX Ingress Controller installation docs</a> for full instructions.</p>
             <div class="install-box"><h3>Helm (example)</h3>
                 <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">If you install NGINX Ingress Controller via Helm, CRDs are included automatically. To ensure they are enabled:</p>
-                <pre><code data-nic-helm-install>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version 2.7.3 --set controller.enableCustomResources=true</code></pre>
+                <pre><code data-nic-helm-install>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version 2.8.0 --set controller.enableCustomResources=true</code></pre>
                 <p style="margin: var(--space-2x) 0 0; font-size: var(--fs-caption); line-height: var(--lh-caption); opacity: 0.8;">The <code>controller.enableCustomResources</code> flag is <code>true</code> by default. If you previously disabled it, re-enable it to use CRD resources. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/helm/" target="_blank" rel="noopener">Helm installation guide</a> for details.</p>
             </div>
             <div class="install-box"><h3>Manifests (example)</h3>
                 <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">If you deploy using manifests, install CRDs manually before deploying the controller:</p>
-                <pre><code data-nic-crd-install>kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/v5.6.3/deploy/crds.yaml</code></pre>
+                <pre><code data-nic-crd-install>kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/v5.7.0/deploy/crds.yaml</code></pre>
                 <p style="margin: var(--space-2x) 0 0; font-size: var(--fs-caption); line-height: var(--lh-caption); opacity: 0.8;">Replace the version number with your target controller version. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/manifests/" target="_blank" rel="noopener">manifest installation guide</a> for the full step-by-step process.</p>
             </div>
             <div class="info-box note"><strong>Note:</strong> The <code>crds.yaml</code> file contains all CRDs (VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration) in a single manifest.</div>
@@ -423,7 +426,7 @@
 
         <div class="tool-page" id="page-analyzer" hidden="until-found">
         <div class="info-box warning eol-warning" style="margin: 0 0 var(--space-2x);"><strong>Warning:</strong> The community-maintained <code>kubernetes/ingress-nginx</code> project has <a href="https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/" target="_blank" rel="noopener">reached end of maintenance</a>. <strong><span data-ingress-nginx-version>v1.15.1</span> (March 19, 2026) is the final release</strong> — it will receive no further releases, bugfixes, or security patches. NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>) is actively maintained and is the recommended migration target.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Ingress-NGINX <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.6.3" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.6.3</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Ingress-NGINX <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
         <!-- YAML Migration Analyzer -->
         <section id="analyzer">
             <h2 id="yaml-analyzer">Ingress-NGINX config analyzer</h2>
@@ -486,7 +489,7 @@ spec:
 
         <div class="tool-page" id="page-reference" hidden="until-found">
         <div class="info-box warning eol-warning" style="margin: 0 0 var(--space-2x);"><strong>Warning:</strong> The community-maintained <code>kubernetes/ingress-nginx</code> project has <a href="https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/" target="_blank" rel="noopener">reached end of maintenance</a>. <strong><span data-ingress-nginx-version>v1.15.1</span> (March 19, 2026) is the final release</strong> — it will receive no further releases, bugfixes, or security patches. NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>) is actively maintained and is the recommended migration target.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Ingress-NGINX <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.6.3" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.6.3</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-ingress-nginx-release-link href="https://github.com/kubernetes/ingress-nginx/releases/tag/controller-v1.15.1" target="_blank" rel="noopener">Ingress-NGINX <span data-ingress-nginx-version>v1.15.1</span> (final release)</a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
         <!-- Key Differences -->
         <section id="differences">
             <h2 id="key-differences">Key differences</h2>
@@ -506,6 +509,7 @@ spec:
             <div class="info-box note" style="margin: var(--space-2x) 0 0;"><strong>New in v5.4.0 &mdash; Policy CRDs on Ingress objects:</strong> Policy CRDs (e.g. <code>accessControl</code>, <code>cors</code>) can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation &mdash; no VirtualServer required. This is the recommended migration path for features that support it. Look for the <strong>(Recommended)</strong> tab in the mapping examples.</div>
             <div class="info-box note" style="margin: var(--space-2x) 0 0;"><strong>New in v5.5.0 &mdash; ExternalAuth Policy and expanded Policy CRDs on Ingress:</strong> A brand new <code>externalAuth</code> Policy CRD provides an OSS-capable replacement for the community's generic <code>auth_request</code> annotations (<code>auth-url</code>, <code>auth-signin</code>, <code>auth-snippet</code>) &mdash; the headline migration win of this release. The <code>ingressMTLS</code>, <code>egressMTLS</code>, and <code>waf</code> (Plus, via <code>nginx.com/policies</code>) Policy CRDs can now also be attached directly to Ingress resources. New direct annotation mappings arrived for <code>proxy-redirect-from</code>/<code>proxy-redirect-to</code>, alongside a new inline <code>nginx.org/add-header</code> (plus <code>nginx.org/add-header-inherit</code>) for response header injection.</div>
             <div class="info-box note" style="margin: var(--space-2x) 0 0;"><strong>New in v5.6.0 &mdash; Custom error pages and upstream Host on Ingress:</strong> Two community annotations now have direct Ingress equivalents: <code>nginx.org/custom-http-errors</code> serves intercepted errors from the Ingress's <code>spec.defaultBackend</code>, and <code>nginx.org/upstream-vhost</code> sets the <code>Host</code> header sent upstream. A new <code>hsts</code> Policy CRD sets HSTS on a VirtualServer, including <code>preload</code> on request. With NGINX Plus, the new <code>oidcNative</code> Policy runs OpenID Connect in the built-in module and attaches to Ingress through <code>nginx.com/policies</code>.</div>
+            <div class="info-box note" style="margin: var(--space-2x) 0 0;"><strong>New in v5.7.0 &mdash; Fewer snippets, and the Secrets you already have:</strong> <code>proxy-http-version</code> maps to <code>nginx.org/proxy-http-version</code> or a VirtualServer upstream's <code>proxy-http-version</code> instead of a snippet, and HTTP/2 to upstreams joins it. gRPC turns HTTP/2 on per host with <code>nginx.org/http2</code> or <code>spec.http2</code>, with or without TLS. <code>opentelemetry-trust-incoming-span</code> maps to the <code>otel-trace-context</code> ConfigMap key, and the community's <code>ewma</code> load balancing to <code>least_time last_byte</code>, now on NGINX Open Source. An <code>Opaque</code> Secret works wherever a CA, TLS, or htpasswd Secret did, so the community controller's Secrets can be used as they are; basic auth still needs its key renamed from <code>auth</code> to <code>htpasswd</code>. The <code>use-forwarded-headers</code> ConfigMap key keeps the forwarded headers a proxy in front has set. cert-manager HTTP-01 challenges pass the HTTPS redirect and authentication, as the community controller's defaults let them, and <code>-enable-topology-aware-routing</code> arrives with the community flag's name.</div>
         </section>
 
         <!-- OSS Mappings -->
@@ -711,14 +715,13 @@ metadata:
     nginx.ingress.kubernetes.io/auth-secret: "basic-auth"
     nginx.ingress.kubernetes.io/auth-secret-type: "auth-file"
     nginx.ingress.kubernetes.io/auth-type: "basic"</code></pre></div>
-                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># auth-secret-type → Secret type
-apiVersion: v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: Secret
 metadata:
   name: basic-auth
-type: nginx.org/htpasswd  # auth-secret-type
+type: Opaque
 data:
-  htpasswd: dXNlcjokYXByMS4uLg==
+  htpasswd: dXNlcjokYXByMS4uLg==  # the community "auth" key, renamed
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -744,9 +747,9 @@ metadata:
 kind: Secret
 metadata:
   name: basic-auth
-type: nginx.org/htpasswd  # auth-secret-type
+type: Opaque
 data:
-  htpasswd: dXNlcjokYXByMS4uLg==
+  htpasswd: dXNlcjokYXByMS4uLg==  # the community "auth" key, renamed
 ---
 apiVersion: k8s.nginx.org/v1
 kind: Policy
@@ -778,9 +781,9 @@ spec:
                             <div class="info-box note">
                                 <strong>Note:</strong> The community <code>auth-secret-type</code> annotation
                                 (<code>auth-file</code> or <code>auth-map</code>) has no NGINX Ingress Controller equivalent.
-                                NGINX Ingress Controller only supports htpasswd format, specified via the
-                                Secret's <code>type: nginx.org/htpasswd</code> field, with the file under the
-                                <code>htpasswd</code> key (the community controller read the <code>auth</code> key). The <code>auth-type</code>
+                                NGINX Ingress Controller only supports the htpasswd format, read from the Secret's
+                                <code>htpasswd</code> key (the community controller read the <code>auth</code> key), so rename the key.
+                                Since v5.7.0 the Secret can stay <code>Opaque</code>; <code>type: nginx.org/htpasswd</code> is no longer required. The <code>auth-type</code>
                                 annotation is also implicit — NGINX Ingress Controller only supports basic auth
                                 via these annotations.
                             </div>
@@ -2453,7 +2456,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/lb-method: "least_conn"  # load-balance — ewma is not supported, using least_conn as the closest equivalent</code></pre></div>
+    nginx.org/lb-method: "least_time last_byte"  # load-balance — ewma has no NGINX equivalent of that name; least_time last_byte also picks the backend with the lowest average response time, and weighs active connections too</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -2474,14 +2477,14 @@ spec:
     - name: backend
       service: my-service
       port: 80
-      lb-method: "least_conn"  # load-balance — ewma is not supported, using least_conn as the closest equivalent
+      lb-method: "least_time last_byte"  # load-balance — ewma has no NGINX equivalent of that name; least_time last_byte also picks the backend with the lowest average response time, and weighs active connections too
   routes:
     - path: /
       action:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Supported methods differ. NGINX Ingress Controller supports: <code>round_robin</code>, <code>least_conn</code>, <code>ip_hash</code>, <code>hash</code>, <code>random</code>, <code>random two</code>, and <code>random two least_conn</code> (NGINX Plus adds <code>least_time</code> variants). The community controller's <code>ewma</code> method is <strong>not supported</strong> — the closest equivalent is <code>least_conn</code>. The NGINX Ingress Controller's default is <code>random two least_conn</code> (not <code>round_robin</code>), so load balancing behavior may change even without explicit configuration.</div>
+                            <div class="info-box note"><strong>Note:</strong> Supported methods differ. NGINX Ingress Controller supports: <code>round_robin</code>, <code>least_conn</code>, <code>ip_hash</code>, <code>hash</code>, <code>random</code>, <code>random two</code>, <code>random two least_conn</code>, and, since v5.7.0 on NGINX Open Source too, <code>least_time header</code> and <code>least_time last_byte</code> (each optionally with <code>inflight</code>). The community controller's <code>ewma</code> has no method of that name; <code>least_time last_byte</code> is the closest: ewma sent each request to the backend with the lowest decayed average of connect and response time, and <code>least_time last_byte</code> picks by average time to the full response, weighing active connections too. The NGINX Ingress Controller's default is <code>random two least_conn</code> (not <code>round_robin</code>), so load balancing behavior may change even without explicit configuration.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/service-upstream</code></td>
@@ -2812,7 +2815,7 @@ metadata:
     nginx.org/server-snippets: |  # auth-tls-error-page
       error_page 495 496 = https://example.com/cert-error;</code></pre></div>
                                 </div>
-                                <div class="info-box warning"><strong>CA Secret and TLS:</strong> NGINX Ingress Controller reads the CA from a Secret of type <code>nginx.org/ca</code>, with the certificate under <code>ca.crt</code>, in the Policy's namespace; the community controller read a generic Secret, so drop the <code>ns/</code> prefix and re-create the Secret. The Policy takes effect only on a host that terminates TLS: without it, NGINX Ingress Controller answers every request with 500. The community controller sent the <code>ssl-client-verify</code>, <code>ssl-client-subject-dn</code>, and <code>ssl-client-issuer-dn</code> headers whenever a CA was set, and <code>ssl-client-cert</code> only with <code>auth-tls-pass-certificate-to-upstream</code>, so the snippet carries all four. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
+                                <div class="info-box warning"><strong>CA Secret and TLS:</strong> NGINX Ingress Controller reads the CA from the Secret's <code>ca.crt</code> key, as the community controller did, so the same Secret works; since v5.7.0 it can stay <code>Opaque</code> rather than type <code>nginx.org/ca</code>. It must be in the Policy's namespace, so drop the <code>ns/</code> prefix. The Policy takes effect only on a host that terminates TLS: without it, NGINX Ingress Controller answers every request with 500. The community controller sent the <code>ssl-client-verify</code>, <code>ssl-client-subject-dn</code>, and <code>ssl-client-issuer-dn</code> headers whenever a CA was set, and <code>ssl-client-cert</code> only with <code>auth-tls-pass-certificate-to-upstream</code>, so the snippet carries all four. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>ingressMTLS</code> Policy CRD can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
@@ -2863,7 +2866,7 @@ spec:
       action:
         pass: backend</code></pre></div>
                                 </div>
-                                <div class="info-box warning"><strong>CA Secret and TLS:</strong> NGINX Ingress Controller reads the CA from a Secret of type <code>nginx.org/ca</code>, with the certificate under <code>ca.crt</code>, in the Policy's namespace; the community controller read a generic Secret, so drop the <code>ns/</code> prefix and re-create the Secret. The Policy takes effect only on a host that terminates TLS: without it, NGINX Ingress Controller answers every request with 500. The community controller sent the <code>ssl-client-verify</code>, <code>ssl-client-subject-dn</code>, and <code>ssl-client-issuer-dn</code> headers whenever a CA was set, and <code>ssl-client-cert</code> only with <code>auth-tls-pass-certificate-to-upstream</code>, so the snippet carries all four. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
+                                <div class="info-box warning"><strong>CA Secret and TLS:</strong> NGINX Ingress Controller reads the CA from the Secret's <code>ca.crt</code> key, as the community controller did, so the same Secret works; since v5.7.0 it can stay <code>Opaque</code> rather than type <code>nginx.org/ca</code>. It must be in the Policy's namespace, so drop the <code>ns/</code> prefix. The Policy takes effect only on a host that terminates TLS: without it, NGINX Ingress Controller answers every request with 500. The community controller sent the <code>ssl-client-verify</code>, <code>ssl-client-subject-dn</code>, and <code>ssl-client-issuer-dn</code> headers whenever a CA was set, and <code>ssl-client-cert</code> only with <code>auth-tls-pass-certificate-to-upstream</code>, so the snippet carries all four. Snippets need the controller's <code>-enable-snippets</code> flag.</div>
                                 <div class="info-box note"><strong>Note:</strong> The VirtualServer approach has been available since before v5.5.0. Use this if you are already migrating to VirtualServer resources for other reasons (e.g., advanced routing, traffic splitting).</div>
                             </div>
                         </div></td></tr>
@@ -2963,7 +2966,7 @@ spec:
   egressMTLS:
     tlsSecret: client-cert  # proxy-ssl-secret (tls.crt, tls.key)
     verifyServer: true  # proxy-ssl-verify
-    trustedCertSecret: client-cert-ca  # proxy-ssl-secret (its ca.crt)
+    trustedCertSecret: client-cert  # proxy-ssl-secret (its ca.crt)
     verifyDepth: 2  # proxy-ssl-verify-depth
     ciphers: "HIGH:!aNULL:!MD5"  # proxy-ssl-ciphers
     protocols: "TLSv1.2 TLSv1.3"  # proxy-ssl-protocols
@@ -2979,7 +2982,7 @@ metadata:
     nginx.org/policies: "my-app-egress-mtls"  # attaches the Policy above
     nginx.org/ssl-services: "my-service"  # backend-protocol HTTPS (the Ingress's backend Service)</code></pre></div>
                                 </div>
-                                <div class="info-box warning"><strong>Secrets and upstream TLS:</strong> The community controller read the client certificate and the CA from one <code>proxy-ssl-secret</code>. NGINX Ingress Controller splits them: <code>tlsSecret</code> is a Secret of type <code>kubernetes.io/tls</code>, and <code>trustedCertSecret</code> a separate Secret of type <code>nginx.org/ca</code> with the CA under <code>ca.crt</code>, both in the Policy's namespace. The Policy applies only to an upstream that already speaks TLS, which <code>backend-protocol: "HTTPS"</code> sets up as <code>nginx.org/ssl-services</code> or upstream <code>tls.enable</code>.</div>
+                                <div class="info-box warning"><strong>Secrets and upstream TLS:</strong> The community controller read the client certificate and the CA from one <code>proxy-ssl-secret</code>. NGINX Ingress Controller reads <code>tls.crt</code> and <code>tls.key</code> for <code>tlsSecret</code> and <code>ca.crt</code> for <code>trustedCertSecret</code>, by key rather than by Secret type since v5.7.0, so both fields can name that same Secret, in the Policy's namespace. The Policy applies only to an upstream that already speaks TLS, which <code>backend-protocol: "HTTPS"</code> sets up as <code>nginx.org/ssl-services</code> or upstream <code>tls.enable</code>.</div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> The <code>egressMTLS</code> Policy CRD can now be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources. Combine with <code>nginx.org/ssl-services</code> to identify which backend services should use TLS.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
@@ -3006,7 +3009,7 @@ spec:
   egressMTLS:
     tlsSecret: client-cert  # proxy-ssl-secret (tls.crt, tls.key)
     verifyServer: true  # proxy-ssl-verify
-    trustedCertSecret: client-cert-ca  # proxy-ssl-secret (its ca.crt)
+    trustedCertSecret: client-cert  # proxy-ssl-secret (its ca.crt)
     verifyDepth: 2  # proxy-ssl-verify-depth
     ciphers: "HIGH:!aNULL:!MD5"  # proxy-ssl-ciphers
     protocols: "TLSv1.2 TLSv1.3"  # proxy-ssl-protocols
@@ -3033,7 +3036,7 @@ spec:
       action:
         pass: backend</code></pre></div>
                                 </div>
-                                <div class="info-box warning"><strong>Secrets and upstream TLS:</strong> The community controller read the client certificate and the CA from one <code>proxy-ssl-secret</code>. NGINX Ingress Controller splits them: <code>tlsSecret</code> is a Secret of type <code>kubernetes.io/tls</code>, and <code>trustedCertSecret</code> a separate Secret of type <code>nginx.org/ca</code> with the CA under <code>ca.crt</code>, both in the Policy's namespace. The Policy applies only to an upstream that already speaks TLS, which <code>backend-protocol: "HTTPS"</code> sets up as <code>nginx.org/ssl-services</code> or upstream <code>tls.enable</code>.</div>
+                                <div class="info-box warning"><strong>Secrets and upstream TLS:</strong> The community controller read the client certificate and the CA from one <code>proxy-ssl-secret</code>. NGINX Ingress Controller reads <code>tls.crt</code> and <code>tls.key</code> for <code>tlsSecret</code> and <code>ca.crt</code> for <code>trustedCertSecret</code>, by key rather than by Secret type since v5.7.0, so both fields can name that same Secret, in the Policy's namespace. The Policy applies only to an upstream that already speaks TLS, which <code>backend-protocol: "HTTPS"</code> sets up as <code>nginx.org/ssl-services</code> or upstream <code>tls.enable</code>.</div>
                                 <div class="info-box note"><strong>Note:</strong> The VirtualServer approach has been available since before v5.5.0. TLS to upstream is enabled per-upstream via <code>tls.enable: true</code> (replacing the Ingress-level <code>nginx.org/ssl-services</code> annotation).</div>
                             </div>
                         </div></td></tr>
@@ -3082,7 +3085,7 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/enable-opentelemetry</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>otel-trace-in-http</code></td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>otel-trace-in-http</code> + <code>otel-trace-context</code> <span class="badge badge-new">New v5.7.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3100,13 +3103,14 @@ metadata:
 data:
   otel-trace-in-http: "true"  # enable-opentelemetry
   otel-exporter-endpoint: "otel-collector:4317"  # TODO: your collector — NIC turns tracing off without it (the community read otlp-collector-host, port 4317)
-  otel-service-name: "nginx"  # the community default service name</code></pre></div>
+  otel-service-name: "nginx"  # the community default service name
+  otel-trace-context: "propagate"  # the community controller propagated trace context (NIC defaults to ignore)</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>otel-trace-in-http</code> is the direct replacement for <code>enable-opentelemetry</code>, but only with <code>otel-exporter-endpoint</code> set: without it, NGINX Ingress Controller reports the ConfigMap invalid and leaves tracing off. <code>otel-service-name</code> keeps the community controller's <code>nginx</code>; without it, NGINX reports <code>unknown_service:nginx</code>. <code>otel-exporter-header-name</code> and <code>otel-exporter-header-value</code> are optional. Unlike the community annotation, this enables tracing globally — not per-Ingress — and there is no per-Ingress opt-out.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>otel-trace-in-http</code> is the direct replacement for <code>enable-opentelemetry</code>, but only with <code>otel-exporter-endpoint</code> set: without it, NGINX Ingress Controller reports the ConfigMap invalid and leaves tracing off. <code>otel-service-name</code> keeps the community controller's <code>nginx</code>; without it, NGINX reports <code>unknown_service:nginx</code>. <code>otel-exporter-header-name</code> and <code>otel-exporter-header-value</code> are optional. The community controller continued an incoming trace and passed it on; <code>otel-trace-context: propagate</code> keeps that, where NGINX Ingress Controller would otherwise ignore the trace headers. Unlike the community annotation, this enables tracing globally — not per-Ingress — and there is no per-Ingress opt-out.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span</code></td>
-                            <td>No direct equivalent (tracing is global-only)</td>
+                            <td><span class="badge badge-configmap">ConfigMap</span> <code>otel-trace-context</code> <span class="badge badge-new">New v5.7.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3115,20 +3119,20 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No per-Ingress equivalent. NIC does not set otel_trace_context,
-# so the ngx_otel_module default applies and incoming trace
-# context is NOT propagated by default (community default: trust).
-# To enable tracing globally:
+    nginx.ingress.kubernetes.io/enable-opentelemetry: "true"
+    nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span: "false"</code></pre></div>
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Global ConfigMap configuration (applies to all routes)
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  otel-trace-in-http: "true"
-  otel-exporter-endpoint: "otel-collector:4317"</code></pre></div>
+  otel-trace-in-http: "true"  # enable-opentelemetry
+  otel-exporter-endpoint: "otel-collector:4317"  # TODO: your collector — NIC turns tracing off without it (the community read otlp-collector-host, port 4317)
+  otel-service-name: "nginx"  # the community default service name
+  otel-trace-context: "inject"  # opentelemetry-trust-incoming-span: false — a new trace, passed on</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller's <code>opentelemetry-trust-incoming-span</code> (default <code>true</code>) enables per-Ingress control over whether to trust incoming trace context (W3C Trace Context propagation). NGINX Ingress Controller has no per-Ingress equivalent, and it does not set <code>otel_trace_context</code> — so the <code>ngx_otel_module</code> default applies and incoming trace context is <strong>not</strong> propagated by default (a behavior difference from the community default). The annotation can be removed during migration.</div>
+                            <div class="info-box note"><strong>New in v5.7.0:</strong> <code>otel-trace-context</code> sets how NGINX handles W3C trace context: <code>propagate</code> continues an incoming trace and passes it on, which is what the community controller did by default; <code>inject</code> starts a new trace and passes that on, the closest match to <code>opentelemetry-trust-incoming-span: "false"</code>. It needs <code>otel-exporter-endpoint</code>, and it is global: one value for every Ingress and VirtualServer, where the community annotation was per Ingress.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -3216,7 +3220,7 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-http-version</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].proxy-http-version</code> <span class="badge badge-new">New v5.7.0</span><span class="or-text">— or —</span><code>nginx.org/proxy-http-version</code> <span class="badge badge-new">New v5.7.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -3236,8 +3240,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/location-snippets: |  # proxy-http-version
-      proxy_http_version 1.1;  # proxy-http-version</code></pre></div>
+    nginx.org/proxy-http-version: "1.1"  # proxy-http-version</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -3258,15 +3261,14 @@ spec:
     - name: backend
       service: backend-svc
       port: 80
+      proxy-http-version: "1.1"  # proxy-http-version
   routes:
     - path: /
-      location-snippets: |  # proxy-http-version
-        proxy_http_version 1.1;  # proxy-http-version
       action:
         pass: backend</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> NGINX Ingress Controller does not have a dedicated annotation for HTTP version. Use <code>location-snippets</code> to set <code>proxy_http_version</code> directly.</div>
+                            <div class="info-box note"><strong>New in v5.7.0:</strong> <code>nginx.org/proxy-http-version</code> and the VirtualServer upstream <code>proxy-http-version</code> take the community's <code>1.0</code> and <code>1.1</code> unchanged, and also <code>2</code> for upstreams that speak cleartext HTTP/2. <code>1.0</code> sends <code>Connection: close</code>. Left unset, NGINX Ingress Controller uses HTTP/2 for a Service port with <code>appProtocol: kubernetes.io/h2c</code> and HTTP/1.1 otherwise. A <code>proxy_http_version</code> snippet is no longer needed.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/proxy-next-upstream</code><br><code>nginx.ingress.kubernetes.io/proxy-next-upstream-timeout</code><br><code>nginx.ingress.kubernetes.io/proxy-next-upstream-tries</code></td>
@@ -3867,7 +3869,7 @@ spec:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="info-box tip"><strong>Tip:</strong> This feature requires CRDs. See <a href="#installation">Installing CRDs</a> for Helm and manifest installation instructions.</div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller has no equivalent for cross-namespace route delegation. VirtualServerRoute allows different teams to manage their own routing rules while a central VirtualServer controls the domain.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller has no equivalent for cross-namespace route delegation. VirtualServerRoute allows different teams to manage their own routing rules while a central VirtualServer controls the domain. Since v5.7.0, a VirtualServerRoute may omit <code>spec.host</code> and be referenced by any number of VirtualServers, so paths that several hosts share, migrated from Ingresses that repeated them per host, can be defined once.</div>
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Ingress-NGINX</h4><pre><code># No equivalent — each team must have
 # their own Ingress resource per host,
@@ -4096,7 +4098,7 @@ spec:
       action:
         pass: backend</code></pre></div>
                             </div>
-                                <div class="info-box note"><strong>Note:</strong> For gRPC backends, use <code>type: grpc</code> on the upstream instead. For gRPC over TLS, combine both: <code>type: grpc</code> and <code>tls.enable: true</code>. gRPC also needs <code>http2: "true"</code> in the ConfigMap and TLS on the VirtualServer, or NIC does not configure it.</div>
+                                <div class="info-box note"><strong>Note:</strong> For gRPC backends, use <code>type: grpc</code> on the upstream instead. For gRPC over TLS, combine both: <code>type: grpc</code> and <code>tls.enable: true</code>. gRPC also needs HTTP/2: since v5.7.0 set <code>spec.http2: true</code> on the VirtualServer (or <code>nginx.org/http2: "true"</code> on an Ingress), with or without TLS. Cleartext gRPC on the default listeners still follows the <code>http2</code> ConfigMap key, because NGINX takes HTTP/2 for a plaintext port from its default server.</div>
                             </div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -4835,7 +4837,7 @@ metadata:
 kind: Secret
 metadata:
   name: oidc-secret
-type: nginx.org/oidc
+type: Opaque
 data:
   client-secret: c2VjcmV0...
 ---
@@ -4880,7 +4882,7 @@ metadata:
 kind: Secret
 metadata:
   name: oidc-secret
-type: nginx.org/oidc
+type: Opaque
 data:
   client-secret: c2VjcmV0...
 ---
@@ -5747,7 +5749,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>use-forwarded-headers</code></td>
-                            <td><code>real-ip-header</code></td>
+                            <td><code>use-forwarded-headers</code> <span class="badge badge-new">New v5.7.0</span> + <code>real-ip-header</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5762,8 +5764,11 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  real-ip-header: "X-Forwarded-For"  # use-forwarded-headers</code></pre></div>
+  use-forwarded-headers: "true"  # use-forwarded-headers (X-Forwarded-Proto, -Host, -Port)
+  real-ip-header: "X-Forwarded-For"  # use-forwarded-headers (the client address)
+  real-ip-recursive: "true"  # the community controller set real_ip_recursive on</code></pre></div>
                             </div>
+                            <div class="info-box note"><strong>New in v5.7.0:</strong> The community key did two things, and NGINX Ingress Controller has a key for each. It took the client address from <code>X-Forwarded-For</code>, which <code>real-ip-header</code> does, with the proxies to trust in <code>set-real-ip-from</code> (the community <code>proxy-real-ip-cidr</code>). And it passed on the <code>X-Forwarded-Proto</code>, <code>X-Forwarded-Host</code>, and <code>X-Forwarded-Port</code> a proxy in front had set, rather than its own, which <code>use-forwarded-headers</code> does. Turn it on only when every request arrives through that proxy; it cannot be combined with <code>disable-forwarded-headers</code>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>use-proxy-protocol</code></td>
@@ -5787,6 +5792,87 @@ data:
   real-ip-header: "proxy_protocol"</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> When enabling PROXY protocol, also configure <code>set-real-ip-from</code> and <code>real-ip-header</code> to properly extract client IPs from the PROXY protocol header.</div>
+                        </div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ACME challenges -->
+            <h3 id="configmap-acme">ACME challenges</h3>
+            <div class="table-wrapper">
+                <table class="mapping-table" aria-labelledby="configmap-acme"><thead><tr><th scope="col">Ingress-NGINX</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
+                    <tbody>
+                        <tr class="expandable">
+                            <td><code>no-auth-locations</code></td>
+                            <td>Automatic for cert-manager <span class="badge badge-new">New v5.7.0</span></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>Ingress-NGINX ConfigMap</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+data:
+  no-auth-locations: "/.well-known/acme-challenge"  # the community default</code></pre></div>
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No ConfigMap key. cert-manager creates this
+# solver Ingress itself; NIC 5.7.0 and later
+# exempts it from authentication.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cm-acme-http-solver-x7k2p
+  labels:
+    acme.cert-manager.io/http01-solver: "true"
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /.well-known/acme-challenge/TOKEN
+            pathType: Exact
+            backend:
+              service:
+                name: cm-acme-http-solver-x7k2p
+                port:
+                  number: 8089</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>New in v5.7.0:</strong> The community default let ACME challenges under <code>/.well-known/acme-challenge</code> past authentication. NGINX Ingress Controller exempts a challenge location only when it serves a cert-manager solver: a path under <code>/.well-known/acme-challenge/</code> whose backend Service name starts with <code>cm-acme-http-solver-</code>, so other ACME clients and other paths listed in this key have no equivalent and need a route without the auth Policy. On a VirtualServer this needs <code>-enable-cert-manager</code> and the solver's Ingress in the VirtualServer's namespace; on an Ingress, cert-manager adds the path with <code>acme.cert-manager.io/http01-edit-in-place: "true"</code>. Access control and rate limiting still apply to the challenge.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
+                            <td><code>no-tls-redirect-locations</code></td>
+                            <td>Automatic for cert-manager <span class="badge badge-new">New v5.7.0</span></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>Ingress-NGINX ConfigMap</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+data:
+  no-tls-redirect-locations: "/.well-known/acme-challenge"  # the community default</code></pre></div>
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No ConfigMap key. cert-manager creates this
+# solver Ingress itself; NIC 5.7.0 and later
+# exempts it from the HTTPS redirect.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cm-acme-http-solver-x7k2p
+  labels:
+    acme.cert-manager.io/http01-solver: "true"
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /.well-known/acme-challenge/TOKEN
+            pathType: Exact
+            backend:
+              service:
+                name: cm-acme-http-solver-x7k2p
+                port:
+                  number: 8089</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>New in v5.7.0:</strong> The community default kept HTTP-01 challenges on plain HTTP even with <code>ssl-redirect</code> or <code>force-ssl-redirect</code>. NGINX Ingress Controller 5.7.0 does the same for an active cert-manager challenge: while one is active, every path under <code>/.well-known/acme-challenge/</code> on that host skips <code>tls.redirect</code>, <code>nginx.org/ssl-redirect</code> and <code>nginx.org/redirect-to-https</code>. Earlier versions redirected the challenge and the certificate could not renew. Other paths listed in this key have no equivalent.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -5863,9 +5949,9 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  lb-method: "random two least_conn"  # load-balance</code></pre></div>
+  lb-method: "least_time last_byte"  # load-balance (ewma: the closest latency-based method)</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller defaults to <code>round_robin</code> and supports methods like <code>ewma</code> and <code>least_conn</code>. NGINX Ingress Controller defaults to <code>random two least_conn</code> and uses standard NGINX load balancing method names.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller defaults to <code>round_robin</code> and supports methods like <code>ewma</code> and <code>least_conn</code>. NGINX Ingress Controller defaults to <code>random two least_conn</code> and uses standard NGINX load balancing method names. For <code>ewma</code>, use <code>least_time last_byte</code>, on NGINX Open Source since v5.7.0: both pick the backend with the lowest average response time.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>upstream-keepalive-connections</code></td>

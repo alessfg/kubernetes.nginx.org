@@ -65,10 +65,13 @@
     <script defer src="assets/js/migration-haproxy.js"></script>
     <script defer src="assets/js/migration-core.js"></script>
 </head>
-<body>
+<body class="has-banner">
     <noscript><div class="noscript-warning">This tool requires JavaScript for the config analyzer, navigation, and interactive features.</div></noscript>
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <div class="sr-only" aria-live="polite" id="page-announce"></div>
+
+    <!-- ── Event Banner ── -->
+    <p class="event-banner" id="eventBanner">F5/NGINX will be at <strong>KubeCon North America, November 9&ndash;12</strong> in Salt Lake City. Visit us at <span class="banner-highlight">Booth&nbsp;100</span>!</p>
 
     <!-- ── Top Bar ── -->
     <nav class="topbar" aria-label="Top navigation">
@@ -191,7 +194,7 @@
 
         <div class="tool-page active" id="page-getting-started">
         <div class="info-box note" style="margin: 0 0 var(--space-2x);"><strong>Migrating from HAProxy?</strong> The HAProxy Kubernetes Ingress Controller is actively maintained &mdash; this guide is for teams standardizing on the NGINX data plane. It translates HAProxy's annotations, ConfigMap, and Global/Defaults/Backend/TCP CRDs into the F5 NGINX Ingress Controller's ConfigMap + annotation + VirtualServer/Policy model, resource by resource.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.4" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.4</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
 
         <section id="overview">
             <h2 id="migration-overview">Overview</h2>
@@ -307,12 +310,12 @@
             <p>CRDs can be installed via Helm or manually using manifests, depending on your deployment method. See the <a href="https://docs.nginx.com/nginx-ingress-controller/installation/" target="_blank" rel="noopener">F5 NGINX Ingress Controller installation docs</a> for full instructions.</p>
             <div class="install-box"><h3>Helm (example)</h3>
                 <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">If you install the F5 NGINX Ingress Controller via Helm, CRDs are included automatically. To ensure they are enabled:</p>
-                <pre><code data-nic-helm-install>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version 2.6.4 --set controller.enableCustomResources=true</code></pre>
+                <pre><code data-nic-helm-install>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version 2.8.0 --set controller.enableCustomResources=true</code></pre>
                 <p style="margin: var(--space-2x) 0 0; font-size: var(--fs-caption); line-height: var(--lh-caption); opacity: 0.8;">The <code>controller.enableCustomResources</code> flag is <code>true</code> by default. If you previously disabled it, re-enable it to use CRD resources. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/helm/" target="_blank" rel="noopener">Helm installation guide</a> for details.</p>
             </div>
             <div class="install-box"><h3>Manifests (example)</h3>
                 <p style="margin: 0 0 var(--space-2x); font-size: var(--fs-body); line-height: var(--lh-body);">If you deploy using manifests, install CRDs manually before deploying the controller:</p>
-                <pre><code data-nic-crd-install>kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/v5.5.4/deploy/crds.yaml</code></pre>
+                <pre><code data-nic-crd-install>kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/v5.7.0/deploy/crds.yaml</code></pre>
                 <p style="margin: var(--space-2x) 0 0; font-size: var(--fs-caption); line-height: var(--lh-caption); opacity: 0.8;">Replace the version number with your target controller version. See the <a href="https://docs.nginx.com/nginx-ingress-controller/install/manifests/" target="_blank" rel="noopener">manifest installation guide</a> for the full step-by-step process.</p>
             </div>
             <div class="info-box note"><strong>Note:</strong> The <code>crds.yaml</code> file contains all CRDs (VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration) in a single manifest.</div>
@@ -387,7 +390,7 @@
         </div><!-- /.tool-page #page-getting-started -->
 
         <div class="tool-page" id="page-analyzer" hidden="until-found">
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.4" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.4</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
         <!-- YAML Migration Analyzer -->
         <section id="analyzer">
             <h2 id="yaml-analyzer">HAProxy config analyzer</h2>
@@ -453,7 +456,7 @@ spec:
         </div><!-- /.tool-page #page-analyzer -->
 
         <div class="tool-page" id="page-reference" hidden="until-found">
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.5.4" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.5.4</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
         <!-- Key Differences -->
         <section id="differences">
             <h2 id="key-differences">Key differences</h2>
@@ -1003,14 +1006,14 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/server-ssl</code></td>
-                            <td><code>nginx.org/ssl-services</code><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].tls.enable</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].tls.enable</code><span class="or-text">— or —</span><code>nginx.org/ssl-services</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
 kind: Service
@@ -1027,7 +1030,7 @@ metadata:
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> The annotation moves from the <em>Service</em> to the <em>Ingress</em>, and its value is the Service name rather than <code>"true"</code>. List several Services comma-separated.</div>
                             </div>
-                            <div class="approach-content" data-approach="crd">
+                            <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
 kind: Service
@@ -2051,14 +2054,14 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/ssl-redirect</code></td>
-                            <td><code>nginx.org/redirect-to-https</code> + <code>nginx.org/ssl-redirect</code><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.redirect</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.redirect</code><span class="or-text">— or —</span><code>nginx.org/redirect-to-https</code> + <code>nginx.org/ssl-redirect</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -2076,7 +2079,7 @@ metadata:
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> Use <code>nginx.org/ssl-redirect</code> when the controller terminates TLS, or <code>nginx.org/redirect-to-https</code> (which keys off <code>X-Forwarded-Proto</code>) when TLS ends at an upstream load balancer.</div>
                             </div>
-                            <div class="approach-content" data-approach="crd">
+                            <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -2163,14 +2166,14 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/path-rewrite</code></td>
-                            <td><code>nginx.org/path-regex</code> + <code>nginx.org/rewrite-target</code><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>path</code> + <code>action.proxy.rewritePath</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>path</code> + <code>action.proxy.rewritePath</code><span class="or-text">— or —</span><code>nginx.org/path-regex</code> + <code>nginx.org/rewrite-target</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># Two-field form: &lt;match-regex&gt; &lt;replacement&gt; (sed-like, \1 captures)
 apiVersion: networking.k8s.io/v1
@@ -2188,7 +2191,7 @@ metadata:
     nginx.org/path-regex: "case_sensitive"  # path-rewrite match (enables the captures)</code></pre></div>
                                 </div>
                             </div>
-                            <div class="approach-content" data-approach="crd">
+                            <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># Two-field form: &lt;match-regex&gt; &lt;replacement&gt; (sed-like, \1 captures)
 apiVersion: networking.k8s.io/v1

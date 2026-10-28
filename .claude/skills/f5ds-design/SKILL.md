@@ -185,4 +185,4 @@ Say so when touching these — F5DS does not specify them: table cell padding (t
 
 An automated design-system scanner is **not** a sufficient gate either. Scanners generally cannot resolve `var()`, so a correct `var(--space-2x)` is invisible to them while a literal `16px` counts as on-token — a site that uses tokens properly scores *worse*. Read `tokens.css` instead.
 
-`tokens.css` is 32KB, so read it whole only when you need the reasoning in its comments. To find a value, `python3 .github/scripts/where.py --list <needle>` prints matching tokens with their light and dark values (`-s` adds the measured-ratio comments), and `where.py --<token-name>` gives one token's definition, its dark override and every file that uses it.
+`tokens.css` is 34KB, so read it whole only when you need the reasoning in its comments. To find a value, `python3 .github/scripts/where.py --list <needle>` prints matching tokens with their light and dark values (`-s` adds the measured-ratio comments), and `where.py --<token-name>` gives one token's definition, its dark override and every file that uses it.

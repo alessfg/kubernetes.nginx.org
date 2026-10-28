@@ -750,14 +750,26 @@
                 return out;
             },
 
-            generateServerSSL: function(findings, context) {
+            generateServerSSL: function(findings, context, strategy) {
                 let out = contribution();
                 findings.forEach(function(f) {
                     if (String(f.value).toLowerCase() !== 'true') {
                         out.notes.push({ code: f.label + ': "' + cmt(f.value) + '"', message: 'server-ssl is disabled — plaintext to the backend is the NIC default, no replacement needed.' });
                         return;
                     }
-                    let svc = (f.data && f.data.serviceName) || specService(basicsOf(f, context));
+                    let basics = basicsOf(f, context);
+                    let svc = (f.data && f.data.serviceName) || specService(basics);
+                    if (strategy === 'crd') {
+                        // CRD-first: the VirtualServer upstream's own TLS switch, the
+                        // field nginx.org/ssl-services stands in for on an Ingress.
+                        let lines = ['apiVersion: k8s.nginx.org/v1', 'kind: VirtualServer', 'metadata:', '  name: backend-tls-app', 'spec:',
+                            '  host: ' + specHost(basics), '  upstreams:', '    - name: backend', '      service: ' + svc, '      port: ' + specPort(basics),
+                            '      tls:', '        enable: true  # ' + cmt(f.label),
+                            '  routes:', '    - path: ' + specPath(basics), '      action:', '        pass: backend'];
+                        out.crds.push({ kind: 'VirtualServer', yaml: lines.join('\n') });
+                        out.notes.push({ code: f.label, message: 'upstreams[].tls.enable sends HTTPS to the backend and, like HAProxy server-ssl, does NOT verify its certificate — add an egressMTLS Policy (server-ca) for verification.' });
+                        return;
+                    }
                     out.swaps.push({ fromKey: f.label, fromValue: f.value, to: 'nginx.org/ssl-services', value: svc, note: 'proxy_pass https:// to this Service — like HAProxy server-ssl, the upstream certificate is NOT verified unless you add an egressMTLS Policy (server-ca)' });
                 });
                 return out;
@@ -1920,7 +1932,7 @@
 
             // Backend TLS
             { keys: ['annotation:server-ca', 'annotation:server-crt'], source: 'server-ca / server-crt', nic: 'Policy CRD egressMTLS (trustedCertSecret + verifyServer / tlsSecret) + nginx.org/ssl-services', type: 'policy', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true, generator: 'generateBackendMTLS' },
-            { keys: ['annotation:server-ssl'], source: 'server-ssl', nic: 'nginx.org/ssl-services — or — VirtualServer upstreams[].tls.enable', type: 'annotation', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true, generator: 'generateServerSSL' },
+            { keys: ['annotation:server-ssl'], source: 'server-ssl', nic: 'VirtualServer upstreams[].tls.enable — or — nginx.org/ssl-services', type: 'annotation', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true, generator: 'generateServerSSL' },
             { keys: ['annotation:server-proto'], source: 'server-proto', nic: 'nginx.org/grpc-services (h2c, gRPC backends only) — generic backend HTTP/2 has no equivalent', type: 'annotation', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true, generator: 'generateServerProto' },
 
             // Session persistence
@@ -1957,9 +1969,9 @@
             { keys: ['annotation:abortonclose', 'configmap:clean-certs'], source: 'abortonclose / clean-certs', nic: 'Not applicable — NIC architecture makes these unnecessary (see notes)', type: 'annotation', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss', grouped: true, generator: 'generateNotApplicable' },
 
             // Rewrites & redirects
-            { keys: ['annotation:path-rewrite'], source: 'path-rewrite', nic: 'nginx.org/rewrite-target (+ nginx.org/path-regex) — or — VirtualServer regex path + rewritePath', type: 'annotation', category: 'Rewrites', anchor: 'rewrites', section: 'oss', grouped: true, generator: 'generatePathRewrite' },
+            { keys: ['annotation:path-rewrite'], source: 'path-rewrite', nic: 'VirtualServer regex path + rewritePath — or — nginx.org/rewrite-target (+ nginx.org/path-regex)', type: 'annotation', category: 'Rewrites', anchor: 'rewrites', section: 'oss', grouped: true, generator: 'generatePathRewrite' },
             { keys: ['annotation:request-redirect', 'annotation:request-redirect-code'], source: 'request-redirect (+ -code)', nic: 'VirtualServer action.redirect {url, code} (HAProxy default 302)', type: 'virtualserver', category: 'Redirects', anchor: 'redirects', section: 'oss', grouped: true, generator: 'generateRequestRedirect' },
-            { keys: ['annotation:ssl-redirect', 'annotation:ssl-redirect-code'], source: 'ssl-redirect (+ -code)', nic: 'nginx.org/ssl-redirect + nginx.org/http-redirect-code (emit 302 explicitly — NIC defaults to 301)', type: 'annotation', category: 'Redirects', anchor: 'redirects', section: 'oss', grouped: true, generator: 'generateSSLRedirect' },
+            { keys: ['annotation:ssl-redirect', 'annotation:ssl-redirect-code'], source: 'ssl-redirect (+ -code)', nic: 'VirtualServer spec.tls.redirect — or — nginx.org/ssl-redirect + nginx.org/http-redirect-code (emit 302 explicitly — NIC defaults to 301)', type: 'annotation', category: 'Redirects', anchor: 'redirects', section: 'oss', grouped: true, generator: 'generateSSLRedirect' },
             { keys: ['annotation:ssl-redirect-port'], source: 'ssl-redirect-port', nic: 'No direct equivalent — NIC redirects to its own HTTPS listener port; bake a custom port into a VirtualServer redirect URL', type: 'annotation', category: 'Redirects', anchor: 'redirects', section: 'oss', grouped: true, generator: 'generateSSLRedirectPort' },
 
             // Timeouts & connection handling

@@ -246,18 +246,21 @@ for (const p of PAGES) {
             const blocks = [...row[1].matchAll(
                 /<div class="comparison-block new"><h4>[\s\S]*?<\/h4><pre><code>([\s\S]*?)<\/code><\/pre><\/div>/g)];
             if (blocks.length < 2) continue;
+            // Bare in one block and commented in ANOTHER: within one block the
+            // same key and value can be both, as a TransportServer's own name
+            // is bare while its listener reference names what it replaces.
             const seen = new Map();
-            for (const b of blocks) {
+            blocks.forEach((b, i) => {
                 for (const line of b[1].split('\n')) {
                     const m = LINE.exec(line);
                     if (!m) continue;
                     const k = `${m[1]}=${m[3]}`;
-                    if (!seen.has(k)) seen.set(k, new Set());
-                    seen.get(k).add(m[4] || '');
+                    if (!seen.has(k)) seen.set(k, { bare: new Set(), commented: new Set() });
+                    seen.get(k)[m[4] ? 'commented' : 'bare'].add(i);
                 }
-            }
-            for (const [k, comments] of seen) {
-                if (comments.size > 1 && comments.has('')) drift.push(k);
+            });
+            for (const [k, at] of seen) {
+                if ([...at.bare].some((i) => [...at.commented].some((j) => j !== i))) drift.push(k);
             }
         }
         assert.deepEqual(drift, [], 'lines commented in one approach tab and bare in another');

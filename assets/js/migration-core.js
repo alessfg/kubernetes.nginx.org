@@ -10,14 +10,14 @@
        year) lives in shared.js, which loads first and exposes those globals. */
     (function() {
         'use strict';
-        // Single source of truth for the F5 NGINX Ingress Controller (the migration
+        // Single source of truth for the NGINX Ingress Controller (the migration
         // TARGET) versions the tool pages are documented against. Bump these when
         // updating the Version Reference (see .claude/skills/release-update/SKILL.md;
         // also update the version pills/install URLs in index.html). The source
         // controller's version lives at the top of its migration-<source>.js.
         const NIC = {
-            VERSION: 'v5.5.4',
-            HELM_VERSION: '2.6.4'
+            VERSION: 'v5.7.0',
+            HELM_VERSION: '2.8.0'
         };
         NIC.CRD_INSTALL_CMD = 'kubectl apply -f https://raw.githubusercontent.com/nginx/kubernetes-ingress/' + NIC.VERSION + '/deploy/crds.yaml';
         NIC.HELM_INSTALL_CMD = 'helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress --version ' + NIC.HELM_VERSION + ' --set controller.enableCustomResources=true';
@@ -114,83 +114,600 @@
             return warnings;
         }
 
-        // Inject "  # <source-name>" comments into generated YAML so each line can be
-        // traced back to the finding it came from. Two passes: value-based matching,
-        // then field-name matching for whatever is still unmatched.
-        function annotateYamlWithSources(yaml, foundAnnotations) {
-            let crdYamlLines = yaml.split('\n');
-            let usedAnnotations = {};
-            // First pass: value-based matching
-            let annotatedLines = crdYamlLines.map(function(line) {
-                // Skip comment lines and top-level structural keys
-                if (/^\s*#/.test(line) || /^(apiVersion|kind|metadata|spec):/.test(line.trim())) return line;
-                // Skip metadata name (shallow indent ≤4 spaces)
-                let nameCheck = line.match(/^(\s+)name:\s/);
-                if (nameCheck && nameCheck[1].length <= 4) return line;
-                // Extract value from "key: value" lines
-                let kvMatch = line.match(/^(\s+\S+:\s*)(.+)$/);
-                if (!kvMatch) return line;
-                let lineVal = kvMatch[2].replace(/^["']|["']$/g, '').trim();
-                let matched = null;
-                foundAnnotations.forEach(function(a) {
-                    if (matched) return;
-                    if (usedAnnotations[a.annotation]) return;
-                    let v = a.value != null ? String(a.value) : '';
-                    let cleaned = v.replace(/^[^/]+\//, '');
-                    if (lineVal && (lineVal === v || lineVal === cleaned || v.indexOf(lineVal) !== -1 || lineVal.indexOf(cleaned) !== -1)) {
-                        matched = a.annotation;
-                    }
-                    // Boolean transforms: on/off → true/false
-                    if (!matched && ((v === 'on' && lineVal === 'true') || (v === 'off' && lineVal === 'false'))) {
-                        matched = a.annotation;
-                    }
-                });
-                if (matched) {
-                    usedAnnotations[matched] = true;
-                    return line + '  # ' + matched;
-                }
-                return line;
-            });
-            // Second pass: field-name matching for remaining unmatched annotations
-            let unmatched = foundAnnotations.filter(function(a) { return !usedAnnotations[a.annotation]; });
-            if (unmatched.length > 0) {
-                annotatedLines = annotatedLines.map(function(line) {
-                    if (/  # \S/.test(line)) return line;
-                    if (/^\s*#/.test(line) || /^(apiVersion|kind|metadata|spec):/.test(line.trim())) return line;
-                    let nameCheck = line.match(/^(\s+)name:\s/);
-                    if (nameCheck && nameCheck[1].length <= 4) return line;
-                    let keyMatch = line.match(/^\s+(\S+):/);
-                    if (!keyMatch) return line;
-                    // Normalize camelCase to hyphenated: sessionCookie → session-cookie
-                    let fieldKey = keyMatch[1].replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-                    let matched = null;
-                    unmatched.forEach(function(a) {
-                        if (matched) return;
-                        if (usedAnnotations[a.annotation]) return;
-                        let parts = a.annotation.toLowerCase().split('-');
-                        let last1 = parts[parts.length - 1];
-                        let last2 = parts.length >= 2 ? parts.slice(-2).join('-') : '';
-                        // Match last segment (min 3 chars) or last two segments against field key
-                        if ((last1.length > 2 && fieldKey === last1) || (last2 && fieldKey === last2)) {
-                            matched = a.annotation;
-                        }
-                        // For key-only lines, check if annotation value appears in field name
-                        if (!matched && /:\s*$/.test(line)) {
-                            let v = a.value != null ? String(a.value).toLowerCase() : '';
-                            if (v.length > 3 && fieldKey.indexOf(v) !== -1) {
-                                matched = a.annotation;
-                            }
-                        }
-                    });
-                    if (matched) {
-                        usedAnnotations[matched] = true;
-                        return line + '  # ' + matched;
-                    }
-                    return line;
-                });
-            }
-            return annotatedLines.join('\n');
+
+        // --- YAML ------------------------------------------------------------
+        // A Kubernetes-manifest subset of YAML, shared by the page and by
+        // nic-migrate (which used to carry its own copy). The analyzer once read
+        // manifests with line regexes; that truncated kubectl's wrapped values,
+        // kept escape sequences literal and took a Deployment's probe path for a
+        // route. One parser, so both tools read a manifest the same way.
+        //
+        // Supported: multi-document streams, block mappings and sequences, plain
+        // and quoted scalars (folded across lines, as kubectl wraps anything past
+        // ~80 columns), block scalars with chomping and indentation indicators,
+        // comments, flow collections on one line, and the scalar types manifests
+        // use. Refused rather than half-read: anchors and aliases, merge keys,
+        // tags other than the standard !!str/!!int/!!bool/!!null, and any line
+        // the parser does not consume. Every error names its line.
+
+        function yamlError(message, line) {
+            let err = new Error(line ? 'line ' + line + ': ' + message : message);
+            err.yamlLine = line || null;
+            return err;
         }
+
+        // Index of a trailing comment's '#', honouring both quote styles and
+        // their escapes, or -1. A '#' opens a comment only at the start or after
+        // whitespace.
+        function yamlCommentStart(s) {
+            let quote = null;
+            let prev = '';
+            for (let i = 0; i < s.length; i++) {
+                let c = s[i];
+                if (quote) {
+                    if (quote === '"' && c === '\\') { i++; continue; }
+                    if (c === quote) {
+                        if (quote === "'" && s[i + 1] === "'") { i++; continue; }
+                        quote = null;
+                        prev = c;
+                    }
+                    continue;
+                }
+                // A quote opens a scalar only where one can start: a plain
+                // scalar such as `it's` or `say "hi"` keeps its quotes literal.
+                if ((c === '"' || c === "'") && (prev === '' || /[\[{,]/.test(prev) || (/[:?-]/.test(prev) && /\s/.test(s[i - 1])))) { quote = c; continue; }
+                if (c === '#' && (i === 0 || /\s/.test(s[i - 1]))) return i;
+                if (!/\s/.test(c)) prev = c;
+            }
+            return -1;
+        }
+
+        function yamlStripComment(s) {
+            let i = yamlCommentStart(s);
+            return i === -1 ? s : s.slice(0, i);
+        }
+
+        function yamlIndent(line) {
+            let n = 0;
+            while (n < line.length && line[n] === ' ') n++;
+            return n;
+        }
+
+        // Split a stream into documents of raw lines, normalising CRLF/CR and a
+        // BOM. `---` may carry a comment (`--- # Source: …` from helm template)
+        // or content after it; `...` ends a document.
+        function yamlSplitStream(text) {
+            let lines = String(text).replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '').split('\n');
+            // A final newline ends the last line; it does not open another. Without
+            // one, a block scalar ending the stream has no final line break.
+            let finalNewline = lines.length > 1 && lines[lines.length - 1] === '';
+            if (finalNewline) lines.pop();
+            let docs = [];
+            let cur = { lines: [], start: 1 };
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                let m = line.match(/^---(?:\s+(.*))?\s*$/);
+                if (m || /^---\s/.test(line)) {
+                    docs.push(cur);
+                    cur = { lines: [], start: i + 2 };
+                    let rest = line.slice(3).trim();
+                    if (rest && rest[0] !== '#') { cur.lines.push(rest); cur.start = i + 1; }
+                    continue;
+                }
+                if (/^\.\.\.\s*$/.test(line)) { docs.push(cur); cur = { lines: [], start: i + 2 }; continue; }
+                cur.lines.push(line);
+            }
+            cur.noFinalNewline = !finalNewline;
+            docs.push(cur);
+            return docs.filter(function(d) { return d.lines.some(function(l) { return l.trim() !== '' && !/^\s*#/.test(l); }); });
+        }
+
+        // Index of the quote closing a scalar that opens at s[0], or -1.
+        function yamlQuoteEnd(s) {
+            let q = s[0];
+            for (let i = 1; i < s.length; i++) {
+                if (q === '"' && s[i] === '\\') { i++; continue; }
+                if (s[i] !== q) continue;
+                if (q === "'" && s[i + 1] === "'") { i++; continue; }
+                return i;
+            }
+            return -1;
+        }
+
+        let YAML_ESCAPES = { '0': '\0', a: '\x07', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\v', f: '\f', r: '\r', e: '\x1b', ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\u0085', _: '\u00a0', L: '\u2028', P: '\u2029' };
+
+        function yamlUnescapeDouble(body, line) {
+            return body.replace(/\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)/g, function(_, e) {
+                if (e.length > 1) return String.fromCodePoint(parseInt(e.slice(1), 16));
+                if (Object.prototype.hasOwnProperty.call(YAML_ESCAPES, e)) return YAML_ESCAPES[e];
+                throw yamlError('unknown escape \\' + e + ' in a double-quoted string', line);
+            });
+        }
+
+        // A YAML 1.2 core-schema scalar, as Kubernetes reads one. Quoted scalars
+        // are always strings; plain ones resolve to null, booleans and decimal
+        // numbers, and stay strings otherwise (0755 and 1:30 included — callers
+        // that care about YAML 1.1's readings quote on output, see yamlNeedsQuotes).
+        function yamlScalar(raw, line) {
+            let t = String(raw).trim();
+            if (t === '') return null;
+            if (t[0] === '&' || t[0] === '*') throw yamlError('anchors and aliases are not supported (found "' + t.split(/\s/)[0] + '")', line);
+            if (t === '<<') throw yamlError('merge keys (<<) are not supported', line);
+            if (t[0] === '!') {
+                let tag = t.match(/^(!\S*)\s*([\s\S]*)$/);
+                let value = tag[2];
+                if (tag[1] === '!!str') { let s = yamlScalar(value, line); return s === null ? '' : String(s); }
+                if (tag[1] === '!!int' || tag[1] === '!!float' || tag[1] === '!!bool' || tag[1] === '!!null') return yamlScalar(value, line);
+                throw yamlError('the tag ' + tag[1] + ' is not supported', line);
+            }
+            if (t[0] === '"') {
+                if (yamlQuoteEnd(t) !== t.length - 1) throw yamlError('unterminated or malformed double-quoted string', line);
+                return yamlUnescapeDouble(t.slice(1, -1), line);
+            }
+            if (t[0] === "'") {
+                if (yamlQuoteEnd(t) !== t.length - 1) throw yamlError('unterminated or malformed single-quoted string', line);
+                return t.slice(1, -1).replace(/''/g, "'");
+            }
+            if (t[0] === '{' || t[0] === '[') return yamlFlow(t, line);
+            if (/^(null|Null|NULL|~)$/.test(t)) return null;
+            if (/^(true|True|TRUE)$/.test(t)) return true;
+            if (/^(false|False|FALSE)$/.test(t)) return false;
+            if (/^[-+]?(0|[1-9][0-9]*)$/.test(t)) return Number(t);
+            if (/^[-+]?(0|[1-9][0-9]*)\.[0-9]+([eE][-+]?[0-9]+)?$/.test(t)) return Number(t);
+            return t;
+        }
+
+        // Split at `sep` on flow depth 0, outside quotes.
+        function yamlSplitFlow(body, sep) {
+            let out = [], depth = 0, quote = null, cur = '';
+            for (let i = 0; i < body.length; i++) {
+                let c = body[i];
+                if (quote) {
+                    cur += c;
+                    if (quote === '"' && c === '\\') { cur += body[++i] || ''; continue; }
+                    if (c === quote) {
+                        if (quote === "'" && body[i + 1] === "'") { cur += body[++i]; continue; }
+                        quote = null;
+                    }
+                    continue;
+                }
+                if ((c === '"' || c === "'") && /(^|[\[{,:?])\s*$/.test(cur)) { quote = c; cur += c; continue; }
+                if (c === '{' || c === '[') depth++;
+                if (c === '}' || c === ']') depth--;
+                if (depth < 0) return null;
+                if (c === sep && depth === 0) { out.push(cur); cur = ''; continue; }
+                cur += c;
+            }
+            if (depth !== 0 || quote) return null;
+            if (cur.trim() !== '') out.push(cur);
+            return out;
+        }
+
+        // A flow mapping key ends at the first ': ' (or a ':' before the end)
+        // outside quotes. Unquoted values never swallow the next key — `{a: b,
+        // c: d}` is two pairs — which is how inline annotations used to merge.
+        function yamlFlow(t, line) {
+            let open = t[0], close = open === '{' ? '}' : ']';
+            if (t[t.length - 1] !== close) throw yamlError('unterminated flow collection', line);
+            let parts = yamlSplitFlow(t.slice(1, -1), ',');
+            if (parts === null) throw yamlError('unbalanced brackets or quotes in a flow collection', line);
+            if (open === '[') return parts.map(function(p) { return yamlScalar(p, line); });
+            let out = {};
+            parts.forEach(function(pair) {
+                let p = pair.trim();
+                if (p === '') return;
+                let key, rest;
+                if (p[0] === '"' || p[0] === "'") {
+                    let end = yamlQuoteEnd(p);
+                    if (end === -1) throw yamlError('unterminated quoted key in a flow mapping', line);
+                    key = yamlScalar(p.slice(0, end + 1), line);
+                    rest = p.slice(end + 1).replace(/^\s*:/, '');
+                } else {
+                    let m = p.match(/^([^:]*?)\s*:(?:\s+|$)([\s\S]*)$/);
+                    if (!m) throw yamlError('flow mapping entry "' + p + '" has no "key: value" form', line);
+                    key = yamlScalar(m[1], line);
+                    rest = m[2];
+                }
+                out[String(key)] = yamlScalar(rest, line);
+            });
+            return out;
+        }
+
+        // Fold a multi-line plain or quoted scalar the way YAML does: a single
+        // line break between two non-empty lines is a space, each empty line a
+        // newline. kubectl wraps long annotation values onto such lines.
+        function yamlFold(lines, quote) {
+            let out = lines[0].replace(/[ \t]+$/, '');
+            let breaks = 0;
+            for (let i = 1; i < lines.length; i++) {
+                let t = lines[i].trim();
+                if (t === '') { breaks++; continue; }
+                // Inside double quotes a trailing backslash escapes the line break.
+                if (quote === '"' && !breaks && /(^|[^\\])(\\\\)*\\$/.test(out)) { out = out.slice(0, -1) + t; continue; }
+                out += breaks ? '\n'.repeat(breaks) : ' ';
+                breaks = 0;
+                out += t;
+            }
+            return out;
+        }
+
+        function YamlReader(lines, firstLine, noFinalNewline) {
+            this.noFinalNewline = !!noFinalNewline;
+            this.raw = lines.map(function(l) { return l; });
+            this.first = firstLine || 1;
+            this.i = 0;
+            this.entries = this.raw.map(function(l, idx) {
+                // A tab may not indent YAML structure; inside a block scalar it is content.
+                return { indent: yamlIndent(l), content: yamlStripComment(l).trim(), raw: l };
+            });
+        }
+        YamlReader.prototype.lineNo = function(i) { return this.first + (i === undefined ? this.i : i); };
+        YamlReader.prototype.blank = function(i) { let r = this.raw[i]; return r.trim() === '' || /^\s*#/.test(r); };
+        YamlReader.prototype.peek = function() {
+            while (this.i < this.raw.length && this.blank(this.i)) this.i++;
+            if (this.i >= this.raw.length) return null;
+            if (/^ *\t/.test(this.raw[this.i])) throw yamlError('a tab is used for indentation', this.lineNo());
+            return this.entries[this.i];
+        };
+        YamlReader.prototype.respan = function(indent, content) {
+            this.entries[this.i] = { indent: indent, content: content, raw: this.raw[this.i] };
+        };
+
+        let YAML_KEY = /^((?:[^:]|:(?=\S))+?)\s*:(\s+[\s\S]*|\s*)$/;
+
+        // `key: rest` from a line, or null when the line is a scalar.
+        function yamlKeyLine(content, line) {
+            if (content[0] === '"' || content[0] === "'") {
+                let end = yamlQuoteEnd(content);
+                if (end === -1) return null;
+                let m = content.slice(end + 1).match(/^\s*:(\s+[\s\S]*|\s*)$/);
+                if (!m) return null;
+                return { key: String(yamlScalar(content.slice(0, end + 1), line)), rest: m[1].trim() };
+            }
+            if (content[0] === '[' || content[0] === '{' || content[0] === '-' && /^-(\s|$)/.test(content)) return null;
+            let m = content.match(YAML_KEY);
+            if (!m) return null;
+            let key = yamlScalar(m[1].trim(), line);
+            return { key: key === null ? '' : String(key), rest: m[2].trim() };
+        }
+
+        function yamlValue(r, minIndent) {
+            let e = r.peek();
+            if (!e || e.indent < minIndent) return null;
+            if (/^-(\s|$)/.test(e.content)) return yamlSequence(r, e.indent);
+            if (yamlKeyLine(e.content, r.lineNo())) return yamlMapping(r, e.indent);
+            return yamlMultiScalar(r, e.indent - 1);
+        }
+
+        // A scalar that starts on its own line and may continue on more-indented
+        // lines (a bare document, or a sequence item's wrapped value).
+        function yamlMultiScalar(r, parentIndent) {
+            let startIdx = r.i;
+            let first = r.entries[r.i].content;
+            r.i++;
+            return yamlContinue(r, first, parentIndent, startIdx);
+        }
+
+        // Read continuation lines for a plain or quoted scalar that began with
+        // `first` on line `startIdx`. Continuation lines are anything indented
+        // deeper than the parent; a quoted scalar continues until its quote closes.
+        function yamlContinue(r, first, parentIndent, startIdx) {
+            let parts = [first];
+            let quote = (first[0] === '"' || first[0] === "'") ? first[0] : null;
+            let closed = quote ? yamlQuoteEnd(first) !== -1 : true;
+            if (quote && closed) return yamlScalar(first, r.lineNo(startIdx));
+            if (!quote && /^[\[{]/.test(first)) {
+                // A flow collection may wrap too; join until brackets balance.
+                while (yamlSplitFlow(parts.join(' ').slice(1, -1), ',') === null || !/[\]}]\s*$/.test(parts.join(' '))) {
+                    if (r.i >= r.raw.length) throw yamlError('unterminated flow collection', r.lineNo(startIdx));
+                    parts.push(r.raw[r.i].trim());
+                    r.i++;
+                }
+                return yamlScalar(parts.join(' '), r.lineNo(startIdx));
+            }
+            while (r.i < r.raw.length) {
+                let raw = r.raw[r.i];
+                if (raw.trim() === '') { parts.push(''); r.i++; continue; }
+                if (quote) {
+                    parts.push(raw);
+                    r.i++;
+                    if (yamlQuoteEnd(parts.map(function(p, k) { return k === 0 ? p : p.trim(); }).join(' ')) !== -1) {
+                        closed = true;
+                        break;
+                    }
+                    continue;
+                }
+                if (/^\s*#/.test(raw)) break;
+                if (yamlIndent(raw) <= parentIndent) break;
+                let content = yamlStripComment(raw).trim();
+                // A plain scalar cannot hold ": " — a deeper line that does is
+                // mis-indented structure, and folding it in would hide that.
+                if (/:(\s|$)/.test(content) || /^-(\s|$)/.test(content)) throw yamlError('mapping or sequence entry inside a value — check the indentation', r.lineNo());
+                parts.push(content);
+                r.i++;
+                if (yamlCommentStart(raw) !== -1) break;
+            }
+            while (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
+            if (quote) {
+                if (!closed) throw yamlError('unterminated ' + (quote === '"' ? 'double' : 'single') + '-quoted string', r.lineNo(startIdx));
+                // Fold inside the quotes, then hand the single-line form to the scalar parser.
+                let joined = yamlFold(parts, quote);
+                let end = yamlQuoteEnd(joined);
+                let after = yamlStripComment(joined.slice(end + 1)).trim();
+                if (after !== '') throw yamlError('unexpected text after a quoted string: ' + after, r.lineNo(startIdx));
+                return yamlScalar(joined.slice(0, end + 1), r.lineNo(startIdx));
+            }
+            if (parts.length === 1) return yamlScalar(parts[0], r.lineNo(startIdx));
+            return yamlFold(parts);
+        }
+
+        function yamlMapping(r, indent) {
+            let out = {};
+            for (;;) {
+                let e = r.peek();
+                if (!e || e.indent < indent) break;
+                if (e.indent > indent) throw yamlError('unexpected indentation', r.lineNo());
+                let kv = yamlKeyLine(e.content, r.lineNo());
+                if (!kv) {
+                    if (/^-(\s|$)/.test(e.content)) break;
+                    throw yamlError('expected "key: value", found "' + e.content.slice(0, 40) + '"', r.lineNo());
+                }
+                if (Object.prototype.hasOwnProperty.call(out, kv.key)) throw yamlError('duplicate key "' + kv.key + '"', r.lineNo());
+                let idx = r.i;
+                r.i++;
+                out[kv.key] = yamlNodeValue(r, kv.rest, indent, idx);
+            }
+            return out;
+        }
+
+        function yamlSequence(r, indent) {
+            let out = [];
+            for (;;) {
+                let e = r.peek();
+                if (!e || e.indent < indent) break;
+                if (e.indent > indent) throw yamlError('unexpected indentation', r.lineNo());
+                if (!/^-(\s|$)/.test(e.content)) break;
+                let rest = e.content.replace(/^-\s*/, '');
+                let idx = r.i;
+                if (rest === '') {
+                    r.i++;
+                    let next = r.peek();
+                    out.push(next && next.indent > indent ? yamlValue(r, indent + 1) : null);
+                    continue;
+                }
+                let dash = e.raw.indexOf('-', indent);
+                let contentIndent = dash + 1 + (e.raw.slice(dash + 1).match(/^ */) || [''])[0].length;
+                if (/^-(\s|$)/.test(rest)) {
+                    r.respan(contentIndent, rest);
+                    out.push(yamlSequence(r, contentIndent));
+                } else if (yamlKeyLine(rest, r.lineNo())) {
+                    r.respan(contentIndent, rest);
+                    out.push(yamlMapping(r, contentIndent));
+                } else {
+                    r.i++;
+                    out.push(yamlNodeValue(r, rest, indent, idx));
+                }
+            }
+            return out;
+        }
+
+        function yamlNodeValue(r, rest, parentIndent, lineIdx) {
+            let block = rest.match(/^([|>])([-+]?)([1-9]?)([-+]?)$/);
+            if (block) return yamlBlockScalar(r, block[1], block[2] || block[4], block[3], parentIndent);
+            if (/^[|>]/.test(rest)) throw yamlError('malformed block scalar header "' + rest + '"', r.lineNo(lineIdx));
+            if (rest !== '') return yamlContinue(r, rest, parentIndent, lineIdx);
+            let next = r.peek();
+            if (!next) return null;
+            if (next.indent > parentIndent) return yamlValue(r, next.indent);
+            // A sequence may sit at its key's own indent.
+            if (next.indent === parentIndent && /^-(\s|$)/.test(next.content)) return yamlSequence(r, next.indent);
+            return null;
+        }
+
+        function yamlBlockScalar(r, style, chomp, explicit, parentIndent) {
+            let lines = [];
+            let contentIndent = explicit ? parentIndent + Number(explicit) : null;
+            for (; r.i < r.raw.length; r.i++) {
+                let raw = r.raw[r.i];
+                if (raw.trim() === '') { lines.push(raw.length > (contentIndent || 0) ? raw.slice(contentIndent || 0) : ''); continue; }
+                let ind = yamlIndent(raw);
+                if (contentIndent === null) {
+                    if (ind <= parentIndent) break;
+                    contentIndent = ind;
+                }
+                if (ind < contentIndent) break;
+                lines.push(raw.slice(contentIndent));
+            }
+            if (contentIndent === null && lines.every(function(l) { return l === ''; })) lines = lines.map(function() { return ''; });
+            let trailing = 0;
+            while (lines.length && lines[lines.length - 1].trim() === '') { lines.pop(); trailing++; }
+            // Line breaks after the last content line: one per trailing blank
+            // line, plus the content line's own unless it ends the stream bare.
+            let breaks = trailing + (r.i >= r.raw.length && r.noFinalNewline ? 0 : 1);
+            let body;
+            if (style === '|') {
+                body = lines.join('\n');
+            } else {
+                // Folded: a break between two plain lines is a space, each empty
+                // line a newline, and breaks around more-indented lines stay.
+                let lead = 0;
+                while (lead < lines.length && lines[lead] === '') lead++;
+                body = '\n'.repeat(lead) + (lead < lines.length ? lines[lead] : '');
+                for (let i = lead + 1; i < lines.length; i++) {
+                    let empties = 0;
+                    while (lines[i] === '') { empties++; i++; }
+                    let more = /^\s/.test(lines[i]) || /^\s/.test(lines[i - 1 - empties]);
+                    body += empties ? '\n'.repeat(empties + (more ? 1 : 0)) : (more ? '\n' : ' ');
+                    body += lines[i];
+                }
+            }
+            if (chomp === '-') return body;
+            if (chomp === '+') return body + '\n'.repeat(lines.length ? breaks : trailing);
+            return body === '' || breaks === 0 ? body : body + '\n';
+        }
+
+        // Parse one document's lines; throws on anything not consumed.
+        function yamlParseLines(lines, firstLine, noFinalNewline) {
+            let r = new YamlReader(lines, firstLine, noFinalNewline);
+            let value = yamlValue(r, 0);
+            let left = r.peek();
+            if (left) throw yamlError('could not parse "' + left.content.slice(0, 40) + '"', r.lineNo());
+            return value;
+        }
+
+        function yamlParse(text) {
+            let docs = yamlSplitStream(text);
+            if (docs.length === 0) return null;
+            if (docs.length > 1) throw yamlError('expected one document, found ' + docs.length);
+            return yamlParseLines(docs[0].lines, docs[0].start, docs[0].noFinalNewline);
+        }
+
+        function yamlParseAll(text) {
+            return yamlSplitStream(text).map(function(d) { return yamlParseLines(d.lines, d.start, d.noFinalNewline); }).filter(function(d) { return d !== null; });
+        }
+
+        // --- emitting ---
+
+        let YAML_RESERVED = /^(true|false|null|~|yes|no|on|off|y|n)$/i;
+
+        // Quote anything a YAML 1.1 or 1.2 reader would not read back as this
+        // string. Kubernetes reads YAML 1.1 in places, where 0755 is 493 and
+        // 1:30 is 90, so anything starting like a number is quoted: over-quoting
+        // is cosmetic, under-quoting is a wrong value.
+        function yamlNeedsQuotes(s) {
+            if (s === '') return true;
+            if (/[\n\r\t\x00-\x08\x0b\x0c\x0e-\x1f\u0085\u2028\u2029]/.test(s)) return true;
+            if (/^\s|\s$/.test(s)) return true;
+            if (/^[-?:,\[\]{}#&*!|>'"%@`]/.test(s)) return true;
+            if (YAML_RESERVED.test(s)) return true;
+            if (/:\s|\s#|:$/.test(s)) return true;
+            if (/^[-+.0-9]/.test(s)) return true;
+            return false;
+        }
+
+        function yamlQuote(s) {
+            return '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\t/g, '\\t')
+                .replace(/\r/g, '\\r').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, function(c) { return '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0'); }) + '"';
+        }
+
+        // One-line form of a scalar for `key: <here>`, or null when the value
+        // needs a block scalar. `opts.quote` forces quotes on any string.
+        function yamlFormatScalar(v, quoteAlways) {
+            if (v === null || v === undefined) return 'null';
+            if (typeof v === 'boolean' || typeof v === 'number') return String(v);
+            let s = String(v);
+            if (s.indexOf('\n') !== -1) return yamlBlockSafe(s) ? null : yamlQuote(s);
+            return quoteAlways || yamlNeedsQuotes(s) ? yamlQuote(s) : s;
+        }
+
+        // A literal block reads back exactly when the text has content, ends in
+        // at most one newline, has no whitespace-only line and no control
+        // characters. Anything else is double-quoted: uglier, never wrong.
+        function yamlBlockSafe(s) {
+            let body = s.replace(/\n$/, '');
+            if (/\n$/.test(body) || body === '' || /^\n/.test(body)) return false;
+            if (/[\x00-\x08\x0b-\x1f\x7f\u0085\u2028\u2029]/.test(s.replace(/\n/g, ''))) return false;
+            return body.split('\n').every(function(l) { return l === '' || l.trim() !== ''; });
+        }
+
+        // Lines for a block scalar holding `s`, indented by `pad`. Chomping and
+        // the indentation indicator are chosen so the value reads back exactly.
+        function yamlBlockLines(s, pad) {
+            let keep = /\n$/.test(s);
+            let body = s.replace(/\n$/, '').split('\n');
+            let indicator = /^\s/.test(body[0]) ? '2' : '';
+            return { header: '|' + indicator + (keep ? '' : '-'), lines: body.map(function(l) { return l === '' ? '' : pad + l; }) };
+        }
+
+        function yamlIsMap(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+
+        // Emit `value` at `indent`. `comments` maps a dotted path ('spec.host',
+        // 'spec.routes.0.path') to a trailing comment, which is how each
+        // generated line names the community annotation it came from.
+        function yamlEmitNode(value, indent, lines, path, comments, opts) {
+            let pad = ' '.repeat(indent);
+            let note = function(p) { return comments && comments[p] ? '  # ' + comments[p] : ''; };
+            if (Array.isArray(value)) {
+                value.forEach(function(item, i) {
+                    let p = path + '.' + i;
+                    if (yamlIsMap(item) || Array.isArray(item)) {
+                        if ((yamlIsMap(item) && Object.keys(item).length === 0) || (Array.isArray(item) && item.length === 0)) {
+                            lines.push(pad + '- ' + (Array.isArray(item) ? '[]' : '{}') + note(p));
+                            return;
+                        }
+                        let before = lines.length;
+                        yamlEmitNode(item, indent + 2, lines, p, comments, opts);
+                        lines[before] = pad + '- ' + lines[before].slice(indent + 2);
+                    } else {
+                        let one = yamlFormatScalar(item);
+                        if (one === null) {
+                            let b = yamlBlockLines(String(item), pad + '  ');
+                            lines.push(pad + '- ' + b.header + note(p));
+                            b.lines.forEach(function(l) { lines.push(l); });
+                        } else {
+                            lines.push(pad + '- ' + one + note(p));
+                        }
+                    }
+                });
+                return;
+            }
+            if (yamlIsMap(value)) {
+                Object.keys(value).forEach(function(key) {
+                    let v = value[key];
+                    let p = path ? path + '.' + key : key;
+                    let k = yamlNeedsQuotes(key) ? yamlQuote(key) : key;
+                    if (yamlIsMap(v) || Array.isArray(v)) {
+                        let empty = Array.isArray(v) ? v.length === 0 : Object.keys(v).length === 0;
+                        if (empty) { lines.push(pad + k + ': ' + (Array.isArray(v) ? '[]' : '{}') + note(p)); return; }
+                        lines.push(pad + k + ':' + note(p));
+                        yamlEmitNode(v, indent + 2, lines, p, comments, opts);
+                        return;
+                    }
+                    let one = yamlFormatScalar(v, opts && opts.quote && opts.quote(p));
+                    if (one === null) {
+                        let b = yamlBlockLines(String(v), pad + '  ');
+                        lines.push(pad + k + ': ' + b.header + note(p));
+                        b.lines.forEach(function(l) { lines.push(l); });
+                    } else {
+                        lines.push(pad + k + ': ' + one + note(p));
+                    }
+                });
+                return;
+            }
+            let one = yamlFormatScalar(value);
+            lines.push(pad + (one === null ? yamlQuote(String(value)) : one));
+        }
+
+        // `comments` maps a dotted path to a trailing comment; `opts.quote(path)`
+        // forces quotes on a string (annotation values read better quoted).
+        function yamlStringify(value, comments, opts) {
+            let lines = [];
+            yamlEmitNode(value, 0, lines, '', comments, opts);
+            return lines.join('\n') + '\n';
+        }
+
+        function yamlStringifyAll(docs) {
+            return docs.map(function(d) { return yamlStringify(d); }).join('---\n');
+        }
+
+        let YAML = {
+            parse: yamlParse,
+            parseAll: yamlParseAll,
+            parseDocuments: function(text) {
+                // Each document parsed on its own, so one broken document does not
+                // hide the others: [{ value, error, start }].
+                return yamlSplitStream(text).map(function(d) {
+                    try { return { value: yamlParseLines(d.lines, d.start, d.noFinalNewline), error: null, start: d.start }; }
+                    catch (e) { return { value: null, error: e.message, start: d.start }; }
+                });
+            },
+            stringify: yamlStringify,
+            stringifyAll: yamlStringifyAll,
+            scalar: yamlFormatScalar,
+            needsQuotes: yamlNeedsQuotes,
+            quote: yamlQuote,
+            splitStream: yamlSplitStream
+        };
 
         // Shared utilities the SOURCE modules call (call-time only — they load first).
         window.MigrationTool = {
@@ -200,9 +717,9 @@
                 stripInlineComment: stripInlineComment,
                 sanitizeSnippetValue: sanitizeSnippetValue,
                 formatYamlKV: formatYamlKV,
-                detectGenericSyntaxWarnings: detectGenericSyntaxWarnings,
-                annotateYamlWithSources: annotateYamlWithSources
-            }
+                detectGenericSyntaxWarnings: detectGenericSyntaxWarnings
+            },
+            yaml: YAML
         };
 
         // The page's source module (loaded before this file) supplies all
@@ -391,22 +908,39 @@
                     });
                 }
             });
-            // Add copy buttons to comparison blocks
+            // Add copy buttons to comparison blocks. The button is the block's
+            // child, beside the <h4> rather than inside it: inside, its label
+            // became part of the heading's accessible name, so ~350 headings
+            // read "… Copy code snippet". And every one of those buttons had
+            // that same name; each now says which row, side and approach it
+            // copies, e.g. "Copy: proxy-body-size, CRD Approach, NGINX
+            // Ingress Controller".
             document.querySelectorAll('.comparison-block').forEach(function(block) {
                 let h5 = block.querySelector('h4');
                 let pre = block.querySelector('pre');
                 if (!h5 || !pre) return;
+                let exampleRow = block.closest('tr.example-row');
+                let trigger = exampleRow && exampleRow.previousElementSibling;
+                let rowName = '';
+                if (trigger) {
+                    let first = trigger.querySelector('td code') || trigger.querySelector('td');
+                    rowName = (first ? first.textContent : '').replace(/^nginx\.ingress\.kubernetes\.io\//, '').replace(/\s+/g, ' ').trim();
+                }
+                let panel = block.closest('.approach-content');
+                let tab = panel && exampleRow && exampleRow.querySelector('.approach-tab[data-approach="' + panel.getAttribute('data-approach') + '"]');
+                let parts = [rowName, tab ? tab.textContent.replace(/\s+/g, ' ').trim() : '', h5.textContent.replace(/\s+/g, ' ').trim()];
                 let btn = document.createElement('button');
+                btn.type = 'button';
                 btn.className = 'comparison-copy-btn';
                 btn.textContent = 'Copy';
-                btn.setAttribute('aria-label', 'Copy code snippet');
+                btn.setAttribute('aria-label', 'Copy: ' + parts.filter(Boolean).join(', '));
                 btn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     // Shared helper handles the fallback path, button feedback, and
                     // the screen-reader announcement via #page-announce.
                     copyToClipboard(pre.textContent, btn);
                 });
-                h5.appendChild(btn);
+                block.insertBefore(btn, h5.nextSibling);
             });
             // Syntax-highlight static YAML examples: the visible page immediately,
             // the ~300 blocks inside hidden pages and collapsed rows during idle
@@ -505,6 +1039,28 @@
             return cached;
         }
 
+        let _searchAnnounceTimer = null;
+
+        // A visible line where the tables were, when a search or category
+        // leaves a section with nothing to show. Before this the section went
+        // silently empty under its filter bar; only the small counter changed.
+        function setEmptyState(s, own, othersVisible) {
+            let section = document.getElementById(s.id);
+            let controls = section && section.querySelector('.controls');
+            if (!controls) return;
+            let empty = section.querySelector('.search-empty');
+            let show = own.total > 0 && own.visible === 0;
+            if (!show) { if (empty) empty.hidden = true; return; }
+            if (!empty) {
+                empty = document.createElement('p');
+                empty.className = 'search-empty';
+                controls.parentNode.insertBefore(empty, controls.nextSibling);
+            }
+            empty.textContent = 'No rows in this section match.' +
+                (othersVisible > 0 ? ' ' + othersVisible + ' match' + (othersVisible !== 1 ? 'es' : '') + ' in other sections.' : ' Try a shorter term or another category.');
+            empty.hidden = false;
+        }
+
         function filterTable(source) {
             let sections = SOURCE.reference.sections;
             let inputs = {};
@@ -523,7 +1079,9 @@
                 let inp = inputs[s.filterSource];
                 if (inp && inp !== primary) inp.value = primary.value;
             });
-            let term = primary.value.toLowerCase();
+            // Trimmed: a pasted "  proxy-body-size  " matched nothing, because
+            // the padding was searched for as part of the term.
+            let term = primary.value.trim().toLowerCase();
             let categoryBySection = {};
             let anyCategory = false;
             sections.forEach(function(s) {
@@ -540,10 +1098,14 @@
             document.querySelectorAll('.mapping-table').forEach(function(table) {
                 let visibleCount = 0;
                 let wrapper = table.closest('.table-wrapper');
-                // Walk back past any info-boxes sitting between the heading and the table.
+                // Walk back past any info-boxes sitting between the heading and
+                // the table. The heading is normally inside its .heading-row
+                // (the permalink wrapper); `h3` is whichever of the two is the
+                // table's sibling, so hiding it hides the permalink as well.
                 let h3 = wrapper ? wrapper.previousElementSibling : null;
-                while (h3 && h3.tagName !== 'H3') h3 = h3.previousElementSibling;
-                let tableCategory = (h3 && h3.id) ? h3.id : '';
+                while (h3 && h3.tagName !== 'H3' && !(h3.classList && h3.classList.contains('heading-row'))) h3 = h3.previousElementSibling;
+                let heading = h3 && (h3.tagName === 'H3' ? h3 : h3.querySelector('h3'));
+                let tableCategory = (heading && heading.id) ? heading.id : '';
                 // Determine which category filter applies based on parent section
                 let parentSection = table.closest('section[id]');
                 let sectionId = parentSection ? parentSection.id : '';
@@ -607,7 +1169,17 @@
                 let othersVisible = 0;
                 sections.forEach(function(o) { if (o !== s) othersVisible += sectionCounts[o.id].visible; });
                 setCount(document.getElementById(s.count), own, othersVisible);
+                setEmptyState(s, own, othersVisible);
             });
+            // One announcement per search, for the section being typed in. The
+            // three counters used to be aria-live themselves, and the inputs are
+            // mirrored, so every keystroke queued three announcements at once.
+            let typedIn = sections.filter(function(s) { return s.filterSource === source; })[0] || sections[0];
+            let typedCount = document.getElementById(typedIn.count);
+            clearTimeout(_searchAnnounceTimer);
+            _searchAnnounceTimer = setTimeout(function() {
+                if (typedCount && typedCount.textContent) announce(typedCount.textContent);
+            }, 600);
             // Restore expanded state when filters are cleared
             if (!term && !anyCategory && _savedExpanded.length > 0) {
                 _savedExpanded.forEach(function(r) {
@@ -643,6 +1215,12 @@
             // Highlight any code blocks that weren't highlighted on initial load
             highlightStaticExamples(panel);
         }
+        // Permalinks go BESIDE their heading, in a .heading-row wrapper, not
+        // inside it. Inside, "Permalink: <heading>" was part of the heading's
+        // accessible name — and of the name of every table that points at the
+        // heading with aria-labelledby: 50 headings and 50 tables read it.
+        // Headings inside a .install-box or .feature-card are left alone: they
+        // carry no id and get no anchor, as before.
         document.querySelectorAll('h2[id], h3[id]').forEach(heading => {
             const anchor = document.createElement('a');
             anchor.className = 'heading-anchor';
@@ -656,14 +1234,20 @@
             anchor.addEventListener('click', function(e) {
                 e.preventDefault();
                 history.replaceState(null, '', '#' + anchorId);
-                scrollToAnchor(document.getElementById(anchorId), true);
+                jumpTo(document.getElementById(anchorId), true);
             });
             anchor.setAttribute('aria-label', 'Permalink: ' + heading.textContent.trim());
             anchor.appendChild(makeSvg(
                 { width: '16', height: '16', viewBox: '0 0 16 16', fill: 'currentColor', 'aria-hidden': 'true' },
                 [['path', { d: 'm7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z' }]]
             ));
-            heading.appendChild(anchor);
+            let row = document.createElement('div');
+            // Whole literals, not 'heading-row ' + tagName: a composed name is
+            // invisible to check-classes.py, which then calls the rule dead.
+            row.className = heading.tagName === 'H2' ? 'heading-row heading-row-h2' : 'heading-row heading-row-h3';
+            heading.parentNode.insertBefore(row, heading);
+            row.appendChild(heading);
+            row.appendChild(anchor);
         });
 
         // Respect the user's reduced-motion preference for programmatic scrolling.
@@ -682,7 +1266,8 @@
         // the sticky search/filter bar when the target sits below it inside a
         // mapping section (the bar would otherwise cover the scrolled-to heading).
         function scrollOffsetFor(target) {
-            let offset = fixedTopHeight() + 12;
+            // 16px clearance, --space-2x (12px is not on the spacing scale).
+            let offset = fixedTopHeight() + 16;
             let section = target.closest('section');
             let controls = section && section.querySelector('.controls');
             if (controls && window.matchMedia('(min-width: 901px)').matches &&
@@ -700,6 +1285,45 @@
             if (!target) return;
             let y = target.getBoundingClientRect().top + window.pageYOffset - scrollOffsetFor(target);
             window.scrollTo(smooth ? { top: y, behavior: scrollBehavior() } : { top: y });
+        }
+
+        // The element a reader should land on for an anchor: a section's own
+        // heading rather than the section box, so focus announces a name.
+        function headingFor(target) {
+            if (!target) return null;
+            if (/^H[1-6]$/.test(target.tagName)) return target;
+            return target.querySelector('h2, h3, h4') || target;
+        }
+
+        // An in-tool jump that moves the reader, not just the viewport: scroll
+        // the target below the fixed bars and put focus on it. Scrolling alone
+        // used to leave focus on the triggering link or pill — or, when the
+        // jump switched pages, on the whole page container, so screen readers
+        // announced the end-of-maintenance banner and the next Tab restarted
+        // at the top of the page.
+        function jumpTo(target, smooth) {
+            if (!target) return;
+            scrollToAnchor(target, smooth);
+            focusTarget(headingFor(target));
+        }
+
+        // Go to an anchor anywhere in the tool: through its sidebar link when
+        // it has one (which switches page, updates the hash and the nav state),
+        // otherwise by revealing the owning page; then, once that page is laid
+        // out, jump to the anchor itself and focus it.
+        function goToAnchor(anchorId, sidebarSection) {
+            let target = document.getElementById(anchorId);
+            if (!target) return;
+            let link = document.querySelector('.sidebar-link[data-section="' + (sidebarSection || anchorId) + '"]');
+            if (link) {
+                link.click();
+            } else {
+                let page = target.closest('.tool-page');
+                let pageBtn = page && !page.classList.contains('active') &&
+                    document.querySelector('.sidebar-link[data-page="' + page.id.replace('page-', '') + '"]');
+                if (pageBtn) pageBtn.click();
+            }
+            requestAnimationFrame(function() { jumpTo(target, false); });
         }
 
         function copyAnalyzerBlock(btn) {
@@ -759,10 +1383,15 @@
             let warnings = detectGenericSyntaxWarnings(yamlText);
             let parsed = SOURCE.analyzer.parseInput(yamlText);
             warnings = warnings.concat(parsed.warnings || []);
-            if (!parsed.findings || parsed.findings.length === 0) {
+            // A source can say why nothing is analyzable (a parse error, no
+            // Ingress in the paste) through parsed.empty; and a source that
+            // can migrate an input with no findings (an Ingress with no
+            // community annotations still needs a new class) leaves it unset.
+            let empty = parsed.empty || ((!parsed.findings || parsed.findings.length === 0) && !(parsed.ingresses && parsed.ingresses.length) ? SOURCE.strings.noFindings : null);
+            if (empty) {
                 resultsDiv.textContent = '';
                 renderParserWarnings(resultsDiv, warnings);
-                showAnalyzerMessage(resultsDiv, 'info', SOURCE.strings.noFindings.title, SOURCE.strings.noFindings.message, { append: true });
+                showAnalyzerMessage(resultsDiv, 'info', empty.title, empty.message, { append: true });
                 return;
             }
             let plan = SOURCE.analyzer.buildPlan(parsed, _migrationStrategy);
@@ -775,9 +1404,14 @@
                 renderParserWarnings(warningHolder, allWarnings);
                 resultsDiv.insertBefore(warningHolder, firstChild);
             }
-            // Smooth scroll to results
+            // Smooth scroll to results, and take focus with it: left on the
+            // Analyze button, focus sat scrolled up under the top bar and the
+            // next Tab went back into the editor controls. A re-run from the
+            // strategy toggle keeps focus on the toggle the reader just used.
             setTimeout(function() {
                 resultsDiv.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+                let active = document.activeElement;
+                if (!(active && active.closest && active.closest('.strategy-toggle'))) focusTarget(resultsDiv);
             }, 100);
             } catch (err) {
                 showAnalyzerMessage(resultsDiv, 'error', 'Analysis failed.', 'There was an error parsing the YAML. Please check the format and try again.');
@@ -915,12 +1549,19 @@
             return svg;
         }
 
-        function buildYamlBlock(text, collapsible) {
+        // `label` names the block for assistive technology. Every Copy button
+        // used to have the same accessible name, "Copy", so a screen reader
+        // listing buttons heard a column of identical entries.
+        let _yamlBlockSeq = 0;
+        function buildYamlBlock(text, collapsible, label) {
             let pre = document.createElement('div');
             pre.className = 'analyzer-yaml-output';
+            pre.id = 'analyzer-yaml-' + (++_yamlBlockSeq);
             let copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
             copyBtn.className = 'analyzer-copy-btn';
             copyBtn.textContent = 'Copy';
+            if (label) copyBtn.setAttribute('aria-label', 'Copy YAML: ' + label);
             copyBtn.addEventListener('click', function() { copyAnalyzerBlock(copyBtn); });
             pre.appendChild(copyBtn);
             pre.appendChild(highlightYaml(text));
@@ -931,16 +1572,17 @@
                 let wrapper = document.createDocumentFragment();
                 wrapper.appendChild(pre);
                 let expandBtn = document.createElement('button');
+                expandBtn.type = 'button';
                 expandBtn.className = 'analyzer-yaml-expand';
-                expandBtn.textContent = 'Show Full YAML (' + lineCount + ' lines)';
+                expandBtn.setAttribute('aria-controls', pre.id);
+                let setExpanded = function(expanded) {
+                    pre.classList.toggle('collapsed', !expanded);
+                    expandBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                    expandBtn.textContent = expanded ? 'Collapse' : 'Show Full YAML (' + lineCount + ' lines)';
+                };
+                setExpanded(false);
                 expandBtn.addEventListener('click', function() {
-                    if (pre.classList.contains('collapsed')) {
-                        pre.classList.remove('collapsed');
-                        expandBtn.textContent = 'Collapse';
-                    } else {
-                        pre.classList.add('collapsed');
-                        expandBtn.textContent = 'Show Full YAML (' + lineCount + ' lines)';
-                    }
+                    setExpanded(pre.classList.contains('collapsed'));
                 });
                 wrapper.appendChild(expandBtn);
                 return wrapper;
@@ -953,7 +1595,10 @@
         // into DOM. It has no source-specific branches: every string it shows comes
         // from the plan; unknown block types are skipped with a console warning.
 
-        function renderComparisonBlock(block) {
+        // `context` is what this comparison is about (the step or the CRD
+        // category); with the side's own heading it makes each Copy button's
+        // accessible name unique.
+        function renderComparisonBlock(block, context) {
             let comp = document.createElement('div');
             comp.className = 'analyzer-comparison';
             [{ side: block.old, cls: 'old' }, { side: block.new, cls: 'new' }].forEach(function(pair) {
@@ -968,7 +1613,8 @@
                     h5.appendChild(badge);
                 }
                 sideBlock.appendChild(h5);
-                sideBlock.appendChild(buildYamlBlock(pair.side.yaml, pair.side.collapsible));
+                let side = (pair.side.title + (pair.side.badge ? ' (' + pair.side.badge + ')' : '')).replace(/\s+/g, ' ').trim();
+                sideBlock.appendChild(buildYamlBlock(pair.side.yaml, pair.side.collapsible, context ? context + ', ' + side : side));
                 comp.appendChild(sideBlock);
             });
             return comp;
@@ -987,8 +1633,7 @@
             installLink.textContent = 'Installing CRDs';
             installLink.addEventListener('click', function(e) {
                 e.preventDefault();
-                let sidebarLink = document.querySelector('.sidebar-link[data-section="installation"]');
-                if (sidebarLink) sidebarLink.click();
+                goToAnchor('installation');
             });
             installNote.appendChild(installLink);
             installNote.appendChild(document.createTextNode(' for Helm and manifest installation instructions.'));
@@ -1027,7 +1672,7 @@
                 }
                 if (item.dualSuffix) catLabel.appendChild(document.createTextNode(item.dualSuffix));
                 groupDiv.appendChild(catLabel);
-                groupDiv.appendChild(renderComparisonBlock({ old: item.old, new: item.new }));
+                groupDiv.appendChild(renderComparisonBlock({ old: item.old, new: item.new }, item.category + ' ' + block.kind));
             });
             return groupDiv;
         }
@@ -1102,9 +1747,14 @@
                     pill.type = 'button';
                     pill.setAttribute('data-scroll', p.scrollTo);
                     pill.setAttribute('title', 'Click to jump to this section');
+                    // Focus goes with the scroll, onto the step's heading. It
+                    // used to stay on the pill, so the next Tab went back to
+                    // the top of the results rather than into the step.
                     pill.addEventListener('click', function() {
                         let el = document.getElementById(p.scrollTo);
-                        if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+                        if (!el) return;
+                        el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+                        focusTarget(headingFor(el));
                     });
                 }
                 summary.appendChild(pill);
@@ -1126,8 +1776,10 @@
             // Success banner
             let banner = document.createElement('div');
             banner.className = 'analyzer-success-banner';
+            // Every icon the renderer draws sits beside text that says the same
+            // thing, so all four are hidden from assistive technology.
             banner.appendChild(makeSvg(
-                { width: '22', height: '22', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.5' },
+                { width: '22', height: '22', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.5', 'aria-hidden': 'true' },
                 [['path', { d: 'M22 11.08V12a10 10 0 1 1-5.93-9.14' }],
                  ['polyline', { points: '22 4 12 14.01 9 11.01' }]]
             ));
@@ -1175,7 +1827,7 @@
 
                 stepData.blocks.forEach(function(block) {
                     if (block.type === 'comparison') {
-                        step.appendChild(renderComparisonBlock(block));
+                        step.appendChild(renderComparisonBlock(block, stepData.title));
                     } else if (block.type === 'dual-note') {
                         let dualNote = document.createElement('div');
                         dualNote.className = 'analyzer-dual-note';
@@ -1232,13 +1884,12 @@
                         link.href = '#' + cardData.anchor;
                         link.className = 'analyzer-note-link';
                         link.textContent = 'See reference guide →';
+                        // One of these per card, so the visible text alone does
+                        // not say where each goes.
+                        if (cardData.title) link.setAttribute('aria-label', 'See reference guide: ' + cardData.title);
                         link.addEventListener('click', function(e) {
                             e.preventDefault();
-                            let sidebarLink = document.querySelector('.sidebar-link[data-section="' + cardData.sidebarSection + '"]');
-                            if (sidebarLink) sidebarLink.click();
-                            setTimeout(function() {
-                                scrollToAnchor(document.getElementById(cardData.anchor), true);
-                            }, 150);
+                            goToAnchor(cardData.anchor, cardData.sidebarSection);
                         });
                         card.appendChild(link);
                     }
@@ -1268,7 +1919,10 @@
                     uHeader.className = 'analyzer-card-header';
                     let uFound = document.createElement('div');
                     uFound.className = 'found-annotations';
-                    uFound.appendChild(buildYamlBlock(u.yaml));
+                    // Named by the annotation it holds, the first key under
+                    // `annotations:` in the item's snippet.
+                    let uKey = (/^\s+([^\s:]+):/m.exec(u.yaml) || [])[1];
+                    uFound.appendChild(buildYamlBlock(u.yaml, false, uKey ? 'unrecognized ' + uKey : 'unrecognized annotation'));
                     uHeader.appendChild(uFound);
                     uCard.appendChild(uHeader);
                     unrecSection.appendChild(uCard);
@@ -1293,8 +1947,9 @@
                 exportRow.className = 'analyzer-export-actions';
                 let copyAllBtn = document.createElement('button');
                 copyAllBtn.className = 'analyzer-copy-all';
+                copyAllBtn.type = 'button';
                 copyAllBtn.appendChild(makeSvg(
-                    { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+                    { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'aria-hidden': 'true' },
                     [['rect', { x: '9', y: '9', width: '13', height: '13', rx: '2', ry: '2' }],
                      ['path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }]]
                 ));
@@ -1309,8 +1964,9 @@
                 // Download YAML button
                 let dlBtn = document.createElement('button');
                 dlBtn.className = 'analyzer-download-btn';
+                dlBtn.type = 'button';
                 dlBtn.appendChild(makeSvg(
-                    { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+                    { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'aria-hidden': 'true' },
                     [['path', { d: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4' }],
                      ['polyline', { points: '7 10 12 15 17 10' }],
                      ['line', { x1: '12', y1: '15', x2: '12', y2: '3' }]]
@@ -1329,6 +1985,9 @@
                     URL.revokeObjectURL(url);
                     dlBtn.classList.add('downloaded');
                     dlLabel.textContent = 'Downloaded!';
+                    // The label change is silent to a screen reader, and so is
+                    // the download itself; Copy already announces, now this does.
+                    announce('Downloaded ' + SOURCE.export.filename);
                     setTimeout(function() {
                         dlLabel.textContent = 'Download YAML';
                         dlBtn.classList.remove('downloaded');
@@ -1338,12 +1997,12 @@
                 container.appendChild(exportRow);
             }
 
-            // What's Next? section
+            // What's next section
             if (plan.nextItems && plan.nextItems.length > 0) {
                 let nextBox = document.createElement('div');
                 nextBox.className = 'analyzer-next-steps';
                 let nextH4 = document.createElement('h4');
-                nextH4.textContent = "What's Next?";
+                nextH4.textContent = "What's next?";
                 nextBox.appendChild(nextH4);
                 let nextUl = document.createElement('ul');
                 plan.nextItems.forEach(function(item) {
@@ -1370,12 +2029,14 @@
                 // Edit YAML button
                 let editBtn = document.createElement('button');
                 editBtn.className = 'analyzer-edit-btn';
+                editBtn.type = 'button';
                 editBtn.appendChild(makeSvg(
-                    { width: '16', height: '16', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+                    { width: '16', height: '16', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'aria-hidden': 'true' },
                     [['path', { d: 'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7' }],
                      ['path', { d: 'M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z' }]]
                 ));
-                editBtn.appendChild(document.createTextNode('Edit YAML & re-analyze'));
+                // A button, so Title Case like every other button label.
+                editBtn.appendChild(document.createTextNode('Edit YAML & Re-Analyze'));
                 editBtn.addEventListener('click', function() {
                     // Switch to analyzer page
                     let analyzerPageLink = document.querySelector('.sidebar-link[data-page="analyzer"]');
@@ -1393,6 +2054,14 @@
         function clearAnalyzer() {
             document.getElementById('yamlInput').value = '';
             document.getElementById('analyzerResults').textContent = '';
+            // The highlight overlay is painted from the textarea, and clearing
+            // the value fires no input event — the old YAML stayed painted
+            // behind an empty editor. The live region likewise kept the last
+            // run's result, which a screen reader could still land on.
+            updateYamlHighlight();
+            let liveStatus = document.getElementById('analyzerLiveStatus');
+            if (liveStatus) liveStatus.textContent = '';
+            announce('Analyzer cleared');
             showEmptyState();
             updateInputStatus();
         }
@@ -1423,7 +2092,30 @@
                     dropdown.style.bottom = 'auto';
                 }
                 let firstItem = dropdown.querySelector('[role="menuitem"]');
-                if (firstItem) firstItem.focus();
+                if (firstItem) focusMenuItem(firstItem);
+            }
+        }
+
+        // Roving tabindex (WAI-ARIA menu pattern): exactly one item is
+        // reachable, the one with focus, and arrow keys move between them. Every
+        // item used to be its own Tab stop, so tabbing through the open menu
+        // took three stops and left it open behind you.
+        function focusMenuItem(item) {
+            let dropdown = document.getElementById('sampleDropdown');
+            dropdown.querySelectorAll('[role="menuitem"]').forEach(function(i) {
+                i.setAttribute('tabindex', i === item ? '0' : '-1');
+            });
+            item.focus();
+        }
+
+        function closeSampleMenu(returnFocus) {
+            let dropdown = document.getElementById('sampleDropdown');
+            let btn = document.querySelector('.sample-dropdown-btn');
+            if (!dropdown || !dropdown.classList.contains('visible')) return;
+            dropdown.classList.remove('visible');
+            if (btn) {
+                btn.setAttribute('aria-expanded', 'false');
+                if (returnFocus) btn.focus();
             }
         }
 
@@ -1441,16 +2133,27 @@
         (function() {
             let dropdown = document.getElementById('sampleDropdown');
             if (!dropdown) return;
+            // The markup gives each item tabindex="0" so it stays operable if
+            // this script never runs; once it does, only the roving item is.
+            dropdown.querySelectorAll('[role="menuitem"]').forEach(function(i) { i.setAttribute('tabindex', '-1'); });
             dropdown.addEventListener('keydown', function(e) {
                 let items = Array.from(dropdown.querySelectorAll('[role="menuitem"]'));
                 if (!items.length) return;
                 let idx = items.indexOf(document.activeElement);
-                let btn = document.querySelector('.sample-dropdown-btn');
-                if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
-                else if (e.key === 'ArrowUp') { e.preventDefault(); items[(idx - 1 + items.length) % items.length].focus(); }
-                else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
-                else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
-                else if (e.key === 'Escape') { e.preventDefault(); dropdown.classList.remove('visible'); if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.focus(); } }
+                if (e.key === 'ArrowDown') { e.preventDefault(); focusMenuItem(items[(idx + 1) % items.length]); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); focusMenuItem(items[(idx - 1 + items.length) % items.length]); }
+                else if (e.key === 'Home') { e.preventDefault(); focusMenuItem(items[0]); }
+                else if (e.key === 'End') { e.preventDefault(); focusMenuItem(items[items.length - 1]); }
+                else if (e.key === 'Escape') { e.preventDefault(); closeSampleMenu(true); }
+                // Tab leaves the menu as the pattern specifies: it closes, and
+                // focus moves on from the trigger rather than from inside a
+                // menu that is about to vanish.
+                else if (e.key === 'Tab') { closeSampleMenu(false); }
+            });
+            // Any other way focus leaves (a click elsewhere is handled above;
+            // this covers a screen reader's virtual cursor and Shift+Tab).
+            dropdown.addEventListener('focusout', function(e) {
+                if (!dropdown.contains(e.relatedTarget)) closeSampleMenu(false);
             });
         })();
 
@@ -1459,35 +2162,18 @@
             let yaml = presets[preset] || presets[SOURCE.analyzer.defaultPreset];
             document.getElementById('yamlInput').value = yaml;
             document.getElementById('analyzerResults').textContent = '';
-            document.getElementById('sampleDropdown').classList.remove('visible');
-            let btn = document.querySelector('.sample-dropdown-btn');
-            if (btn) {
-                btn.setAttribute('aria-expanded', 'false');
-                // Focus was on the now-hidden menu item — return it to the trigger.
-                btn.focus();
-            }
+            // Focus was on the now-hidden menu item — return it to the trigger.
+            closeSampleMenu(true);
             updateInputStatus();
             updateYamlHighlight();
         }
 
+        // Go to a section, focus its heading, and flash it so the eye finds it.
         function highlightSection(anchorId) {
             let el = document.getElementById(anchorId);
             if (!el) return;
-            // Switch to the correct page if needed
-            let sectionLink = document.querySelector('.sidebar-link[data-section="' + anchorId + '"]');
-            if (sectionLink) {
-                sectionLink.click();
-            } else {
-                // Fallback: check which page contains the element
-                let page = el.closest('.tool-page');
-                if (page && !page.classList.contains('active')) {
-                    let pageId = page.id.replace('page-', '');
-                    let pageBtn = document.querySelector('.sidebar-link[data-page="' + pageId + '"]');
-                    if (pageBtn) pageBtn.click();
-                }
-            }
+            goToAnchor(anchorId);
             requestAnimationFrame(function() {
-                el.scrollIntoView({ behavior: scrollBehavior() });
                 el.style.transition = 'background-color var(--dur-reveal)';
                 el.style.backgroundColor = 'var(--amber-tint)';
                 setTimeout(function() {

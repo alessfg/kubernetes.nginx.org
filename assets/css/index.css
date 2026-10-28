@@ -28,17 +28,19 @@
 /* ── Sidebar accent rails ─────────────────────────────────────────────────
    The hidden .dot spans carry each item's product colour; the active item's
    left rail (shared.css ::before, green by default) picks it up via :has().
-   The teal and red rules are dormant — they belong to the blogs and videos
-   sections, which are built but not currently linked. Check `git log -S`
-   before deleting anything here as unused. */
+   Green and blue are the only two colours the markup carries. The teal and
+   red rails, like every .blogs/.videos rule below, belonged to blog and video
+   sections that are no longer in the page; `git log -S'page-hero videos'`
+   has them. */
 .sidebar-link.active:has(.dot[data-color="blue"])::before { background: var(--blue); }
-.sidebar-link.active:has(.dot[data-color="teal"])::before { background: var(--java); }
-.sidebar-link.active:has(.dot[data-color="red"])::before { background: var(--pomegranate); }
 
 /* Matching text colour, so the active item's rail and label agree. */
 .sidebar-link.active:has(.dot[data-color="blue"]) { color: var(--blue-text); }
-.sidebar-link.active:has(.dot[data-color="teal"]) { color: var(--java-text); }
-.sidebar-link.active:has(.dot[data-color="red"])  { color: var(--pomegranate-text); }
+/* Same specificity as the blue rail above, so forced colours need the same
+   override shared.css gives the green one. */
+@media (forced-colors: active) {
+    .sidebar-link.active:has(.dot[data-color="blue"])::before { forced-color-adjust: none; background: Highlight; }
+}
 
 
 /* ── Product page ─────────────────────────────────────────────────────────
@@ -60,8 +62,6 @@
 .page-hero.ngf       { background: var(--green-tint); }
 .page-hero.migration,
 .page-hero.i2g       { background: var(--blue-tint); }
-.page-hero.blogs     { background: var(--java-tint); }
-.page-hero.videos    { background: var(--pomegranate-tint); }
 
 /* Every soft edge, in one overlay. Two layers of the page background painted
    back over the tint: downward, so the band dissolves into the page instead of
@@ -152,14 +152,10 @@
     margin-bottom: var(--space-2x);
     border-bottom: 1px solid var(--border);
 }
-.page-hero-badge.home,
 .page-hero-badge.nic,
 .page-hero-badge.ngf       { color: var(--green-deep); }
 .page-hero-badge.migration,
 .page-hero-badge.i2g       { color: var(--blue-text); }
-.page-hero-badge.blogs     { color: var(--java-text); }
-.page-hero-badge.videos    { color: var(--pomegranate-text); }
-:is(html, body).dark-mode .page-hero-badge.home,
 :is(html, body).dark-mode .page-hero-badge.nic,
 :is(html, body).dark-mode .page-hero-badge.ngf { color: var(--green-text); }
 
@@ -189,12 +185,28 @@
     font-weight: 700;
     margin-bottom: var(--space-base);
 }
+/* Full body colour, not --text-secondary. The secondary grey is tuned for the
+   N0 and N100 surfaces; on these hero tints it measured 4.09–4.14:1 in light,
+   on all five views. --text is 13.0:1 on both tints, and in dark it is the
+   same N100 the hero's other text already uses. The 16px size and the h1
+   above it keep the subtitle reading as subordinate. */
 .page-hero p {
     font-size: var(--fs-body-lg);
     line-height: var(--lh-body-lg);
-    color: var(--text-secondary);
+    color: var(--text);
 }
 .hero-cta-row { margin-top: var(--space-3x); }
+/* The landing page's one statement that the community controller is retired;
+   the migration tool opens with the full warning. Plain text, not a warning
+   box: on the front door it is context for the CTA above it, not an alert. */
+.page-hero p.hero-status {
+    margin-top: var(--space-2x);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+}
+.page-hero .hero-status a:link,
+.page-hero .hero-status a:visited { color: var(--blue-text); }
+.page-hero .hero-status a:hover { color: var(--blue-deep); }
 .coming-soon-label { font-weight: 500; color: var(--text-secondary); }
 
 .page-body { padding: var(--space-5x) var(--space-6x) var(--space-8x); max-width: 1140px; }
@@ -268,7 +280,7 @@
     font-weight: 500;
     margin-bottom: var(--space-base);
 }
-.feature-card h3 svg { flex-shrink: 0; color: var(--green-text); }
+.feature-card .feature-title svg { flex-shrink: 0; color: var(--green-text); }
 .feature-card p { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-secondary); }
 
 /* Variant: card whose first child is media and whose content sits in a body
@@ -276,6 +288,11 @@
 .feature-card-flush { padding: 0; overflow: hidden; }
 .feature-card-flush .video-embed { margin: 0; border-radius: var(--radius) var(--radius) 0 0; }
 .feature-card-flush > .feature-card-body { padding: var(--space-2x); }
+/* Featured video and blog cards. The content's own title is the card's <h3>,
+   and "Featured video" / "Featured blog" is a label above it. They used to be
+   the other way round: four headings all saying "Featured …" while the title a
+   reader would scan for sat in a paragraph. The type is unchanged — both are
+   still 16px Medium; only the label takes the secondary colour. */
 .feature-card-flush .feature-card-eyebrow {
     font-family: var(--font-display);
     font-size: var(--fs-body-lg);
@@ -283,6 +300,7 @@
     font-weight: 500;
     margin-bottom: var(--space-base);
 }
+.feature-card-flush p.feature-title { color: var(--text-secondary); }
 a.feature-card, a.feature-card:link, a.feature-card:visited { text-decoration: none; color: inherit; }
 .feature-card-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
 .feature-card-cta {
@@ -364,8 +382,6 @@ a.feature-card, a.feature-card:link, a.feature-card:visited { text-decoration: n
 .cta-primary.nic:hover, .cta-primary.ngf:hover { background: var(--green-deep); border-color: var(--green-deep); }
 .cta-primary.migration, .cta-primary.i2g { background: var(--blue-text); border-color: var(--blue-text); color: var(--n0); }
 .cta-primary.migration:hover, .cta-primary.i2g:hover { background: var(--blue-deep); border-color: var(--blue-deep); }
-.cta-primary.blogs { background: var(--java-text); border-color: var(--java-text); color: var(--n0); }
-.cta-primary.videos { background: var(--pomegranate-text); border-color: var(--pomegranate-text); color: var(--n0); }
 
 :is(html, body).dark-mode .cta-primary.nic,
 :is(html, body).dark-mode .cta-primary.ngf { background: var(--green); border-color: var(--green); color: var(--n700); }
@@ -430,7 +446,6 @@ a.feature-card, a.feature-card:link, a.feature-card:visited { text-decoration: n
 .version-pill a { color: inherit; text-decoration: none; }
 .version-pill a:hover { text-decoration: underline; }
 .version-pill.nic, .version-pill.ngf { background: var(--green-tint); color: var(--green-deep); }
-.version-pill.i2g { background: var(--blue-tint); color: var(--on-blue-tint); }
 :is(html, body).dark-mode .version-pill.nic,
 :is(html, body).dark-mode .version-pill.ngf { color: var(--green-text); }
 

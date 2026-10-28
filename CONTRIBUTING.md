@@ -49,7 +49,7 @@ If you have not yet agreed to the F5 CLA terms and submit a PR to this repositor
 
 - Keep a clean, concise and meaningful git commit history on your branch (within reason), rebasing locally and squashing before submitting a PR.
 - Use the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) prefix in the subject line (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `ci:`, `chore:`), in the imperative mood: "Add feature", not "Added feature".
-- **Write a body, and make it a record of the reasoning.** The commit bodies in this repository are its largest body of decision-making — roughly 4,000 words of what was tried, what was rejected, and how it was verified. That is knowledge which exists in no other file, and it is why `git log --grep='Considered and rejected'` and `git log -S<name>` are the first things to run before re-proposing an idea or deleting something that looks dead.
+- **Write a body, and make it a record of the reasoning.** The commit bodies in this repository are its largest body of decision-making — what was tried, what was rejected, and how it was verified. That is knowledge which exists in no other file, and it is why `git log --grep='Considered and rejected'` and `git log -S<name>` are the first things to run before re-proposing an idea or deleting something that looks dead.
 
   A good body here answers four things:
 
@@ -58,4 +58,5 @@ If you have not yet agreed to the F5 CLA terms and submit a PR to this repositor
   - **What was considered and rejected**, so the next person does not spend an afternoon rediscovering it.
   - **How it was verified.** For a check, that means the fault you planted and what it reported. "Fixed the check" is worth much less later than "planted a misspelled transform; the run reported it and exited 1".
 
+- **Keep it proportionate.** A body over ~15 lines is almost always padding. Record the fault you planted and the decision you rejected, not a narrative of the work.
 - Reference issues and pull requests liberally after the subject line.

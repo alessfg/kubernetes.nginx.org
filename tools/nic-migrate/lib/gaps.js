@@ -1,16 +1,12 @@
 'use strict';
-/* gaps.js — where the analyzer's output is not the whole migration.
+/* gaps.js — what a reader still has to do before applying the output.
    =========================================================================
-   The engine was written for a paste box: it teaches one annotation at a time,
-   against a single example host/service/path, and each CRD generator emits a
-   self-contained illustration. That is right for the page and wrong for a file
-   you would apply. These checks name the difference, so the advisory output can
-   be honest about what a human still has to do.
-
-   Every gap here was observed by running the real engine, not inferred:
-   a two-path Ingress yields a context holding only the first service, and a
-   rewrite-target + affinity pair yields two VirtualServers that both claim the
-   same host.
+   The engine now assembles complete resources (one VirtualServer per host, or
+   the migrated Ingress), so most of what this file once reported — hosts,
+   paths and backends past the first, two VirtualServers on one host, TLS
+   dropped, Policies never referenced — cannot happen any more. These checks
+   still compare the source Ingress with the generated resources, so if the
+   assembler regresses they fail loudly instead of trusting it.
 
    Severity: 'blocking' would be rejected or lose traffic if applied as-is,
    'review' needs a human decision, 'note' is informational.
@@ -21,7 +17,7 @@ function countMatches(text, re) {
     return m ? m.length : 0;
 }
 
-/* Generated resources, grouped by kind, with the host each one claims. */
+/* Generated resources, with the host each one claims. */
 function generatedResources(parts) {
     const out = [];
     for (const part of parts) {
@@ -30,10 +26,10 @@ function generatedResources(parts) {
         out.push({
             kind,
             name: (part.match(/^\s{2}name:\s*(\S+)\s*$/m) || [])[1] || null,
-            host: (part.match(/^\s{2}host:\s*(\S+)\s*$/m) || [])[1] || null,
-            hasPolicies: /^\s*policies:\s*$/m.test(part),
-            hasTls: /^\s{2}tls:\s*$/m.test(part),
-            hasNamespace: /^\s{2}namespace:\s*\S+/m.test(part),
+            host: ((part.match(/^\s{2}host:\s*(\S+)/m) || [])[1] || '').replace(/^"|"$/g, '') || null,
+            hasPolicies: /^\s*policies:/m.test(part) || /nginx\.org\/policies:/.test(part),
+            hasTls: /^\s{2}tls:/m.test(part) || /^\s{2}tls:\s*$/m.test(part) || /secretName:/.test(part),
+            hasClass: /ingressClassName:\s*\S/.test(part),
             text: part
         });
     }
@@ -46,37 +42,30 @@ function detect(desc, result) {
     const parts = result.parts || [];
     const yaml = result.yaml || '';
     const resources = generatedResources(parts);
-    const crds = resources.filter((r) => r.kind !== 'ConfigMap');
-    const routable = crds.filter((r) => r.kind === 'VirtualServer' || r.kind === 'TransportServer');
+    const routable = resources.filter((r) => r.kind === 'VirtualServer' || r.kind === 'TransportServer' || r.kind === 'Ingress');
 
-    /* 1. A generator that threw was swallowed by buildPlan's try/catch and its
-       resource is simply missing. This is the only signal. */
+    /* 1. A translator that threw was swallowed and its fragment is missing. */
     for (const w of result.warnings || []) {
-        add('generator-warning', 'blocking',
-            'A CRD generator failed and its resource was dropped from the output: ' + w);
+        add('generator-warning', 'blocking', 'A translator failed and part of the output is missing: ' + w);
     }
 
-    /* 2. parseInput keeps ONE host/service/path. Anything beyond the first is
-       absent from every generated CRD. */
-    const ctx = (result.parsed && result.parsed.context) || {};
-    if (desc.hosts.length > 1 && crds.length > 0) {
-        add('hosts-dropped', 'blocking',
-            'Ingress defines ' + desc.hosts.length + ' hosts (' + desc.hosts.join(', ') + ') but the ' +
-            'generated resources cover only ' + (ctx.host || desc.hosts[0]) + '. The rest have no output.');
-    }
-    if (desc.paths > 1 && crds.length > 0) {
-        add('paths-dropped', 'blocking',
-            'Ingress defines ' + desc.paths + ' paths but the generated resources cover only ' +
-            (ctx.path || 'the first') + '. Add the remaining routes by hand.');
-    }
-    if (desc.services.length > 1 && crds.length > 0) {
-        add('backends-dropped', 'blocking',
-            'Ingress routes to ' + desc.services.length + ' services (' + desc.services.join(', ') + ') but ' +
-            'the generated upstreams reference only ' + (ctx.serviceName || desc.services[0]) + '.');
+    if (!desc.annotations.length) return gaps;
+
+    /* 2. Every source host has a resource. */
+    const covered = new Set(routable.map((r) => r.host).filter(Boolean));
+    const ingressOut = routable.some((r) => r.kind === 'Ingress');
+    const missing = ingressOut ? [] : desc.hosts.filter((h) => !covered.has(h));
+    if (missing.length && routable.length) {
+        add('hosts-dropped', 'blocking', 'No generated resource serves ' + missing.join(', ') + '.');
     }
 
-    /* 3. Each generator emits its own VirtualServer. Two claiming one host is
-       not a mergeable pair — NIC accepts one and rejects the other. */
+    /* 3. Every source backend is referenced. */
+    const services = desc.services.filter((s) => !new RegExp('(service: |name: )' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(yaml));
+    if (services.length && routable.length) {
+        add('backends-dropped', 'blocking', 'Backends missing from the generated resources: ' + services.join(', ') + '.');
+    }
+
+    /* 4. Two resources may not claim one host (NIC accepts the oldest). */
     const byHost = new Map();
     for (const r of routable) {
         if (!r.host) continue;
@@ -85,75 +74,53 @@ function detect(desc, result) {
     }
     for (const [host, rs] of byHost) {
         if (rs.length > 1) {
-            add('host-conflict', 'blocking',
-                rs.length + ' resources claim host ' + host + ' (' +
-                rs.map((r) => r.kind + '/' + r.name).join(', ') + '). They are separate illustrations of ' +
-                'single features — merge them into one resource before applying.');
+            add('host-conflict', 'blocking', rs.length + ' resources claim host ' + host + ' (' +
+                rs.map((r) => r.kind + '/' + r.name).join(', ') + '); NIC serves the oldest and rejects the rest.');
         }
     }
 
-    /* 4. Policies are generated but the reference is only ever a comment. */
-    const policies = crds.filter((r) => r.kind === 'Policy');
-    if (policies.length > 0 && !routable.some((r) => r.hasPolicies)) {
-        add('policy-unwired', 'blocking',
-            policies.length + ' Policy resource' + (policies.length !== 1 ? 's' : '') + ' (' +
-            policies.map((p) => p.name).join(', ') + ') ' + (policies.length !== 1 ? 'are' : 'is') +
-            ' generated but never referenced. Add nginx.org/policies on the Ingress, or spec.policies ' +
-            'on the VirtualServer.');
+    /* 5. Policies are referenced. */
+    const policies = resources.filter((r) => r.kind === 'Policy');
+    if (policies.length && !routable.some((r) => r.hasPolicies)) {
+        add('policy-unwired', 'blocking', policies.map((p) => p.name).join(', ') + ' generated but referenced by nothing.');
     }
 
-    /* 5-7. Facts present in the source that no generator carries over. */
-    if (desc.namespace && crds.length > 0 && !crds.some((r) => r.hasNamespace)) {
-        add('namespace-dropped', 'review',
-            'Source Ingress is in namespace "' + desc.namespace + '"; generated resources carry no ' +
-            'namespace and would apply to the current context. Policy references are namespace-scoped.');
+    /* 6. TLS and class carried over. */
+    if (desc.hasTls && routable.length && !routable.some((r) => r.hasTls)) {
+        add('tls-dropped', 'blocking', 'Source terminates TLS (' + (desc.tlsSecrets.join(', ') || 'unnamed') + ') but no generated resource does.');
     }
-    if (desc.hasTls && crds.length > 0 && !routable.some((r) => r.hasTls)) {
-        add('tls-dropped', 'review',
-            'Source Ingress terminates TLS (secret' + (desc.tlsSecrets.length !== 1 ? 's' : '') + ': ' +
-            (desc.tlsSecrets.join(', ') || 'unnamed') + ') but no generated VirtualServer has a tls block.');
-    }
-    if ((desc.ingressClassName || desc.classAnnotation) && crds.length > 0) {
-        add('class-dropped', 'review',
-            'Source selects controller "' + (desc.ingressClassName || desc.classAnnotation) + '"; generated ' +
-            'resources set no ingressClassName. Set it explicitly while both controllers run side by side.');
+    if ((desc.ingressClassName || desc.classAnnotation) && routable.length && !routable.some((r) => r.hasClass)) {
+        add('class-dropped', 'review', 'Source selects controller "' + (desc.ingressClassName || desc.classAnnotation) +
+            '"; the generated resources set no ingressClassName. Pass --class with your NIC class.');
     }
 
-    /* 8. Placeholders the generators emit deliberately. */
-    const todos = countMatches(yaml, /#\s*TODO:/g);
-    if (todos > 0) {
-        add('todo-placeholders', 'review',
-            todos + ' TODO placeholder' + (todos !== 1 ? 's' : '') + ' in the generated YAML must be ' +
-            'filled in — the analyzer could not infer these values from the Ingress.');
-    }
-
-    /* 9. Recognised but with no migration path, and never-seen annotations. */
+    /* 7. Placeholders and warnings the engine raised. */
     const plan = result.plan || {};
+    const todos = (plan.infoNotes || []).filter((n) => /TODO/.test(n.code)).length + countMatches(yaml, /#\s*TODO:/g);
+    if (todos > 0) {
+        add('todo-placeholders', 'review', todos + ' placeholder' + (todos !== 1 ? 's' : '') + ' to fill in — the analyzer could not infer these values.');
+    }
+    for (const n of plan.infoNotes || []) {
+        if (n.severity === 'warning' && !/TODO|^snippets$/.test(n.code)) add('needs-attention', 'review', n.code + ' — ' + n.message);
+    }
+
+    /* 8. Recognised with no migration path, and never-seen annotations. */
     if (plan.unsupported && plan.unsupported.cards) {
-        for (const c of plan.unsupported.cards) {
-            add('unsupported', 'review', c.code + ' — ' + c.title + ': ' + c.desc);
-        }
+        for (const c of plan.unsupported.cards) add('unsupported', 'review', c.code + ' — ' + c.title + ': ' + c.desc);
     }
     if (plan.unrecognized && plan.unrecognized.items) {
         const names = plan.unrecognized.items
-            .map((i) => (i.yaml.match(/nginx\.ingress\.kubernetes\.io\/([^:]+):/) || [])[1])
+            .map((i) => (i.yaml.match(/nginx\.ingress\.kubernetes\.io\/([^:"]+)/) || [])[1])
             .filter(Boolean);
-        if (names.length > 0) {
-            add('unrecognized', 'note',
-                'Not in the mapping database (custom, deprecated, or not yet mapped): ' + names.join(', ') + '.');
-        }
+        if (names.length) add('unrecognized', 'note', 'Not in the mapping database (custom, deprecated, or not yet mapped): ' + names.join(', ') + '.');
     }
 
-    /* 10. Snippets migrate as text; nothing validates the NGINX inside them. */
-    if (/nginx\.org\/(server|location)-snippets:/.test(yaml)) {
-        add('snippet-passthrough', 'blocking',
-            'Output uses snippet annotations. NIC ships with snippets DISABLED and rejects the whole ' +
-            'Ingress ("snippet specified but snippets feature is not enabled") rather than ignoring ' +
-            'them — install with helm --set controller.enableSnippets=true. Contents are also carried ' +
-            'across verbatim and never validated, so directives valid in the community controller may ' +
-            'not be valid in this context under NIC.');
+    /* 9. Snippets: NIC rejects the resource unless snippets are enabled. */
+    if (/location-snippets|server-snippets/.test(yaml)) {
+        add('snippet-passthrough', 'blocking', 'Output uses snippets. NIC ships with snippets DISABLED and rejects the resource ' +
+            '("snippet specified but snippets feature is not enabled") — install with helm --set controller.enableSnippets=true. ' +
+            'Directives from community-only modules (more_set_headers, Lua) fail the reload.');
     }
-
     return gaps;
 }
 

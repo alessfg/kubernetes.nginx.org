@@ -88,7 +88,16 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { -webkit-text-size-adjust: 100%; }
+/* Keyboard focus, scrollIntoView() and fragment jumps land below the fixed top
+   bar instead of under it. This clears the bar once, for every page; a page
+   stylesheet adds only what is its own on top, through scroll-margin-top —
+   migration.css does that for its sticky filter bar. Measured before this
+   existed: shift-tabbing back through the reference tables left 17 of 60 focus
+   stops hidden behind the two bars. */
+html {
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: calc(var(--fixed-top-h) + var(--space-base));
+}
 
 /* F5DS pairs a fixed leading with each size rather than applying one global
    ratio, so line-height here is a length, not a multiplier — every rule that
@@ -132,6 +141,9 @@ body {
     transition: top var(--dur-colour) linear;
 }
 .skip-link:focus-visible { top: 0; }
+/* Dark lightens --green-text to #00B244, where white measures 2.82:1. The dark
+   label is the one the dark primary buttons already use: 6.19:1. */
+:is(html, body).dark-mode .skip-link { color: var(--n700); }
 
 .sr-only {
     position: absolute;
@@ -369,8 +381,11 @@ body {
 
 
 /* ── Event banner ─────────────────────────────────────────────────────────
-   Dormant by design. It was live for three weeks in 2026-03/04 for a
-   conference and is kept for the next one; `git log -S` before deleting. */
+   Shown only for a conference: KubeCon EU 2026-03/04, and KubeCon North
+   America (Salt Lake City, 9-12 November 2026, booth 100). To show it, add the
+   <p class="event-banner" id="eventBanner"> after #page-announce and
+   class="has-banner" on <body>, on both pages; to retire it, remove both. The
+   classes stay on check-classes.py's DORMANT list for the weeks in between. */
 .event-banner {
     position: fixed;
     top: 0; left: 0; right: 0;
@@ -379,18 +394,34 @@ body {
     background: var(--green-text);
     color: var(--n0);
     text-align: center;
-    font-size: var(--fs-caption);
-    line-height: var(--lh-caption);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
     font-weight: 500;
 }
 .event-banner strong { font-weight: 700; }
 .event-banner .banner-highlight { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .event-banner a { color: var(--n0); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .event-banner a:hover { text-decoration-thickness: 2px; }
-/* Showing the banner overrides --banner-h so every offset that depends on it recomputes. */
-body.has-banner { --banner-h: 36px; }
-@media (max-width: 600px) {
-    body.has-banner { --banner-h: 48px; }
+/* Dark --green-text is #00B244, and white on it is 2.82:1: the dark-theme
+   pairing of the filled green buttons instead (--n700 on --green, 6.19:1). */
+:is(html, body).dark-mode .event-banner { background: var(--green); color: var(--n700); }
+:is(html, body).dark-mode .event-banner a { color: var(--n700); }
+/* Showing the banner overrides --banner-h so every offset that depends on it
+   recomputes. It is the banner's own height — its lines of --lh-body plus
+   its padding — so the top bar sits just below it. The fixed 36px/48px this
+   replaced fit one line and less than two, and a two-line banner slid 4px
+   under the top bar on phones. The KubeCon copy wraps below 710px and
+   400px; re-measure the breakpoints whenever the copy changes.
+   Set on the root, not on body: a custom property holding var() resolves where
+   it is declared, so --fixed-top-h, and html's scroll-padding, see this value
+   only if it is the root's. Set on body, the sidebar and content started under
+   the top bar and in-page jumps landed behind the banner. */
+:root:has(body.has-banner) { --banner-h: calc(var(--lh-body) + 2 * var(--space-base)); }
+@media (max-width: 720px) {
+    :root:has(body.has-banner) { --banner-h: calc(2 * var(--lh-body) + 2 * var(--space-base)); }
+}
+@media (max-width: 400px) {
+    :root:has(body.has-banner) { --banner-h: calc(3 * var(--lh-body) + 2 * var(--space-base)); }
 }
 
 
@@ -508,9 +539,6 @@ body.has-banner { --banner-h: 36px; }
        applied to every row rather than only the active one — the hierarchy is
        between name and description, not between selected and unselected. */
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     color: inherit;
 }
 .sidebar-link-desc {
@@ -518,10 +546,14 @@ body.has-banner { --banner-h: 36px; }
     line-height: var(--lh-caption);
     font-weight: 400;
     color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
+/* Both lines wrap rather than ellipsise. Every label is still chosen to fit
+   the rail on one line at the default size — that is why "Config analyzer" is
+   shorter than its heading — so nothing wraps at 100%. Under text-only zoom
+   the rail stays 264px while the text doubles, and an ellipsis cut 10 labels
+   on the migration tool and 6 on the landing page at 200%; wrapping keeps
+   every word. */
+.sidebar-link-name, .sidebar-link-desc { overflow-wrap: anywhere; }
 
 .sidebar-divider { height: 1px; background: var(--border); margin: var(--space-3x) var(--space-2x); }
 
@@ -684,8 +716,14 @@ body.has-banner { --banner-h: 36px; }
 }
 
 .info-box {
+    /* The text inset is the icon's own geometry — its 16px offset, its 1rem
+       box, an 8px gap — rather than a flat 40px. At the default size the two
+       are identical; under text-only zoom the icon grows with the rem and a
+       fixed inset let it run into the first word (measured at 200%: the icon
+       ended at 48px, the text started at 40px). */
+    --info-box-inset: calc(var(--space-2x) + 1rem + var(--space-base));
     position: relative;
-    padding: var(--space-2x) var(--space-2x) var(--space-2x) var(--space-5x);
+    padding: var(--space-2x) var(--space-2x) var(--space-2x) var(--info-box-inset);
     margin: var(--space-2x) 0;
     border-radius: var(--radius);
     border-left: 4px solid var(--border-control);
@@ -708,12 +746,12 @@ body.has-banner { --banner-h: 36px; }
 .info-box p + p { margin-top: var(--space-base); }
 .info-box strong { font-weight: 700; }
 
-.info-box.note, .info-box.info {
+.info-box.note {
     background: var(--purple-tint);
     border-left-color: var(--purple);
     --icon-mask: var(--icon-info);
 }
-.info-box.note::before, .info-box.info::before { background: var(--purple); }
+.info-box.note::before { background: var(--purple); }
 
 .info-box.tip, .info-box.tip-green {
     background: var(--emerald-tint);
@@ -733,7 +771,7 @@ body.has-banner { --banner-h: 36px; }
 /* ── Code block ───────────────────────────────────────────────────────────
    The code surface stays dark in both themes, tinted with N700 rather than
    black so it sits in the same colour world as the rest of the site. */
-code, kbd, samp {
+code {
     font-family: var(--mono);
     font-size: 0.9em;   /* relative to its context, not a scale step */
 }
@@ -766,6 +804,22 @@ code, kbd, samp {
 .code-block .comment { color: var(--code-comment); }
 .code-block .str     { color: var(--code-string); }
 
+/* Geometry for all three copy buttons: the landing page's .copy-btn and the
+   two the migration tool builds at runtime. It lived in migration.css, so the
+   landing page's buttons rendered with the browser's own font, outset border
+   and square corners at 35x19 from the F5DS restyle onwards. 24px is the
+   WCAG 2.2 minimum target; at 20px the comparison button missed it. */
+.copy-btn, .comparison-copy-btn, .analyzer-copy-btn {
+    min-height: 24px;
+    padding: 0 var(--space-base);
+    border: 1px solid;
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+    cursor: pointer;
+    transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
+}
 .copy-btn {
     position: absolute;
     top: var(--space-base);
@@ -776,11 +830,21 @@ code, kbd, samp {
     color: var(--n300);
 }
 .copy-btn:hover { background: var(--on-code-strong); color: var(--n0); }
-.copy-btn.copied {
-    background: var(--emerald-tint);
-    border-color: transparent;
-    color: var(--n700);
+
+/* One success state for all three, and it holds under the pointer — which is
+   where the pointer is right after the click. The :hover forms outrank each
+   button's own hover rule whichever stylesheet that sits in. The landing
+   page's previous version was an emerald tint under N700 text, which in dark
+   mode composites onto the code surface at 1.32:1. */
+.copy-btn.copied, .comparison-copy-btn.copied, .analyzer-copy-btn.copied,
+.copy-btn.copied:hover, .comparison-copy-btn.copied:hover, .analyzer-copy-btn.copied:hover {
+    background: var(--green-text);
+    border-color: var(--green-text);
+    color: var(--n0);
 }
+:is(html, body).dark-mode .copy-btn.copied,
+:is(html, body).dark-mode .comparison-copy-btn.copied,
+:is(html, body).dark-mode .analyzer-copy-btn.copied { color: var(--n700); }
 
 
 /* ── Status dot ───────────────────────────────────────────────────────────
@@ -796,10 +860,9 @@ code, kbd, samp {
     flex-shrink: 0;
     background: var(--n400);
 }
-.status-dot.positive  { background: var(--emerald); }
-.status-dot.attention { background: var(--amber); }
-.status-dot.negative  { background: var(--pomegranate); }
-.status-dot.info      { background: var(--purple); }
+/* The analyzer's input status is the only status dot either page renders, and
+   it styles its own .active/.inactive pair in migration.css. The four
+   sentiment variants that sat here matched nothing in either page or script. */
 
 
 /* ── Responsive: navigation collapses ─────────────────────────────────────
@@ -867,6 +930,33 @@ code, kbd, samp {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+    }
+}
+
+
+/* ── Forced colours (Windows high contrast) ───────────────────────────────
+   The browser replaces every author colour with the user's palette, and
+   backgrounds and box-shadows go with them — which is how this site marks
+   every "you are here" state: the active-item rail is a background, the
+   selected strategy is a surface plus a shadow, the selected approach tab is
+   a background bar. All three vanished. These rules restate each state in
+   something forced colours keeps: a system-colour fill with
+   forced-color-adjust: none, or a border.
+
+   System colour keywords are used here and nowhere else. They are not design
+   values but the user's own palette, which is the point of this mode. */
+@media (forced-colors: active) {
+    .sidebar-link.active::before { forced-color-adjust: none; background: Highlight; }
+    /* The lockup's fills read custom properties (see .brand-logo above), so
+       they can follow the palette like text does. Without this its official
+       colours stood untouched on the forced background: the dark theme's white
+       N over a white canvas, and the light theme's #222 wordmark on black. */
+    .topbar-brand .brand-logo,
+    :is(html, body).dark-mode .topbar-brand .brand-logo {
+        --logo-wordmark: CanvasText;
+        --logo-endorse:  CanvasText;
+        --logo-hex:      CanvasText;
+        --logo-n:        Canvas;
     }
 }
 

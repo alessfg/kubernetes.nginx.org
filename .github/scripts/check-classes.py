@@ -2,7 +2,7 @@
 """Assert every class the markup or JS uses actually has a CSS rule.
 
 This is the check that matters most after a restyle. The two HTML pages carry
-~5,600 lines of markup and migration-core.js builds several hundred more nodes
+thousands of lines of markup and migration-core.js builds several hundred more nodes
 at runtime; the stylesheets were rewritten underneath all of it. A class that
 lost its rule does not error — the element simply renders unstyled, which is
 easy to miss on a page with thousands of rows.
@@ -11,9 +11,16 @@ It reports both directions:
   - USED BUT UNSTYLED is a failure. Something references a class with no rule.
   - DEFINED BUT UNUSED is reported only, never failed. This codebase has
     dormant-by-design CSS: the event banner ran for three weeks in 2026 for a
-    conference, the blogs/videos sections are built but unlinked, and the
-    ingress2gateway annotation grid is waiting on content. Run `git log -S`
-    before deleting anything on that list.
+    conference, and the ingress2gateway annotation grid is waiting on content.
+    Run `git log -S` before deleting anything on that list.
+
+What it cannot see: a compound selector whose parts are each used somewhere,
+but never together. `.page-hero.videos` passes because `.page-hero` is used
+and `videos` is a STATE_ONLY modifier; the same goes for `.status-dot.positive`
+and `.info-box.info`, and an element selector such as `kbd` is not a class at
+all. Twenty-odd rules of that shape outlived the markup they styled — the blog
+and video pages among them, which no longer exist. Proving one dead means
+grepping the markup AND every script that could add the class at runtime.
 
 Usage:  python3 .github/scripts/check-classes.py
 Exit:   0 nothing unstyled, 1 otherwise.
@@ -317,11 +324,10 @@ def check_load_order():
     return failures
 
 
-# The sidebar label is the <h2> it links to, verbatim — except where the heading
-# would clip. `.sidebar-link-name` is `white-space: nowrap` inside a 264px rail
-# (~226px usable), so a long heading gets a short label instead. Measured, not
-# guessed: "Ingress NGINX config analyzer" is ~285px, while "Phased migration
-# strategy" is 150.5px and is therefore spelled out in full.
+# The sidebar label is the <h2> it links to, verbatim — with one exception,
+# recorded in the f5ds-design skill. "Config analyzer" was shortened when the
+# label did not wrap and the heading measured ~285px; it wraps now, and the full
+# heading measures 208px against ~215px usable, so the short label is a choice.
 LABEL_EXCEPTIONS = {
     'yaml-analyzer': 'Config analyzer',
 }

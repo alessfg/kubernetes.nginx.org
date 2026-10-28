@@ -9,10 +9,9 @@ ingress-nginx by default, or HAProxy with `--source haproxy`.
 The web tool at
 [kubernetes.nginx.org/ingress-nginx-migration.html](https://kubernetes.nginx.org/ingress-nginx-migration.html)
 analyzes one paste at a time. `nic-migrate` runs the same engine over a
-directory of manifests or a live cluster. Same 57 mapping entries, same 130
-annotations, same value transforms and CRD generators. It reads the mapping
-database out of `assets/js/` instead of vendoring a copy, so it cannot drift
-from the published page. Run it from a checkout.
+directory of manifests or a live cluster: the same YAML parser, mappings,
+value transforms and assembly, read out of `assets/js/` instead of vendored,
+so it cannot drift from the published page. Run it from a checkout.
 
 No dependencies. Node 18 or newer. `kubectl` is needed only for `--kubectl`
 and `--validate`.
@@ -29,14 +28,13 @@ node tools/nic-migrate/nic-migrate.js report --kubectl -n prod
 node tools/nic-migrate/nic-migrate.js convert -f ./manifests --validate
 node tools/nic-migrate/nic-migrate.js convert -f ./in --target ingress -o ./out
 
-# The 22-item checklist, read live from the published page
+# The migration checklist, read live from the published page
 node tools/nic-migrate/nic-migrate.js checklist
 ```
 
-`report` shows the analyzer's own output, one single-feature illustration per
-annotation, and names what those illustrations leave out. Use it to understand
-a workload. `convert` merges them into manifests you can apply. Use it to
-migrate one.
+`report` summarises what each Ingress becomes and what still needs a person.
+Use it to understand a workload. `convert` writes the same resources as
+manifests. Use it to migrate one.
 
 ## Sources
 
@@ -56,19 +54,13 @@ the same job across annotated Ingress **and Service** objects, its controller
 ConfigMap and five CRs — a scan that only looked at Ingresses would report
 "nothing found" on a real HAProxy deployment.
 
-`report` covers all of those kinds. `convert` builds from the Ingress, so for a
-HAProxy input it names the Service objects, ConfigMap and CRs it did not
-represent on stderr and tells you to run `report` for them, rather than dropping
-them quietly.
+`report` covers all of those kinds. `convert` supports ingress-nginx only: it
+runs the source module's whole-Ingress assembler (`source.analyzer.migrate`),
+and the HAProxy module does not have one yet, so `convert --source haproxy`
+exits 2 and points you at `report` rather than writing a partial migration.
 
-One more difference worth knowing: the class on a source Ingress selects the
-*source* controller. Copying `ingressClassName: haproxy` onto NIC output would
-produce a resource NIC ignores — silently, since an unmatched class is not an
-error — so `convert` omits a foreign class and says so. Pass `--class nginx` to
-set NIC's. The community controller's class is usually literally `nginx`, which
-is also NIC's default, so that one carries over untouched.
-
-Adding a source is one entry in `lib/sources.js` plus a module in `assets/js/`.
+Adding a source is one entry in `lib/sources.js` plus a module in `assets/js/`;
+`convert` also needs the module to export `migrate` and `migrateMany`.
 
 ## Reading a report
 
@@ -76,48 +68,24 @@ Adding a source is one entry in `lib/sources.js` plus a module in `assets/js/`.
 nic-migrate — advisory report · strategy: crd
 
 e2e-shop/shop  (shop.example.com, b.example.com)
-  7 annotations found · 5 migration paths · 3 require CRDs · complexity advanced
+  9 annotations found · 6 migration paths · 3 require CRDs · complexity moderate
 
-  Annotation swaps
-    annotations:
-      # Buffering
-      nginx.org/client-max-body-size: "10m"  # proxy-body-size
-      # SSL/TLS
-      nginx.org/ssl-redirect: "false"  # ssl-redirect
+  Resources
+    Policy/shop-cors
+    VirtualServer/shop  host shop.example.com
+    VirtualServer/shop-b  host b.example.com
+  note: spec.ingressClassName — Set spec.ingressClassName to the NGINX Ingress Controller class ...
+  note: cors-allow-headers — Dropped DNT, Keep-Alive from allowHeaders — browsers send these ...
 
-  CRD resources  (illustrative — see gaps)
-    Policy/cors-policy
-    VirtualServer/rewrite-app  host shop.example.com
-    VirtualServer/sticky-app  host shop.example.com
-
-  Gaps  (8)
-    [blocking] backends-dropped
-      Ingress routes to 3 services (api-svc, web-svc, web2-svc) but the generated
-      upstreams reference only api-svc.
-    [blocking] host-conflict
-      2 resources claim host shop.example.com (VirtualServer/rewrite-app,
-      VirtualServer/sticky-app). They are separate illustrations of single
-      features — merge them into one resource before applying.
-    [review  ] tls-dropped
-      Source Ingress terminates TLS (secret: shop-tls) but no generated
-      VirtualServer has a tls block.
-    ... 5 more
+────────────────────────────────────────────────────────────
+1 Ingress · 1 with community annotations · 0 blocking · 0 review · 0 note
 ```
 
-Do not apply a report unreviewed. The engine was written to teach one
-annotation at a time, and its output follows from that:
-
-- `parseInput` keeps one host, service, path, and TLS secret. A two-path
-  Ingress produces output covering the first path only.
-- Each CRD generator emits a self-contained illustration. `rewrite-target`
-  plus `affinity` yields two VirtualServers claiming the same host. Apply both
-  and NGINX Ingress Controller accepts one, rejects the other.
-- Policies are generated, but the reference to them is only ever a comment.
-- `namespace`, `ingressClassName`, and `spec.tls` are read but not carried into
-  any generated resource.
-
-A reference page needs one feature at a time. A file you `kubectl apply` needs
-all of them at once. `nic-migrate` reports each case as a named gap:
+Each Ingress becomes complete resources: under CRD-first one VirtualServer per
+host carrying every route, backend, TLS secret, Policy reference and snippet;
+under annotation-first the migrated Ingress. Every recognised annotation is
+either in the output, with a trailing comment naming it, or in a note saying
+why not. Gaps are what a person still has to decide:
 
 | Severity | Meaning |
 |---|---|
@@ -128,15 +96,16 @@ all of them at once. `nic-migrate` reports each case as a named gap:
 `--strict` exits non-zero when any `blocking` gap is found, which makes this
 usable as a CI gate on a migration branch.
 
-The gaps it detects: `generator-warning`, `hosts-dropped`, `paths-dropped`,
-`backends-dropped`, `host-conflict`, `policy-unwired`, `namespace-dropped`,
-`tls-dropped`, `class-dropped`, `todo-placeholders`, `unsupported`,
-`unrecognized`, `snippet-passthrough`.
+The gaps: `generator-warning`, `needs-attention`, `todo-placeholders`,
+`snippet-passthrough`, `unsupported`, `unrecognized`, `class-dropped`; and,
+as a guard on the assembly itself, `hosts-dropped`, `backends-dropped`,
+`host-conflict`, `policy-unwired` and `tls-dropped`, which compare the source
+Ingress with the generated resources.
 
-Watch `generator-warning` in particular. `buildPlan` runs each generator in a
-`try`/`catch` that only calls `console.warn`, so a broken generator drops its
-resource while the analysis still looks successful. The failure signal is a
-captured warning, not a thrown exception.
+Watch `generator-warning` in particular. Each translator runs in a
+`try`/`catch` that only calls `console.warn`, so a broken one drops its part of
+the output while the analysis still looks successful. The failure signal is a
+captured warning, not a thrown exception, and both commands exit non-zero on it.
 
 ## Converting
 
@@ -152,14 +121,20 @@ Controller reads standard `networking.k8s.io/v1` Ingress. It defaults to
 `--strategy annotation`, since asking for an Ingress and then running the
 CRD-first strategy produces fragments an Ingress cannot carry.
 
-Anything the chosen target cannot represent is reported as a note rather than
-dropped. That includes a `$n` rewrite copied onto a path with no capture group,
-which is faithful to the community annotation and almost never intended.
+Custom error pages differ by target. `--target ingress` keeps
+`nginx.org/custom-http-errors` and turns `default-backend` into
+`spec.defaultBackend`, which is where NIC sends the errors. The port comes from
+the Service when run with `--kubectl`, and is otherwise left as a reported
+placeholder. `--target virtualserver` emits `errorPages`, which can only return
+a canned body or redirect, and says so.
 
-Nothing here re-implements a mapping. Each generated resource is parsed back
-into data, its distinguishing fragment is lifted out, and that fragment is
-grafted onto a resource built from the real Ingress spec. Fix a mapping on the
-page and it is fixed here on the next run.
+Anything the chosen target cannot represent is reported as a note rather than
+dropped. That includes a `$n` rewrite on a path with no capture group, which
+is faithful to the community annotation and almost never intended.
+
+Nothing here re-implements a mapping: `convert` calls the assembler the page
+uses (`source.analyzer.migrate`). Fix a mapping on the page and it is fixed
+here on the next run.
 
 `--validate` runs `kubectl apply --dry-run=server`, which is the check that
 catches a CRD that is not installed. With no cluster reachable it reports that
@@ -175,17 +150,21 @@ source's name. Applying it replaces the Ingress you are migrating. Pass
 
 ## What is still manual
 
-- **Canary and traffic splitting.** `splits` and `matches` need the other
-  Ingress to be known, and a single-resource converter cannot infer it.
-- **Snippets.** Carried across verbatim and never validated. Directives valid
-  in the community controller may not be valid in the same context under
-  NGINX Ingress Controller.
+- **Canary Ingresses on their own.** A canary Ingress names only the canary
+  Service. Pass its main Ingress in the same run (same namespace, host and
+  path) and the two become one VirtualServer; alone, the stable side is a
+  reported placeholder.
+- **Snippets.** Carried across as written and never validated. Directives from
+  modules the community image included — `more_set_headers`, Lua — do not exist
+  in NGINX Ingress Controller and fail the reload; the analyzer names them.
 - **NGINX Plus features** (JWT, OIDC, WAF) have no community equivalent to
-  convert from. They are additions, not migrations. Session affinity is not in
-  this group: `sessionCookie` works on NGINX Open Source.
+  convert from. They are additions, not migrations.
 - **The controller install.** `checklist` prints the steps. Installing CRDs and
   running both controllers side by side is a cluster operation this tool does
   not perform.
+- **ConfigMap keys.** Settings that are global in NGINX Ingress Controller come
+  out as `nginx-config.merge.yaml` (or a last document on stdout): keys to merge
+  into your `nginx-config`, not a ConfigMap to apply over it.
 
 ## Layout
 
@@ -193,34 +172,31 @@ source's name. Applying it replaces the Ingress you are migrating. Pass
 nic-migrate.js      CLI: argument parsing, input gathering, output, validation
 lib/sources.js      One entry per source: module path, kinds read, CLI strings
 lib/engine.js       Boots the site's analyzer headless through .github/test/lib/load.js
-lib/ingress.js      Document splitting and the Ingress scanner (report only)
+lib/ingress.js      Reads Ingresses (List and IngressList items too) and describes them
 lib/gaps.js         The gap checks (report only)
 lib/render.js       Text report, JSON, and the -o file header
-lib/yaml.js         YAML subset parser and emitter (convert only)
-lib/convert.js      Ingress model, fragment lifting, resource assembly
+lib/yaml.js         Hands over the site's YAML parser and emitter (MigrationTool.yaml)
+lib/convert.js      Runs the shared assembler per Ingress; fills ports from the cluster
 ```
 
-`lib/ingress.js` is a scanner and `lib/yaml.js` is a parser. Everything the
-scanner reads ends up in an advisory sentence, so approximation is acceptable
-there, and not in the converter, where values have to round-trip into manifests.
+`lib/engine.js` and `lib/yaml.js` depend on `.github/test/lib/load.js` on
+purpose. One loader means a change to how the engine boots breaks the CLI at
+startup, instead of leaving a vendored copy to age quietly.
 
-`lib/engine.js` depends on `.github/test/lib/load.js` on purpose. One loader
-means a change to how the engine boots breaks the CLI at startup, instead of
-leaving a vendored copy to age quietly.
+Tests live at `.github/test/nic-migrate.test.js` and
+`.github/test/analyzer.test.js`, under `.github/` so Pages does not serve them,
+and picked up by the existing `node --test` suite. `_config.yml` at the repo
+root keeps `tools/` off the published site.
 
-Tests live at `.github/test/nic-migrate.test.js`, under `.github/` so Pages does
-not serve them, and picked up by the existing `node --test` suite. `_config.yml`
-at the repo root keeps `tools/` off the published site.
+### About the YAML parser
 
-### About lib/yaml.js
-
-A subset parser and emitter, cross-checked against PyYAML on realistic
-manifests and fuzzed over roughly 5,000 random round-trips. Fuzzing found two bugs that reading would
-not have. `- - k: v` parsed as a key named `- k`. And `- "x: y"` parsed as
-`{'"x': 'y"'}`, because the key pattern backtracks into the quoted scalar.
-
-Anchors, aliases, merge keys, and tags return an error rather than being
-silently dropped. No Kubernetes manifest in the wild needs them.
+It lives in `assets/js/migration-core.js` so the page and the CLI read a
+manifest the same way; it replaced both the page's line scanner and this
+tool's own parser. It folds plain and quoted scalars across lines (kubectl
+wraps long annotation values), decodes escapes, and refuses rather than skips:
+anchors, aliases, merge keys, non-standard tags, tab indentation, and any line
+it did not use are errors that name the line. It matches PyYAML on every
+manifest the migration page shows and on 3,000 generated documents.
 
 Considered and rejected: shelling out to `kubectl create --dry-run=client -o
 json` to borrow kubectl's parser. It is the more correct parser. But it makes
@@ -280,24 +256,26 @@ Scope is NGINX Open Source. A case with no equivalent on a target prints as
 `skip` with its reason rather than being dropped, so the count never quietly
 shrinks.
 
-### What the first real run found
+### What the real runs found
 
-None of these was predicted. All three are now handled by `convert`.
+All of these are now handled by `convert` and by the page.
 
-- **Ingress paths are matched literally.** The community controller treats an
-  `ImplementationSpecific` path containing regex metacharacters as a regex.
-  NGINX Ingress Controller needs `nginx.org/path-regex`. Without it,
+- **Ingress paths are matched literally.** With `rewrite-target` or
+  `use-regex`, the community controller makes every path on the host a
+  case-insensitive regex. NGINX Ingress Controller matches Ingress paths
+  literally unless told otherwise: without `nginx.org/path-regex`,
   `/api(/|$)(.*)` matched nothing and every `/api/...` request fell through to
   the catch-all `/`, returning 200 from the wrong backend. No dry run would
   have caught it.
-- **Snippets are rejected by default.** `enableSnippets` is off, and an Ingress
-  using `nginx.org/server-snippets` is rejected outright rather than degraded:
-  `snippet specified but snippets feature is not enabled`. The annotation
-  strategy converts CORS into snippets, so `--target ingress` needs
-  `helm --set controller.enableSnippets=true`.
-- **Session affinity has no Ingress annotation form.** It maps to VirtualServer
-  `upstreams[].sessionCookie`, which works on NGINX Open Source. There is no
-  `nginx.org/*` equivalent, so `--target ingress` loses stickiness silently.
+- **Regex routes need the community order and case rules.** NGINX takes the
+  first regex location that matches, and NIC writes VirtualServer routes in
+  order, so they are sorted longest first, as the community controller sorted
+  its paths. A route of `~ (?i)^/api…` keeps `/API/x` rewritten; `~* ^/api…`
+  matched it and then skipped NIC's case-sensitive rewrite.
+- **Snippets are rejected by default.** `enableSnippets` is off, and a resource
+  using snippets is rejected outright rather than degraded: `snippet specified
+  but snippets feature is not enabled`. The pipeline installs with
+  `--set controller.enableSnippets=true`.
 
 The pipeline also answered the question it was built for: `rewritePath` handles
 `$2` captures the same way the community `rewrite-target` does. Both

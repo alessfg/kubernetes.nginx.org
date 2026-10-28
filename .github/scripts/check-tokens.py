@@ -58,6 +58,12 @@ EXEMPT = [
     ("isDark ? '#0F1E57' : '#FFFFFF'",
      'a <meta> content attribute cannot hold a var() — asserted against '
      '--surface instead, below'),
+    ('-duration: 0.01ms',
+     'reduced motion switches animation and transition off; it is not a step '
+     'on the duration scale'),
+    ('analyzer-spin 0.7s',
+     'a spinner\'s rotation period: a loop, not one of the transition '
+     'durations the --dur-* scale names'),
 ]
 
 SPACING_PROPS = r'(?<![\w-])(?:padding|margin|gap|row-gap|column-gap)[a-z-]*'
@@ -102,6 +108,16 @@ def is_exempt(line):
         if needle in line:
             return True
     return False
+
+
+def without_exempt(line):
+    """The line with each sanctioned value blanked, so the rest of it is still
+    checked. Skipping the whole line meant one exempt value hid every other
+    violation on it: `width: 8px; height: 8px; border-radius: 50%` was never
+    read past the radius."""
+    for needle, _ in EXEMPT:
+        line = line.replace(needle, ' ' * len(needle))
+    return line
 
 
 def strip_css_comments(text):
@@ -154,13 +170,31 @@ def check_value_rules(c, path, lineno, line):
     if re.search(r'border-radius:[^;}"]*\d+px', line):
         c.fail(path, lineno, 'literal border-radius (use --radius*)', line)
 
-    # The pill token is 999, not 9999.
-    if '9999px' in line:
+    # The pill token is 999, not 9999. A radius only: the off-screen copy
+    # textarea sits at left: -9999px, which is a position, not a pill.
+    if re.search(r'border-radius:[^;}"]*9999px', line):
         c.fail(path, lineno, '9999px (the pill token is 999px)', line)
 
-    # Every font-size goes through the scale.
-    if re.search(r'font-size: *[0-9]', line):
+    # Every font-size goes through the scale, in any unit.
+    if re.search(r'font-size: *\.?[0-9]', line):
         c.fail(path, lineno, 'literal font-size (use --fs-*)', line)
+
+    # Spacing in rem or em escapes the px arithmetic below, so it is held to
+    # the tokens outright.
+    for m in re.finditer(SPACING_PROPS + r': *([^;}"]+)', line):
+        if re.search(r'(?<![\w-])\.?\d[\d.]*r?em\b', m.group(1)):
+            c.fail(path, lineno, 'spacing in rem/em (use --space-*)', line)
+            break
+
+    # Line height is paired with its size (--lh-*), never written as a number.
+    if re.search(r'line-height: *\.?[0-9]', line):
+        c.fail(path, lineno, 'literal line-height (use the --lh-* paired with the size)', line)
+
+    # Motion goes through the --dur-* scale.
+    for m in re.finditer(r'(?<![\w-])(?:transition|animation)(?:-duration|-delay)?: *([^;}"]+)', line):
+        if re.search(r'(?<![\w.-])\.?\d[\d.]*m?s\b', m.group(1)):
+            c.fail(path, lineno, 'literal duration (use --dur-*)', line)
+            break
 
     # The scale specifies no tracking anywhere.
     if 'letter-spacing' in line:
@@ -205,9 +239,8 @@ def check_inline_styles(c, html_paths):
                 for decls in re.findall(r'style="([^"]*)"', line):
                     if is_exempt(decls):
                         c.note(path, lineno, decls)
-                        continue
-                    check_value_rules(c, path, lineno, decls)
-                    check_type_pairing(c, path, lineno, decls)
+                    check_value_rules(c, path, lineno, without_exempt(decls))
+                    check_type_pairing(c, path, lineno, without_exempt(decls))
 
 
 def check_type_pairing(c, path, lineno, block):
@@ -271,6 +304,10 @@ def check_font_coverage(c, html_paths, js_paths):
     """
     allowed = subset_codepoints()
     if allowed is None:
+        # Returning quietly here switched the whole check off: a README whose
+        # --unicodes line changed quoting passed an out-of-subset glyph.
+        c.fail(os.path.join(ROOT, 'assets', 'fonts', 'README.md'), 1,
+               "no --unicodes='…' list found, so webfont coverage was not checked", '')
         return
     for path in html_paths:
         with open(path, encoding='utf-8') as fh:
@@ -308,6 +345,8 @@ def check_manifest(c, expected):
     """
     path = os.path.join(ROOT, 'site.webmanifest')
     if not os.path.isfile(path):
+        # Both pages link it; a missing file is a 404 for every visitor.
+        c.fail(path, 1, 'site.webmanifest is missing, so its colours were not checked', '')
         return
     with open(path, encoding='utf-8') as fh:
         try:
@@ -340,7 +379,7 @@ def run():
 
             if is_exempt(line):
                 c.note(path, lineno, line)
-                continue
+                line = without_exempt(line)
 
             check_value_rules(c, path, lineno, line)
 
@@ -352,6 +391,16 @@ def run():
                 if '.dark' not in raw[:raw.find(line)].rsplit('}', 1)[-1]:
                     c.fail(path, lineno, 'raw black shadow (use --elev-*)', line)
 
+            # Content link colours are scoped to the page's content area and live
+            # in the page stylesheet: in shared.css, or unscoped, they override
+            # the topbar and sidebar links (AGENTS.md).
+            if re.search(r'(?<![\w-])a:(?:link|visited)\b', line):
+                if path.endswith('shared.css'):
+                    c.fail(path, lineno, 'a:link/a:visited in shared.css (scope it in the page CSS)', line)
+                elif not re.search(r'\.(?:page-body|main-inner)\b', line) and \
+                        not re.search(r'\.[\w-]+\s+a:', line):
+                    c.fail(path, lineno, 'unscoped a:link/a:visited (scope it to the content area)', line)
+
             # One focus idiom: outline, never a ring.
             if re.search(r':focus[^{]*\{[^}]*box-shadow', line):
                 c.fail(path, lineno, 'focus via box-shadow (use outline)', line)
@@ -361,10 +410,8 @@ def run():
         for block in re.finditer(r'\{[^{}]*\}', strip_css_comments(raw)):
             if 'font-size' not in block.group(0):
                 continue
-            if is_exempt(block.group(0)):
-                continue
             lineno = raw[:block.start()].count('\n') + 1
-            check_type_pairing(c, path, lineno, block.group(0))
+            check_type_pairing(c, path, lineno, without_exempt(block.group(0)))
 
     # ── Inline style= attributes ──────────────────────────────────────────
     check_inline_styles(c, html)
@@ -382,6 +429,19 @@ def run():
                     c.fail(path, lineno, 'letter-spacing in JS', line)
                 if 'fontFamily' in line or 'font-family' in line:
                     c.fail(path, lineno, 'font-family in JS (use a class)', line)
+                # A style property set to a literal is a raw value at a call site.
+                # Layout switches (display, overflow, position, top/bottom as
+                # 'auto') carry no design value; '' clears an earlier assignment.
+                m = re.search(r"\.style\.(padding\w*|margin\w*|gap|rowGap|columnGap|lineHeight|fontSize|"
+                              r"fontWeight|color|backgroundColor|background|borderColor|borderRadius|"
+                              r"boxShadow|transition\w*|animation\w*)\s*=\s*(['\"`])([^'\"`]+)\2", line)
+                # A value naming a token is fine; one holding a raw number with a
+                # unit, or a colour literal, is the call-site value AGENTS.md rules out.
+                raw = m and re.sub(r'var\([^)]*\)', '', m.group(3))
+                if m and re.search(r'(?<![\w-])\.?\d[\d.]*(?:px|r?em|m?s|%)?\b|#[0-9A-Fa-f]{3,8}\b|\b(?:rgba?|hsla?)\(', raw):
+                    c.fail(path, lineno, f'style.{m.group(1)} set to a literal in JS (use a token or a class)', line)
+                for _, decls in re.findall(r"cssText\s*=\s*(['\"`])([^'\"`]*)\1", line):
+                    check_value_rules(c, path, lineno, decls.replace(';', '; '))
 
     # ── Raw colour literals at call sites ─────────────────────────────────
     # "Never write a raw value at a call site" is the most-repeated rule in
@@ -407,6 +467,15 @@ def run():
     # is the ▶ used in the reference tables; its four digits are a valid #RGBA
     # literal, so length alone cannot tell them apart — only the leading &.
     COLOURLESS = re.compile(r'(?<!&)#[0-9A-Fa-f]{3,8}\b|\brgba?\(')
+    # hsl() and the CSS named colours write a colour without a hex. The system
+    # colours (Canvas, CanvasText, Highlight…) are not here: forced-colours
+    # blocks need them, and they follow the reader's theme, not this one.
+    HSL = re.compile(r'\bhsla?\(')
+    NAMED = re.compile(r'(?<![\w-])(?:color|background(?:-color)?|border(?:-[a-z]+)*-color|border(?:-[a-z]+)?|'
+                       r'outline(?:-color)?|fill|stroke|box-shadow|text-shadow)\s*:[^;{}]*?(?<![\w-])'
+                       r'(red|blue|green|white|black|gray|grey|silver|maroon|purple|fuchsia|lime|olive|yellow|'
+                       r'navy|teal|aqua|orange|pink|brown|gold|indigo|violet|crimson|coral|salmon|tomato|'
+                       r'rebeccapurple|darkgray|darkgrey|lightgray|lightgrey|whitesmoke|ghostwhite)(?![\w-])', re.I)
     HEX = re.compile(r'(?<!&)#([0-9A-Fa-f]{3,8})\b')
     RGB = re.compile(r'\brgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)')
 
@@ -451,8 +520,12 @@ def run():
                 continue
             if is_exempt(line):
                 c.note(path, lineno, line)
-                continue
+                line = without_exempt(line)
             bad = hues(line)
+            if not bad and HSL.search(line):
+                bad = ['hsl()']
+            if not bad and NAMED.search(line):
+                bad = [NAMED.search(line).group(1)]
             if bad:
                 c.fail(path, lineno,
                        f'raw colour at a call site ({bad[0]}) — define it in tokens.css', line)
@@ -573,7 +646,10 @@ def run():
     # JS and HTML too: migration-core.js sets inline styles that resolve tokens
     # (`calc(100% + var(--space-base))`), and a token referenced only from there
     # would otherwise read as unreferenced below.
-    for path in js + html:
+    # SVGs too: the NGINX logo paints itself with var(--logo-*), which read as
+    # "unreferenced and unexplained" while the topbar used all four.
+    svgs = walk(os.path.join(ROOT, 'assets', 'img'), '.svg')
+    for path in js + html + svgs:
         with open(path, encoding='utf-8') as fh:
             for lineno, line in enumerate(fh, 1):
                 for name in re.findall(r'var\(\s*(--[\w-]+)', line):
@@ -600,18 +676,26 @@ def run():
         '--dur-travel':  'D5 of the F5DS motion scale, alongside D2/D3/D4',
         '--space-4hx':   'the 36px half-step; 2hx/3hx are both in use, so the '
                          'gap would be the odd one out',
+        '--java':        'the F5DS accent hue, "unbound" in tokens.css: its text '
+                         'companion --java-text is in use',
+        '--java-tint':   'the tint that pairs with --java',
     }
     unused = sorted(n for n in defined if n not in used)
     unexplained = [n for n in unused if n not in SCALE_COMPLETE]
 
     # ── Report ────────────────────────────────────────────────────────────
+    # Quiet on success: the lists below are for -v, or for when they need
+    # reading — an unexplained unused token, a failure. The summary line keeps
+    # the counts, so "OK" never means "measured nothing".
+    verbose = '-v' in sys.argv or '--verbose' in sys.argv
     scanned = len(css) + len(js) + len(html)
-    print(f'Scanned {scanned} files '
-          f'({len(css)} css, {len(js)} js, {len(html)} html)')
-    print(f'{len(defined)} custom properties defined, {len(used)} referenced, '
-          f'{len(unused)} unreferenced\n')
+    summary = (f'{scanned} files ({len(css)} css, {len(js)} js, {len(html)} html), '
+               f'{len(defined)} custom properties ({len(used)} referenced), '
+               f'{len(c.exemptions)} sanctioned deviation(s)')
+    if verbose or c.failures or unexplained:
+        print(f'Scanned {summary}\n')
 
-    if unused:
+    if unused and (verbose or unexplained):
         kept = [n for n in unused if n in SCALE_COMPLETE]
         if kept:
             print(f'{len(kept)} unreferenced by design (scale completeness — do not delete):')
@@ -626,7 +710,7 @@ def run():
             print('  Either use it, delete it, or add it to SCALE_COMPLETE '
                   'in this script with the reason.\n')
 
-    if c.exemptions:
+    if c.exemptions and verbose:
         print(f'{len(c.exemptions)} sanctioned deviation(s):')
         for e in c.exemptions:
             print(f'  {e}')
@@ -651,7 +735,7 @@ def run():
         print('All design-token invariants hold in rebuilt files.')
         print(f'{len(LEGACY)} pre-rebuild file(s) still pending replacement.')
     else:
-        print('All design-token invariants hold.')
+        print(f'check-tokens: all invariants hold — {summary}. -v for the lists.')
     return 0
 
 

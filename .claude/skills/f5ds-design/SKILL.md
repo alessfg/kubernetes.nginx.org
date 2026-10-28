@@ -108,7 +108,7 @@ Where that lands in practice:
 - **Radius**: `--radius` 4px for everything, replacing f5.com's 5px. `--radius-small` 2px **only when genuinely too small for 4px** — the 3px nav rail, the 16px tick box, not a 20px button. `--radius-pill` for Tags and Badges only.
 - **Elevation**: `--elev-*` only, N700-tinted, never black. **Cards are border-only at rest** — the console does this on its own landing pages, reserving shadow for surfaces that genuinely float.
 - **Type scale**: `h1` 36/54, `h2` 24/36, `h3` 18/26, `body-lg` 16/24, `body` 14/20, `caption` 12/18, `badge` 10/16, `code` 14/24. F5DS pairs a **fixed leading with each size** rather than one global ratio, so `line-height` is a length, not a multiplier: any rule that sets `font-size` must restate the paired `--lh-*`. Weights 400/500/700 only — no 300, no 600. The scale specifies no tracking anywhere, so there should be no `letter-spacing` declaration in the CSS at all.
-- The font is **self-hosted, never a CDN**. Read `assets/fonts/README.md` before upgrading or re-subsetting it — `→` appears 29 times in the mapping tables and is outside both stock Google `latin` and `latin-ext` ranges.
+- The font is **self-hosted, never a CDN**. Read `assets/fonts/README.md` before upgrading or re-subsetting it — `→` appears throughout the mapping tables and is outside both stock Google `latin` and `latin-ext` ranges.
 
 ## Documented deviations, with justifications
 
@@ -120,8 +120,8 @@ Do not let a scanner or a tidying pass "fix" these.
 | **Hexagon lattice in the landing hero** (`--pattern-hex`) | F5DS defines exactly four graphic classes — icons, flags, pictograms, illustrations — and a tiled background texture is none of them. Kept because the lattice is the site's strongest NGINX signal, and the 48px-gutter reasoning applies: F5DS assumes a dense console screen and a community docs front page is not one. Confined to `.page-hero.home`, masked out from behind all copy so no contrast pairing changes, clamped to 10% in dark, hidden below 600px, suppressed in print. |
 | **No hover lift** — shadow only, no `translateY` | A page of cards rising at once is a lot of motion for a docs site. F5DS's `Elevate Up` is a Motion-page catalogue entry, not a mandate. |
 | **Dark theme** | F5DS publishes none (Early Availability only). Authored here, deepening into the same N-ramp — N700 page, N600 surface — with both accents lightened until they clear 4.5:1 on both. |
-| **Two button vocabularies** — `.cta*` and `.btn*` | Given identical geometry in `shared.css` rather than merged, because consolidating means editing markup in two pages for no visual gain. Compose new work onto `.btn`. |
-| **`--mono` = SF Mono** (not F5DS's Courier) | Courier is unreadable at code-block sizes; docs.nginx.com deviates identically. Inline `code` also sizes at `0.9em`, relative to its context rather than off the scale. |
+| **Two button vocabularies** — `.cta*` and `.btn*` | Share one base rule in `shared.css` rather than being merged, because consolidating means editing markup in two pages for no visual gain. The geometry is **not** identical: `.cta` is the larger landing-page call to action and overrides the base's height and padding, so check `where.py .cta` before assuming a change to one reaches the other. Compose new work onto `.btn`. |
+| **`--mono` = the system monospace** (`ui-monospace` first, not F5DS's Courier) | Courier is unreadable at code-block sizes; docs.nginx.com deviates identically. `ui-monospace` is SF Mono in Safari; Chrome on macOS renders Menlo, because no web page can name SF Mono. Inline `code` also sizes at `0.9em`, relative to its context rather than off the scale. |
 | **Code syntax palette** (`--code-key`/`-string`/`-comment`/`-keyword`/`-number`/`-punct`) | F5DS publishes no code palette and no syntax-highlighting guidance at all. VS Code Dark+, as the pre-F5DS design and docs.nginx.com both use, adjusted only where contrast required it (`#808080` → `#8B9099`, since VS Code's own separator grey measures 4.19:1 on `--code-bg`). **Do not "fix" these to status hues** — that was tried and broke two rules at once: status hues carry sentiment rather than token role, and `--emerald`/`--amber` were being rendered as text, which this site forbids. The print block inverts them, because the code surface prints light. |
 | **Code surface is neutral `#1E1E1E`, not N700 navy** | Hue proximity between a navy code block and the navy top bar and sidebar hurt readability. This is VS Code Dark+'s own editor background, which the syntax palette was designed against. `--code-border` `#333333` is part of the same exemption. |
 | **Inline code is a wash with no border and no colour** | Every hue in this system is spoken for: blue is links, green is the accent, pomegranate reads as error, purple and java read as blue-violet and teal — as links again. And a mapping cell holds up to ten annotation names stacked, where ten outlined boxes turn the cell into a grid. GitHub, Slack and Stack Overflow all render inline code the same way. |
@@ -164,10 +164,12 @@ values that `tokens.css` does not contain.
 ### Sidebar labels are the headings they link to
 
 The sidebar labels *are* the `<h2>` headings they link to, so they match those
-headings verbatim — with one measured exception. `.sidebar-link-name` is
-`white-space: nowrap` inside a 264px rail (~226px usable), so a heading that
-would clip is shortened instead. Today that is "Config analyzer" for "Ingress
-NGINX config analyzer", which measures ~285px.
+headings verbatim — with one exception. "Config analyzer" stands for
+"Ingress-NGINX config analyzer". It was shortened when `.sidebar-link-name` was
+`white-space: nowrap` and the heading measured ~285px against ~226px of rail.
+Neither holds now: the label wraps (`overflow-wrap: anywhere`, for 200% zoom),
+and the full heading measures 208px against ~215px usable (2026-10-27), so it
+would fit on one line. The short label is a choice, not a clip.
 
 **Measure rather than assume**, with `shot.sh --measure '.sidebar-link-name'`:
 "Phased migration strategy" is 150.5px and fits, which is why it is spelled out

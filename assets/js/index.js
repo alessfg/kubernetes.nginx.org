@@ -11,15 +11,15 @@
             'home': 'Home',
             'nginx-ingress-controller': 'NGINX Ingress Controller',
             'nginx-gateway-fabric': 'NGINX Gateway Fabric',
-            'migration-tool': 'Ingress-NGINX Migration',
+            'migration-tool': 'NGINX Ingress Migration Tool',
             'haproxy-migration-tool': 'HAProxy Migration',
             'ingress2gateway': 'ingress2gateway'
         };
 
         /* ── Auto-Fetch Versions ── */
         let VERSION_CONFIG = {
-            nic: { repo: 'nginx/kubernetes-ingress',        chartPath: 'charts/nginx-ingress',        fallback: { release: 'v5.5.4', helm: 'v2.6.4' } },
-            ngf: { repo: 'nginx/nginx-gateway-fabric',      chartPath: 'charts/nginx-gateway-fabric', fallback: { release: 'v2.6.7', helm: 'v2.6.7' } },
+            nic: { repo: 'nginx/kubernetes-ingress',        chartPath: 'charts/nginx-ingress',        fallback: { release: 'v5.7.0', helm: 'v2.8.0' } },
+            ngf: { repo: 'nginx/nginx-gateway-fabric',      chartPath: 'charts/nginx-gateway-fabric', fallback: { release: 'v2.8.0', helm: 'v2.8.0' } },
             i2g: { repo: 'kubernetes-sigs/ingress2gateway',  fallback: { release: 'v1.2.0' } }
         };
         // Bump the cache key suffix when VERSION_CONFIG shape or applyVersions logic changes
@@ -330,6 +330,21 @@
                     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
                     e.preventDefault();
                     showProductFn('home');
+                });
+            }
+
+            // The skip link moves focus without touching the URL. As a plain
+            // link it rewrote the hash to #main-content, which is not a view,
+            // so reloading — or sharing the URL — landed on Home instead of
+            // the product the reader was on. The href stays for no-JS.
+            let skip = document.querySelector('.skip-link');
+            if (skip) {
+                skip.addEventListener('click', function(e) {
+                    let main = document.getElementById('main-content');
+                    if (!main) return;
+                    e.preventDefault();
+                    focusTarget(main);
+                    main.scrollIntoView();
                 });
             }
 

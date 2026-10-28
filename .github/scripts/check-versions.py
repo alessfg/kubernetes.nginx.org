@@ -17,7 +17,8 @@ Sources of truth, in order of authority:
                               TARGET, used to build the install commands
   assets/js/migration-*.js    INGRESS_NGINX_VERSION — the migration SOURCE
 
-Everything else is a copy, and this asserts every copy.
+Everything else is a copy, and this asserts every copy — including the NIC
+chart the e2e runner installs (tools/nic-migrate/e2e/run-e2e.py).
 
 What this deliberately does NOT check:
   - `badge badge-new` labels ("New v5.4.0"). They are claims about which
@@ -28,6 +29,12 @@ What this deliberately does NOT check:
   - the NGINX and Kubernetes rows in the compatibility tables. Those cannot be
     derived from anything in this repo; they are marked with `data-compat` so
     they are at least greppable per product, and the release skill owns them.
+
+What it REPORTS but never fails on:
+  - a featured release post older than the pinned minor. Release posts exist
+    only for minor releases, so this is the one minor-only step, and for three
+    minors running nobody took it: the v5.4.0 post stayed featured through
+    5.5 and 2.5–2.6. It cannot fail, because a post trails its release by days.
 
 Usage:  python3 .github/scripts/check-versions.py
 Exit:   0 every copy agrees, 1 otherwise.
@@ -153,6 +160,17 @@ def check_migration_target(config):
 
     want_release = config['nic']['release']
     want_helm = config['nic']['helm'].lstrip('v')
+
+    # The e2e runner installs NIC from the chart; testing a different release
+    # than the site documents proves nothing about what a reader installs.
+    e2e = 'tools/nic-migrate/e2e/run-e2e.py'
+    chart = re.search(r"^NIC_CHART_VERSION = '([^']+)'", read(e2e), re.M)
+    if not chart:
+        failures.append(f'{e2e}: could not find NIC_CHART_VERSION')
+    elif chart.group(1) != want_helm:
+        failures.append(f'{e2e}: NIC_CHART_VERSION is {chart.group(1)}, '
+                        f'VERSION_CONFIG.nic.helm is {want_helm}')
+
     if version.group(1) != want_release:
         failures.append(f'assets/js/migration-core.js: NIC.VERSION is {version.group(1)}, '
                         f'VERSION_CONFIG.nic.release is {want_release}')
@@ -227,6 +245,27 @@ def check_source_version():
     return failures
 
 
+def report_featured_posts(config):
+    """Featured release posts against the minor each product is pinned to.
+
+    Slugs carry the minor ("nginx-ingress-controller-5-6-…",
+    "nginx-gateway-fabric-2-7-…", older ones "v5-4-0"), which is the only
+    machine-readable statement of which release a card promotes.
+    """
+    stale = []
+    slugs = {'nic': 'nginx-ingress-controller', 'ngf': 'nginx-gateway-fabric'}
+    text = read('index.html')
+    for product, slug in slugs.items():
+        pinned = tuple(int(n) for n in config[product]['release'].lstrip('v').split('.')[:2])
+        for major, minor in re.findall(
+                r'href="https://blog\.nginx\.org/blog/' + slug + r'-v?(\d+)-(\d+)-', text):
+            if (int(major), int(minor)) < pinned:
+                stale.append(f'a featured post promotes {product} {major}.{minor}, but the site '
+                             f'pins {".".join(map(str, pinned))} — feature that release\'s post '
+                             f'once it is on blog.nginx.org (release-update skill)')
+    return stale
+
+
 def main():
     config = parse_version_config(read('assets/js/index.js'))
 
@@ -247,6 +286,11 @@ def main():
         found = fn()
         print(f'  {"FAIL" if found else "ok  "}  {label}')
         failures += found
+
+    stale = report_featured_posts(config)
+    print(f'  {"note" if stale else "ok  "}  featured release posts (reported, never failed)')
+    for s in stale:
+        print(f'          {s}')
 
     print()
     if failures:

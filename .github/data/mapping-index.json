@@ -46,9 +46,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "nicSize"
   },
   {
    "community": [
@@ -57,9 +57,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "nicOffset"
   },
   {
    "community": [
@@ -68,9 +68,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "nicSize"
   },
   {
    "community": [
@@ -79,9 +79,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "onOffBool"
   },
   {
    "community": [
@@ -90,8 +90,8 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "appendBufferSize"
   },
   {
@@ -101,9 +101,9 @@
    "category": "Buffering",
    "anchor": "buffering",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "nicSize"
   },
   {
    "community": [
@@ -152,7 +152,7 @@
    "anchor": "session-affinity",
    "type": "virtualserver",
    "crdKind": "VirtualServer",
-   "templateFn": null,
+   "templateFn": "generateCanaryAffinityNote",
    "transform": null
   },
   {
@@ -215,7 +215,7 @@
    "type": "virtualserver",
    "crdKind": "VirtualServer",
    "templateFn": "generateErrorPagesVirtualServer",
-   "transform": null
+   "transform": "customHttpErrors"
   },
   {
    "community": [
@@ -224,9 +224,9 @@
    "category": "Headers",
    "anchor": "headers",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "snippetWrap"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "connectionKeepalive"
   },
   {
    "community": [
@@ -249,7 +249,7 @@
    "type": "virtualserver",
    "crdKind": "VirtualServer",
    "templateFn": "generateRequestHeadersVS",
-   "transform": null
+   "transform": "upstreamVhost"
   },
   {
    "community": [
@@ -258,8 +258,8 @@
    "category": "Load balancing",
    "anchor": "load-balancing",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "lbMethod"
   },
   {
@@ -269,8 +269,8 @@
    "category": "Load balancing",
    "anchor": "load-balancing",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "direct"
   },
   {
@@ -372,7 +372,7 @@
    "anchor": "mirroring",
    "type": "annotation",
    "crdKind": null,
-   "templateFn": null,
+   "templateFn": "generateMirrorSnippets",
    "transform": "mirrorSnippet"
   },
   {
@@ -382,9 +382,9 @@
    "category": "Proxy settings",
    "anchor": "proxy-settings",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
-   "transform": "snippetWrap"
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
+   "transform": "direct"
   },
   {
    "community": [
@@ -405,8 +405,8 @@
    "anchor": "opentelemetry",
    "type": "configmap",
    "crdKind": null,
-   "templateFn": null,
-   "transform": "direct"
+   "templateFn": "generateOtelConfigMap",
+   "transform": null
   },
   {
    "community": [
@@ -414,9 +414,9 @@
    ],
    "category": "OpenTelemetry",
    "anchor": "opentelemetry",
-   "type": "unsupported",
+   "type": "configmap",
    "crdKind": null,
-   "templateFn": null,
+   "templateFn": "generateOtelConfigMap",
    "transform": null
   },
   {
@@ -508,8 +508,8 @@
    "category": "SSL/TLS",
    "anchor": "ssl-tls",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "backendProtocol"
   },
   {
@@ -585,8 +585,8 @@
    "category": "Timeouts",
    "anchor": "timeouts",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "appendTimeUnit"
   },
   {
@@ -596,8 +596,8 @@
    "category": "Timeouts",
    "anchor": "timeouts",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "appendTimeUnit"
   },
   {
@@ -607,8 +607,8 @@
    "category": "Timeouts",
    "anchor": "timeouts",
    "type": "annotation",
-   "crdKind": null,
-   "templateFn": null,
+   "crdKind": "VirtualServer",
+   "templateFn": "generateUpstreamSettingsVS",
    "transform": "appendTimeUnit"
   },
   {
@@ -642,8 +642,8 @@
    "anchor": "authentication-external",
    "type": "annotation",
    "crdKind": null,
-   "templateFn": null,
-   "transform": "snippetWrap"
+   "templateFn": "generateAuthKeepaliveNote",
+   "transform": null
   },
   {
    "community": [
@@ -653,8 +653,8 @@
    "anchor": "authentication-external",
    "type": "annotation",
    "crdKind": null,
-   "templateFn": null,
-   "transform": "snippetWrap"
+   "templateFn": "generateAuthCookieNote",
+   "transform": null
   },
   {
    "community": [

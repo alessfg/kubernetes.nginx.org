@@ -101,4 +101,17 @@ function analyze(source, yaml, strategy) {
     return { parsed, plan, text };
 }
 
-module.exports = { ROOT, loadAnalyzer, analyze };
+// Element ids a script looks up by literal: getElementById('x') and
+// querySelector('#x'), in any of JavaScript's three quotes. Only single quotes
+// were matched once, so a lookup written getElementById("x") was invisible to
+// every id test. A concatenated id (`'page-' + name`) ends in '-' and is
+// dropped: its value is decided at run time.
+function idsQueriedBy(js) {
+    const q = '([\'"`])';
+    return [...new Set([
+        ...[...js.matchAll(new RegExp('getElementById\\(\\s*' + q + '([^\'"`]+)\\1\\s*\\)', 'g'))].map((m) => m[2]),
+        ...[...js.matchAll(new RegExp('querySelector(?:All)?\\(\\s*' + q + '#([A-Za-z][\\w-]*)\\1\\s*\\)', 'g'))].map((m) => m[2]),
+    ])].filter((id) => !id.endsWith('-'));
+}
+
+module.exports = { ROOT, loadAnalyzer, analyze, idsQueriedBy };

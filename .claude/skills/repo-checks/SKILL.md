@@ -12,6 +12,22 @@ python3 .github/scripts/check-all.py       # -v to see every check's full output
 ```
 
 It runs all nine and prints **how many ran**, which is the number that matters.
+On failure it prints only the failing checks' output — for the node suites, only
+the failing tests — so a fix-and-re-run loop stays small; `-v` prints everything.
+
+## When to run them
+
+**When asked, not after every change.** Most edits here are prose or markup no
+check reads, and a nine-check run after each one is noise; one run per logical
+change is the most that is ever useful. The corollary is not optional: **if you
+have not run them, say so**, and do not describe the work as verified. "I have
+not run the checks" is a complete and acceptable thing to report.
+
+Nothing runs them automatically, on purpose. Agent permissions, hooks and MCP
+servers are not checked in: they are a property of whoever is working, not of
+the project, and a hook that fires at the end of every turn runs the full suite
+whether or not anyone asked — more time and context than it catches. The
+obligation above stands in its place.
 
 ## Why a runner, and never a shell line
 
@@ -43,7 +59,8 @@ keep all three:
   the absence of errors.
 
 A missing interpreter or script is a **failure**, never a skip (`FileNotFoundError`
-→ exit 127).
+→ exit 127). The summary lists it as "could not run" rather than as a check that
+ran and failed, because the fix is to install the interpreter, not to edit code.
 
 The same shape is why the CI test step names its glob and guards on `find`:
 `node --test` exits 0 when it matches no files, so a moved directory would turn
@@ -76,14 +93,14 @@ times out. Save and restore through Python, or call `/bin/cp` directly.
 | Check | Asserts |
 |---|---|
 | `check-syntax.py` | every script parses — one `node --check` per file, never a glob |
-| `check-tokens.py` | token invariants, retired colours/typefaces, undefined `var()`, inline `style=`, type pairing, the manifest, webfont coverage |
-| `check-contrast.py` | every pairing against WCAG 2.1 AA in both themes, plus pairings derived from the CSS, plus the measured-ratio comments |
+| `check-tokens.py` | token invariants in px, rem and em, literal line-heights and durations, retired colours/typefaces, hex/rgb/hsl/named colours at call sites, undefined `var()`, inline `style=`, JS `style.X =` and `cssText`, content-link scoping, type pairing, the manifest, webfont coverage. An `EXEMPT` value blanks only itself, so the rest of its line is still checked; a missing font list or manifest fails |
+| `check-contrast.py` | every pairing against WCAG 2.1 AA in both themes, plus pairings derived from the CSS (white labels included, and a rule with no dark override measured in dark too), plus the measured-ratio comments |
 | `check-classes.py` | classes resolve to rules; load order, asset paths, sitemap and navigation labels hold |
-| `check-versions.py` | every version string agrees with its source of truth |
+| `check-versions.py` | every version string agrees with its source of truth, including the NIC chart the e2e runner installs |
 | `check-markup.py` | tag balance, duplicate ids, anchors, JSON-LD |
-| `test-analyzer.js` | the migration analyzer under a DOM stub; regenerates `mapping-index.json` |
-| `node --test .github/test/` | page ↔ engine ↔ module wiring |
-| `where.py --self-test` | the locator's resolvers still match, by kind not line number |
+| `test-analyzer.js` | the migration analyzer under a DOM stub; regenerates `mapping-index.json`. Quiet on success; `-v` for each check and the accuracy-provenance queue |
+| `node --test .github/test/` | page ↔ engine ↔ module wiring, including every id `shared.js` queries on every page; the analyzer over all 130 annotations × both strategies, failing on any translator warning and parsing every output back; the e2e runner's own `--self-test`, which needs no cluster |
+| `where.py --self-test` | the locator's resolvers still match (by kind, not line number, against independent counts); every repo path the docs backtick exists, every SHA they cite resolves, and every number they still state matches its source; `--outline`, `--tests`, `--stats` and `--diff` work, `--diff` including on a planted drift; every reference row's example matches the analyzer and its NIC cell names each key its mapping writes, except the tabs `ALTERNATIVE_TABS` lists with a reason |
 
 Five things to know:
 

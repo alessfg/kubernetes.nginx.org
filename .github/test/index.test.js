@@ -9,7 +9,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { ROOT } = require('./lib/load.js');
+const { ROOT, idsQueriedBy } = require('./lib/load.js');
 
 const page = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const js = fs.readFileSync(path.join(ROOT, 'assets/js/index.js'), 'utf8');
@@ -65,10 +65,7 @@ test('every data-version binding names a real VERSION_CONFIG field', () => {
 });
 
 test('every element id index.js queries by literal exists in the page', () => {
-    const ids = [...new Set([
-        ...[...js.matchAll(/getElementById\(\s*'([^']+)'\s*\)/g)].map((m) => m[1]),
-        ...[...js.matchAll(/querySelector\(\s*'#([A-Za-z][\w-]*)'\s*\)/g)].map((m) => m[1]),
-    ])].filter((id) => !id.endsWith('-'));
+    const ids = idsQueriedBy(js);
     const missing = ids.filter((id) => !page.includes(`id="${id}"`));
     assert.deepEqual(missing, []);
 });

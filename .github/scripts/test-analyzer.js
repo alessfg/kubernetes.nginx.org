@@ -110,6 +110,11 @@ sandbox.globalThis = sandbox;
 
 const context = vm.createContext(sandbox);
 
+// Quiet on success (repo-checks: "a one-line summary that includes the counts
+// it asserted"); every progress line below prints with -v, and failures always.
+const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
+const say = (...args) => { if (VERBOSE) console.log(...args); };
+
 function load(rel) {
     const file = path.join(ROOT, rel);
     const code = fs.readFileSync(file, 'utf8');
@@ -119,10 +124,10 @@ function load(rel) {
         console.error(`FAIL  ${rel} threw while loading: ${err.message}`);
         process.exit(1);
     }
-    console.log(`  loaded ${rel}`);
+    say(`  loaded ${rel}`);
 }
 
-console.log('Loading the analyzer...');
+say('Loading the analyzer...');
 /* Order matters and is the inverse of what it looks like: the source module
    only dereferences MigrationTool inside function bodies (call time), while
    migration-core.js reads window.MIGRATION_SOURCE at top level. So source
@@ -149,7 +154,7 @@ if (missingShared.length) {
         + missingShared.join(', '));
     process.exit(1);
 }
-console.log(`  all ${SHARED_GLOBALS.length} shared.js globals the page scripts `
+say(`  all ${SHARED_GLOBALS.length} shared.js globals the page scripts `
     + 'call are defined');
 
 const SOURCE = sandbox.window.MIGRATION_SOURCE;
@@ -187,7 +192,7 @@ function dig(obj, dotted) {
         (acc, key) => (acc == null ? acc : acc[key]), obj);
 }
 
-console.log('\nChecking the MIGRATION_SOURCE contract...');
+say('\nChecking the MIGRATION_SOURCE contract...');
 let contractOk = true;
 for (const key of CONTRACT) {
     const value = dig(SOURCE, key);
@@ -197,7 +202,7 @@ for (const key of CONTRACT) {
     }
 }
 if (!contractOk) { process.exit(1); }
-console.log(`  all ${CONTRACT.length} required properties present`);
+say(`  all ${CONTRACT.length} required properties present`);
 
 /* The block types migration-core.js knows how to render. Anything else is
    skipped with a warning in the browser, which is invisible on a page this
@@ -337,50 +342,55 @@ function checkReferenceTables() {
    output — six lines, and it fails the moment a number moves.
 
    When a number legitimately changes, update it here in the same commit as
-   the change, and say in the message which way it moved and why. */
+   the change, and say in the message which way it moved and why.
+
+   Every export is now complete manifests: one VirtualServer per host
+   (CRD-first) or the migrated Ingress (annotation-first), plus Policies and
+   the ConfigMap. The CRD-first numbers fell when the bare `annotations:` block
+   and the per-feature VirtualServers that claimed the same host went. */
 const EXPECTED = {
-    'simple/crd':          { findings: 5,  steps: 1, blocks: 1, exported: 1 },
+    'simple/crd':          { findings: 5,  steps: 1, blocks: 2, exported: 1 },
     'simple/annotation':   { findings: 5,  steps: 1, blocks: 1, exported: 1 },
-    'moderate/crd':        { findings: 12, steps: 2, blocks: 2, exported: 2 },
+    'moderate/crd':        { findings: 12, steps: 2, blocks: 3, exported: 2 },
     'moderate/annotation': { findings: 12, steps: 2, blocks: 2, exported: 2 },
-    'advanced/crd':        { findings: 24, steps: 3, blocks: 5, exported: 6 },
-    'advanced/annotation': { findings: 24, steps: 3, blocks: 6, exported: 4 }
+    'advanced/crd':        { findings: 24, steps: 2, blocks: 4, exported: 5 },
+    'advanced/annotation': { findings: 24, steps: 3, blocks: 4, exported: 4 }
 };
 
 const presets = Object.keys(SOURCE.analyzer.samplePresets);
 let failures = 0;
 
-console.log('\nChecking the mapping ↔ generator contract...');
+say('\nChecking the mapping ↔ generator contract...');
 const gen = checkGeneratorContract();
 if (gen.problems.length) {
     gen.problems.forEach(p => console.error(`  FAIL  ${p}`));
     failures += gen.problems.length;
 } else {
-    console.log(`  ok    ${gen.named} templateFn reference(s) and `
+    say(`  ok    ${gen.named} templateFn reference(s) and `
         + `${gen.defined} generator(s) agree in both directions`);
 }
 
-console.log('\nChecking the transform vocabulary...');
+say('\nChecking the transform vocabulary...');
 const tv = checkTransformVocabulary();
 if (tv.problems.length) {
     tv.problems.forEach(p => console.error(`  FAIL  ${p}`));
     failures += tv.problems.length;
 } else {
-    console.log(`  ok    ${tv.named} declared transform(s) and ${tv.cases} `
+    say(`  ok    ${tv.named} declared transform(s) and ${tv.cases} `
         + 'translateValue case(s) agree in both directions');
 }
 
-console.log('\nChecking the mappings ↔ reference tables...');
+say('\nChecking the mappings ↔ reference tables...');
 const ref = checkReferenceTables();
 if (ref.problems.length) {
     ref.problems.forEach(p => console.error(`  FAIL  ${p}`));
     failures += ref.problems.length;
 } else {
-    console.log(`  ok    ${ref.mapped} mapped annotations and `
+    say(`  ok    ${ref.mapped} mapped annotations and `
         + `${ref.documented} documented annotations agree in both directions`);
 }
 
-console.log('\nRunning every sample preset through both strategies...');
+say('\nRunning every sample preset through both strategies...');
 
 for (const preset of presets) {
     for (const strategy of ['crd', 'annotation']) {
@@ -452,14 +462,14 @@ for (const preset of presets) {
             continue;
         }
 
-        console.log(`  ok    ${label.padEnd(20)} ${findings} findings, ${steps} steps, `
+        say(`  ok    ${label.padEnd(20)} ${findings} findings, ${steps} steps, `
             + `${blocks} blocks, ${exported} exported resource(s)`);
     }
 }
 
 /* The utils are carried verbatim, so a regression here means someone edited
    migration-core.js. These assert the behaviours the mapping data relies on. */
-console.log('\nChecking the carried utility behaviours...');
+say('\nChecking the carried utility behaviours...');
 const u = MT.util;
 const cases = [
     ['stripInlineComment keeps a quoted hash',
@@ -481,7 +491,7 @@ const cases = [
 ];
 for (const [name, actual, expected] of cases) {
     if (actual === expected) {
-        console.log(`  ok    ${name}`);
+        say(`  ok    ${name}`);
     } else {
         console.error(`  FAIL  ${name}\n          expected ${JSON.stringify(expected)}`
             + `\n          got      ${JSON.stringify(actual)}`);
@@ -494,7 +504,7 @@ for (const [name, actual, expected] of cases) {
    validates the same data, so it cannot drift: if it is wrong, the checks
    above have already failed. It exists so that answering "which section
    documents proxy-body-size, and does it generate a CRD?" costs one small JSON
-   read instead of a grep through 4,952 lines of markup and 1,340 of JS.
+   read instead of a grep through the whole page and source module.
 
    Under .github/ because Pages publishes this branch. */
 function writeMappingIndex() {
@@ -534,11 +544,11 @@ function writeMappingIndex() {
 }
 
 const indexed = writeMappingIndex();
-console.log(`\nWrote .github/data/mapping-index.json (${indexed} mappings).`);
+say(`\nWrote .github/data/mapping-index.json (${indexed} mappings).`);
 
 /* ── Accuracy provenance ────────────────────────────────────────────────────
    The three Version-reference banners assert that the whole tool "is based on"
-   a given NIC release. That is one claim about 57 mappings and 19 generators,
+   a given NIC release. That is one claim about 57 mappings and 20 generators,
    and nothing records when any individual one was last checked against a
    tagged source — so a version bump silently re-asserts them all.
 
@@ -561,17 +571,17 @@ function reportProvenance() {
         if (m[1] !== current) { stale++; }
     }
     const unmarked = chunks.length - verified;
-    console.log(`\nAccuracy provenance (reported, never failed):`);
-    console.log(`  ${verified} of ${chunks.length} mapping(s) record a verified: tag`
+    say(`\nAccuracy provenance (reported, never failed):`);
+    say(`  ${verified} of ${chunks.length} mapping(s) record a verified: tag`
         + `; ${stale} of those are behind ${current}, ${unmarked} carry none.`);
     if (unmarked === chunks.length) {
-        console.log('  Add `verified: "<tag>"` to a mapping when its four-point accuracy');
-        console.log('  check is done, so the queue shrinks instead of being re-audited whole.');
+        say('  Add `verified: "<tag>"` to a mapping when its four-point accuracy');
+        say('  check is done, so the queue shrinks instead of being re-audited whole.');
     }
 }
 reportProvenance();
 
-console.log('');
+say('');
 if (errors.length) {
     console.error(`${errors.length} console.error during the run:`);
     errors.forEach(e => console.error(`  ${e}`));
@@ -581,5 +591,5 @@ if (failures) {
     console.error(`${failures} failure(s).`);
     process.exit(1);
 }
-console.log(`All ${presets.length * 2} preset/strategy combinations produced a clean `
-    + 'plan, with no dropped resources.');
+console.log(`test-analyzer: ${presets.length * 2} preset/strategy runs clean, ${ref.mapped} mapped `
+    + `annotations documented, ${indexed} mappings indexed — -v for every check.`);

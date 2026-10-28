@@ -1733,15 +1733,20 @@ spec:
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>stream-snippets</code><span class="or-text">— or —</span><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> +<span class="badge badge-transportserver">TransportServer CRD</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>Ingress-NGINX</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="configmap">ConfigMap Snippet</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="transportserver">TransportServer CRD</button>
+                            </div>
+                            <div class="approach-content active" data-approach="configmap">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Ingress-NGINX</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     nginx.ingress.kubernetes.io/stream-snippet: |
       server { listen 3306; proxy_pass mysql; }</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. As-is: the stream-snippets key of the global ConfigMap
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># As-is: the stream-snippets key of the global ConfigMap
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1764,9 +1769,19 @@ spec:
   routes:
     - path: /
       action:
-        pass: backend
----
-# 2. Long-term: a GlobalConfiguration listener + TransportServer
+        pass: backend</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="transportserver">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Ingress-NGINX</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.ingress.kubernetes.io/stream-snippet: |
+      server { listen 3306; proxy_pass mysql; }</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Long-term: a listener and a TransportServer
 apiVersion: k8s.nginx.org/v1
 kind: GlobalConfiguration
 metadata:
@@ -1784,7 +1799,7 @@ metadata:
   name: mysql-tcp
 spec:
   listener:
-    name: mysql-tcp  # references GlobalConfiguration listener
+    name: mysql-tcp  # the GlobalConfiguration listener
     protocol: TCP
   upstreams:
     - name: mysql
@@ -1792,6 +1807,7 @@ spec:
       port: 3306
   action:
     pass: mysql</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> The analyzer moves the snippet as-is into the <code>stream-snippets</code> ConfigMap key, which, like <code>http-snippets</code>, does not need the <code>-enable-snippets</code> flag. Its upstreams name Services by DNS, which NGINX resolves once at reload, so a Pod change is not picked up until the next one. A TransportServer behind a GlobalConfiguration listener tracks the Pod endpoints instead, which makes it the long-term form.</div>
                         </div></td></tr>
@@ -6326,14 +6342,19 @@ data:
                             <td><code>server-snippets</code><span class="or-text">— or —</span><code>nginx.org/custom-http-errors</code> <span class="badge badge-new">New v5.6.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>Ingress-NGINX ConfigMap</h4><pre><code>apiVersion: v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="snippet">Snippet Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                            </div>
+                            <div class="approach-content active" data-approach="snippet">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Ingress-NGINX ConfigMap</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ingress-nginx-controller
 data:
   custom-http-errors: "404,503"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller ConfigMap</h4><pre><code>apiVersion: v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller ConfigMap</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
@@ -6346,6 +6367,41 @@ data:
       proxy_intercept_errors off;
       proxy_pass http://error-pages.default.svc.cluster.local;
     }</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Ingress-NGINX ConfigMap</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+data:
+  custom-http-errors: "404,503"</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Per Ingress: on each Ingress that intercepts errors
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/custom-http-errors: "404,503"  # custom-http-errors
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80
+  defaultBackend:  # the community controller's default backend
+    service:
+      name: error-pages
+      port:
+        number: 80</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> The community key is controller-wide and sends errors to the controller's default backend; NGINX Ingress Controller has no ConfigMap key for it. Controller-wide, a <code>server-snippets</code> entry must define both the <code>error_page</code> and the named location it targets, and the Service in <code>proxy_pass</code> must exist when NGINX reloads or the reload fails. Per Ingress, <code>nginx.org/custom-http-errors</code> (v5.6.0+) does the same without snippets, sending errors to that Ingress's <code>spec.defaultBackend</code> — see <a href="#error-handling">Error handling</a>.</div>
                         </div></td></tr>

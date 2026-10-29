@@ -180,3 +180,66 @@ test('load-balance: verified value map incl. no-equivalent fallbacks', () => {
     assert.ok(!/lb-method/.test(first.text), 'balance first has no NIC equivalent');
     assert.ok(first.plan.infoNotes.some((n) => /first/.test(n.code)));
 });
+
+test('allow-list beside deny-list: one allow Policy, and the denied addresses inside it still denied', () => {
+    /* HAProxy denies a client outside allow-list OR inside deny-list. NGINX
+       Ingress Controller applies only the allow Policy when a resource
+       references both, so two Policies dropped the deny list without a word.
+       A denied address inside an allowed range must still be denied. */
+    const { source } = load();
+    const yaml = ingressWith({ 'haproxy.org/allow-list': '10.0.0.0/8', 'haproxy.org/deny-list': '10.1.2.3,192.168.1.1' });
+    for (const strategy of ['crd', 'annotation']) {
+        const { text } = analyze(source, yaml, strategy);
+        assert.doesNotMatch(text, /access-control-deny/, strategy + ': a deny Policy is ignored beside an allow one');
+        assert.match(text, /allow:\s*\n\s*- 10\.0\.0\.0\/8/, strategy);
+        assert.match(text, /deny 10\.1\.2\.3;/, strategy + ': the denied address inside the allowed range');
+        assert.doesNotMatch(text, /deny 192\.168\.1\.1;/, strategy + ': outside every allowed range, allow-only blocks it');
+    }
+    // A deny list on its own is still a deny Policy.
+    assert.match(analyze(source, ingressWith({ 'haproxy.org/deny-list': '10.1.2.3' }), 'crd').text, /deny:\s*\n\s*- 10\.1\.2\.3/);
+});
+
+test('5.7: server-proto h2 becomes proxy-http-version "2", on the annotation and the upstream field', () => {
+    /* v5.7.0 sets the upstream HTTP version (annotations.go, http_version.go).
+       Before it, generic HTTP/2 to a backend had no form at all. */
+    const { source } = load();
+    const svc = ingressWith({ 'haproxy.org/server-proto': 'h2' });
+    assert.match(analyze(source, svc, 'annotation').text, /nginx\.org\/proxy-http-version: "2"/);
+    assert.match(analyze(source, svc, 'crd').text, /proxy-http-version: "2"\s+# haproxy\.org\/server-proto/);
+});
+
+test('5.6: set-host becomes nginx.org/upstream-vhost when it is a plain hostname, a VirtualServer otherwise', () => {
+    const { source } = load();
+    const plain = analyze(source, ingressWith({ 'haproxy.org/set-host': 'Internal.Example.com' }), 'annotation').text;
+    assert.match(plain, /nginx\.org\/upstream-vhost: "internal\.example\.com"/, 'lowercased, as validation requires');
+    // A port fails upstream-vhost validation and would reject the Ingress.
+    const port = analyze(source, ingressWith({ 'haproxy.org/set-host': 'internal.example.com:8080' }), 'annotation').text;
+    assert.doesNotMatch(port, /nginx\.org\/upstream-vhost:/);
+    assert.match(port, /name: Host\s+value: "internal\.example\.com:8080"/);
+});
+
+test('a header value built from a sample fetch never lands in a literal-only annotation', () => {
+    /* nginx.org/proxy-set-headers and add-header take literal values only; %[src]
+       is HAProxy syntax, and a "$" makes NGINX Ingress Controller reject the Ingress. */
+    const { source } = load();
+    const { text, plan } = analyze(source, ingressWith({ 'haproxy.org/request-set-header': 'X-Client %[src]' }), 'annotation');
+    assert.doesNotMatch(text, /proxy-set-headers/);
+    assert.match(text, /kind: VirtualServer/);
+    assert.ok((plan.infoNotes || []).some((n) => /sample fetch/.test(n.message)), 'the rewrite is called out');
+});
+
+test('5.6: forwarded-for "false" becomes the disable-forwarded-headers ConfigMap key, with its cost named', () => {
+    const { source } = load();
+    const { text, plan } = analyze(source, ingressWith({ 'haproxy.org/forwarded-for': 'false' }), 'crd');
+    assert.match(text, /disable-forwarded-headers: "true"/);
+    assert.ok((plan.infoNotes || []).some((n) => /global/.test(n.message) && /-enable-snippets/.test(n.message)));
+});
+
+test('cors-respond-to-options is answered by the cors Policy, not reported as unsupported', () => {
+    /* The cors Policy renders "if ($request_method = 'OPTIONS') { return 204; }",
+       which is what HAProxy's annotation turned on (resSetCORS.go). */
+    const { source } = load();
+    const { plan } = analyze(source, ingressWith({ 'haproxy.org/cors-enable': 'true', 'haproxy.org/cors-respond-to-options': 'true' }), 'crd');
+    assert.ok(!plan.unsupported || !plan.unsupported.cards.some((c) => /respond-to-options/.test(c.code)));
+    assert.ok((plan.infoNotes || []).some((n) => /respond-to-options/.test(n.code) && /204/.test(n.message)));
+});

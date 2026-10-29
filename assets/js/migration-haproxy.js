@@ -1490,7 +1490,11 @@
         // lookahead, then HAProxy's regex found leftmost — beside the plain
         // route for the rest. Verified on nginx 1.31.7: /app/a/b?q=1 becomes
         // /new/a/b?q=1, /app passes unchanged, /apple is not routed.
-        function routeRewrite(p, rewrite, ctx) {
+        // `others` are the host's other Prefix paths: HAProxy picks the longest
+        // matching prefix first (its path map), then rewrites, so a route must
+        // not take a request a longer path owns. Verified on nginx 1.31.7 with
+        // /api and /: /api/things/42 → api /things/42, /x/api/y → web /y.
+        function routeRewrite(p, rewrite, ctx, others) {
             let rules = rewrite.rules;
             if (rules.length !== 1) {
                 ctx.note('path-rewrite', 'path-rewrite has ' + rules.length + ' rules, which HAProxy applies in turn; a route rewrites once. The first rule is migrated; fold the others into it by hand.', 'warning');
@@ -1498,8 +1502,10 @@
             let r = rules[0];
             let base = p.pathType === 'Exact' ? escapeRe(p.path) + '$'
                 : p.path === '/' ? '/' : escapeRe(p.path.replace(/\/$/, '')) + '(?:/|$)';
-            // "/" matches every path: no lookahead needed.
-            let guard = p.path === '/' && p.pathType !== 'Exact' ? '' : '(?=' + base + ')';
+            let longer = (others || []).filter(function(o) { return o.pathType !== 'Exact' && o.path !== p.path && o.path.replace(/\/$/, '').indexOf(p.path.replace(/\/$/, '')) === 0 && o.path.length > p.path.length; });
+            let exclude = longer.length ? '(?!' + longer.map(function(o) { return escapeRe(o.path.replace(/\/$/, '')) + '(?:/|$)'; }).join('|') + ')' : '';
+            // "/" matches every path: no lookahead of its own.
+            let guard = (p.path === '/' && p.pathType !== 'Exact' ? '' : '(?=' + base + ')') + exclude;
             if (r.re === '(.*)') return [{ path: '~ ^' + guard + '.*', rewritePath: r.to, rewritten: true }];
             // HAProxy's captures shift by none: the lookahead captures nothing.
             if (/\$\{|"|\\$/.test(r.re) || /\$\d/.test(r.to) && /\(\?[^:=!]/.test(r.re)) {
@@ -1562,10 +1568,20 @@
                 let upstreams = [];
                 let taken = {};
                 let routes = [];
-                let paths = h.paths.filter(function(p) { return !(p.backend && canaryServices.indexOf(p.backend.service) !== -1); });
+                // A route-acl Service's rule carries only HAProxy's custom route
+                // (route.go AddCustomRoute adds no map entry for it). Where
+                // another backend serves the same path, that backend is the
+                // route and the canary its matches or split; where none does,
+                // the route answers 404 — HAProxy's default backend — unless
+                // the ACL sends the request to the canary.
+                let isCanary = function(p) { return p.backend && canaryServices.indexOf(p.backend.service) !== -1; };
+                let paths = h.paths.filter(function(p) { return !isCanary(p); });
+                h.paths.filter(isCanary).forEach(function(cp) {
+                    if (!paths.some(function(p) { return p.path === cp.path; })) paths.push({ path: cp.path, pathType: cp.pathType, backend: null, canaryOnly: cp });
+                });
                 let rewritten = [];
                 paths.forEach(function(p) {
-                    let rws = f.rewrite ? routeRewrite(p, f.rewrite, ctx) : null;
+                    let rws = f.rewrite ? routeRewrite(p, f.rewrite, ctx, paths) : null;
                     if (!rws) { rewritten.push({ p: p, rw: null }); return; }
                     rws.forEach(function(rw) { rewritten.push({ p: p, rw: rw.rewritten ? rw : null, plain: rw.rewritten ? null : rw.path }); });
                 });
@@ -1585,8 +1601,8 @@
                 };
                 rewritten.forEach(function(item) {
                     let p = item.p;
-                    if (!p.backend || p.backend.resource) { ctx.note('backend', 'Path ' + p.path + ' on ' + h.host + ' has a resource backend, which a VirtualServer cannot route to; it is skipped.', 'warning'); return; }
-                    let up = addUpstream(p.backend.service, p.backend.port, 'spec.upstreams.' + upstreams.length + '.port');
+                    if (!p.canaryOnly && (!p.backend || p.backend.resource)) { ctx.note('backend', 'Path ' + p.path + ' on ' + h.host + ' has a resource backend, which a VirtualServer cannot route to; it is skipped.', 'warning'); return; }
+                    let up = p.canaryOnly ? null : addUpstream(p.backend.service, p.backend.port, 'spec.upstreams.' + upstreams.length + '.port');
                     let route = { path: item.rw ? item.rw.path : item.plain || (p.pathType === 'Exact' ? '=' + p.path : p.path) };
                     let ri = routes.length;
                     let action;
@@ -1594,6 +1610,9 @@
                         action = { redirect: { url: f.redirect.url, code: f.redirect.code } };
                         c['spec.routes.' + ri + '.action.redirect.url'] = f.redirect.source;
                         c['spec.routes.' + ri + '.action.redirect.code'] = f.redirect.codeSource;
+                    } else if (p.canaryOnly) {
+                        action = { return: { code: 404, type: 'text/plain', body: 'Not Found' } };
+                        c['spec.routes.' + ri + '.action'] = 'no backend but the route-acl Service: HAProxy answers 404 otherwise';
                     } else {
                         let proxy = Object.assign({}, f.proxy);
                         if (item.rw) proxy.rewritePath = item.rw.rewritePath;
@@ -1607,12 +1626,16 @@
                         }
                     }
                     // route-acl canaries on this host: splits and matches.
-                    let legs = f.canary.filter(function(cn) { return h.paths.some(function(x) { return x.backend && x.backend.service === cn.service; }); });
+                    // A leg applies under its own rule's path ({ path -m beg }
+                    // in AddCustomRoute): to this route when the route's path
+                    // lies under it.
+                    let under = function(cp) { return cp.path === '/' || p.path === cp.path || p.path.indexOf(cp.path.replace(/\/$/, '') + '/') === 0; };
+                    let legs = f.canary.filter(function(cn) { return h.paths.some(function(x) { return x.backend && x.backend.service === cn.service && under(x); }); });
                     if (legs.length && !f.redirect) {
                         let matches = [];
                         let splitLeg = null;
                         legs.forEach(function(cn) {
-                            let cp = h.paths.find(function(x) { return x.backend && x.backend.service === cn.service; });
+                            let cp = h.paths.find(function(x) { return x.backend && x.backend.service === cn.service && under(x); });
                             let cup = addUpstream(cn.service, cp.backend.port, 'spec.upstreams.' + upstreams.length + '.port');
                             if (cn.match) matches.push({ conditions: [matchCondition(cn.match)], action: { pass: cup }, source: cn.source, found: cn.match.value === null });
                             else if (!splitLeg) splitLeg = { up: cup, pct: cn.split, source: cn.source };

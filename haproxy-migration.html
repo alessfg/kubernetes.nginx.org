@@ -3278,6 +3278,15 @@ spec:
             pathType: Prefix
             backend:
               service:
+                name: main-svc
+                port:
+                  number: 80
+          # the canary leg: HAProxy sends a request here only when the
+          # route-acl matches; without main-svc the rest would get a 404
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
                 name: canary-svc  # references the annotated Service
                 port:
                   number: 80</code></pre></div>
@@ -3289,18 +3298,20 @@ spec:
   host: app.example.com
   upstreams:
     - name: main
-      service: canary-svc
+      service: main-svc
       port: 80
     - name: canary
-      service: # TODO: canary service
+      service: canary-svc
       port: 80
   routes:
     - path: /
       splits:
         - weight: 75
-          action: { pass: main }
+          action:
+            pass: main
         - weight: 25  # route-acl: rand(100) lt 25
-          action: { pass: canary }</code></pre></div>
+          action:
+            pass: canary</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>No direct equivalent for raw ACL strings:</strong> only a fixed set of primitives converts. <code>src</code>/CIDR ACLs become a Policy <code>accessControl</code> (allow XOR deny) — a gate, <strong>not</strong> a canary router; if two backends must serve different CIDRs, split them across hostnames. <code>base</code> / general path regex beyond NGINX Ingress Controller's match variables has no equivalent — re-express the intent with VirtualServer <code>matches</code> or split hostnames.</div>
                             <div class="info-box note"><strong>Note:</strong> HAProxy <code>route-acl</code> rules fire in config order (first match wins); NGINX Ingress Controller splits are declarative percentages, so the conversion assumes this is the only routing rule for the path. Other portable primitives map to <code>matches[].conditions</code>: <code>cookie(NAME)</code>/<code>req.cook(NAME)</code> → <code>cookie: NAME</code> (<code>$cookie_NAME</code>), <code>urlp(NAME)</code> → <code>argument: NAME</code> (<code>$arg_NAME</code>), <code>hdr(NAME) -m str V</code> → <code>{header: NAME, value: V}</code>, and <code>method GET</code> → <code>{variable: $request_method}</code>.</div>

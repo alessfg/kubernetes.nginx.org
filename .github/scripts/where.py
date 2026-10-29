@@ -39,15 +39,27 @@ from html.parser import HTMLParser
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-PAGES = ['index.html', 'ingress-nginx-migration.html']
+MIGRATION = 'ingress-nginx-migration.html'
+SOURCE = 'assets/js/migration-ingress-nginx.js'
+# Every migration tool: its page, its source module, and which example kinds
+# its analyzer takes (ingress-nginx reads Ingresses; HAProxy also reads
+# Services, its ConfigMap and its CRs). Preview branches add a row here; main
+# ships the first. Every lookup below covers each tool present on the branch.
+TOOLS = [
+    {'page': MIGRATION, 'module': SOURCE, 'inputs': r'^kind: Ingress\b'},
+    {'page': 'haproxy-migration.html', 'module': 'assets/js/migration-haproxy.js',
+     'inputs': r'^kind: (Ingress|Service|ConfigMap|Global|Defaults|Backend|Frontend|TCP)\b'},
+]
+TOOLS = [t for t in TOOLS if os.path.exists(os.path.join(ROOT, t['page']))]
+
+PAGES = ['index.html'] + [t['page'] for t in TOOLS]
 CSS = ['assets/css/tokens.css', 'assets/css/shared.css',
        'assets/css/index.css', 'assets/css/migration.css']
-JS = ['assets/js/shared.js', 'assets/js/index.js', 'assets/js/migration-core.js',
-      'assets/js/migration-ingress-nginx.js']
+JS = ['assets/js/shared.js', 'assets/js/index.js', 'assets/js/migration-core.js'] \
+    + [t['module'] for t in TOOLS]
 
-# Source modules define ANNOTATION_MAPPINGS; the core deliberately does not.
-SOURCES = [p for p in JS if p.startswith('assets/js/migration-')
-           and not p.endswith('migration-core.js')]
+# Source modules define the mappings; the core deliberately does not.
+SOURCES = [t['module'] for t in TOOLS]
 
 
 _CACHE = {}
@@ -344,14 +356,16 @@ def reference_rows(rel='ingress-nginx-migration.html'):
     return rows
 
 
-def find_rows(name, rel='ingress-nginx-migration.html'):
+def find_rows(name, rel=None):
     """Reference rows whose collapsed cells name `name` in a <code> span.
 
     Whole-name equality after stripping prefix and value, so `auth-secret`
     never matches `auth-secret-type`, and a ConfigMap key or a NIC-only
     construct on a "No direct equivalent" row is found the same way as an
-    annotation.
+    annotation. Every tool's page unless `rel` names one.
     """
+    if rel is None:
+        return [h for t in TOOLS for h in find_rows(name, t['page'])]
     bare = name.split('/')[-1].strip()
     hits = []
 
@@ -373,19 +387,27 @@ def find_rows(name, rel='ingress-nginx-migration.html'):
 
 def find_annotation(name):
     bare = name.split('/')[-1].strip()
-    hits, generators = [], set()
+    hits = []
 
     for rel in SOURCES:
         lines = read(rel)
+        generators = set()
         for i, line in enumerate(lines):
+            # ingress-nginx lists `community: ["name"]` with a `templateFn`;
+            # HAProxy lists `keys: ['annotation:name', 'configmap:name']`
+            # with a `generator`, a TRANSLATORS member.
             m = re.search(r'community:\s*\[([^\]]*)\]', line)
-            if not m or bare not in re.findall(r'"([^"]+)"', m.group(1)):
+            names = re.findall(r'"([^"]+)"', m.group(1)) if m else []
+            k = re.search(r'\bkeys:\s*\[([^\]]*)\]', line)
+            if k:
+                names = [n.split(':', 1)[-1] for n in re.findall(r"'([^']+)'", k.group(1))]
+            if bare not in names:
                 continue
             end = brace_extent(lines, i)
             block = '\n'.join(lines[i:end + 1])
-            cat = re.search(r'category:\s*"([^"]+)"', block)
+            cat = re.search(r'''category:\s*["']([^"']+)["']''', block)
             hits.append(Hit('mapping', rel, i, end, cat.group(1) if cat else ''))
-            generators.update(re.findall(r'templateFn:\s*"([^"]+)"', block))
+            generators.update(re.findall(r'''(?:templateFn|generator):\s*["']([^"']+)["']''', block))
 
         # Generators are object-literal members (`generateFoo: function(found) {`),
         # not declarations — matching only `function foo(` finds nothing at all,
@@ -558,21 +580,10 @@ def find_function(name):
 # went stale within weeks, while the page and the analyzer kept changing under
 # them. So the docs no longer quote them; this computes them on demand.
 
-MIGRATION = 'ingress-nginx-migration.html'
-SOURCE = 'assets/js/migration-ingress-nginx.js'
-# Every migration tool whose reference rows are run through its analyzer.
-# Preview branches add a row here; main ships the first. `inputs` is which
-# example kinds the analyzer takes: ingress-nginx reads Ingresses, HAProxy
-# also reads Services, its ConfigMap and its CRs.
-TOOLS = [
-    {'page': MIGRATION, 'module': SOURCE, 'inputs': r'^kind: Ingress\b'},
-    {'page': 'haproxy-migration.html', 'module': 'assets/js/migration-haproxy.js',
-     'inputs': r'^kind: (Ingress|Service|ConfigMap|Global|Defaults|Backend|Frontend|TCP)\b'},
-]
-
-
 def tool_for(page_rel):
     return next(t for t in TOOLS if t['page'] == page_rel)
+
+
 FONT = 'assets/fonts/InterVariable-subset.woff2'
 
 
@@ -1060,6 +1071,16 @@ SELF_TEST = [
     ('filterTable',           {'function'}),
     ('ANNOTATION_MAPPINGS',   {'binding'}),
 ]
+# A second tool's schema (`keys:` and a TRANSLATORS `generator`) and its page:
+# before these, every HAProxy name was NOT FOUND and #traffic-splitting
+# resolved to an id-less index.html heading.
+if any(t['page'] == 'haproxy-migration.html' for t in TOOLS):
+    SELF_TEST += [
+        ('route-acl',             {'mapping', 'generator', 'reference row'}),
+        ('cookie-persistence',    {'mapping', 'generator', 'reference row'}),
+        ('#traffic-splitting',    {'h3'}),
+        ('routeRewrite',          {'function'}),
+    ]
 
 
 def query_kinds(query):
@@ -1128,10 +1149,12 @@ def resolver_failures():
     # Every reference row resolves by every name in its collapsed cells, and
     # the row the resolver returns is that row.
     unfound = []
-    for row in reference_rows():
-        for name in (row['left'] or row['right'])[:1]:
-            if not any(h.start == row['start'] + 1 for h in find_rows(name)):
-                unfound.append('%s@%d' % (name, row['start'] + 1))
+    for t in TOOLS:
+        for row in reference_rows(t['page']):
+            for name in (row['left'] or row['right'])[:1]:
+                if not any(h.rel == t['page'] and h.start == row['start'] + 1
+                           for h in find_rows(name)):
+                    unfound.append('%s@%s:%d' % (name, t['page'], row['start'] + 1))
     if unfound:
         failures.append('%d reference row(s) unfindable by their own code name: %s'
                         % (len(unfound), ', '.join(unfound[:5])))

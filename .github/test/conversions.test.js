@@ -298,3 +298,43 @@ test('a class naming HAProxy is never carried over, since NGINX Ingress Controll
     const r = run(ingressWith({}, { spec: { ingressClassName: 'haproxy', rules: [{ host: 'a.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }] } }));
     assert.equal(kinds(r, 'VirtualServer')[0].spec.ingressClassName, undefined);
 });
+
+/* Found by the HAProxy e2e (run-e2e.py --source haproxy), each a routing
+   difference only a live comparison showed; held here without a cluster. */
+
+test('path-rewrite routes leave longer prefixes to their own route, as HAProxy\'s path map does', () => {
+    /* HAProxy picks the longest matching prefix, then rewrites. The "/" route's
+       regex must not take /api requests: verified on nginx 1.31.7 and on kind. */
+    const two = Y.stringify({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app', annotations: { 'haproxy.org/path-rewrite': '/api/(.*) /\\1' } }, spec: { rules: [{ host: 'a.example.com', http: { paths: [
+        { path: '/api', pathType: 'Prefix', backend: { service: { name: 'api', port: { number: 80 } } } },
+        { path: '/', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }] } });
+    const routes = kinds(run(two), 'VirtualServer')[0].spec.routes;
+    const re = (r) => new RegExp(r.path.replace(/^~ /, ''));
+    const api = routes.find((r) => r.action && r.action.proxy && r.action.proxy.upstream === 'api' && r.path.startsWith('~'));
+    const web = routes.find((r) => r.action && r.action.proxy && r.action.proxy.upstream === 'web' && r.path.startsWith('~'));
+    assert.ok(re(api).test('/api/things/42') && !re(web).test('/api/things/42'), '/api/things/42 is api\'s');
+    assert.ok(re(web).test('/x/api/y') && !re(api).test('/x/api/y'), '/x/api/y is web\'s, rewritten');
+});
+
+test('a route-acl Service that is a path\'s only backend answers 404 unless its ACL matches', () => {
+    /* AddCustomRoute adds no path-map entry: HAProxy's default backend answers
+       the rest. Dropping the host instead lost the canary's requests. */
+    const r = run(stream(
+        Y.stringify({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app' }, spec: { rules: [{ host: 'b.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'canary', port: { number: 80 } } } }] } }] } }),
+        service('canary', { 'haproxy.org/route-acl': 'hdr(X-Canary) -m str yes' })));
+    const route = kinds(r, 'VirtualServer')[0].spec.routes[0];
+    assert.equal(route.action.return.code, 404);
+    assert.deepEqual(route.matches[0].conditions, [{ header: 'X-Canary', value: 'yes' }]);
+});
+
+test('a canary leg applies under its own path only', () => {
+    /* The custom route tests { path -m beg <canary path> }: a canary on /beta
+       leaves the / route alone. */
+    const ing = Y.stringify({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app' }, spec: { rules: [{ host: 'a.example.com', http: { paths: [
+        { path: '/beta', pathType: 'Prefix', backend: { service: { name: 'main', port: { number: 80 } } } },
+        { path: '/beta', pathType: 'Prefix', backend: { service: { name: 'canary', port: { number: 80 } } } },
+        { path: '/', pathType: 'Prefix', backend: { service: { name: 'main', port: { number: 80 } } } }] } }] } });
+    const routes = kinds(run(stream(ing, service('canary', { 'haproxy.org/route-acl': 'hdr(X-Canary) -m str yes' }))), 'VirtualServer')[0].spec.routes;
+    assert.ok(routes.find((r) => r.path === '/beta').matches, '/beta carries the canary');
+    assert.equal(routes.find((r) => r.path === '/').matches, undefined, '/ does not');
+});

@@ -243,11 +243,22 @@ python3 tools/nic-migrate/e2e/run-e2e.py --until baseline
 
 # Use a cluster you already have
 python3 tools/nic-migrate/e2e/run-e2e.py --skip-cluster
+
+# The HAProxy Kubernetes Ingress Controller as the source, either target
+python3 tools/nic-migrate/e2e/run-e2e.py --source haproxy
+python3 tools/nic-migrate/e2e/run-e2e.py --source haproxy --target ingress
 ```
 
 Needs `kubectl`, `helm`, `node`, and `openssl`, plus `kind` and `docker` unless
 you pass `--skip-cluster`. Preflight names anything missing before doing any
 work.
+
+With `--source haproxy` the stages are the same, with HAProxy in ingress-nginx's
+place. The fixture is `manifests/haproxy-source.yaml`: the Ingress, the
+annotated Services HAProxy reads backend settings from, and the controller
+ConfigMap, which the runner sets through the chart (`HAPROXY_CONFIG`) instead
+of applying it. The chart's image tag must match `HAPROXY_APP_VERSION` unless
+you pass `--source-chart`. CI runs both sources.
 
 Every stage after the first compares against the recorded stage-1 baseline
 rather than against literals. The assertion is equivalence: each case goes to
@@ -290,3 +301,22 @@ All of these are now handled by `convert` and by the page.
 The pipeline also answered the question it was built for: `rewritePath` handles
 `$2` captures the same way the community `rewrite-target` does. Both
 controllers return `/things/42` for `/api/things/42`.
+
+The HAProxy runs found three more, each now a unit test in
+`.github/test/conversions.test.js`:
+
+- **A `path-rewrite` regex route on `/` took longer prefixes.** HAProxy picks
+  the longest matching path first, then rewrites; the converted `/` route
+  matched `/api/...` too. Each such route now excludes the host's longer
+  prefixes with a lookahead.
+- **A path whose only backend carries a `route-acl` was dropped.** HAProxy adds
+  no path-map entry for it, so requests the ACL does not match get its default
+  backend, a 404. The converted route now answers 404 unless the match holds.
+- **A canary leg applied to every route on the host.** HAProxy tests the
+  canary's own path (`{ path -m beg }`), so a leg is now scoped to routes
+  under it.
+
+With `--target ingress`, three cases skip with their reason: the two that test
+a two-field `path-rewrite`, whose captures `nginx.org/rewrite-target` cannot
+keep, and the header canary, since an Ingress has no match annotation. The
+analyzer says to use CRD-first for both.

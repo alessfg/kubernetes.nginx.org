@@ -528,7 +528,7 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: access-control-allow
+  name: my-app-access-control
 spec:
   accessControl:
     allow:  # allow-list
@@ -541,7 +541,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "access-control-allow"</code></pre></div>
+    nginx.org/policies: "my-app-access-control"</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.4.0:</strong> AccessControl policies can be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources.</div>
                             </div>
@@ -557,7 +557,7 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: access-control-allow
+  name: my-app-access-control
 spec:
   accessControl:
     allow:  # allow-list
@@ -572,7 +572,7 @@ metadata:
 spec:
   host: app.example.com
   policies:
-    - name: access-control-allow
+    - name: my-app-access-control
   upstreams:
     - name: backend
       service: backend-svc
@@ -607,7 +607,7 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: access-control-deny
+  name: my-app-access-control
 spec:
   accessControl:
     deny:  # deny-list
@@ -620,7 +620,7 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "access-control-deny"</code></pre></div>
+    nginx.org/policies: "my-app-access-control"</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.4.0:</strong> AccessControl policies can be referenced directly from Ingress resources using the <code>nginx.org/policies</code> annotation. This is the simplest migration path — you stay on Ingress resources.</div>
                             </div>
@@ -636,7 +636,7 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: access-control-deny
+  name: my-app-access-control
 spec:
   accessControl:
     deny:  # deny-list
@@ -651,7 +651,7 @@ metadata:
 spec:
   host: app.example.com
   policies:
-    - name: access-control-deny
+    - name: my-app-access-control
   upstreams:
     - name: backend
       service: backend-svc
@@ -713,10 +713,8 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  # Real-IP is controller-global (one header for ALL apps), not per-Ingress
   real-ip-header: "X-Client-IP"  # src-ip-header
-  set-real-ip-from: "# TODO: trusted proxy CIDRs"  # required — nginx trusts real-ip-header only from these peers
-  real-ip-recursive: "True"</code></pre></div>
+  set-real-ip-from: "10.0.0.0/8"  # TODO: the proxies you trust (src-ip-header)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Real-IP settings are controller-global in NGINX Ingress Controller (ConfigMap), not per-Ingress — one header applies to all applications. NGINX Ingress Controller ignores <code>real-ip-header</code> unless the connecting peer matches <code>set-real-ip-from</code>, so that key is required.</div>
                         </div></td></tr>
@@ -746,15 +744,33 @@ metadata:
   name: my-app
   annotations:
     haproxy.org/auth-type: basic-auth
+    haproxy.org/auth-secret: dashboard-users
     haproxy.org/auth-realm: "Restricted Area"</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: basic-auth-policy
+  name: my-app-basic-auth
 spec:
   basicAuth:
-    secret: dashboard-users
-    realm: "Restricted Area"  # auth-realm (verbatim)</code></pre></div>
+    secret: dashboard-users  # auth-secret
+    realm: Restricted Area  # auth-realm
+---
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:  # the Policies above
+    - name: my-app-basic-auth
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> <code>basicAuth</code> is not Ingress-attachable — this Policy is referenced from a VirtualServer or VirtualServerRoute <code>spec.policies</code>. See the <code>auth-secret</code> row for the full setup.</div>
                             </div>
@@ -766,14 +782,15 @@ metadata:
   name: my-app
   annotations:
     haproxy.org/auth-type: basic-auth
+    haproxy.org/auth-secret: dashboard-users
     haproxy.org/auth-realm: "Restricted Area"</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/basic-auth-secret: "dashboard-users"
-    nginx.org/basic-auth-realm: "Restricted Area"  # auth-realm (verbatim)</code></pre></div>
+    nginx.org/basic-auth-secret: "dashboard-users"  # auth-secret
+    nginx.org/basic-auth-realm: "Restricted Area"  # auth-realm</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> HAProxy defaults the realm to <code>Protected Content</code> when basic auth is active; NGINX Ingress Controller emits no realm unless you set one — set it explicitly to preserve the browser prompt text. See the <code>auth-secret</code> row for the full setup.</div>
@@ -1135,14 +1152,15 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/backend-config-snippet</code></td>
-                            <td><code>nginx.org/location-snippets</code><span class="or-text">— or —</span><span class="badge badge-configmap">ConfigMap</span> <code>location-snippets</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].location-snippets</code><span class="or-text">— or —</span><code>nginx.org/location-snippets</code><span class="or-text">— or —</span><span class="badge badge-configmap">ConfigMap</span> <code>location-snippets</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                                 <button class="approach-tab" data-action="switchApproach" data-approach="configmap">ConfigMap Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -1161,6 +1179,33 @@ metadata:
       # TODO rewrite as NGINX: http-request set-header X-Backend api</code></pre></div>
                                 </div>
                             </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/backend-config-snippet: |
+      http-request set-header X-Backend api</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      location-snippets: |  # backend-config-snippet
+        # TODO rewrite as NGINX: http-request set-header X-Backend api
+      action:
+        pass: backend</code></pre></div>
+                                </div>
+                            </div>
                             <div class="approach-content" data-approach="configmap">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
@@ -1174,9 +1219,8 @@ metadata:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
-  # requires the controller flag -enable-snippets
+  # ConfigMap snippet keys need no -enable-snippets
   location-snippets: |  # backend-config-snippet
     # TODO rewrite as NGINX: http-request set-header X-Backend api</code></pre></div>
                                 </div>
@@ -1195,22 +1239,53 @@ data:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/pod-maxconn</code></td>
-                            <td><code>nginx.org/max-conns</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].max-conns</code><span class="or-text">— or —</span><code>nginx.org/max-conns</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                            </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     haproxy.org/pod-maxconn: "100"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/max-conns: "100"  # pod-maxconn — per-server max connections (VirtualServer: upstreams[].max-conns)</code></pre></div>
+    nginx.org/max-conns: "100"  # pod-maxconn</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/pod-maxconn: "100"</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+      max-conns: 100  # pod-maxconn
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> HAProxy divides <code>pod-maxconn</code> by the controller instance count automatically; NGINX Ingress Controller does not — divide by your replica count yourself.</div>
                         </div></td></tr>
@@ -1325,11 +1400,16 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/cors-enable</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>cors</code> + <code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>cors</code><span class="or-text">— or —</span><code>nginx.org/policies</code> <span class="badge badge-new">New v5.4.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="ingress-policy">Policy + Ingress (Recommended)</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="vs-policy">Policy + VirtualServer</button>
+                            </div>
+                            <div class="approach-content active" data-approach="ingress-policy">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
@@ -1340,29 +1420,84 @@ metadata:
     haproxy.org/cors-allow-headers: "Authorization, Content-Type"
     haproxy.org/cors-allow-credentials: "true"
     haproxy.org/cors-max-age: "1h"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Create the CORS Policy
+apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: cors-policy
+  name: my-app-cors
 spec:
   cors:  # cors-enable
-    allowOrigin:
-      - "https://app.example.com"
-    allowMethods:
+    allowOrigin:  # cors-allow-origin
+      - https://app.example.com
+    allowMethods:  # cors-allow-methods
       - GET
       - POST
       - OPTIONS
-    allowHeaders:
+    allowHeaders:  # cors-allow-headers
       - Authorization
       - Content-Type
-    allowCredentials: true
-    # HAProxy defaults to 5s and
-    # NGINX Ingress Controller to 86400: set it
-    maxAge: 3600
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "cors-policy"</code></pre></div>
+    allowCredentials: true  # cors-allow-credentials
+    maxAge: 3600  # cors-max-age
+---
+# 2. Reference from Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/policies: "my-app-cors"  # the Policies above</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="vs-policy">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/cors-enable: "true"
+    haproxy.org/cors-allow-origin: "https://app.example.com"
+    haproxy.org/cors-allow-methods: "GET, POST, OPTIONS"
+    haproxy.org/cors-allow-headers: "Authorization, Content-Type"
+    haproxy.org/cors-allow-credentials: "true"
+    haproxy.org/cors-max-age: "1h"</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Create the CORS Policy
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-cors
+spec:
+  cors:  # cors-enable
+    allowOrigin:  # cors-allow-origin
+      - https://app.example.com
+    allowMethods:  # cors-allow-methods
+      - GET
+      - POST
+      - OPTIONS
+    allowHeaders:  # cors-allow-headers
+      - Authorization
+      - Content-Type
+    allowCredentials: true  # cors-allow-credentials
+    maxAge: 3600  # cors-max-age
+---
+# 2. Reference from VirtualServer
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:  # the Policies above
+    - name: my-app-cors
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> <code>cors-enable</code> is the on switch — in NGINX Ingress Controller the presence of the <code>cors</code> Policy is the enable, so drop the key and create the Policy. All six <code>cors-*</code> annotations collapse into this one Policy. Referencing it from an Ingress via <code>nginx.org/policies</code> is <strong>new in v5.4.0</strong>, so you can migrate CORS without leaving Ingress resources.</div>
                         </div></td></tr>
@@ -1422,55 +1557,151 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/blacklist</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.deny</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.deny</code><span class="or-text">— or —</span><code>nginx.org/policies</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="ingress-policy">Policy + Ingress (Recommended)</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="vs-policy">Policy + VirtualServer</button>
+                            </div>
+                            <div class="approach-content active" data-approach="ingress-policy">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     haproxy.org/blacklist: "203.0.113.0/24"  # deprecated alias of deny-list</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Create the AccessControl Policy
+apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: access-control-deny
+  name: my-app-access-control
 spec:
   accessControl:
-    deny:  # blacklist (deprecated alias)
-      - 203.0.113.0/24
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "access-control-deny"</code></pre></div>
+    deny:  # blacklist
+      - "203.0.113.0/24"
+---
+# 2. Reference from Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/policies: "my-app-access-control"  # the Policies above</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="vs-policy">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/blacklist: "203.0.113.0/24"  # deprecated alias of deny-list</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Create the AccessControl Policy
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-access-control
+spec:
+  accessControl:
+    deny:  # blacklist
+      - "203.0.113.0/24"
+---
+# 2. Reference from VirtualServer
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:  # the Policies above
+    - name: my-app-access-control
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> <code>blacklist</code> is a <strong>deprecated</strong> HAProxy alias of <code>deny-list</code> (it logs a deprecation warning) — migrate it exactly as <code>deny-list</code> to a single <code>accessControl.deny</code> Policy.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/whitelist</code></td>
-                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.allow</code></td>
+                            <td><span class="badge badge-policy">Policy CRD</span> <code>accessControl.allow</code><span class="or-text">— or —</span><code>nginx.org/policies</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="ingress-policy">Policy + Ingress (Recommended)</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="vs-policy">Policy + VirtualServer</button>
+                            </div>
+                            <div class="approach-content active" data-approach="ingress-policy">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     haproxy.org/whitelist: "10.0.0.0/8"  # deprecated alias of allow-list</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Create the AccessControl Policy
+apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: access-control-allow
+  name: my-app-access-control
 spec:
   accessControl:
-    allow:  # whitelist (deprecated alias)
-      - 10.0.0.0/8
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "access-control-allow"</code></pre></div>
+    allow:  # whitelist
+      - "10.0.0.0/8"
+---
+# 2. Reference from Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/policies: "my-app-access-control"  # the Policies above</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="vs-policy">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/whitelist: "10.0.0.0/8"  # deprecated alias of allow-list</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Create the AccessControl Policy
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-access-control
+spec:
+  accessControl:
+    allow:  # whitelist
+      - "10.0.0.0/8"
+---
+# 2. Reference from VirtualServer
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:  # the Policies above
+    - name: my-app-access-control
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> <code>whitelist</code> is a <strong>deprecated</strong> HAProxy alias of <code>allow-list</code> (it logs a deprecation warning) — migrate it exactly as <code>allow-list</code> to a single <code>accessControl.allow</code> Policy.</div>
                         </div></td></tr>
@@ -1563,7 +1794,7 @@ metadata:
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
-  name: headers-app
+  name: my-app
 spec:
   host: app.example.com
   upstreams:
@@ -1575,14 +1806,15 @@ spec:
       action:
         proxy:
           upstream: backend
-          responseHeaders:
+          responseHeaders:  # response-set-header (hide, then add: a replace)
+            hide:
+              - X-Robots-Tag
             add:
               - name: X-Robots-Tag
-                value: "noindex"
-                always: true
-            # add_header APPENDS — list upstream-sent duplicates under "hide:" for a true replace</code></pre></div>
+                value: noindex
+                always: true</code></pre></div>
                                 </div>
-                                <div class="info-box note"><strong>Replace vs append:</strong> HAProxy <code>response-set-header</code> <em>replaces</em> the header; NGINX <code>add_header</code> <em>appends</em>, so if the upstream also sends the header the response carries both — add the header name under <code>responseHeaders.hide</code> for a true replace. <code>always: true</code> matches HAProxy's unconditional set (header added on error responses too).</div>
+                                <div class="info-box note"><strong>Replace vs append:</strong> HAProxy <code>response-set-header</code> <em>replaces</em> the header; NGINX <code>add_header</code> <em>appends</em>, so a header the upstream also sends would arrive twice. The migration hides the upstream's copy first — <code>responseHeaders.hide</code>, or <code>nginx.org/proxy-hide-headers</code> on an Ingress — so only the new value is sent (checked on NGINX 1.31.7).</div>
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
@@ -1598,8 +1830,8 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    # response-set-header — comma-separated "Name: value[: always]" pairs
-    nginx.org/add-header: "X-Robots-Tag: noindex: always"</code></pre></div>
+    nginx.org/proxy-hide-headers: "X-Robots-Tag"  # response-set-header (a replace, not an append)
+    nginx.org/add-header: "X-Robots-Tag: noindex: always"  # response-set-header</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>New in v5.5.0:</strong> the <code>nginx.org/add-header</code> annotation (and matching ConfigMap key). Values may not contain <code>$</code>, newlines, or unescaped double quotes; append <code>: always</code> to a pair to add the header on all response codes. Header removal has no annotation form — use <code>responseHeaders.hide</code> on a VirtualServer.</div>
                             </div>
@@ -1705,24 +1937,55 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/load-balance</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>lb-method</code> + <code>nginx.org/lb-method</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].lb-method</code> + <span class="badge badge-transportserver">TransportServer CRD</span> <code>upstreams[].loadBalancingMethod</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].lb-method</code><span class="or-text">— or —</span><code>nginx.org/lb-method</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                            </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     haproxy.org/load-balance: "leastconn"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     nginx.org/lb-method: "least_conn"  # load-balance</code></pre></div>
+                                </div>
                             </div>
-                            <div class="info-box note"><strong>Token map:</strong> <code>roundrobin</code> → <code>round_robin</code>; <code>leastconn</code> → <code>least_conn</code>; <code>source</code> → <code>ip_hash</code>; <code>uri</code> → <code>hash $request_uri consistent</code>; <code>url_param &lt;name&gt;</code> → <code>hash $arg_&lt;name&gt; consistent</code>; <code>hdr(&lt;name&gt;)</code> → <code>hash $http_&lt;name&gt; consistent</code>; <code>random</code> / <code>random(n)</code> → <code>random</code> / <code>random two</code>; <code>static-rr</code> → <code>round_robin</code> (loses the static-assignment guarantee). <code>first</code> and <code>rdp-cookie</code> have <strong>no NGINX Ingress Controller equivalent</strong> — choose <code>round_robin</code> or <code>least_conn</code>. <code>least_time header</code> or <code>least_time last_byte</code> also works on NGINX Open Source since v5.7.0 (NGINX 1.31). On a TransportServer the field is <code>upstreams[].loadBalancingMethod</code>, not <code>lb-method</code>.</div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/load-balance: "leastconn"</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+      lb-method: least_conn  # load-balance
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="info-box note"><strong>Token map:</strong> <code>roundrobin</code> → <code>round_robin</code>; <code>leastconn</code> → <code>least_conn</code>; <code>source</code> → <code>ip_hash</code>; <code>uri</code> → <code>hash $request_uri consistent</code>; <code>url_param &lt;name&gt;</code> → <code>hash $arg_&lt;name&gt; consistent</code>; <code>hdr(&lt;name&gt;)</code> → <code>hash $http_&lt;name&gt; consistent</code>; <code>random</code> / <code>random(n)</code> → <code>random</code> / <code>random two</code>; <code>static-rr</code> → <code>round_robin</code> (loses the static-assignment guarantee). <code>first</code> and <code>rdp-cookie</code> have <strong>no NGINX Ingress Controller equivalent</strong> — choose <code>round_robin</code> or <code>least_conn</code>. <code>least_time header</code> or <code>least_time last_byte</code> also works on NGINX Open Source since v5.7.0 (NGINX 1.31). On a TransportServer the field is <code>upstreams[].loadBalancingMethod</code>, not <code>lb-method</code>. Set in the HAProxy ConfigMap, <code>load-balance</code> applies to every backend: the analyzer writes it to the <code>lb-method</code> key of the <code>nginx-config</code> ConfigMap, which every upstream inherits.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/scale-server-slots</code></td>
@@ -1826,16 +2089,17 @@ metadata:
   annotations:
     haproxy.org/request-capture: |
       hdr(Host)
-      cookie(sessionid)
-    haproxy.org/request-capture-len: "64"</code></pre></div>
+      cookie(sessionid)</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  # captured values become $http_*/$cookie_* appended to the ONE global log-format
-  log-format: '$remote_addr - $remote_user [$time_local] "$request" $status $http_host $cookie_sessionid'
-  log-format-escaping: json</code></pre></div>
+  log-format: |  # request-capture — the global log format, captures appended
+    $remote_addr - $remote_user [$time_local] "$request"
+    $status $body_bytes_sent "$http_referer" "$http_user_agent"
+    $http_host $cookie_sessionid
+  log-format-escaping: "json"  # request-capture — header and cookie values are quoted safely</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> nginx has no per-route capture slots — captured headers/cookies become <code>$http_*</code>/<code>$cookie_*</code> variables appended to the single global <code>log-format</code>. There is no per-field length cap (<code>request-capture-len</code> has no equivalent — the full value is logged), and the <code>req.fhdr</code> vs <code>hdr</code> distinction is lost (<code>$http_&lt;name&gt;</code> is the full value). Set <code>log-format-escaping: json</code> for safe quoting.</div>
                         </div></td></tr>
@@ -1890,24 +2154,34 @@ metadata:
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: rate-limit-policy
+  name: my-app-rate-limit
 spec:
   rateLimit:
-    rate: 10r/s  # rate-limit-requests / rate-limit-period
-    burst: 0  # HAProxy stick-table limiting hard-denies (no queue)
-    key: ${binary_remote_addr}  # HAProxy tracks src
-    # rate-limit-size counts tracked IPs (100k);
-    # NGINX Ingress Controller sizes the zone in
-    # memory, about 16k states per 1M
-    zoneSize: 10M  # rate-limit-size
-    # HAProxy defaults to 403 and
-    # NGINX Ingress Controller to 503: always set
-    # it
-    rejectCode: 429
-
-# rateLimit Policies attach to VirtualServer/VirtualServerRoute only (NOT
-# nginx.org/policies on Ingress) — on a plain Ingress use the annotations
-# nginx.org/limit-req-rate, nginx.org/limit-req-burst, nginx.org/limit-req-reject-code instead.</code></pre></div>
+    rate: "10r/s"  # rate-limit-requests / rate-limit-period
+    burst: 9  # rate-limit-requests − 1, with noDelay
+    noDelay: true  # HAProxy does not queue
+    key: ${binary_remote_addr}  # HAProxy tracks the client address (src)
+    zoneSize: "10M"  # rate-limit-size (clients → memory)
+    rejectCode: 429  # rate-limit-status-code
+---
+# Reference from VirtualServer: a rateLimit Policy
+# attaches to a VirtualServer only
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:
+    - name: my-app-rate-limit
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content" data-approach="annotation">
@@ -1926,13 +2200,14 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/limit-req-rate: "10r/s"          # rate-limit-requests / rate-limit-period
-    nginx.org/limit-req-burst: "0"             # hard-deny (stick-table does not queue)
-    nginx.org/limit-req-reject-code: "429"     # rate-limit-status-code (HAProxy default 403) — set explicitly
-    nginx.org/limit-req-zone-size: "10M"       # rate-limit-size (count) → memory size</code></pre></div>
+    nginx.org/limit-req-rate: "10r/s"  # rate-limit-requests / rate-limit-period
+    nginx.org/limit-req-burst: "9"  # rate-limit-requests − 1, with no-delay
+    nginx.org/limit-req-no-delay: "true"  # HAProxy does not queue
+    nginx.org/limit-req-reject-code: "429"  # rate-limit-status-code
+    nginx.org/limit-req-zone-size: "10M"  # rate-limit-size (clients → memory)</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Behavior differs:</strong> HAProxy rate limiting is a stick-table <em>sliding-window</em> counter that hard-denies once the rate is exceeded; NGINX <code>limit_req</code> is a <em>leaky bucket</em>. To mimic HAProxy's non-queuing deny, keep <code>burst: 0</code>. The period folds into the rate denominator (only <code>r/s</code> and <code>r/m</code> exist), and <code>zoneSize</code> is a memory allocation rather than HAProxy's tracked-IP count, so both are approximate — validate under load. Always set <code>rejectCode</code>/<code>limit-req-reject-code</code> explicitly: HAProxy defaults to <code>403</code>, while the Policy's <code>rejectCode</code> defaults to <strong>503</strong> and the <code>nginx.org/limit-req-reject-code</code> annotation defaults to <strong>429</strong>. Cluster-wide aggregation needs NGINX Plus zone-sync (OSS counts per pod). The <code>rateLimit</code> Policy is not Ingress-attachable — on a plain Ingress use the <code>nginx.org/limit-req-*</code> annotations.</div>
+                            <div class="info-box note"><strong>Behavior differs:</strong> HAProxy rate limiting is a stick-table <em>sliding-window</em> counter that hard-denies once the rate is exceeded; NGINX <code>limit_req</code> is a <em>leaky bucket</em>. HAProxy admits <code>rate-limit-requests</code> requests at once and denies the rest without queueing, so the burst is one less than that count with <code>noDelay</code> on: with <code>rate: 10r/s</code>, <code>burst: 0</code> admitted 1 of 12 simultaneous requests on NGINX 1.31.7, and <code>burst: 9</code> with <code>noDelay</code> admitted 10, as HAProxy does. The period folds into the rate denominator (only <code>r/s</code> and <code>r/m</code> exist), and <code>zoneSize</code> is a memory allocation rather than HAProxy's tracked-IP count, so both are approximate — validate under load. Always set <code>rejectCode</code>/<code>limit-req-reject-code</code> explicitly: HAProxy defaults to <code>403</code>, while the Policy's <code>rejectCode</code> defaults to <strong>503</strong> and the <code>nginx.org/limit-req-reject-code</code> annotation defaults to <strong>429</strong>. Cluster-wide aggregation needs NGINX Plus zone-sync (OSS counts per pod). The <code>rateLimit</code> Policy is not Ingress-attachable — on a plain Ingress use the <code>nginx.org/limit-req-*</code> annotations.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/rate-limit-size</code></td>
@@ -1950,16 +2225,37 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    haproxy.org/rate-limit-size: "100k"  # tracked IP entries (default 100k)</code></pre></div>
+    haproxy.org/rate-limit-requests: "10"
+    haproxy.org/rate-limit-size: "100k"  # tracked client entries</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: rate-limit-policy
+  name: my-app-rate-limit
 spec:
   rateLimit:
-    rate: 10r/s
-    key: ${binary_remote_addr}
-    zoneSize: 10M  # rate-limit-size (~100k IPs of state)</code></pre></div>
+    rate: "10r/s"  # rate-limit-requests (HAProxy default period 1s)
+    burst: 9  # rate-limit-requests − 1, with noDelay
+    noDelay: true  # HAProxy does not queue
+    key: ${binary_remote_addr}  # HAProxy tracks the client address (src)
+    zoneSize: "10M"  # rate-limit-size (clients → memory)
+    rejectCode: 403  # the HAProxy default 403 (NGINX Ingress Controller would send 503)
+---
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:  # the Policies above
+    - name: my-app-rate-limit
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content" data-approach="annotation">
@@ -1969,14 +2265,18 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    haproxy.org/rate-limit-size: "100k"  # tracked IP entries (default 100k)</code></pre></div>
+    haproxy.org/rate-limit-requests: "10"
+    haproxy.org/rate-limit-size: "100k"  # tracked client entries</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/limit-req-rate: "10r/s"
-    nginx.org/limit-req-zone-size: "10M"  # rate-limit-size (~100k IPs of state)</code></pre></div>
+    nginx.org/limit-req-rate: "10r/s"  # rate-limit-requests (HAProxy default period 1s)
+    nginx.org/limit-req-burst: "9"  # rate-limit-requests − 1, with no-delay
+    nginx.org/limit-req-no-delay: "true"  # HAProxy does not queue
+    nginx.org/limit-req-reject-code: "403"  # the HAProxy default 403 (NGINX Ingress Controller would send 503)
+    nginx.org/limit-req-zone-size: "10M"  # rate-limit-size (clients → memory)</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> HAProxy's <code>rate-limit-size</code> is a <em>count</em> of tracked IP entries (default 100k); NGINX Ingress Controller's <code>zoneSize</code>/<code>limit-req-zone-size</code> is a <em>memory allocation</em> (roughly 16k states per 1M, so ~100k IPs →  <code>10M</code>). The units differ — treat the conversion as approximate.</div>
@@ -1997,16 +2297,37 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    haproxy.org/rate-limit-status-code: "429"  # default 403</code></pre></div>
+    haproxy.org/rate-limit-requests: "10"
+    haproxy.org/rate-limit-status-code: "429"</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: rate-limit-policy
+  name: my-app-rate-limit
 spec:
   rateLimit:
-    rate: 10r/s
-    key: ${binary_remote_addr}
-    rejectCode: 429  # rate-limit-status-code (Policy default is 503)</code></pre></div>
+    rate: "10r/s"  # rate-limit-requests (HAProxy default period 1s)
+    burst: 9  # rate-limit-requests − 1, with noDelay
+    noDelay: true  # HAProxy does not queue
+    key: ${binary_remote_addr}  # HAProxy tracks the client address (src)
+    zoneSize: "10M"
+    rejectCode: 429  # rate-limit-status-code
+---
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:  # the Policies above
+    - name: my-app-rate-limit
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content" data-approach="annotation">
@@ -2016,14 +2337,17 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    haproxy.org/rate-limit-status-code: "429"  # default 403</code></pre></div>
+    haproxy.org/rate-limit-requests: "10"
+    haproxy.org/rate-limit-status-code: "429"</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/limit-req-rate: "10r/s"
-    nginx.org/limit-req-reject-code: "429"  # rate-limit-status-code (annotation default is 429)</code></pre></div>
+    nginx.org/limit-req-rate: "10r/s"  # rate-limit-requests (HAProxy default period 1s)
+    nginx.org/limit-req-burst: "9"  # rate-limit-requests − 1, with no-delay
+    nginx.org/limit-req-no-delay: "true"  # HAProxy does not queue
+    nginx.org/limit-req-reject-code: "429"  # rate-limit-status-code</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Integer pass-through, but the two NGINX Ingress Controller paths have <em>different</em> defaults: the <code>rateLimit</code> Policy's <code>rejectCode</code> defaults to <strong>503</strong>, while the <code>nginx.org/limit-req-reject-code</code> annotation defaults to <strong>429</strong>. HAProxy defaults to <code>403</code>, so emit the code explicitly on either path to preserve the response.</div>
@@ -2089,19 +2413,17 @@ metadata:
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
-  name: redirect-app
+  name: my-app
 spec:
   host: app.example.com
   routes:
     - path: /
       action:
         redirect:
-          url: "${scheme}://newapp.example.com${request_uri}"  # request-redirect (path and query preserved via ${request_uri})
-          # HAProxy defaults to 302 and
-          # NGINX Ingress Controller to 301
-          code: 302</code></pre></div>
+          url: http://newapp.example.com${request_uri}  # request-redirect
+          code: 302  # the HAProxy default 302</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Default trap:</strong> no Ingress annotation performs a host-substitution redirect, so this converts to a VirtualServer <code>action.redirect</code>. HAProxy defaults the redirect code to <strong>302</strong> but NGINX Ingress Controller's <code>ActionRedirect.Code</code> defaults to <strong>301</strong> — the generator emits <code>code: 302</code> explicitly to preserve behavior. The <code>url</code> interpolates only <code>${scheme}</code>, <code>${http_x_forwarded_proto}</code>, <code>${request_uri}</code>, and <code>${host}</code>.</div>
+                            <div class="info-box note"><strong>Default trap:</strong> no Ingress annotation performs a host-substitution redirect, so this converts to a VirtualServer <code>action.redirect</code>. HAProxy defaults the redirect code to <strong>302</strong> but NGINX Ingress Controller's <code>ActionRedirect.Code</code> defaults to <strong>301</strong> — the generator emits <code>code: 302</code> explicitly to preserve behavior. HAProxy redirects to <code>http://</code> when the value names no scheme, whatever the request used, and to <code>https://</code> only when the value starts with it; write the scheme into the <code>url</code>. The <code>url</code> interpolates only <code>${scheme}</code>, <code>${http_x_forwarded_proto}</code>, <code>${request_uri}</code>, and <code>${host}</code>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/request-redirect-code</code></td>
@@ -2119,14 +2441,14 @@ metadata:
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
-  name: redirect-app
+  name: my-app
 spec:
   host: app.example.com
   routes:
     - path: /
       action:
         redirect:
-          url: "${scheme}://newapp.example.com${request_uri}"
+          url: http://newapp.example.com${request_uri}  # request-redirect
           code: 301  # request-redirect-code</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> This is not a standalone setting — it only sets the <code>code</code> of the <code>request-redirect</code> action above. NGINX Ingress Controller restricts redirect codes to <strong>301/302/307/308</strong>; any other HAProxy value (e.g. <code>303</code>) has no equivalent and falls back to <strong>302</strong>.</div>
@@ -2147,16 +2469,30 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    haproxy.org/ssl-redirect: "true"</code></pre></div>
+    haproxy.org/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-service
+                port:
+                  number: 80</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     nginx.org/ssl-redirect: "true"  # ssl-redirect
-    # HAProxy defaults to 302 and
-    # NGINX Ingress Controller to 301
-    nginx.org/http-redirect-code: "302"</code></pre></div>
+    nginx.org/http-redirect-code: "302"  # the HAProxy default 302</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> Use <code>nginx.org/ssl-redirect</code> when the controller terminates TLS, or <code>nginx.org/redirect-to-https</code> (which keys off <code>X-Forwarded-Proto</code>) when TLS ends at an upstream load balancer.</div>
                             </div>
@@ -2167,21 +2503,34 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    haproxy.org/ssl-redirect: "true"</code></pre></div>
+    haproxy.org/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-service
+                port:
+                  number: 80</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: my-app
 spec:
   host: app.example.com
-  tls:
+  tls:  # spec.tls
     secret: app-tls
-    redirect:
-      enable: true  # ssl-redirect
-      # HAProxy defaults to 302 and
-      # NGINX Ingress Controller to 301
-      code: 302
-      basedOn: scheme  # use x-forwarded-proto when TLS ends upstream
+    redirect:  # ssl-redirect
+      enable: true
+      code: 302  # the HAProxy default 302
   upstreams:
     - name: backend
       service: backend-svc
@@ -2196,28 +2545,94 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/ssl-redirect-code</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> <code>http-redirect-code</code> + <code>nginx.org/http-redirect-code</code> <span class="badge badge-new">New v5.4.0</span> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.redirect.code</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.redirect.code</code><span class="or-text">— or —</span><code>nginx.org/http-redirect-code</code> <span class="badge badge-new">New v5.4.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                            </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     haproxy.org/ssl-redirect: "true"
-    haproxy.org/ssl-redirect-code: "303"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+    haproxy.org/ssl-redirect-code: "303"
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-service
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    # 303 is not among NGINX Ingress Controller's
-    # codes (301/302/307/308); 302 is the closest
-    # non-permanent, non-method-preserving one
-    nginx.org/http-redirect-code: "302"  # ssl-redirect-code</code></pre></div>
+    nginx.org/ssl-redirect: "true"  # ssl-redirect
+    nginx.org/http-redirect-code: "302"  # ssl-redirect-code (303 → 302)</code></pre></div>
+                                </div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> HAProxy's <code>303</code> is not in the NGINX Ingress Controller set (<code>301</code>/<code>302</code>/<code>307</code>/<code>308</code>) — it falls back to <strong>302</strong> (the closest non-permanent, non-method-preserving code; <em>not</em> 301 or 308). Applies to both <code>ssl-redirect</code> and <code>redirect-to-https</code>.</div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/ssl-redirect: "true"
+    haproxy.org/ssl-redirect-code: "303"
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-service
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  tls:  # spec.tls
+    secret: app-tls
+    redirect:  # ssl-redirect
+      enable: true
+      code: 302  # ssl-redirect-code (303 → 302)
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> HAProxy's <code>303</code> is not in the NGINX Ingress Controller set (<code>301</code>/<code>302</code>/<code>307</code>/<code>308</code>) — it falls back to <strong>302</strong> (the closest non-permanent, non-method-preserving code; <em>not</em> 301 or 308). Applies to both <code>ssl-redirect</code> and <code>redirect-to-https</code>. Set in the HAProxy ConfigMap, it becomes the <code>http-redirect-code</code> key of the <code>nginx-config</code> ConfigMap.</div>
                             <div class="info-box note"><strong>Default trap:</strong> emit the code explicitly when <code>ssl-redirect</code> is on — HAProxy <code>ssl-redirect-code</code> defaults to <strong>302</strong> while <code>nginx.org/http-redirect-code</code> defaults to <strong>301</strong>, so leaving it unset silently flips the redirect to a permanent 301.</div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -2253,7 +2668,7 @@ metadata:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/path-rewrite</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>path</code> + <code>action.proxy.rewritePath</code><span class="or-text">— or —</span><code>nginx.org/path-regex</code> + <code>nginx.org/rewrite-target</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>path</code> + <code>action.proxy.rewritePath</code><span class="or-text">— or —</span><code>nginx.org/rewrite-target</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
@@ -2262,20 +2677,19 @@ metadata:
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># Two-field form: &lt;match-regex&gt; &lt;replacement&gt; (sed-like, \1 captures)
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># One-field form: replace the whole path
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    haproxy.org/path-rewrite: '/old/(.*) /new/\1'</code></pre></div>
+    haproxy.org/path-rewrite: /landing</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/rewrite-target: "/new/$1"  # path-rewrite replacement (\1 → $1)
-    nginx.org/path-regex: "case_sensitive"  # path-rewrite match (enables the captures)</code></pre></div>
+    nginx.org/rewrite-target: "/landing"  # path-rewrite — replaces the whole path</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content active" data-approach="crd">
@@ -2298,15 +2712,18 @@ spec:
       service: backend-svc
       port: 80
   routes:
-    - path: ~ /old/(.*)  # path-rewrite match (~ marks a regex route)
+    - path: ~ ^.*?/old/(.*)  # path-rewrite (its regex)
       action:
         proxy:
           upstream: backend
-          rewritePath: /new/$1  # path-rewrite replacement (\1 → $1)</code></pre></div>
+          rewritePath: /new/$1  # path-rewrite
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
-                                <div class="info-box note"><strong>Note:</strong> Prefer this form when the capture groups differ from the Ingress rule path — <code>rewritePath</code> resolves its <code>$1</code>–<code>$9</code> against the route's own regex.</div>
+                                <div class="info-box note"><strong>How it matches:</strong> HAProxy's <code>replace-path</code> searches the path for its regex and, where it matches, replaces the <em>whole</em> path with the format; a request it does not match passes unchanged. The first route matches only the requests the rule rewrites (the leftmost match, as HAProxy finds it) and <code>rewritePath</code> takes its captures; the second carries every other request on the path. On NGINX 1.31.7, <code>/old/a?q=1</code> became <code>/new/a?q=1</code>, <code>/x/old/b</code> became <code>/new/b</code>, and <code>/other</code> passed unchanged. On a path other than <code>/</code>, the route also checks the path in a lookahead, so it matches only that path's requests.</div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> A single-field <code>path-rewrite</code> (just <code>/</code>-style replacement) maps to <code>nginx.org/rewrite-target</code> alone; the two-field regex form also needs <code>nginx.org/path-regex</code>. Capture groups (<code>$1</code>–<code>$9</code>) resolve against the <strong>Ingress rule path</strong>, not your original regex — when they differ, use a VirtualServer regex route (<code>path: ~&lt;regex&gt;</code> + <code>action.proxy.rewritePath</code>). Multi-line rules become multiple VirtualServer routes. <code>rewrite-target</code> is mutually exclusive with <code>nginx.org/rewrites</code>.</div>
+                            <div class="info-box note"><strong>On an Ingress:</strong> only the one-field form (<code>path-rewrite: /landing</code>, which replaces the whole path) has an annotation: <code>nginx.org/rewrite-target</code> without <code>nginx.org/path-regex</code> rewrites every request of the path to it. The two-field form keeps captures from its own regex, which <code>nginx.org/rewrite-target</code> cannot do (it captures from the Ingress rule path), so the analyzer migrates it under CRD-first only. Multi-line rules, which HAProxy applies in turn, become one rewrite: fold them into the first by hand.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2642,23 +3059,55 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/timeout-server</code></td>
-                            <td><code>nginx.org/proxy-read-timeout</code> + <code>nginx.org/proxy-send-timeout</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].read-timeout</code> + <code>upstreams[].send-timeout</code><span class="or-text">— or —</span><code>nginx.org/proxy-read-timeout</code> + <code>nginx.org/proxy-send-timeout</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                            </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     haproxy.org/timeout-server: "50s"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     nginx.org/proxy-read-timeout: "50s"
-    nginx.org/proxy-send-timeout: "50s"  # timeout-server covers both directions — set read AND send</code></pre></div>
+    nginx.org/proxy-send-timeout: "50s"  # timeout-server</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/timeout-server: "50s"</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+      read-timeout: "50s"  # timeout-server
+      send-timeout: "50s"  # timeout-server
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> One HAProxy <code>timeout-server</code> governs both directions; NGINX splits it into <code>proxy_read_timeout</code> and <code>proxy_send_timeout</code> (each default 60s). Set <strong>both</strong> — mapping only one silently leaves the other at 60s. ConfigMap and VirtualServer twins are available.</div>
                         </div></td></tr>
@@ -3763,16 +4212,15 @@ metadata:
   name: haproxy-kubernetes-ingress
   namespace: haproxy-controller
 data:
-  log-format: "%ci:%cp [%tr] %ft %s %ST %B"</code></pre></div>
+  log-format: "%ci:%cp [%tr] %ft %b/%s %ST %B"</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  log-format: |
+  log-format: |  # TODO: log-format, in NGINX variables
     $remote_addr - $remote_user [$time_local] "$request"
-    $status $body_bytes_sent "$http_referer" "$http_user_agent"
-    # TODO: hand-translate your HAProxy log-format tokens</code></pre></div>
+    $status $body_bytes_sent "$http_referer" "$http_user_agent"</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>Hand-translation required:</strong> HAProxy <code>%</code>-tokens are a different DSL from NGINX <code>$</code>-variables (<code>%ci</code> → <code>$remote_addr</code>, <code>%ST</code> → <code>$status</code>, <code>%Tr</code> → <code>$upstream_response_time</code>) — never copy them verbatim. Several HAProxy timers (<code>%Tw</code>/<code>%Tc</code>/<code>%Ta</code>) have no NGINX variable. <code>log-format</code> is <strong>global</strong> (one HTTP format).</div>
                         </div></td></tr>
@@ -3788,16 +4236,15 @@ metadata:
   name: haproxy-kubernetes-ingress
   namespace: haproxy-controller
 data:
-  log-format-tcp: "%ci:%cp [%t] %ft %b/%s %B"</code></pre></div>
+  log-format-tcp: "%ci:%cp [%t] %ft %b/%s %B %ts"</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  stream-log-format: |  # log-format-tcp
+  stream-log-format: |  # TODO: log-format-tcp
     $remote_addr [$time_local] $protocol $status
-    $bytes_sent $bytes_received $session_time
-    # TODO: hand-translate your HAProxy tcplog tokens</code></pre></div>
+    $bytes_sent $bytes_received $session_time</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>Hand-translation required:</strong> tcplog tokens become NGINX stream <code>$</code>-variables (<code>%ci:%cp</code> → <code>$remote_addr:$remote_port</code>, <code>%B</code> → <code>$bytes_sent</code>). <code>stream-log-format</code> applies globally to <strong>all</strong> TransportServer traffic (not per TCP service).</div>
                         </div></td></tr>
@@ -3886,16 +4333,27 @@ metadata:
 data:
   "6379": default/redis:6379:ssl  # hostless SSL offload</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: GlobalConfiguration
+metadata:
+  name: nginx-configuration
+  namespace: nginx-ingress
+spec:
+  listeners:
+    - name: redis-6379-tcp  # tcp-services "6379"
+      port: 6379
+      protocol: TCP
+---
+apiVersion: k8s.nginx.org/v1
 kind: TransportServer
 metadata:
-  name: redis
+  name: redis-6379
+  namespace: default
 spec:
   listener:
     name: redis-6379-tcp
     protocol: TCP
-  host: # OPTIONAL — only needed to SNI-differentiate multiple TransportServers on one listener
   tls:
-    secret: redis-tls  # kubernetes.io/tls Secret in this namespace
+    secret: redis-tls  # tcp-services :ssl — a kubernetes.io/tls Secret
   upstreams:
     - name: backend
       service: redis
@@ -3933,7 +4391,6 @@ data:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   http-snippets: |
     client_body_timeout 50s;
@@ -4536,7 +4993,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   lb-method: "least_conn"  # balance.algorithm — a default, not a lock
   # per app: nginx.org/lb-method or VirtualServer upstreams[].lb-method</code></pre></div>
@@ -4559,7 +5015,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   proxy-connect-timeout: "5s"  # connect_timeout — NGINX defaults to 60s</code></pre></div>
                             </div>
@@ -4581,7 +5036,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   # Client side only; NGINX Ingress Controller
   # defaults to 75s
@@ -4607,7 +5061,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   log-format: |
     $remote_addr:$remote_port [$time_local] "$request"
@@ -4661,7 +5114,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   stream-log-format: |
     $remote_addr [$time_local] $protocol $status
@@ -4687,7 +5139,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   http-snippets: |
     client_body_timeout 50s;    # client_timeout
@@ -4955,7 +5406,6 @@ spec:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   proxy-protocol: "true"          # every listen port, not one bind
   real-ip-header: "proxy_protocol"
@@ -4984,7 +5434,6 @@ spec:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info"
   log-format: |
@@ -5017,7 +5466,6 @@ spec:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   # last resort — try the native forms first:
   #   HSTS: the hsts / hsts-max-age ConfigMap keys
@@ -5108,7 +5556,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   worker-processes: "4"  # nbthread — one mask per worker below
   # TODO: translate to nginx CPU bitmasks (e.g. "0001 0010")
@@ -5134,7 +5581,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   worker-shutdown-timeout: "30m"  # hard_stop_after 1800000ms
   # grace has no second key — the two collapse into this one</code></pre></div>
@@ -5160,7 +5606,6 @@ spec:                    # v1: spec.log_targets, beside spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info"
   error-log-level: "info"  # level — verbosity only, still stderr</code></pre></div>
@@ -5189,7 +5634,6 @@ spec:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   worker-connections: "40000"  # performance_options.maxconn — per-worker (divide by worker-processes)
   worker-processes: "4"        # nbthread — processes, not threads
@@ -5218,7 +5662,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   worker-processes: "4"  # nbthread — "auto" is also accepted</code></pre></div>
                             </div>
@@ -5241,7 +5684,6 @@ spec:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"</code></pre></div>
                             </div>
@@ -5264,7 +5706,6 @@ spec:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   ssl-protocols: "TLSv1.2 TLSv1.3"      # ssl-min-ver TLSv1.2
   ssl-prefer-server-ciphers: "false"    # prefer-client-ciphers
@@ -5290,7 +5731,6 @@ spec:
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   # The PEM itself: NGINX Ingress Controller
   # writes the file and points ssl_dhparam at it
@@ -5317,7 +5757,6 @@ spec:                    # v1 wraps under spec.config
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   worker-rlimit-nofile: "200000"  # ulimit_n</code></pre></div>
                             </div>

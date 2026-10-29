@@ -614,6 +614,11 @@
             });
         }
         // A HAProxy log-format/sample-fetch value: %[...] is not NGINX syntax.
+        // NGINX Ingress Controller's default access-log formats, as the ConfigMap
+        // takes them: parseLogFormat splits on newlines and joins with spaces, so
+        // a block reads like the default it starts from (nginx.tmpl, v5.7.0).
+        let LOG_FORMAT_HTTP = '$remote_addr - $remote_user [$time_local] "$request"\n$status $body_bytes_sent "$http_referer" "$http_user_agent"\n';
+        let LOG_FORMAT_TCP = '$remote_addr [$time_local] $protocol $status\n$bytes_sent $bytes_received $session_time\n';
         let SAMPLE_FETCH = /%\[|%\{|%[A-Za-z]{1,3}\b/;
 
         let TRANSLATORS = {
@@ -659,7 +664,7 @@
                 ctx.use('src-ip-header');
                 let x = a['src-ip-header'];
                 ctx.cm('real-ip-header', x.value || 'X-Forwarded-For', src(x, 'src-ip-header'));
-                ctx.cm('set-real-ip-from', '0.0.0.0/0', 'src-ip-header — TODO: only the proxies you trust; NGINX ignores real-ip-header from any other peer');
+                ctx.cm('set-real-ip-from', '10.0.0.0/8', 'TODO: the proxies you trust (src-ip-header)');
                 ctx.todo('configmap.set-real-ip-from', 'the CIDRs of the proxies in front of NGINX Ingress Controller (HAProxy trusted the header from any client)');
                 ctx.note('src-ip-header', 'Real-IP settings are global in NGINX Ingress Controller (ConfigMap), so the header applies to every application, not only this Ingress.');
             },
@@ -797,14 +802,15 @@
                 ctx.note('rate-limit-requests', 'HAProxy counts requests over a sliding period; NGINX limit_req refills at a steady rate, so a client is admitted at the same average but spaced differently near the limit. Each NGINX Ingress Controller pod counts on its own (HAProxy counted per controller too).');
                 if (ctx.strategy === 'annotation') {
                     f.ann['nginx.org/limit-req-rate'] = rate; ctx.annComment('nginx.org/limit-req-rate', rateSrc);
-                    f.ann['nginx.org/limit-req-burst'] = String(burst); ctx.annComment('nginx.org/limit-req-burst', 'rate-limit-requests − 1: HAProxy admits that many at once');
+                    f.ann['nginx.org/limit-req-burst'] = String(burst); ctx.annComment('nginx.org/limit-req-burst', 'rate-limit-requests − 1, with no-delay');
                     f.ann['nginx.org/limit-req-no-delay'] = 'true'; ctx.annComment('nginx.org/limit-req-no-delay', 'HAProxy does not queue');
                     f.ann['nginx.org/limit-req-reject-code'] = String(reject); ctx.annComment('nginx.org/limit-req-reject-code', codeSrc);
+                    if (a['rate-limit-size']) { f.ann['nginx.org/limit-req-zone-size'] = '10M'; ctx.annComment('nginx.org/limit-req-zone-size', 'rate-limit-size (clients → memory)'); }
                     return;
                 }
                 f.policies.push({ name: ctx.name('rate-limit'), onIngress: false,
                     spec: { rateLimit: { rate: rate, burst: burst, noDelay: true, key: '${binary_remote_addr}', zoneSize: '10M', rejectCode: reject } },
-                    comments: { 'spec.rateLimit.rate': rateSrc, 'spec.rateLimit.burst': 'rate-limit-requests − 1: HAProxy admits that many at once', 'spec.rateLimit.noDelay': 'HAProxy does not queue', 'spec.rateLimit.key': 'HAProxy tracks the client address (src)', 'spec.rateLimit.rejectCode': codeSrc } });
+                    comments: { 'spec.rateLimit.rate': rateSrc, 'spec.rateLimit.burst': 'rate-limit-requests − 1, with noDelay', 'spec.rateLimit.noDelay': 'HAProxy does not queue', 'spec.rateLimit.key': 'HAProxy tracks the client address (src)', 'spec.rateLimit.zoneSize': a['rate-limit-size'] ? 'rate-limit-size (clients → memory)' : null, 'spec.rateLimit.rejectCode': codeSrc } });
             },
 
             // CORS (resSetCORS.go): headers only when cors-enable is true; the
@@ -820,7 +826,7 @@
                 let creds = a['cors-allow-credentials'] && str(a['cors-allow-credentials'].value) === 'true';
                 let origins = a['cors-allow-origin'] ? splitCommaList(a['cors-allow-origin'].value) : ['*'];
                 let spec = {};
-                let comments = {};
+                let comments = { 'spec.cors': src(a['cors-enable'], 'cors-enable') };
                 if (a['cors-allow-origin'] && /[\\^$|()\[\]+?]/.test(a['cors-allow-origin'].value)) {
                     ctx.todo('spec.cors.allowOrigin', 'list the origins the regular expression ' + a['cors-allow-origin'].value + ' matched — allowOrigin takes exact origins, a leading-label wildcard, or "*"');
                     spec.allowOrigin = ['https://app.example.com'];
@@ -867,7 +873,7 @@
                 if (ctx.strategy === 'annotation' && !req.some(dynamic) && !res.some(dynamic) && (!host || vhostOk)) {
                     if (req.length) { f.ann['nginx.org/proxy-set-headers'] = req.map(function(h) { return h.name + (h.value ? ': ' + h.value : ''); }).join(','); ctx.annComment('nginx.org/proxy-set-headers', src(a['request-set-header'], 'request-set-header')); }
                     if (res.length) {
-                        f.ann['nginx.org/proxy-hide-headers'] = res.map(function(h) { return h.name; }).join(','); ctx.annComment('nginx.org/proxy-hide-headers', 'response-set-header — HAProxy replaces the backend\'s header');
+                        f.ann['nginx.org/proxy-hide-headers'] = res.map(function(h) { return h.name; }).join(','); ctx.annComment('nginx.org/proxy-hide-headers', 'response-set-header (a replace, not an append)');
                         f.ann['nginx.org/add-header'] = res.map(function(h) { return h.name + ': ' + h.value + ': always'; }).join(','); ctx.annComment('nginx.org/add-header', src(a['response-set-header'], 'response-set-header'));
                     }
                     if (host) { f.ann['nginx.org/upstream-vhost'] = host.toLowerCase(); ctx.annComment('nginx.org/upstream-vhost', src(a['set-host'], 'set-host') + (host.toLowerCase() !== host ? ' (lowercased)' : '')); }
@@ -880,7 +886,7 @@
                     }
                     if (res.length) {
                         f.proxy.responseHeaders = { hide: res.map(function(h) { return h.name; }), add: res.map(function(h) { return { name: h.name, value: braced(h.value), always: true }; }) };
-                        f.responseHeaderNote = 'response-set-header — hidden from the backend, then added: HAProxy replaces it';
+                        f.responseHeaderNote = 'response-set-header (hide, then add: a replace)';
                     }
                 }
                 if (req.length) ctx.note('request-set-header', 'HAProxy sets request headers before it picks the backend, so they can steer routing; NGINX sets them after the route is chosen. Routing that depended on them needs VirtualServer matches.');
@@ -899,7 +905,8 @@
                     else ctx.note('request-capture', 'No NGINX log variable for the capture "' + expr + '".', 'warning');
                 });
                 if (vars.length) {
-                    ctx.cm('log-format', '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" ' + vars.join(' '), 'request-capture — the global log format, with the captures appended');
+                    ctx.cm('log-format', LOG_FORMAT_HTTP + vars.join(' ') + '\n', 'request-capture — the global log format, captures appended');
+                    ctx.cm('log-format-escaping', 'json', 'request-capture — header and cookie values are quoted safely');
                     ctx.note('request-capture', 'NGINX has no per-route capture slots: the captured headers and cookies are appended to the one global log-format. Set log-format-escaping: json for safe quoting.');
                 }
                 if (a['request-capture-len']) ctx.note('request-capture-len', 'NGINX log variables have no length cap; the whole value is logged.');
@@ -987,7 +994,8 @@
                     if ([301, 302, 307, 308].indexOf(n) !== -1) code = n;
                     else ctx.note('request-redirect-code', 'A VirtualServer redirect takes 301, 302, 307 or 308; ' + a['request-redirect-code'].value + ' became 302.', 'warning');
                 }
-                f.redirect = { url: scheme + '://' + target + '${request_uri}', code: code, source: src(x, 'request-redirect') + (m ? '' : ' (HAProxy redirects to http:// when the value has no scheme)'), codeSource: a['request-redirect-code'] ? 'request-redirect-code' : 'the HAProxy default 302' };
+                f.redirect = { url: scheme + '://' + target + '${request_uri}', code: code, source: src(x, 'request-redirect'), codeSource: a['request-redirect-code'] ? 'request-redirect-code' : 'the HAProxy default 302' };
+                if (!m) ctx.note('request-redirect', 'HAProxy redirects to http:// when request-redirect names no scheme, whatever the request used; write https:// in the URL to redirect to HTTPS.');
             },
 
             // ssl-redirect: on by default when the Ingress has TLS
@@ -995,10 +1003,10 @@
             sslRedirect: function(a, f, ctx) {
                 ctx.use('ssl-redirect', 'ssl-redirect-code');
                 let on = a['ssl-redirect'] ? truthy(a['ssl-redirect'].value) : null;
-                let code = 302, codeSrc = 'the HAProxy default 302 (NGINX Ingress Controller would send 301)';
+                let code = 302, codeSrc = 'the HAProxy default 302';
                 if (a['ssl-redirect-code']) {
                     let n = parseInt(a['ssl-redirect-code'].value, 10);
-                    if (n === 303) { codeSrc = 'ssl-redirect-code 303, which NGINX Ingress Controller does not take: 302 is the closest'; }
+                    if (n === 303) { codeSrc = 'ssl-redirect-code (303 → 302)'; }
                     else if ([301, 302, 307, 308].indexOf(n) !== -1) { code = n; codeSrc = 'ssl-redirect-code'; }
                 }
                 f.tlsRedirect = on === false ? false : { code: code, codeSource: codeSrc, source: a['ssl-redirect'] ? src(a['ssl-redirect'], 'ssl-redirect') : null };
@@ -1015,7 +1023,7 @@
                 let t = haproxyTimeToNginx(x.value);
                 let c = 'timeout-server' + (t.note ? ' — ' + t.note : '');
                 ctx.backend(x, 'read-timeout', t.value, 'nginx.org/proxy-read-timeout', t.value, c);
-                ctx.backend(x, 'send-timeout', t.value, 'nginx.org/proxy-send-timeout', t.value, 'timeout-server covers both directions');
+                ctx.backend(x, 'send-timeout', t.value, 'nginx.org/proxy-send-timeout', t.value, 'timeout-server');
             },
 
             podMaxconn: function(a, f, ctx) {
@@ -1023,7 +1031,8 @@
                 let x = a['pod-maxconn'];
                 let n = parseInt(x.value, 10);
                 if (isNaN(n)) { ctx.note('pod-maxconn', 'pod-maxconn "' + x.value + '" is not a number; nothing is migrated.', 'warning'); return; }
-                ctx.backend(x, 'max-conns', n, 'nginx.org/max-conns', String(n), 'pod-maxconn — HAProxy divides it by the controller replicas; divide by yours');
+                ctx.backend(x, 'max-conns', n, 'nginx.org/max-conns', String(n), 'pod-maxconn');
+                ctx.note('pod-maxconn', 'HAProxy divides pod-maxconn by the controller replicas itself; NGINX Ingress Controller applies the value per replica, so divide it by your replica count.');
             },
 
             sslPassthrough: function(a, f, ctx) {
@@ -1489,14 +1498,16 @@
             let r = rules[0];
             let base = p.pathType === 'Exact' ? escapeRe(p.path) + '$'
                 : p.path === '/' ? '/' : escapeRe(p.path.replace(/\/$/, '')) + '(?:/|$)';
-            if (r.re === '(.*)') return [{ path: '~ ^(?=' + base + ').*', rewritePath: r.to, rewritten: true }];
+            // "/" matches every path: no lookahead needed.
+            let guard = p.path === '/' && p.pathType !== 'Exact' ? '' : '(?=' + base + ')';
+            if (r.re === '(.*)') return [{ path: '~ ^' + guard + '.*', rewritePath: r.to, rewritten: true }];
             // HAProxy's captures shift by none: the lookahead captures nothing.
             if (/\$\{|"|\\$/.test(r.re) || /\$\d/.test(r.to) && /\(\?[^:=!]/.test(r.re)) {
                 ctx.note('path-rewrite', 'The path-rewrite regex "' + r.re + '" cannot be placed in a VirtualServer route as it is; rewrite it by hand.', 'warning');
                 return null;
             }
             return [
-                { path: '~ ^(?=' + base + ').*?' + r.re, rewritePath: r.to, rewritten: true },
+                { path: '~ ^' + guard + '.*?' + r.re, rewritePath: r.to, rewritten: true },
                 { path: p.pathType === 'Exact' ? '=' + p.path : p.path, rewritten: false }
             ];
         }
@@ -1532,7 +1543,7 @@
                     c['spec.tls'] = 'spec.tls';
                     // HAProxy turns the redirect on by itself when the Ingress has TLS.
                     if (tlsRedirect !== false) {
-                        let r = tlsRedirect || { code: 302, codeSource: 'the HAProxy default 302 (NGINX Ingress Controller would send 301)', source: null };
+                        let r = tlsRedirect || { code: 302, codeSource: 'the HAProxy default 302', source: null };
                         spec.tls.redirect = { enable: true, code: r.code };
                         c['spec.tls.redirect'] = r.source || 'ssl-redirect (HAProxy default with TLS)';
                         c['spec.tls.redirect.code'] = r.codeSource;
@@ -1588,7 +1599,7 @@
                         if (item.rw) proxy.rewritePath = item.rw.rewritePath;
                         if (Object.keys(proxy).length) {
                             action = { proxy: Object.assign({ upstream: up }, proxy) };
-                            if (item.rw) { c['spec.routes.' + ri + '.path'] = f.rewrite.source + ' — the rule\'s regex, on ' + p.path; c['spec.routes.' + ri + '.action.proxy.rewritePath'] = f.rewrite.source; }
+                            if (item.rw) { c['spec.routes.' + ri + '.path'] = f.rewrite.source + ' (its regex)'; c['spec.routes.' + ri + '.action.proxy.rewritePath'] = f.rewrite.source; }
                             if (proxy.requestHeaders) c['spec.routes.' + ri + '.action.proxy.requestHeaders'] = f.requestHeaderSources;
                             if (proxy.responseHeaders) c['spec.routes.' + ri + '.action.proxy.responseHeaders'] = f.responseHeaderNote;
                         } else {
@@ -1630,7 +1641,11 @@
                     routes.push(ordered);
                 });
                 if (!routes.length) { ctx.note('host', 'Host ' + h.host + ' has no routable path; no VirtualServer is emitted for it.', 'warning'); return; }
-                spec.upstreams = upstreams;
+                // request-redirect answers every request of the host, so no
+                // route passes to an upstream: none is declared.
+                let referenced = JSON.stringify(routes);
+                upstreams = upstreams.filter(function(u) { return referenced.indexOf('"' + u.name + '"') !== -1; });
+                if (upstreams.length) spec.upstreams = upstreams;
                 spec.routes = routes;
                 upstreams.forEach(function(u, ui) {
                     Object.keys(f.upstreamComments).forEach(function(k) { if (u[k] !== undefined) c['spec.upstreams.' + ui + '.' + k] = f.upstreamComments[k]; });
@@ -1731,8 +1746,14 @@
             if (f.tlsRedirect === false) {
                 if (model.tls.length) { ann['nginx.org/ssl-redirect'] = 'false'; annComments['nginx.org/ssl-redirect'] = 'ssl-redirect "false"'; }
             } else if (model.tls.length || f.tlsRedirect) {
-                let r = f.tlsRedirect || { code: 302, codeSource: 'the HAProxy default 302 (NGINX Ingress Controller would send 301)' };
-                if (!model.tls.length) { ann['nginx.org/redirect-to-https'] = 'true'; annComments['nginx.org/redirect-to-https'] = r.source + ' — no TLS on the Ingress: TLS ends in front, redirect on X-Forwarded-Proto'; }
+                let r = f.tlsRedirect || { code: 302, codeSource: 'the HAProxy default 302' };
+                if (!model.tls.length) {
+                    ann['nginx.org/redirect-to-https'] = 'true'; annComments['nginx.org/redirect-to-https'] = r.source;
+                    ctx.note('ssl-redirect', 'This Ingress has no TLS, so TLS ends in front of the controller: nginx.org/redirect-to-https redirects on X-Forwarded-Proto. NGINX Ingress Controller would send 301 by default; the HAProxy code is kept.');
+                } else if (r.source) {
+                    // On by default with TLS on both controllers; set, it stays visible.
+                    ann['nginx.org/ssl-redirect'] = 'true'; annComments['nginx.org/ssl-redirect'] = r.source;
+                }
                 ann['nginx.org/http-redirect-code'] = String(r.code); annComments['nginx.org/http-redirect-code'] = r.codeSource;
             }
             if (f.redirect) ctx.note('request-redirect', 'A redirect has no Ingress annotation; switch the strategy to CRD-first, which emits a VirtualServer redirect.', 'warning');
@@ -1806,7 +1827,7 @@
             'timeout-server': function(x, g) {
                 let t = haproxyTimeToNginx(x.value);
                 g.cm('proxy-read-timeout', t.value, 'timeout-server' + (t.note ? ' — ' + t.note : ''));
-                g.cm('proxy-send-timeout', t.value, 'timeout-server covers both directions');
+                g.cm('proxy-send-timeout', t.value, 'timeout-server');
             },
             'check': function(x, g) {
                 if (!truthy(x.value)) { g.cm('max-fails', '0', 'check "false" — NGINX Ingress Controller marks a server failed after 1 error otherwise'); return; }
@@ -1818,7 +1839,7 @@
         // write global keys from wherever HAProxy read them.
         let CONTROLLER = {
             'proxy-protocol': function(x, g) {
-                g.cm('proxy-protocol', 'True', 'proxy-protocol (inbound PROXY header)');
+                g.cm('proxy-protocol', 'true', 'proxy-protocol (inbound PROXY header)');
                 g.cm('set-real-ip-from', isPatternFileRef(x.value) ? '0.0.0.0/0' : (x.value || '0.0.0.0/0'), 'proxy-protocol — the addresses HAProxy accepted it from');
                 if (isPatternFileRef(x.value)) g.todo('configmap.set-real-ip-from', 'inline the CIDRs from the patterns/ file ' + x.value);
                 g.cm('real-ip-header', 'proxy_protocol', 'proxy-protocol');
@@ -1836,11 +1857,11 @@
                 g.note('syslog-server', 'Only the access log can go to syslog, to one server; the error log stays on stderr (error-log-level sets its level).');
             },
             'log-format': function(x, g) {
-                g.cm('log-format', '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"', 'log-format — TODO: rewrite the HAProxy %-tokens as NGINX variables');
+                g.cm('log-format', LOG_FORMAT_HTTP, 'TODO: log-format, in NGINX variables');
                 g.todo('configmap.log-format', 'rewrite the HAProxy log-format "' + x.value + '" with NGINX variables (%ci is $remote_addr, %ST is $status, %Tr is $upstream_response_time)');
             },
             'log-format-tcp': function(x, g) {
-                g.cm('stream-log-format', '$remote_addr [$time_local] $protocol $status $bytes_sent $bytes_received $session_time', 'log-format-tcp — TODO: rewrite the HAProxy %-tokens as NGINX stream variables');
+                g.cm('stream-log-format', LOG_FORMAT_TCP, 'TODO: log-format-tcp');
                 g.todo('configmap.stream-log-format', 'rewrite the HAProxy log-format-tcp "' + x.value + '" with NGINX stream variables');
             },
             'dontlognull': function(x, g) { g.note('dontlognull', 'Nothing to migrate: the NGINX access log records requests, so a connection that sends none is not logged.'); },
@@ -1967,8 +1988,8 @@
                     case 'balance': { let m = haproxyLbMethod(isMap(v) ? v.algorithm : v); if (m.value) g.cm('lb-method', m.value, label + ' balance'); else g.note(label, 'balance: ' + m.none, 'warning'); break; }
                     case 'retries': g.note(label, 'retries is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream-tries, or VirtualServer upstreams[].next-upstream-tries.'); break;
                     case 'redispatch': g.note(label, 'Retrying on another server is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream (default "error timeout").'); break;
-                    case 'httplog': case 'log-format': g.cm('log-format', '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"', label + ' ' + raw + ' — TODO: rewrite as NGINX variables'); g.todo('configmap.log-format', 'rewrite the Defaults log format with NGINX variables'); break;
-                    case 'tcplog': g.cm('stream-log-format', '$remote_addr [$time_local] $protocol $status $bytes_sent $bytes_received $session_time', label + ' tcplog — TODO: rewrite as NGINX stream variables'); break;
+                    case 'httplog': case 'log-format': g.cm('log-format', LOG_FORMAT_HTTP, label + ' ' + raw + ' — TODO: rewrite as NGINX variables'); g.todo('configmap.log-format', 'rewrite the Defaults log format with NGINX variables'); break;
+                    case 'tcplog': g.cm('stream-log-format', LOG_FORMAT_TCP, label + ' tcplog — TODO: rewrite as NGINX stream variables'); break;
                     case 'forwardfor': g.note(label, 'forwardfor: NGINX Ingress Controller sends X-Forwarded-For by default.'); break;
                     case 'mode': g.note(label, 'mode is structural in NGINX Ingress Controller: HTTP is an Ingress or VirtualServer, TCP a TransportServer.'); break;
                     default: none.push(raw);
@@ -1987,7 +2008,7 @@
             spec.listener = { name: name + '-tcp', protocol: 'TCP' };
             let c = { 'spec.listener': source };
             if (ssl) {
-                spec.tls = { secret: secret || 'tls-secret' };
+                spec.tls = { secret: secret || dnsName(service + '-tls') };
                 c['spec.tls.secret'] = source + ' :ssl — a kubernetes.io/tls Secret';
                 if (!secret) g.todo('TransportServer ' + name + ' spec.tls.secret', 'the kubernetes.io/tls Secret with the certificate HAProxy used');
             }

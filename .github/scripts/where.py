@@ -560,6 +560,19 @@ def find_function(name):
 
 MIGRATION = 'ingress-nginx-migration.html'
 SOURCE = 'assets/js/migration-ingress-nginx.js'
+# Every migration tool whose reference rows are run through its analyzer.
+# Preview branches add a row here; main ships the first. `inputs` is which
+# example kinds the analyzer takes: ingress-nginx reads Ingresses, HAProxy
+# also reads Services, its ConfigMap and its CRs.
+TOOLS = [
+    {'page': MIGRATION, 'module': SOURCE, 'inputs': r'^kind: Ingress\b'},
+    {'page': 'haproxy-migration.html', 'module': 'assets/js/migration-haproxy.js',
+     'inputs': r'^kind: (Ingress|Service|ConfigMap|Global|Defaults|Backend|Frontend|TCP)\b'},
+]
+
+
+def tool_for(page_rel):
+    return next(t for t in TOOLS if t['page'] == page_rel)
 FONT = 'assets/fonts/InterVariable-subset.woff2'
 
 
@@ -803,8 +816,9 @@ def normalise(text, ingress_name='my-app'):
         m = SCAFFOLD.match(line)
         if m:
             line = '%s: <%s>' % (m.group(1), m.group(1).strip(' -'))
-        # `"/$2"` and `/$2` are the same scalar.
+        # `"/$2"` and `/$2` are the same scalar, as a value or a list item.
         line = re.sub(r'''^(\s*(?:-\s+)?[\w./-]+:\s+)(["'])(.*)\2$''', r'\1\3', line)
+        line = re.sub(r'''^(\s*-\s+)(["'])(.*)\2$''', r'\1\3', line)
         lines.append(line)
     if lines and lines[0] == 'annotations:':
         lines = ['apiVersion: networking.k8s.io/v1', 'kind: Ingress', 'metadata:',
@@ -854,12 +868,12 @@ def sort_siblings(lines):
     return out
 
 
-def run_analyzer(cases):
+def run_analyzer(cases, module=SOURCE):
     """Run [(yaml, strategy)] through .github/test/lib/load.js in one node."""
     node = shutil.which('node')
     if not node:
         return None, 'node is not on PATH — --diff did not run'
-    payload = json.dumps({'module': SOURCE,
+    payload = json.dumps({'module': module,
                           'cases': [{'yaml': y, 'strategy': s} for y, s in cases]})
     loader = os.path.join(ROOT, '.github/test/lib/load.js')
     try:
@@ -873,36 +887,47 @@ def run_analyzer(cases):
 
 
 def diff_annotation(name):
-    """[(row, tab, strategy, diff_lines, warnings)] and an error string."""
+    """[(page, row, tab, strategy, diff_lines, extra, warnings)] and an error string."""
     bare = name.split('/')[-1]
-    results, err = diff_rows([r for r in reference_rows() if bare in r['left']])
-    if not results and not err:
-        return [], 'no reference row shows an Ingress for %r to analyze' % bare
-    return results, err
+    out, errs = [], []
+    for t in TOOLS:
+        if not read(t['page']):
+            continue
+        results, err = diff_rows([r for r in reference_rows(t['page']) if bare in r['left']], t['page'])
+        out += results
+        if err:
+            errs.append(err)
+    if not out and not errs:
+        return [], 'no reference row shows an example for %r to analyze' % bare
+    return out, '; '.join(errs)
 
 
-def diff_rows(rows):
+def diff_rows(rows, page_rel=MIGRATION):
     """Every tab of `rows` against the analyzer, in one node process."""
+    tool = tool_for(page_rel)
     plan, cases = [], []
     for row in rows:
-        for tab, old, new in panels(row):
-            if 'kind: Ingress' not in old:
-                continue                          # a ConfigMap row: not analyzer input
+        for tab, old, new in panels(row, page_rel):
+            if not re.search(tool['inputs'], old, re.M):
+                continue                          # nothing the analyzer reads
+            if not re.search(r'^\s*[^#\s]', new, re.M):
+                continue                          # an explainer: "# No standalone equivalent"
+
             strategy = TAB_STRATEGY.get(tab, 'crd')
             plan.append((row, tab or '(single)', strategy, new))
-            cases.append((with_spec(old), strategy))
+            cases.append((with_spec(old) if 'kind: Ingress' in old else old, strategy))
     if not cases:
         return [], ''
-    results, err = run_analyzer(cases)
+    results, err = run_analyzer(cases, tool['module'])
     if results is None:
         return [], err
     out = []
     for (row, tab, strategy, new), res in zip(plan, results):
         if res['error']:
-            out.append((row, tab, strategy, ['+ERROR: ' + res['error']], [], res['warnings']))
+            out.append((page_rel, row, tab, strategy, ['+ERROR: ' + res['error']], [], res['warnings']))
             continue
         delta, extra = compare_documents(normalise(new), normalise(res['text']), tab, strategy)
-        out.append((row, tab, strategy, delta, extra, res['warnings']))
+        out.append((page_rel, row, tab, strategy, delta, extra, res['warnings']))
     return out, ''
 
 
@@ -969,11 +994,11 @@ def print_diff(name):
         return 1
     drift = 0
     print()
-    for row, tab, strategy, delta, extra, warnings in results:
+    for page_rel, row, tab, strategy, delta, extra, warnings in results:
         state = 'matches' if not delta else 'DIFFERS'
         drift += bool(delta) or bool(warnings)
         print('  %-7s  %s:%d  #%s  tab %-15s strategy %s%s' % (
-            state, MIGRATION, row['start'] + 1, row['heading'] or row['section'], tab, strategy,
+            state, page_rel, row['start'] + 1, row['heading'] or row['section'], tab, strategy,
             ('   (page also shows: %s)' % ', '.join(extra)) if extra else ''))
         for w in warnings:
             print('           WARNING from the analyzer: %s' % w[:160])
@@ -1368,7 +1393,7 @@ def command_failures():
     results, err = diff_annotation('proxy-body-size')
     if err or not results:
         failures.append('--diff proxy-body-size did not run: %s' % (err or 'no tabs'))
-    elif any(r[3] for r in results):
+    elif any(r[4] for r in results):
         failures.append('--diff proxy-body-size reports drift on a row that matches')
     row = [r for r in reference_rows() if 'proxy-body-size' in r['left']][0]
     tab, old, new = [p for p in panels(row) if p[0] == 'crd'][0]
@@ -1392,6 +1417,8 @@ def command_failures():
 # annotation, because #oidc-authentication lists the external-auth annotations
 # whose own row must still match. An entry that stops differing fails too, so
 # the list cannot outlive its reason.
+# Keyed (heading, tab) for the ingress-nginx page; (page, heading, tab) for
+# any other, so the main page's entries keep their form.
 ALTERNATIVE_TABS = {
     ('cors', 'annotation'): 'CORS as server snippets: the hand-written alternative to the Policy the analyzer emits',
     ('cors', 'crd-headers'): 'CORS as VirtualServer responseHeaders: the declarative alternative to the Policy',
@@ -1402,7 +1429,16 @@ ALTERNATIVE_TABS = {
     ('configuration-snippets', 'transportserver'): 'stream-snippet as a GlobalConfiguration listener and '
                              'TransportServer: the long-term form, read from the snippet by hand; the analyzer '
                              'moves the snippet to the stream-snippets key',
-}
+    # HAProxy page: a tab that answers with something the analyzer must not
+    # choose for the reader.
+    ('haproxy-migration.html', 'configuration-snippets', 'configmap'): 'the global location-snippets key, which '
+                             'applies to every location; the analyzer keeps a backend-config-snippet on its own Ingress',
+    ('haproxy-migration.html', 'rate-limiting', '(single)'): 'rate-limit-whitelist as a hand-written geo/map key '
+                             'beside the rate-limit Policy; NGINX Ingress Controller has no exemption field',
+} | {('haproxy-migration.html', 'enterprise', '(single)#' + k): 'HAProxy Enterprise ' + k + ' arrives as raw configuration '
+                             'in a snippet key; the tab shows the NGINX Plus product that replaces it, which the analyzer '
+                             'cannot read from the snippet (it converts the snippet key itself, with a TODO per line)'
+     for k in ['Global Profiling Engine', 'Global Rate Limiting', 'Intelligent WAF', 'UDP']}
 
 
 def mapping_keys():
@@ -1440,13 +1476,22 @@ def reference_row_failures():
             if bare not in shown:
                 failures.append('%s maps to %s, which no row for it names in its NIC cell (%s:%d)'
                                 % (k['community'], key, MIGRATION, rows[0]['start'] + 1))
-    results, err = diff_rows(reference_rows())
-    if err:
-        return failures + ['the reference rows did not run through the analyzer: %s' % err]
+    results = []
+    for t in TOOLS:
+        if not read(t['page']):
+            continue
+        res, err = diff_rows(reference_rows(t['page']), t['page'])
+        if err:
+            return failures + ['the reference rows of %s did not run through the analyzer: %s' % (t['page'], err)]
+        results += res
     differing = set()
-    for row, tab, strategy, delta, extra, warnings in results:
-        key = (row['heading'] or row['section'], tab)
-        where = '%s:%d #%s tab %s' % (MIGRATION, row['start'] + 1, key[0], tab)
+    for page_rel, row, tab, strategy, delta, extra, warnings in results:
+        key = (row['heading'] or row['section'], tab) if page_rel == MIGRATION else (page_rel, row['heading'] or row['section'], tab)
+        if key not in ALTERNATIVE_TABS and row['left']:
+            named = key[:-1] + (tab + '#' + row['left'][0],)
+            if named in ALTERNATIVE_TABS:
+                key = named
+        where = '%s:%d #%s tab %s' % (page_rel, row['start'] + 1, row['heading'] or row['section'], tab)
         for w in warnings:
             failures.append('%s: the analyzer warned: %s' % (where, w[:160]))
         if not delta:
@@ -1458,8 +1503,8 @@ def reference_row_failures():
                                else 'its left cell names no annotation: see the row', delta[0].strip()))
     for key, why in sorted(ALTERNATIVE_TABS.items()):
         if key not in differing:
-            failures.append('ALTERNATIVE_TABS lists #%s tab %s, which now matches the '
-                            'analyzer: remove the entry (%s)' % (key[0], key[1], why))
+            failures.append('ALTERNATIVE_TABS lists %s, which now matches the '
+                            'analyzer: remove the entry (%s)' % (' '.join(key), why))
     return failures
 
 

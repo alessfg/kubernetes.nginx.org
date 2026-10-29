@@ -109,6 +109,14 @@ a different answer on purpose. Those are listed, each with its reason, in
 `ALTERNATIVE_TABS`; an entry that stops differing fails too. Add to it only for
 a tab that shows an answer the analyzer must not emit, never to quiet drift.
 
+Every page in `where.py`'s `TOOLS` table is checked this way. On a branch that
+ships another source, its row goes there: `haproxy-migration.html` takes
+Ingress, Service, ConfigMap and CR examples as analyzer input, and its
+`ALTERNATIVE_TABS` entries are keyed `(page, heading, tab)`. A tab whose NGINX
+side is comments only ("# No standalone equivalent") is an explainer and is
+not compared; the key-in-NIC-cell half reads `nicMapping`, so it covers
+ingress-nginx alone.
+
 Storage keys are frozen: the checklist persists against `data-id` values in
 `localStorage`, so renaming one silently resets every reader's progress.
 

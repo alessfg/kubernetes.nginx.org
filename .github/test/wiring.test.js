@@ -139,6 +139,9 @@ for (const p of PAGES) {
         const sections = [...page.matchAll(/<section id="([\w-]+)"([\s\S]*?)(?=<section id="|$)/g)];
         let checked = 0;
         for (const [, id, body] of sections) {
+            // Only a reference section has a category filter to match; prose
+            // subsections (Install, then Defaults) keep their reading order.
+            if (!/class="mapping-table"/.test(body)) continue;
             const headings = [...body.matchAll(/<h3 id="[\w-]+">([\s\S]*?)<\/h3>/g)]
                 .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim());
             if (headings.length < 2) continue;

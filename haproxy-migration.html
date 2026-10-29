@@ -227,11 +227,52 @@
             <h2 id="phased-migration-strategy">Phased migration strategy</h2>
             <p>Rather than performing a "big bang" cutover, F5 recommends a phased migration that validates each application before decommissioning HAProxy. Because HAProxy's CRD group (<code>ingress.v3.haproxy.org</code>) and NGINX Ingress Controller's CRDs (<code>k8s.nginx.org</code>) are entirely separate API groups, both controllers coexist in one cluster without touching each other's resources &mdash; the migration is additive translation, not in-place mutation.</p>
             <ol class="doc-list">
-                <li><strong>Deploy side-by-side</strong> &mdash; Install NGINX Ingress Controller alongside HAProxy. Existing HAProxy-annotated resources are untouched; plain Ingress resources stay with HAProxy until you flip their <code>ingressClassName</code>.</li>
-                <li><strong>Translate service-by-service</strong> &mdash; Create the VirtualServer, Policy, and TransportServer resources for one application at a time (the <a href="#analyzer" data-action="showPage" data-page="analyzer">Config analyzer</a> generates first drafts). Validate against the LoadBalancer IP of NGINX Ingress Controller with <code>curl --resolve app.example.com:443:&lt;NGINX-IP&gt;</code>, then flip that host's DNS record. Plain-Ingress users instead switch <code>ingressClassName</code> from the HAProxy class to <code>nginx</code> after converting annotations.</li>
+                <li><strong>Deploy side-by-side</strong> &mdash; Install NGINX Ingress Controller alongside HAProxy with its own <code>IngressClass</code> (see <a href="#side-by-side-install">Install alongside HAProxy Kubernetes Ingress Controller</a>). Existing traffic is unaffected: an Ingress keeps the controller its class names.</li>
+                <li><strong>Translate service-by-service</strong> &mdash; Create the VirtualServer, Policy, and TransportServer resources for one application at a time (the <a href="#analyzer" data-action="showPage" data-page="analyzer">Config analyzer</a> and <a href="#cli">nic-migrate</a> generate them, reading the Ingress, the Services it routes to and the HAProxy ConfigMap together). Validate against the LoadBalancer IP of NGINX Ingress Controller with <code>curl --resolve app.example.com:443:&lt;NGINX-IP&gt;</code>, then flip that host's DNS record. To keep a plain Ingress instead, migrate its annotations and set its <code>ingressClassName</code> to the NGINX Ingress Controller class.</li>
                 <li><strong>Decommission</strong> &mdash; After every host has been cut over and validated, remove the HAProxy Deployment, its IngressClass, both <code>*.haproxy.org</code> CRD groups, and the CRs they managed.</li>
             </ol>
             <div class="info-box tip"><strong>Tip:</strong> Migrate certificates first. NGINX Ingress Controller has no on-the-fly certificate signing (HAProxy's <code>generate-certificates</code> has no equivalent) &mdash; install cert-manager and issue certificates for each host <em>before</em> the DNS cutover, or pre-provision <code>kubernetes.io/tls</code> Secrets, so the new controller serves valid TLS from the first request.</div>
+
+            <h3 id="side-by-side-install">Install alongside HAProxy Kubernetes Ingress Controller</h3>
+            <p>HAProxy Kubernetes Ingress Controller's class is usually <code>haproxy</code> (an <code>IngressClass</code> with controller <code>haproxy.org/ingress-controller</code>), and NGINX Ingress Controller's Helm chart creates <code>nginx</code>, so the two classes do not collide. Each controller takes the Ingresses whose class names it:</p>
+            <div class="install-box"><h3>Helm (example)</h3>
+                <pre><code>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress \
+  --set controller.ingressClass.name=nginx \
+  --set controller.enableSnippets=true \
+  --set controller.enableTLSPassthrough=true</code></pre>
+            </div>
+            <p>Keep only the flags your migrated resources need:</p>
+            <ul class="doc-list">
+                <li><strong><code>controller.enableSnippets</code></strong> &mdash; Off by default. With it off, NGINX Ingress Controller rejects any resource that carries a snippet, and every HAProxy <code>*-config-snippet</code> becomes one, as does a deny list inside an allow list. The ConfigMap snippet keys work without it.</li>
+                <li><strong><code>controller.enableTLSPassthrough</code></strong> &mdash; Off by default. <code>ssl-passthrough</code> becomes a TransportServer on the built-in <code>tls-passthrough</code> listener, which exists only with this flag.</li>
+                <li><strong><code>controller.globalConfiguration.create</code></strong> &mdash; Off by default. <code>tcp-services</code> entries and TCP custom resources become TransportServers on listeners a GlobalConfiguration declares: list them under <code>controller.globalConfiguration.spec</code>, and expose their ports on the controller Service.</li>
+                <li><strong><code>controller.enableCertManager</code></strong> &mdash; Off by default. cert-manager HTTP-01 challenges for a VirtualServer's host pass its HTTPS redirect and authentication only with this flag (v5.7.0 and later).</li>
+            </ul>
+            <div class="info-box warning"><strong>An Ingress with no class:</strong> HAProxy Kubernetes Ingress Controller, run without <code>--ingress.class</code>, takes an Ingress that names no class when the cluster has no default <code>IngressClass</code>; NGINX Ingress Controller never takes one. A VirtualServer or TransportServer with no class is the opposite: every NGINX Ingress Controller in the cluster takes it. Give each HAProxy Ingress an explicit class before you start, and the migrated resources the NGINX Ingress Controller class: the analyzer leaves a class naming HAProxy off them, and <code>nic-migrate --class</code> sets one.</div>
+            <div class="info-box note"><strong>Note:</strong> The NGINX Ingress Controller documentation covers this in <a href="https://docs.nginx.com/nginx-ingress-controller/install/multiple-controllers/" target="_blank" rel="noopener">Run multiple Ingress controllers</a>.</div>
+
+            <h3 id="changed-defaults">Defaults that change</h3>
+            <p>A setting you never configured still changes if the two controllers default it differently. Set the NGINX Ingress Controller value in the <code>nginx-config</code> ConfigMap, or per resource, wherever the old default matters to you.</p>
+            <div class="table-wrapper">
+                <table class="diff-table" aria-labelledby="changed-defaults">
+                    <thead><tr><th scope="col">Setting</th><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th><th scope="col">What to check</th></tr></thead>
+                    <tbody>
+                        <tr><td>Request body size</td><td>No limit</td><td>1m (<code>client-max-body-size</code>)</td><td>Uploads over 1 MB get 413. Set <code>client-max-body-size</code> to the largest body you accept.</td></tr>
+                        <tr><td>Response buffering</td><td>Streamed</td><td>On (<code>proxy-buffering</code>)</td><td>Server-sent events and streamed responses arrive in chunks. Set <code>proxy-buffering: "false"</code> for them.</td></tr>
+                        <tr><td>HTTP/2</td><td>Offered (<code>tls-alpn</code> <code>h2,http/1.1</code>)</td><td>Off (<code>http2</code>)</td><td>Clients fall back to HTTP/1.1, and gRPC fails. Turn it on per host with <code>nginx.org/http2</code> or VirtualServer <code>spec.http2</code>, or for every host with <code>http2: "true"</code>.</td></tr>
+                        <tr><td>Upstream connect timeout</td><td>5s (<code>timeout-connect</code>)</td><td>60s (<code>proxy-connect-timeout</code>)</td><td>An unreachable Pod is given up on later.</td></tr>
+                        <tr><td>Upstream response timeout</td><td>50s (<code>timeout-server</code>)</td><td>60s (<code>proxy-read-timeout</code>)</td><td>A slow backend is given longer.</td></tr>
+                        <tr><td>Client keep-alive idle timeout</td><td>1m (<code>timeout-http-keep-alive</code>)</td><td>75s (<code>keepalive-timeout</code>)</td><td>Idle client connections stay open longer.</td></tr>
+                        <tr><td>Load-balancing method</td><td>Round robin</td><td><code>random two least_conn</code> (<code>lb-method</code>)</td><td>Request distribution changes.</td></tr>
+                        <tr><td>Health checks</td><td>Active probes (<code>check</code>)</td><td>Passive: 1 failure in 10s (<code>max-fails</code>, <code>fail-timeout</code>)</td><td>An idle Pod is never probed. Active health checks need NGINX Plus.</td></tr>
+                        <tr><td>HTTP-to-HTTPS redirect code</td><td>302 (<code>ssl-redirect-code</code>)</td><td>301 (<code>http-redirect-code</code>)</td><td>Clients and caches treat the redirect as permanent. The analyzer sets 302.</td></tr>
+                        <tr><td><code>Server</code> header</td><td>The backend's own</td><td>NGINX and its version (<code>server-tokens</code>)</td><td>Set <code>server-tokens: "false"</code> to hide the NGINX version.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 id="gateway-api">Gateway API</h3>
+            <p>HAProxy Kubernetes Ingress Controller implements only the Gateway API's TCPRoute. <a href="https://docs.nginx.com/nginx-gateway-fabric/" target="_blank" rel="noopener">NGINX Gateway Fabric</a> is the NGINX implementation of the <a href="https://gateway-api.sigs.k8s.io/" target="_blank" rel="noopener">Gateway API</a>, and <a href="https://github.com/kubernetes-sigs/ingress2gateway" target="_blank" rel="noopener">ingress2gateway</a> converts Ingress resources to it. This tool covers the move to NGINX Ingress Controller, which keeps the Ingress API.</p>
         </section>
 
         <!-- CRD Features Summary -->
@@ -352,6 +393,7 @@
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-log-format"><span>Hand-translate <code>log-format</code>/<code>log-format-tcp</code> &mdash; HAProxy <code>%</code>-tokens become nginx <code>$</code>-variables (never copy verbatim)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-modsecurity"><span>Re-author ModSecurity/CRS rules as an F5 WAF for NGINX <code>waf</code> Policy (NGINX Plus) &mdash; HAProxy Enterprise WAF rules are not portable</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="rebuild-dashboards"><span>Rebuild Prometheus/Grafana dashboards &mdash; NGINX Ingress Controller metric names (<code>nginx_ingress_*</code>) differ from HAProxy's on a dedicated <code>:9113</code> port</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="review-changed-defaults"><span>Review the <a href="#changed-defaults">defaults that change</a> (request body size, response buffering, HTTP/2, timeouts, load balancing, health checks) and set the ones that matter in <code>nginx-config</code></span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="test-in-staging"><span>Validate in a staging environment before cutover</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="cutover-decommission"><span>Cut over DNS host-by-host (validate with <code>curl --resolve app.example.com:443:&lt;NGINX-IP&gt;</code>), then decommission the HAProxy Deployment, IngressClass, and CRDs</span></li>
             </ul>

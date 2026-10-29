@@ -59,32 +59,42 @@ test('haproxy: unknown haproxy.org annotation lands in the unrecognized bucket',
     assert.equal(plan.unrecognized.items.length, 1);
 });
 
+// HAProxy applies a Global only when the controller ConfigMap names it in
+// cr-global (controller/global.go), so each Global here comes with that ConfigMap.
+const namingConfigMap = ['apiVersion: v1', 'kind: ConfigMap', 'metadata:', '  name: haproxy-kubernetes-ingress', 'data:', '  cr-global: g', '---'];
+
 test('haproxy: v1 CRD spec.config unwraps and maps Global fields', () => {
     const { source, warnings } = loadAnalyzer('assets/js/migration-haproxy.js');
-    const yaml = [
+    const yaml = namingConfigMap.concat([
         'apiVersion: ingress.v1.haproxy.org/v1', 'kind: Global', 'metadata:', '  name: g',
         'spec:', '  config:', '    maxconn: 5000', '    nbthread: 4',
-    ].join('\n');
+    ]).join('\n');
     const { parsed, plan, text } = analyze(source, yaml, 'crd');
     assert.equal(warnings.length, 0, warnings.join(' | '));
-    assert.equal(parsed.foundCount, 1);
+    assert.equal(parsed.foundCount, 2, 'the Global and the cr-global key');
     assert.match(text, /worker-connections: "?5000/);
     assert.match(text, /worker-processes: "?4/);
-    // v1 group warning surfaces to the user
-    assert.ok(plan.warnings.some((w) => /ingress\.v1\.haproxy\.org/.test(w.title)));
+    // v1 group warning surfaces to the user: the page shows parse warnings
+    // beside the plan's, as for ingress-nginx.
+    assert.ok(parsed.warnings.some((w) => /ingress\.v1\.haproxy\.org/.test(w.title)));
+    assert.ok(plan.steps.length > 0);
 });
 
 test('haproxy: v3 Global CRD unwraps nested performance/ssl options', () => {
     const { source } = loadAnalyzer('assets/js/migration-haproxy.js');
-    const yaml = [
+    const global = [
         'apiVersion: ingress.v3.haproxy.org/v3', 'kind: Global', 'metadata:', '  name: g',
         'spec:', '  nbthread: 4',
         '  performance_options:', '    maxconn: 40000',
         '  ssl_options:', '    default_bind_ciphers: ECDHE-RSA-AES256-GCM-SHA384',
-    ].join('\n');
-    const { text } = analyze(source, yaml, 'crd');
+    ];
+    const { text } = analyze(source, namingConfigMap.concat(global).join('\n'), 'crd');
     assert.match(text, /worker-connections: "?40000/);
     assert.match(text, /ssl-ciphers: "?ECDHE-RSA-AES256-GCM-SHA384/);
+    // Pasted without the ConfigMap that names it, HAProxy applied it to nothing.
+    const alone = analyze(source, global.join('\n'), 'crd');
+    assert.doesNotMatch(alone.text, /worker-connections/);
+    assert.ok(alone.plan.infoNotes.some((n) => /applied to nothing/.test(n.message)));
 });
 
 test('haproxy: tcp-services ConfigMap becomes GlobalConfiguration + TransportServer per entry', () => {
@@ -121,8 +131,10 @@ test('haproxy: hard no-equivalents surface as unsupported cards, not silently dr
         '  annotations:',
         '    haproxy.org/send-proxy-protocol: "proxy-v2"',
         '    haproxy.org/rate-limit-whitelist: "10.0.0.0/8"',
-        '    haproxy.org/quic-alt-svc-max-age: "60"',
         'spec:', '  rules:', '    - host: u.example.com',
+        // quic-alt-svc-max-age is read from the ConfigMap only (handler/quic.go).
+        '---', 'apiVersion: v1', 'kind: ConfigMap', 'metadata:', '  name: haproxy-kubernetes-ingress',
+        'data:', '  quic-alt-svc-max-age: "60"',
     ].join('\n');
     const { plan } = analyze(source, yaml, 'crd');
     assert.ok(plan.unsupported, 'expected unsupported section');
@@ -138,7 +150,8 @@ test('haproxy: what a reader sees names each product in full', () => {
     const fs = require('node:fs'), path = require('node:path');
     const { ROOT } = require('./lib/load.js');
     const { source } = loadAnalyzer('assets/js/migration-haproxy.js');
-    const BAD = /\b(NIC|NGF)\b|F5 NGINX Ingress Controller|behaviour/;
+    // Page copy and analyzer output are American English (AGENTS.md).
+    const BAD = /\b(NIC|NGF)\b|F5 NGINX Ingress Controller|behaviour|\b\w*([Nn]ormalis|[Rr]ecognis|[Oo]rganis|[Hh]onour|[Cc]olour)\w*/;
     const found = new Set();
     const walk = (o, where) => {
         if (typeof o === 'string') { if (BAD.test(o)) found.add(where + ': ' + o.match(new RegExp('.{0,40}' + BAD.source + '.{0,20}'))[0]); return; }

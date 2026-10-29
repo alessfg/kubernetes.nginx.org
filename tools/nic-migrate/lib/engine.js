@@ -68,9 +68,12 @@ function createEngine(sourceId) {
         /* Several Ingresses at once, so a canary Ingress folds into its stable
            one's VirtualServer as on the page. A translator warning cannot be
            traced to one Ingress here, so every result carries the run's. */
-        migrateMany(docs, strategy, options) {
+        migrateMany(docs, strategy, options, runDocs) {
             const before = warnings.length;
-            const outs = source.analyzer.migrateMany(docs, strategy, options);
+            // `runDocs` is every document the source reads (sources.js kinds):
+            // HAProxy resolves an Ingress against its Services, the controller
+            // ConfigMap and its CRs. ingress-nginx reads the Ingresses alone.
+            const outs = source.analyzer.migrateMany(docs, strategy, options, runDocs);
             const run = warnings.slice(before);
             for (const o of outs) o.out.warnings = run;
             return outs;

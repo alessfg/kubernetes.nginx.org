@@ -54,7 +54,8 @@ CHECKS = [
                       '.github/test/nic-migrate.test.js',
                       '.github/test/analyzer.test.js',
                       '.github/test/sources.test.js',
-                      '.github/test/conversions.test.js']),
+                      '.github/test/conversions.test.js',
+                      '.github/test/haproxy-analyzer.test.js']),
     ('locator', [sys.executable, '.github/scripts/where.py', '--self-test']),
 ]
 

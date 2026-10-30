@@ -202,7 +202,7 @@
             { keys: ['annotation:allow-list', 'annotation:deny-list', 'annotation:blacklist', 'annotation:whitelist'], source: 'allow-list / deny-list (+ deprecated blacklist/whitelist)', nic: 'Policy CRD accessControl allow[]/deny[] (+ nginx.org/policies on Ingress)', type: 'policy', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'accessControl' },
             { keys: ['annotation:src-ip-header'], source: 'src-ip-header', nic: 'ConfigMap real-ip-header + set-real-ip-from + real-ip-recursive (global)', type: 'configmap', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'srcIpHeader' },
             { keys: ['configmap:proxy-protocol'], source: 'proxy-protocol (inbound)', nic: 'ConfigMap proxy-protocol + set-real-ip-from + real-ip-header: proxy_protocol', type: 'configmap', category: 'Client mTLS & PROXY protocol', anchor: 'client-mtls-proxy', section: 'configmap', grouped: true, generator: 'controller' },
-            { keys: ['annotation:send-proxy-protocol'], source: 'send-proxy-protocol', nic: 'No direct equivalent — PROXY-to-backend does not exist for HTTP upstreams; TCP/UDP only via TransportServer streamSnippets (proxy_protocol on; sends PROXY v1 only, requires -enable-snippets)', type: 'unsupported', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true },
+            { keys: ['annotation:send-proxy-protocol'], source: 'send-proxy-protocol', nic: 'No direct equivalent — PROXY-to-backend does not exist for HTTP upstreams; TCP/UDP only via TransportServer serverSnippets (proxy_protocol on; sends PROXY v1 only, requires -enable-snippets)', type: 'unsupported', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true },
             { keys: ['annotation:forwarded-for'], source: 'forwarded-for', nic: 'Automatic — NGINX Ingress Controller sends X-Forwarded-For by default; "false": ConfigMap disable-forwarded-headers (global)', type: 'annotation', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'forwardedFor' },
 
             // Authentication
@@ -1358,10 +1358,11 @@
 
             modsecurity: function(a, f, ctx) {
                 ctx.use('modsecurity');
-                f.policies.push({ name: ctx.name('waf'), spec: { waf: { enable: true, apPolicy: 'default/dataguard-alarm', securityLog: { enable: true, apLogConf: 'default/logconf', logDest: 'syslog:server=127.0.0.1:514' } } }, onIngress: true, plus: true,
+                // securityLogs: securityLog is deprecated (policy.go, v5.7.0).
+                f.policies.push({ name: ctx.name('waf'), spec: { waf: { enable: true, apPolicy: 'default/dataguard-alarm', securityLogs: [{ enable: true, apLogConf: 'default/logconf', logDest: 'syslog:server=127.0.0.1:514' }] } }, onIngress: true, plus: true,
                     comments: { 'spec.waf.enable': 'modsecurity — NGINX Plus with F5 WAF for NGINX', 'spec.waf.apPolicy': 'TODO: an APPolicy you author; ModSecurity rules do not carry over' } });
                 ctx.todo('spec.waf.apPolicy', 'author an APPolicy — ModSecurity and CRS rules do not carry over');
-                ctx.note('modsecurity', 'HAProxy Enterprise ModSecurity rules cannot be imported: F5 WAF for NGINX uses its own policy (APPolicy). Re-author and tune it, and set the enforcement mode (HAProxy ships detection-only). Needs NGINX Plus; on an Ingress, reference the Policy through nginx.com/policies.', 'warning');
+                ctx.note('modsecurity', 'modsecurity is an HAProxy Enterprise Kubernetes Ingress Controller key (1.7 and later); the community controller has none. Its ModSecurity rules cannot be imported: F5 WAF for NGINX uses its own policy (APPolicy). Re-author and tune it, and set the enforcement mode (HAProxy ships detection-only). Needs NGINX Plus and the -enable-app-protect flag; on an Ingress, reference the Policy through nginx.com/policies.', 'warning');
             },
 
             crBackendRef: function(a, f, ctx) {
@@ -2266,7 +2267,10 @@
                 let dest = 'syslog:server=' + t.address + (t.port ? ':' + t.port : '');
                 if (t.facility) dest += ',facility=' + t.facility;
                 if (t.level) { let l = t.level.toLowerCase(); dest += ',severity=' + (l === 'err' ? 'error' : l === 'warning' ? 'warn' : l); }
-                g.cm('access-log', dest, 'syslog-server (NGINX Ingress Controller reads only values that start with syslog:)');
+                // "main" is the format the log-format key defines; without a
+                // name NGINX logs in its predefined combined format, and a
+                // migrated log-format is never used (nginx.tmpl, v5.7.0).
+                g.cm('access-log', dest + ' main', 'syslog-server (NGINX Ingress Controller reads only values that start with syslog:; main is the log-format key\'s format)');
                 g.note('syslog-server', 'Only the access log can go to syslog, to one server; the error log stays on stderr (error-log-level sets its level).');
             },
             'log-format': function(x, g) {
@@ -2416,7 +2420,7 @@
                     // (MainServerSSLDHParamFileContent): NGINX Ingress Controller writes the file.
                     case 'ssl-dh-param-file': g.cm('ssl-dhparam-file', '-----BEGIN DH PARAMETERS-----\n# TODO: paste the contents of ' + v + '\n-----END DH PARAMETERS-----\n', label + ' ssl_dh_param_file — the key takes the PEM content, not a path'); g.todo('configmap.ssl-dhparam-file', 'paste the contents of ' + v); break;
                     case 'cpu-maps': case 'cpu-set': case 'cpu-policy': g.cm('worker-cpu-affinity', 'auto', label + ' ' + k + ' — TODO: translate to NGINX CPU masks'); g.todo('configmap.worker-cpu-affinity', 'translate ' + k + ' to NGINX CPU masks'); break;
-                    case 'log-targets': case 'log': g.cm('access-log', 'syslog:server=127.0.0.1:514', label + ' log targets — TODO: the syslog address'); g.todo('configmap.access-log', 'the syslog address from the Global log targets'); break;
+                    case 'log-targets': case 'log': g.cm('access-log', 'syslog:server=127.0.0.1:514 main', label + ' log targets — TODO: the syslog address'); g.todo('configmap.access-log', 'the syslog address from the Global log targets'); break;
                     case 'daemon': case 'master-worker': case 'pidfile': case 'localpeer': case 'chroot': case 'user': case 'uid': case 'group': case 'gid': case 'default-path': managed.push(k); break;
                     default: dropped.push(k);
                 }

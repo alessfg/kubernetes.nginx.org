@@ -1005,6 +1005,9 @@ spec:
     # NGINX Ingress Controller defaults to false;
     # server-ca implies verification
     verifyServer: true  # server-ca
+    # The name the backend certificate must carry. HAProxy checked only the
+    # chain; NGINX also checks the name, $proxy_host (the upstream name) unless set.
+    sslName: backend-svc.default.svc
 
 # Attach via VirtualServer spec.policies, or on Ingress via:
 #   annotations:
@@ -1013,6 +1016,7 @@ spec:
 # upstream to HTTPS. Always pair it with nginx.org/ssl-services (see the server-ssl row).</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>The CA key changes:</strong> HAProxy's <code>server-ca</code> Secret carries the CA under <code>tls.crt</code>; NGINX Ingress Controller reads the bundle from <code>ca.crt</code>. Add that key; since v5.7.0 the Secret can stay <code>Opaque</code>, so the existing one can be reused. <code>verifyServer</code> defaults to <strong>false</strong>, so set it to <code>true</code> explicitly or the backend certificate is never verified.</div>
+                            <div class="info-box warning"><strong>The name is checked too:</strong> HAProxy's <code>server-ca</code> sets <code>verify required</code> and no <code>verifyhost</code>, so it checked the certificate chain only. With <code>verifyServer</code>, NGINX also checks the certificate's name against <code>sslName</code>, which defaults to <code>$proxy_host</code>: on a VirtualServer that is the generated upstream name (<code>vs_&lt;namespace&gt;_&lt;name&gt;_&lt;upstream&gt;</code>), which no certificate carries, so every request fails with <code>502</code>. Set <code>sslName</code> to a name in the backend certificate's subjectAltName (the analyzer uses <code>&lt;service&gt;.&lt;namespace&gt;.svc</code>, the name NGINX Ingress Controller checks on an Ingress), and <code>serverName: true</code> if the backend needs SNI.</div>
                             <div class="info-box note"><strong>Note:</strong> <code>egressMTLS</code> only renders <code>proxy_ssl_*</code> directives — it does not switch the upstream to HTTPS. Pair it with <code>nginx.org/ssl-services</code> (see the <code>server-ssl</code> row) or, on VirtualServer, <code>upstreams[].tls.enable: true</code>. Merge <code>server-ca</code> and <code>server-crt</code> into one <code>egressMTLS</code> Policy for full mutual TLS. Ingress-attach is supported since v5.5.0.</div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -1168,19 +1172,22 @@ metadata:
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent for HTTP/gRPC backends.
 # nginx's proxy_protocol (send) exists ONLY in the stream module, so there is
 # no way to prepend a PROXY header to an HTTP upstream (a location-snippet
-# "proxy_protocol on;" is rejected as an unknown directive).
+# "proxy_protocol on;" fails the reload: "directive is not allowed here").
 #
-# TCP/UDP only — via a TransportServer stream snippet (PROXY v1 only):
+# TCP/UDP only — via a TransportServer server snippet (PROXY v1 only).
+# serverSnippets renders inside this TransportServer's own server block;
+# streamSnippets renders at stream level and would send PROXY headers to
+# every TransportServer's backends.
 apiVersion: k8s.nginx.org/v1
 kind: TransportServer
 metadata:
   name: my-tcp-app
 spec:
-  streamSnippets: |
+  serverSnippets: |
     proxy_protocol on;  # requires -enable-snippets; sends PROXY v1
   # ... action.pass to the upstream</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> sending PROXY protocol to a backend does not exist as an NGINX Ingress Controller field. nginx implements <code>proxy_protocol</code> (send) only in the stream module, so HTTP/gRPC upstreams cannot receive a PROXY header at all — a <code>location-snippet</code> <code>proxy_protocol on;</code> is invalid. For TCP/UDP services a TransportServer <code>streamSnippets</code> <code>proxy_protocol on;</code> works but emits <strong>PROXY v1 only</strong>, so the <code>proxy-v2</code>, <code>proxy-v2-ssl</code>, and <code>proxy-v2-ssl-cn</code> variants are not reproducible. This is distinct from inbound <code>proxy-protocol</code> (accepting PROXY from a fronting load balancer), which NGINX Ingress Controller does support.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> sending PROXY protocol to a backend does not exist as an NGINX Ingress Controller field. nginx implements <code>proxy_protocol</code> (send) only in the stream module, so HTTP/gRPC upstreams cannot receive a PROXY header at all — a <code>location-snippet</code> <code>proxy_protocol on;</code> is invalid. For TCP/UDP services a TransportServer <code>serverSnippets</code> <code>proxy_protocol on;</code> works but emits <strong>PROXY v1 only</strong> (not <code>streamSnippets</code>, which renders at stream level and affects every TransportServer), so the <code>proxy-v2</code>, <code>proxy-v2-ssl</code>, and <code>proxy-v2-ssl-cn</code> variants are not reproducible. This is distinct from inbound <code>proxy-protocol</code> (accepting PROXY from a fronting load balancer), which NGINX Ingress Controller does support.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -3490,8 +3497,8 @@ spec:
             </div>
 
             <h3 id="enterprise">Enterprise features</h3>
-            <div class="info-box note"><strong>Why NGINX Plus:</strong> NGINX Ingress Controller answers below — F5 WAF for NGINX, F5 DoS for NGINX, zone synchronization, active health checks — are its <strong>NGINX Plus</strong> capabilities, backed by an F5 subscription, so the migration cost is deploying the NGINX Plus image rather than configuring a subscription.</div>
-            <div class="info-box note"><strong>Where to find the HAProxy side:</strong> no module below has an annotation, a ConfigMap key, a CRD field or a controller flag — in v3.2.12 the ModSecurity WAF is the only Enterprise feature that does (see <a href="#waf">WAF</a>). Their settings are HAProxy configuration, and it reaches a cluster two ways, both shown in the examples. Directives that belong <em>inside</em> a section the controller generates travel in the <code>global-config-snippet</code> and <code>frontend-config-snippet</code> ConfigMap keys, because a second file cannot reopen a section the controller already wrote. Whole new sections travel in a secondary config file mounted at <code>/etc/haproxy/haproxy-aux.cfg</code>, which the controller loads alongside its own generated config, watches for changes, and never rewrites. Running the controller in external mode puts all of it back into one config file you own. So there <em>is</em> something to inventory in the cluster — two ConfigMaps and a volume mount — but nothing that names the feature, and the contents are HAProxy's configuration language, which is re-authored rather than translated.</div>
+            <div class="info-box note"><strong>Why NGINX Plus:</strong> NGINX Ingress Controller answers below — F5 WAF for NGINX, F5 DoS for NGINX, zone synchronization, active health checks — are its <strong>NGINX Plus</strong> capabilities, backed by an F5 subscription. Running them means the NGINX Plus image, the license token Secret (NGINX Ingress Controller exits at startup without it; Helm <code>controller.mgmt.licenseTokenSecretName</code>), and for the WAF and DoS modules the <code>-enable-app-protect</code> and <code>-enable-app-protect-dos</code> flags.</div>
+            <div class="info-box note"><strong>Where to find the HAProxy side:</strong> no module below has an annotation, a ConfigMap key, a CRD field or a controller flag; the community controller (v3.2.12) has none for any Enterprise feature, and the HAProxy Enterprise Kubernetes Ingress Controller adds one only for its ModSecurity WAF (see <a href="#waf">WAF</a>). Their settings are HAProxy configuration, and it reaches a cluster two ways, both shown in the examples. Directives that belong <em>inside</em> a section the controller generates travel in the <code>global-config-snippet</code> and <code>frontend-config-snippet</code> ConfigMap keys, because a second file cannot reopen a section the controller already wrote. Whole new sections travel in a secondary config file mounted at <code>/etc/haproxy/haproxy-aux.cfg</code>, which the controller loads alongside its own generated config, watches for changes, and never rewrites. Running the controller in external mode puts all of it back into one config file you own. So there <em>is</em> something to inventory in the cluster — two ConfigMaps and a volume mount — but nothing that names the feature, and the contents are HAProxy's configuration language, which is re-authored rather than translated.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="enterprise"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -3533,7 +3540,7 @@ data:
 # backed by a DosProtectedResource CRD (author its spec
 # to match your protected object).</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>Different mechanism:</strong> HAProxy Enterprise Bot Management has no Ingress annotation, ConfigMap key or CRD field in v3.2.12, so it arrives as raw configuration: the profile section through the mounted <code>haproxy-aux.cfg</code>, the per-frontend lines through <code>frontend-config-snippet</code>. Mount the aux ConfigMap with <code>subPath: haproxy-aux.cfg</code> so it lands as a file rather than a directory. The <code>botmgmt-profile</code> section and <code>botmgmt-evaluate</code> are named in HAProxy Enterprise's release notes; the profile's own fields are portal-documented, so treat the body above as a placeholder. F5 DoS for NGINX provides <em>behavioral</em> DDoS and automated-traffic protection, not fingerprint-based bot scoring, and its interactive-challenge (CAPTCHA) counterpart has <strong>no NGINX equivalent</strong> (see the CAPTCHA and Fingerprint rows). F5 WAF for NGINX bot signatures cover a further slice.</div>
+                            <div class="info-box warning"><strong>Different mechanism:</strong> HAProxy Enterprise Bot Management has no Ingress annotation, ConfigMap key or CRD field, so it arrives as raw configuration: the profile section through the mounted <code>haproxy-aux.cfg</code>, the per-frontend lines through <code>frontend-config-snippet</code>. Mount the aux ConfigMap with <code>subPath: haproxy-aux.cfg</code> so it lands as a file rather than a directory. The <code>botmgmt-profile</code> section and <code>botmgmt-evaluate</code> are named in HAProxy Enterprise's release notes; the profile's own fields are portal-documented, so treat the body above as a placeholder. F5 DoS for NGINX provides <em>behavioral</em> DDoS and automated-traffic protection, not fingerprint-based bot scoring, and its interactive-challenge (CAPTCHA) counterpart has <strong>no NGINX equivalent</strong> (see the CAPTCHA and Fingerprint rows). F5 WAF for NGINX bot signatures cover a further slice.</div>
                             <div class="info-box note"><strong>Note:</strong> F5 DoS for NGINX is enabled with the <code>appprotectdos.f5.com/app-protect-dos-resource</code> annotation plus a <code>DosProtectedResource</code> CRD, and requires <strong>NGINX Plus</strong>.</div>
                         </div></td></tr>
                         <tr class="expandable">
@@ -3603,7 +3610,8 @@ metadata:
 spec:
   rateLimit:
     rate: 100r/s
-    burst: 0                    # HAProxy hard-denies (no queue)
+    # No burst: excess requests are refused at once, as HAProxy does
+    # (a burst of 0 fails validation — it must be positive when set).
     key: ${binary_remote_addr}  # per client IP
     zoneSize: 10M
     rejectCode: 429
@@ -3825,7 +3833,7 @@ spec:
                 <table class="mapping-table" aria-labelledby="waf"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>haproxy.org/modsecurity</code><br><code>modsecurity</code> ConfigMap key</td>
+                            <td><code>haproxy.org/modsecurity</code><br><code>modsecurity</code> ConfigMap key (HAProxy Enterprise)</td>
                             <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>waf</code> via <code>nginx.com/policies</code> <span class="badge badge-new">New v5.5.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3851,16 +3859,16 @@ spec:
   waf:
     enable: true  # NGINX Plus + F5 WAF for NGINX
     apPolicy: "default/dataguard-alarm"  # TODO: author an APPolicy — ModSecurity/CRS rules are NOT portable
-    securityLog:
-      enable: true
-      apLogConf: "default/logconf"
-      logDest: "syslog:server=127.0.0.1:514"
+    securityLogs:  # securityLog (singular) is deprecated
+      - enable: true
+        apLogConf: "default/logconf"
+        logDest: "syslog:server=127.0.0.1:514"
 
 # Attach via VirtualServer spec.policies, or on Ingress via nginx.com/policies
 # (waf Policies are rejected on nginx.org/policies).</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>Rules are not portable:</strong> HAProxy Enterprise ModSecurity rules (<code>SecRule</code> / OWASP CRS supplied through the <code>modsecurity</code> ConfigMap key) cannot be imported — F5 WAF for NGINX uses its own declarative policy model (an <code>APPolicy</code> CRD or a compiled policy bundle). Re-author and re-tune the ruleset from scratch, and set the enforcement mode explicitly: HAProxy ships detection-only by default. This is <strong>NGINX Plus + F5 WAF for NGINX</strong> only — there is no OSS or built-in WAF.</div>
-                            <div class="info-box note"><strong>Note:</strong> Attach the <code>waf</code> Policy via <code>nginx.com/policies</code> on an Ingress, or from VirtualServer / VirtualServerRoute <code>spec.policies</code> — it is <strong>rejected</strong> on <code>nginx.org/policies</code>. <code>apPolicy</code>, <code>apBundle</code> and <code>apBundleSource</code> <span class="badge badge-new">New v5.6.0</span> are mutually exclusive (set exactly one); <code>apLogConf</code> pairs only with <code>apPolicy</code>, and <code>apLogBundle</code> or <code>apLogBundleSource</code> only with a bundle — there is <strong>no <code>securityLogBundle</code> field</strong>. NGINX Ingress Controller has no cluster-wide <code>modsecurity</code> toggle — attach the Policy per Ingress or VirtualServer. You can also enable F5 WAF for NGINX directly with the <code>appprotect.f5.com/</code> annotations (<code>app-protect-enable</code>, <code>app-protect-policy</code>, <code>app-protect-security-log-enable</code>, <code>app-protect-security-log</code>, <code>app-protect-security-log-destination</code>).</div>
+                            <div class="info-box warning"><strong>Rules are not portable:</strong> HAProxy Enterprise ModSecurity rules (<code>SecRule</code> / OWASP CRS supplied through the <code>modsecurity</code> ConfigMap key) cannot be imported — F5 WAF for NGINX uses its own declarative policy model (an <code>APPolicy</code> CRD or a compiled policy bundle). Re-author and re-tune the ruleset from scratch, and set the enforcement mode explicitly: HAProxy ships detection-only by default. This is <strong>NGINX Plus + F5 WAF for NGINX</strong> only — there is no OSS or built-in WAF — and the controller must run with <code>-enable-app-protect</code>, or every <code>waf</code> Policy is rejected.</div>
+                            <div class="info-box note"><strong>Note:</strong> Attach the <code>waf</code> Policy via <code>nginx.com/policies</code> on an Ingress, or from VirtualServer / VirtualServerRoute <code>spec.policies</code> — it is <strong>rejected</strong> on <code>nginx.org/policies</code>. <code>apPolicy</code>, <code>apBundle</code> and <code>apBundleSource</code> <span class="badge badge-new">New v5.6.0</span> are mutually exclusive (set at most one); <code>apLogConf</code> pairs only with <code>apPolicy</code>, and <code>apLogBundle</code> or <code>apLogBundleSource</code> only with a bundle — there is <strong>no <code>securityLogBundle</code> field</strong>. NGINX Ingress Controller has no cluster-wide <code>modsecurity</code> toggle — attach the Policy per Ingress or VirtualServer. You can also enable F5 WAF for NGINX directly with the <code>appprotect.f5.com/</code> annotations (<code>app-protect-enable</code>, <code>app-protect-policy</code>, <code>app-protect-security-log-enable</code>, <code>app-protect-security-log</code>, <code>app-protect-security-log-destination</code>).</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4319,7 +4327,7 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info"  # syslog-server</code></pre></div>
+  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info main"  # syslog-server (main: the log-format key's format)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Access log only — there is no ConfigMap key to send the NGINX <em>error</em> log to syslog (only <code>error-log-level</code> controls its verbosity). Single destination (no multi-server fan-out); HAProxy <code>format</code>/<code>length</code>/<code>minlevel</code> fields have no equivalent. NGINX Ingress Controller ignores any <code>access-log</code> value that does not start with <code>syslog:</code>. If HAProxy logged to <code>stdout</code>, that is already the NGINX Ingress Controller default — leave it unset.</div>
                         </div></td></tr>
@@ -4907,6 +4915,10 @@ spec:
     trustedCertSecret: backend-ca  # verify: required (CA under ca.crt)
     verifyServer: true
     serverName: true               # sni — sends SNI upstream
+    # A fixed name, checked against the certificate and sent as SNI: HAProxy's
+    # per-request sni (req.hdr(host)) does not port, and without sslName NGINX
+    # uses $proxy_host, the upstream name, which no certificate carries.
+    sslName: app.example.com
 ---
 apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
@@ -5361,7 +5373,9 @@ spec:
     http:
       name: http
       port: 8080</code></pre></div>
-                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 8080 is NGINX Ingress Controller's stub_status port (-nginx-status-port),
+# which a listener may not take while -nginx-status is on (the default).
+apiVersion: k8s.nginx.org/v1
 kind: GlobalConfiguration
 metadata:
   name: nginx-configuration
@@ -5369,8 +5383,26 @@ metadata:
 spec:
   listeners:
     - name: frontend-http
-      port: 8080  # binds.http.port
-      protocol: HTTP</code></pre></div>
+      port: 8083  # binds.http.port, moved off 8080
+      protocol: HTTP
+---
+# A listener carries traffic only for the VirtualServers that name it.
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  listener:
+    http: frontend-http
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content" data-approach="annotation">
@@ -5390,14 +5422,14 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/listen-ports: "8080"  # binds.http.port
+    nginx.org/listen-ports: "8083"  # binds.http.port, moved off 8080 (stub_status)
 spec:
   rules:
-    - host: app.example.com  # required — listen-ports needs a host</code></pre></div>
+    - host: app.example.com</code></pre></div>
                                 </div>
-                                <div class="info-box note"><strong>Note:</strong> <code>nginx.org/listen-ports</code> is per-Ingress and is <strong>not</strong> supported on an Ingress without a <code>host</code> — use the <code>-default-http-listener-port</code> command-line argument for that case.</div>
+                                <div class="info-box note"><strong>Note:</strong> <code>nginx.org/listen-ports</code> is per-Ingress and needs a <code>host</code> on the rule: it is <strong>not</strong> supported on an Ingress without one — use the <code>-default-http-listener-port</code> command-line argument for that case.</div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The default 80/443 listeners are set by <code>-default-http-listener-port</code> / <code>-default-https-listener-port</code>. Extra ports become GlobalConfiguration listeners (referenced by <code>-global-configuration &lt;ns&gt;/&lt;name&gt;</code>) or per-Ingress <code>nginx.org/listen-ports</code>. Expose the ports on the controller Service.</div>
+                            <div class="info-box note"><strong>Note:</strong> Hosts listen on 80 and 443 unless moved: an Ingress by <code>nginx.org/listen-ports</code> / <code>-ssl</code>, a VirtualServer by naming a GlobalConfiguration listener (the GlobalConfiguration referenced by <code>-global-configuration &lt;ns&gt;/&lt;name&gt;</code>) in <code>spec.listener</code>. <code>-default-http-listener-port</code> / <code>-default-https-listener-port</code> move only the catch-all default server. A listener may not take 80, 443, or a port the controller uses itself (stub_status 8080, metrics 9113, service insight 9114, while each is on). Expose the ports on the controller Service.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>ssl</code> / <code>ssl_certificate</code></td>
@@ -5488,7 +5520,7 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info"
+  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info main"
   log-format: |
     $remote_addr - $remote_user [$time_local] "$request" $status
     # TODO: hand-translate the HAProxy %-tokens</code></pre></div>
@@ -5524,8 +5556,11 @@ data:
   #   HSTS: the hsts / hsts-max-age ConfigMap keys
   #   headers: VirtualServer routes[].action.proxy.requestHeaders
   #            and responseHeaders
+  # (proxy_set_header does not go here: every location NGINX Ingress
+  # Controller generates sets its own, so a server-level one is never
+  # inherited. Use VirtualServer requestHeaders, or on an Ingress
+  # nginx.org/redirect-to-https, which sends X-Forwarded-Proto: https.)
   server-snippets: |
-    proxy_set_header X-Forwarded-Proto https;
     add_header Strict-Transport-Security "max-age=31536000" always;</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>Content not copyable:</strong> frontend <code>http-request</code>/<code>http-response</code> rules become <code>server-snippets</code> — rewrite each by hand. Prefer native NGINX Ingress Controller constructs (Policies, VirtualServer matches) first.</div>
@@ -5660,7 +5695,7 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info"
+  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info main"
   error-log-level: "info"  # level — verbosity only, still stderr</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Log targets become the <code>access-log</code> key (<code>syslog:</code> destination only); NGINX error-log verbosity is set by <code>error-log-level</code>. There is no error-log-to-syslog key. One destination only — NGINX Ingress Controller ignores any <code>access-log</code> value that does not start with <code>syslog:</code>.</div>
@@ -6149,10 +6184,11 @@ spec:
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --http-bind-port=8080  # HAProxy default</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>args:
-  # NGINX Ingress Controller defaults to 80
+  # Moves only the catch-all default_server (default 80);
+  # each Ingress host stays on 80 unless nginx.org/listen-ports moves it
   - -default-http-listener-port=8080</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HAProxy default 8080; NGINX Ingress Controller default 80 (range 1024-65535). Sets the NGINX HTTP <code>default_server</code> port. Keeping 8080 keeps the pod unprivileged; moving to 80 means the container needs <code>NET_BIND_SERVICE</code>, which NGINX Ingress Controller's manifests already grant.</div>
+                            <div class="info-box warning"><strong>Only the default server moves:</strong> HAProxy's <code>--http-bind-port</code> moves the HTTP listener every route uses. <code>-default-http-listener-port</code> moves only the catch-all <code>default_server</code> and host-less Ingresses: every Ingress host keeps listening on <code>80</code> unless <code>nginx.org/listen-ports</code> moves it, and a VirtualServer stays on <code>80</code> unless it names a GlobalConfiguration listener in <code>spec.listener</code>. So the pod still binds 80 (the manifests grant <code>NET_BIND_SERVICE</code>), and a controller Service targeting 8080 reaches only the default server, which answers <code>404</code>. Point the Service at 80, or move each host.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--https-bind-port</code></td>
@@ -6163,10 +6199,11 @@ spec:
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --https-bind-port=8443  # HAProxy default</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>args:
-  # NGINX Ingress Controller defaults to 443
+  # Moves only the catch-all default_server (default 443);
+  # each Ingress host stays on 443 unless nginx.org/listen-ports-ssl moves it
   - -default-https-listener-port=8443</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HAProxy default 8443; NGINX Ingress Controller default 443 (range 1024-65535). Whatever you pick, the controller Service must publish it — the flag moves the listener, not the Service port.</div>
+                            <div class="info-box warning"><strong>Only the default server moves:</strong> like the HTTP flag, <code>-default-https-listener-port</code> moves only the catch-all <code>default_server</code>. Ingress hosts keep <code>443</code> unless <code>nginx.org/listen-ports-ssl</code> moves them, and VirtualServers keep <code>443</code> unless they name a GlobalConfiguration listener in <code>spec.listener</code>. A controller Service targeting 8443 reaches only the default server.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--ingress.class</code></td>
@@ -6199,12 +6236,11 @@ spec:
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --log=warning  # HAProxy default is info</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>args:
-  # NGINX Ingress Controller rejects "warning"
-  # and falls back to info
-  - -log-level=warn
-  - -log-format=glog  # or text, json</code></pre></div>
+  # The same name: "warning", not "warn"
+  - -log-level=warning
+  - -log-format=glog  # or text, json (and their -unix / -unix-ms variants)</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Rename <code>warning</code> → <code>warn</code> — NGINX Ingress Controller rejects <code>warning</code> and reverts to <code>info</code>. Levels: <code>trace</code>/<code>debug</code>/<code>info</code>/<code>warn</code>/<code>error</code>/<code>fatal</code>. Controls the controller log, not the data plane — NGINX's own verbosity is the <code>error-log-level</code> ConfigMap key.</div>
+                            <div class="info-box note"><strong>Note:</strong> Keep <code>warning</code>. The levels NGINX Ingress Controller sets are <code>trace</code>/<code>debug</code>/<code>info</code>/<code>warning</code>/<code>error</code>/<code>fatal</code>: <code>-log-level=warn</code> matches none of them and runs at <code>info</code>. At startup it also prints "Invalid log level: warning … Falling back to default: info", which is wrong: the level stays <code>warning</code>. Controls the controller log, not the data plane — NGINX's own verbosity is the <code>error-log-level</code> ConfigMap key.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--namespace-whitelist</code></td>

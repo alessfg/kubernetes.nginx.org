@@ -218,7 +218,7 @@
             { keys: ['annotation:server-proto'], source: 'server-proto', nic: 'VirtualServer upstreams[].proxy-http-version "2" — or — nginx.org/proxy-http-version "2" (gRPC backends: nginx.org/grpc-services)', type: 'annotation', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true, generator: 'serverProto' },
 
             // Session persistence
-            { keys: ['annotation:cookie-persistence', 'annotation:cookie-persistence-no-dynamic'], source: 'cookie-persistence / cookie-persistence-no-dynamic', nic: 'VirtualServer upstreams[].sessionCookie', type: 'virtualserver', category: 'Session persistence', anchor: 'session-persistence', section: 'oss', grouped: true, generator: 'cookiePersistence' },
+            { keys: ['annotation:cookie-persistence', 'annotation:cookie-persistence-no-dynamic'], source: 'cookie-persistence / cookie-persistence-no-dynamic', nic: 'VirtualServer upstreams[].sessionCookie — or — nginx.org/sticky-cookie-services', type: 'virtualserver', dualApproach: true, category: 'Session persistence', anchor: 'session-persistence', section: 'oss', grouped: true, generator: 'cookiePersistence' },
 
             // Rate limiting
             { keys: ['annotation:rate-limit-requests', 'annotation:rate-limit-period', 'annotation:rate-limit-size', 'annotation:rate-limit-status-code'], source: 'rate-limit-*', nic: 'Policy CRD rateLimit — or — nginx.org/limit-req-* annotations (Ingress)', type: 'policy', category: 'Rate limiting', anchor: 'rate-limiting', section: 'oss', grouped: true, dualApproach: true, generator: 'rateLimit' },
@@ -985,7 +985,7 @@
                 else if (periodMs === 1000) rate = n + 'r/s';
                 else if (periodMs % 60000 === 0 && n * 60000 % periodMs === 0) { rate = (n * 60000 / periodMs) + 'r/m'; rateNote = 'normalized from ' + n + ' requests per ' + period + ' — NGINX rates are per second or per minute'; }
                 else { let perS = n * 1000 / periodMs; rate = (perS >= 1 ? Math.round(perS) + 'r/s' : Math.max(1, Math.round(n * 60000 / periodMs)) + 'r/m'); rateNote = 'normalized from ' + n + ' requests per ' + period + ' — NGINX rates are per second or per minute' + (perS >= 1 ? (perS % 1 ? ', rounded' : '') : ''); }
-                let reject = 403, codeSrc = 'the HAProxy default 403 (NGINX Ingress Controller would send 503)';
+                let reject = 403, codeSrc = 'the HAProxy default 403 (NGINX Ingress Controller would send ' + (ctx.strategy === 'annotation' ? '429' : '503') + ')';
                 if (a['rate-limit-status-code']) {
                     let c = haproxyInt(a['rate-limit-status-code'].value);
                     // deny_status codes HAProxy can send (configuration.txt 3.2,
@@ -1132,13 +1132,19 @@
                     return;
                 }
                 let dynamic = function(h) { return SAMPLE_FETCH.test(h.value) || /\$/.test(h.value); };
+                // The annotations split on "," into entries, and add-header on
+                // ":" into name, value and the always flag (header_parsing_helper,
+                // v5.7.0): a value with a comma becomes two headers, and one with
+                // a colon in add-header fails admission. Those need the VirtualServer.
+                let splits = function(h, colon) { return /,/.test(h.value) || (colon && /:/.test(h.value)); };
+                let unsplittable = req.some(function(h) { return splits(h, false); }) || res.some(function(h) { return splits(h, true); });
                 let fetches = req.concat(res).concat(host ? [{ name: 'Host', value: host }] : []).filter(function(h) { return SAMPLE_FETCH.test(h.value); });
                 if (fetches.length) ctx.todo('headers', 'rewrite each HAProxy sample fetch as an NGINX variable (' + fetches.map(function(h) { return h.name; }).join(', ') + '): %[src] is ${remote_addr}, %[req.hdr(x)] is ${http_x}');
                 // nginx.org/proxy-set-headers, add-header and upstream-vhost take
                 // literal values only; a "$" or a sample fetch needs the
                 // VirtualServer, whose header values take NGINX variables.
                 let vhostOk = host && host.length <= 253 && /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/.test(host.toLowerCase());
-                if (ctx.strategy === 'annotation' && !req.some(dynamic) && !res.some(dynamic) && (!host || vhostOk)) {
+                if (ctx.strategy === 'annotation' && !req.some(dynamic) && !res.some(dynamic) && !unsplittable && (!host || vhostOk)) {
                     if (req.length) { f.ann['nginx.org/proxy-set-headers'] = req.map(function(h) { return h.name + (h.value ? ': ' + h.value : ''); }).join(','); ctx.annComment('nginx.org/proxy-set-headers', src(a['request-set-header'], 'request-set-header')); }
                     if (res.length) {
                         f.ann['nginx.org/proxy-hide-headers'] = res.map(function(h) { return h.name; }).join(','); ctx.annComment('nginx.org/proxy-hide-headers', 'response-set-header (a replace, not an append)');
@@ -1146,7 +1152,9 @@
                     }
                     if (host) { f.ann['nginx.org/upstream-vhost'] = host.toLowerCase(); ctx.annComment('nginx.org/upstream-vhost', src(a['set-host'], 'set-host') + (host.toLowerCase() !== host ? ' (lowercased)' : '')); }
                 } else {
-                    if (ctx.strategy === 'annotation') ctx.note(a['set-host'] && !vhostOk ? 'set-host' : 'request-set-header', 'A header value here is not a literal (or set-host is not a plain hostname), which nginx.org/proxy-set-headers, add-header and upstream-vhost reject. Switch the strategy to CRD-first: VirtualServer requestHeaders and responseHeaders take NGINX variables.', 'warning');
+                    if (ctx.strategy === 'annotation') ctx.note(a['set-host'] && !vhostOk ? 'set-host' : unsplittable && !req.some(function(h) { return splits(h, false); }) ? 'response-set-header' : 'request-set-header', unsplittable
+                        ? 'A header value here holds a comma (or, in a response header, a colon): nginx.org/proxy-set-headers and add-header split on those, so the header would come out cut or the Ingress be rejected. Switch the strategy to CRD-first: VirtualServer requestHeaders and responseHeaders take any value.'
+                        : 'A header value here is not a literal (or set-host is not a plain hostname), which nginx.org/proxy-set-headers, add-header and upstream-vhost reject. Switch the strategy to CRD-first: VirtualServer requestHeaders and responseHeaders take NGINX variables.', 'warning');
                     let braced = function(v) { return str(v).replace(/\$([A-Za-z_][A-Za-z0-9_]*)/g, '${$1}'); };
                     if (req.length || host) {
                         f.proxy.requestHeaders = { set: req.map(function(h) { return { name: h.name, value: braced(h.value) }; }).concat(host ? [{ name: 'Host', value: braced(host) }] : []) };
@@ -1157,7 +1165,6 @@
                         f.responseHeaderNote = 'response-set-header (hide, then add: a replace)';
                     }
                 }
-                if (req.length) ctx.note('request-set-header', 'HAProxy sets request headers before it picks the backend, so they can steer routing; NGINX sets them after the route is chosen. Routing that depended on them needs VirtualServer matches.');
             },
 
             requestCapture: function(a, f, ctx) {
@@ -1310,7 +1317,7 @@
                 ctx.use('ssl-redirect-port');
                 let v = str(a['ssl-redirect-port'].value);
                 if (haproxyInt(v) === null) { invalidNote(ctx, 'ssl-redirect-port', v, 'a port number', 'redirected to its default port 8443'); return; }
-                ctx.note('ssl-redirect-port', 'NGINX Ingress Controller redirects to its own HTTPS listener (443 unless -default-https-listener-port moves it) and has no separate port for the redirect. To send clients to ' + v + ', write the redirect yourself: a VirtualServer route with action.redirect.url https://${host}:' + v + '${request_uri}.', 'warning');
+                ctx.note('ssl-redirect-port', 'NGINX Ingress Controller has no separate redirect port: an Ingress redirects to its first nginx.org/listen-ports-ssl port (443 by default), which also moves the listener, and a VirtualServer tls.redirect sends no port. To send clients to ' + v + ', write the redirect yourself in a VirtualServer route, matched on $scheme http (a route redirect fires for HTTPS too): action.redirect.url https://${host}:' + v + '${request_uri}.', 'warning');
             },
 
             // timeoutServer.go: ParseTime; an error is logged and the
@@ -2387,7 +2394,13 @@
             let from = source || 'http-connection-mode';
             if (mode === 'http-keep-alive') g.cm('keepalive', '64', from + ' http-keep-alive — idle upstream connections per worker; NGINX Ingress Controller leaves this 0, which closes each VirtualServer upstream connection');
             else if (mode === 'httpclose') g.cm('keepalive-timeout', '0', from + ' httpclose');
-            else if (mode === 'http-server-close') g.note(from, 'http-server-close matches the NGINX Ingress Controller default (client keep-alive on, none to the upstream); nothing to migrate.');
+            else if (mode === 'http-server-close') {
+                // A VirtualServer with keepalive 0 already sends Connection:
+                // close; an Ingress keeps 32 idle upstream connections unless
+                // keepalive is set (nginx.ingress.tmpl, NGINX 1.29.7+).
+                g.cm('keepalive', '0', from + ' http-server-close — closes each upstream connection, as HAProxy did (a VirtualServer already does; an Ingress would keep 32 idle)');
+                g.note(from, 'http-server-close keeps client keep-alive and closes each server connection: keepalive "0" does that for an Ingress too, which otherwise keeps up to 32 idle upstream connections per worker.');
+            }
             else if (mode === '') g.note(from, 'http-connection-mode is empty, so HAProxy kept its default http-keep-alive; see http-keep-alive.');
             else { g.note(from, 'http-connection-mode "' + mode + '" is not http-keep-alive, http-server-close or httpclose, so HAProxy logged an error and kept http-keep-alive.', 'warning'); connectionMode('http-keep-alive', g, from); }
         }

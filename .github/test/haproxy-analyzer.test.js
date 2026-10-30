@@ -172,7 +172,7 @@ test('each card shows the HAProxy objects behind its own resource', () => {
    (internal/k8s/validation.go, pkg/apis/configuration/validation, configmaps.go).
    The analyzer used to copy "5 seconds" into proxy-read-timeout and
    "10.0.0.0/8, bogus" into an accessControl Policy, both refused. */
-const SPREAD = ['', 'true', 'false', 't', '1', 'on', 'yes', 'off', '0', '-1', '5', '100abc', '5 seconds', '500us', '30s', 'x y z',
+const SPREAD = ['', 'true', 'false', 't', '1', 'on', 'yes', 'off', '0', '-1', '5', '100abc', '5 seconds', '500us', '30s', 'x y z', 'X-H a, b', 'X-H a:b',
     '10.0.0.0/8, bogus', 'https://a.com,https://b.com', 'Cookie', 'GET,FOO', '302', 'default/name'];
 const nicTime = (s) => typeof s === 'string' && s.trim() !== '' && /^(\d+y)??\s*(\d+M)??\s*(\d+w)??\s*(\d+d)??\s*(\d+h)??\s*(\d+m)??\s*(\d+s?)??\s*(\d+ms)??$/.test(s);
 const nicLb = (s) => ['round_robin', 'least_conn', 'ip_hash', 'random', 'random two', 'random two least_conn', 'least_time header', 'least_time last_byte', 'least_time header inflight', 'least_time last_byte inflight'].includes(s) || /^hash \S+( consistent)?$/.test(s);
@@ -190,6 +190,9 @@ function refused(d) {
     check('nginx.org/limit-req-burst', (v) => /^\d+$/.test(v) && v !== '0');
     check('nginx.org/limit-req-reject-code', (v) => +v >= 400 && +v <= 599);
     ['nginx.org/proxy-set-headers', 'nginx.org/add-header'].forEach((k) => check(k, (v) => v.split(',').every((e) => nicHeader.test(e.split(':')[0].trim()))));
+    // add-header splits on ":" into name, value and flag; the flag must be
+    // "always" (validateAddHeaderAnnotation, v5.7.0).
+    check('nginx.org/add-header', (v) => v.split(',').every((e) => { const p = e.split(':'); return p.length < 3 || (p.length === 3 && /^\s*always\s*$/i.test(p[2])); }));
     const s = d.spec || {};
     if (d.kind === 'Policy') {
         const rl = s.rateLimit;

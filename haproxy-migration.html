@@ -265,6 +265,7 @@
                         <tr><td>Upstream connect timeout</td><td>5s (<code>timeout-connect</code>)</td><td>60s (<code>proxy-connect-timeout</code>)</td><td>An unreachable Pod is given up on later.</td></tr>
                         <tr><td>Upstream response timeout</td><td>50s (<code>timeout-server</code>)</td><td>60s (<code>proxy-read-timeout</code>)</td><td>A slow backend is given longer.</td></tr>
                         <tr><td>Client keep-alive idle timeout</td><td>1m (<code>timeout-http-keep-alive</code>)</td><td>75s (<code>keepalive-timeout</code>)</td><td>Idle client connections stay open longer.</td></tr>
+                        <tr><td>WebSocket idle timeout</td><td>1h (<code>timeout-tunnel</code>)</td><td>60s (<code>proxy-read-timeout</code>, <code>proxy-send-timeout</code>)</td><td>An idle WebSocket or other upgraded connection closes after a minute. Raise both timeouts for the backends that hold one open.</td></tr>
                         <tr><td>Load-balancing method</td><td>Round robin</td><td><code>random two least_conn</code> (<code>lb-method</code>)</td><td>Request distribution changes.</td></tr>
                         <tr><td>Health checks</td><td>Active probes (<code>check</code>)</td><td>Passive: 1 failure in 10s (<code>max-fails</code>, <code>fail-timeout</code>)</td><td>An idle Pod is never probed. Active health checks need NGINX Plus.</td></tr>
                         <tr><td>HTTP-to-HTTPS redirect code</td><td>302 (<code>ssl-redirect-code</code>)</td><td>301 (<code>http-redirect-code</code>)</td><td>Clients and caches treat the redirect as permanent. The analyzer sets 302.</td></tr>
@@ -292,7 +293,7 @@
                         <li><strong>Path Rewriting:</strong> Modify request URIs with regex support before forwarding to backends</li>
                         <li><strong>Error Pages:</strong> Custom responses for specific HTTP error codes</li>
                         <li><strong>Request/Response Headers:</strong> Add, modify, or remove headers in transit</li>
-                        <li><strong>Health Checks:</strong> Active health monitoring of upstream servers</li>
+                        <li><strong>Health Checks:</strong> Active health monitoring of upstream servers (NGINX Plus)</li>
                         <li><strong>Session Persistence:</strong> Cookie-based sticky sessions</li>
                     </ul>
                 </div>
@@ -330,18 +331,17 @@
                         <li><strong>TCP Load Balancing:</strong> MySQL, PostgreSQL, Redis, custom TCP services</li>
                         <li><strong>UDP Load Balancing:</strong> DNS, RADIUS, gaming protocols</li>
                         <li><strong>TLS Passthrough:</strong> Pass encrypted traffic directly to backends</li>
-                        <li><strong>Health Checks:</strong> TCP/UDP health monitoring</li>
+                        <li><strong>Health Checks:</strong> TCP/UDP health monitoring (NGINX Plus; ignored on NGINX Open Source)</li>
                         <li><strong>Session Persistence:</strong> IP hash-based session affinity</li>
                     </ul>
                 </div>
 
                 <div class="feature-card">
                     <h3><span class="badge badge-globalconfiguration" style="margin:0 var(--space-base) 0 0; font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); padding: var(--space-small) var(--space-2x);">GlobalConfiguration CRD</span></h3>
-                    <p class="description">Cluster-wide configuration for NGINX Ingress Controller. Defines global listeners for TCP/UDP and TLS passthrough that TransportServers can reference.</p>
+                    <p class="description">Cluster-wide listeners for NGINX Ingress Controller: the TCP, UDP and HTTP ports that TransportServers and VirtualServers reference by name.</p>
                     <ul>
                         <li><strong>TCP/UDP Listeners:</strong> Define ports for non-HTTP traffic</li>
-                        <li><strong>TLS Passthrough Listeners:</strong> Configure SNI-based routing</li>
-                        <li><strong>Global Settings:</strong> Controller-wide configuration options</li>
+                        <li><strong>HTTP Listeners:</strong> Extra HTTP or HTTPS ports a VirtualServer selects in <code>spec.listener</code></li>
                     </ul>
                 </div>
             </div>
@@ -510,7 +510,7 @@ spec:
                     <tbody>
                         <tr><td>Repository</td><td><code>haproxytech/kubernetes-ingress</code></td><td><code>nginx/kubernetes-ingress</code></td></tr>
                         <tr><td>Data plane</td><td>HAProxy</td><td>NGINX (OSS or Plus)</td></tr>
-                        <tr><td>Annotation prefix</td><td><code>haproxy.org/</code> (OSS) or <code>haproxy.com/</code> (Enterprise)</td><td><code>nginx.org/</code> or <code>nginx.com/</code> or <code>appprotect.f5.com/</code></td></tr>
+                        <tr><td>Annotation prefix</td><td><code>haproxy.org/</code>, <code>haproxy.com/</code> or <code>ingress.kubernetes.io/</code> (read the same)</td><td><code>nginx.org/</code> or <code>nginx.com/</code> or <code>appprotect.f5.com/</code></td></tr>
                         <tr><td>ConfigMap name</td><td><code>haproxy-kubernetes-ingress</code></td><td><code>nginx-config</code></td></tr>
                         <tr><td>CRD support</td><td>Global, Defaults, Backend, TCP, Frontend, ValidationRules (<code>ingress.v3.haproxy.org</code>)</td><td>VirtualServer, VirtualServerRoute, Policy, TransportServer, GlobalConfiguration</td></tr>
                         <tr><td>Enterprise support</td><td>HAProxy Enterprise (Intelligent WAF, Global Profiling Engine, Bot Management)</td><td>NGINX Plus (F5 WAF for NGINX, F5 DoS for NGINX, JWT, OIDC, active health checks, zone sync)</td></tr>
@@ -760,7 +760,7 @@ data:
   real-ip-header: "X-Client-IP"  # src-ip-header
   set-real-ip-from: "10.0.0.0/8"  # TODO: the proxies you trust (src-ip-header)</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Real-IP settings are controller-global in NGINX Ingress Controller (ConfigMap), not per-Ingress — one header applies to all applications. NGINX Ingress Controller ignores <code>real-ip-header</code> unless the connecting peer matches <code>set-real-ip-from</code>, so that key is required.</div>
+                            <div class="info-box note"><strong>Note:</strong> Real-IP settings are controller-global in NGINX Ingress Controller (ConfigMap), not per-Ingress — one header applies to all applications. NGINX Ingress Controller ignores <code>real-ip-header</code> unless the connecting peer matches <code>set-real-ip-from</code>, so that key is required. With <code>-enable-tls-passthrough</code> on, it ignores <code>real-ip-header</code> altogether (the address comes from the PROXY header the passthrough listener adds): enable passthrough only if <code>ssl-passthrough</code> is migrated.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4195,7 +4195,9 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  worker-connections: "40000"  # maxconn — PER-WORKER (default 1024)</code></pre></div>
+  # Per worker, so divide by worker-processes (auto: one per CPU):
+  # with 4 workers, 10000 gives HAProxy's process-wide 40000.
+  worker-connections: "40000"  # maxconn — divide by worker-processes (default 1024)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Approximate:</strong> HAProxy <code>maxconn</code> is process-wide; NGINX <code>worker-connections</code> is per-worker and counts client + upstream + internal connections. Effective capacity →  <code>worker-connections</code> × <code>worker-processes</code> — divide accordingly.</div>
                         </div></td></tr>
@@ -4697,7 +4699,7 @@ kind: ConfigMap
 metadata:
   name: haproxy-kubernetes-ingress
 data:
-  generate-certificates-signer: my-ca   # ConfigMap-only</code></pre></div>
+  generate-certificates-signer: default/my-ca   # namespace/name; ConfigMap-only</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX Ingress Controller
 # has no on-the-fly per-connection certificate
 # signing. Pre-issue certificates instead
@@ -5088,7 +5090,8 @@ spec:                    # v1: spec.acls + spec.http-requests
   server_switching_rule_list:
     - cond: if
       cond_test: is_api
-      target_server: api-backend</code></pre></div>
+      target_server: SRV_2  # a server of THIS backend (use-server); the
+                            # controller names them SRV_&lt;n&gt;</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Rules do not port as data — re-express them natively.
 apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
@@ -5104,7 +5107,10 @@ spec:
       service: api-svc
       port: 80
   routes:
-    - path: /api           # acl_list + server_switching_rule_list
+    # use-server picks a server inside one backend, which has no NGINX
+    # Ingress Controller form; sending /api to another Service is
+    # use_backend's job, re-expressed here as a route.
+    - path: /api           # acl_list
       action:
         proxy:
           upstream: api
@@ -5414,21 +5420,25 @@ spec:                    # v1 wraps under spec.config
   error_files:
     - code: 503
       file: /etc/haproxy/errors/503.http</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No key for queue/tunnel/tarpit/*-fin timeouts, and none for
-# check_timeout on OSS — drop them. Two of the six have homes:
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No key for the *-fin timeouts, and none for check_timeout on
+# NGINX Open Source. tunnel_timeout has no tunnel-only key: the proxy
+# timeouts cover upgraded connections, so raise them where WebSockets
+# idle. queue_timeout is the NGINX Plus upstreams[].queue.timeout.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
   namespace: nginx-ingress
 data:
+  proxy-read-timeout: 1h  # tunnel_timeout (every upstream, not only tunnels)
+  proxy-send-timeout: 1h  # tunnel_timeout
   http-snippets: |
     gzip on;               # compression.algorithms
     gzip_types text/html;  # compression.types
 # error_files becomes per-route VirtualServer errorPages — see the
 # --configmap-errorfiles row under Controller flag mappings.</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> queue/tunnel/tarpit/<code>*-fin</code> timeouts and OSS <code>check_timeout</code> have no NGINX Ingress Controller key; <code>compression</code> uses <code>http-snippets</code> (<code>gzip</code>, no ConfigMap key); <code>error_files</code> becomes per-route VirtualServer <code>errorPages</code>. See the per-topic reference tables for guidance.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> the tarpit and <code>*-fin</code> timeouts and OSS <code>check_timeout</code> have no NGINX Ingress Controller key. <code>tunnel_timeout</code> is the proxy timeouts, which also cover every other request, so a 1h value keeps WebSockets but also lets a hung backend hold a request an hour: set it per VirtualServer upstream (<code>read-timeout</code>, <code>send-timeout</code>) where you can. <code>queue_timeout</code> is the NGINX Plus <code>upstreams[].queue.timeout</code>, rejected on NGINX Open Source; <code>compression</code> uses <code>http-snippets</code> (<code>gzip</code>, no ConfigMap key); <code>error_files</code> becomes per-route VirtualServer <code>errorPages</code>. See the per-topic reference tables for guidance.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -6086,8 +6096,16 @@ spec:
 kind: ValidationRules
 metadata:
   name: custom-annotations
-# Defines a prefix plus CEL-validated, Go-templated custom
-# annotations that render into HAProxy config snippets.</code></pre></div>
+# A prefix plus CEL-validated, Go-templated custom annotations
+# that render into HAProxy configuration.
+spec:
+  prefix: "example.com"
+  validation_rules:
+    timeout-server:
+      section: all
+      template: "timeout server {{.}}"
+      type: duration
+      rule: "value > duration('42s') && value <= duration('42m')"</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX Ingress Controller
 # has a fixed annotation vocabulary and no
 # CEL/template custom-annotation framework.
@@ -6180,7 +6198,7 @@ spec:
             type: text/plain
             body: "Down for maintenance"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> No flag equivalent — custom error responses become per-route VirtualServer <code>errorPages</code> (structured <code>return</code>/<code>redirect</code>, not raw HTTP files). See the Error Handling reference. One controller-wide ConfigMap becomes a block repeated on every route that needs it. On an Ingress, <code>nginx.org/custom-http-errors</code> <span class="badge badge-new">New v5.6.0</span> is the alternative: it sends the listed codes to the Ingress's <code>spec.defaultBackend</code>, so the pages come from a Service you run rather than from inline bodies.</div>
+                            <div class="info-box note"><strong>Note:</strong> No flag equivalent — custom error responses become per-route VirtualServer <code>errorPages</code> (structured <code>return</code>/<code>redirect</code>, not raw HTTP files). See the Error Handling reference. One controller-wide ConfigMap becomes a block repeated on every route that needs it. Behaviour changes too: HAProxy's errorfiles replace only the errors HAProxy itself generates, while <code>errorPages</code> turn on <code>proxy_intercept_errors</code> for the route, so an application's own response with a listed code is replaced as well. On an Ingress, <code>nginx.org/custom-http-errors</code> <span class="badge badge-new">New v5.6.0</span> is the alternative: it sends the listed codes to the Ingress's <code>spec.defaultBackend</code>, so the pages come from a Service you run rather than from inline bodies.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--configmap-tcp-services</code></td>
@@ -6233,7 +6251,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--disable-ingress-status-update</code></td>
-                            <td>Not needed — already the NGINX Ingress Controller default</td>
+                            <td>Leave out <code>-report-ingress-status</code> (Helm <code>controller.reportIngressStatus.enable=false</code>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -6241,14 +6259,12 @@ spec:
   - --disable-ingress-status-update  # status is ON by default</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>args:
   - -nginx-configmaps=$(POD_NAMESPACE)/nginx-config
-  # Nothing to add — NGINX Ingress Controller
-  # never updates status unless asked. The
-  # opposite (status on) is what takes flags:
-  #   -report-ingress-status
-  #   -external-service=nginx-ingress   # or -ingresslink
-  #   -enable-leader-election           # default true</code></pre></div>
+  # Status updates come from -report-ingress-status, which the
+  # manifests and the Helm chart both set: drop it (and its
+  # -external-service / -ingresslink) to turn them off.
+  # Helm: --set controller.reportIngressStatus.enable=false</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HAProxy updates status by default; NGINX Ingress Controller does not — HAProxy's opt-out is already NGINX Ingress Controller's default (no flag). For the on case use <code>-report-ingress-status</code> + <code>-external-service</code>/<code>-ingresslink</code> and leader election.</div>
+                            <div class="info-box note"><strong>Note:</strong> The binary's default is off, but NGINX Ingress Controller's manifests pass <code>-report-ingress-status -external-service=nginx-ingress</code>, and the Helm chart sets <code>controller.reportIngressStatus.enable: true</code>, so an install updates status unless you turn it off as above.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--disable-ipv6</code></td>
@@ -6764,7 +6780,7 @@ spec:
 # hostNetwork with a nodeSelector. -disable-ipv6
 # drops the IPv6 side entirely.</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX binds <code>0.0.0.0</code> / IPv6 by default — restrict at the Service/host-network level. <code>-disable-ipv6</code> drops IPv6 entirely.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> the default HTTP and HTTPS listeners, and every Ingress, bind all addresses (<code>0.0.0.0</code> and IPv6) — restrict at the Service/host-network level. <code>-disable-ipv6</code> drops IPv6 entirely. A GlobalConfiguration listener does take an <code>ipv4</code> and <code>ipv6</code> address, for the VirtualServers and TransportServers that name it.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--job-check-crd</code></td>

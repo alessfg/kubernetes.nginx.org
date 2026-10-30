@@ -790,7 +790,7 @@
                 ctx.cm('real-ip-header', x.value || 'X-Forwarded-For', src(x, 'src-ip-header'));
                 ctx.cm('set-real-ip-from', '10.0.0.0/8', 'TODO: the proxies you trust (src-ip-header)');
                 ctx.todo('configmap.set-real-ip-from', 'the CIDRs of the proxies in front of NGINX Ingress Controller (HAProxy trusted the header from any client)');
-                ctx.note('src-ip-header', 'Real-IP settings are global in NGINX Ingress Controller (ConfigMap), so the header applies to every application, not only this Ingress.');
+                ctx.note('src-ip-header', 'Real-IP settings are global in NGINX Ingress Controller (ConfigMap), so the header applies to every application, not only this Ingress. With -enable-tls-passthrough on, NGINX Ingress Controller ignores real-ip-header (it reads the client address from the PROXY header instead), so turn passthrough on only if ssl-passthrough is migrated.');
             },
 
             // backendForwardedFor.go: GetBoolValue; an error leaves the
@@ -2478,6 +2478,17 @@
                         break;
                     }
                     case 'balance': { let m = haproxyLbMethod(balanceString(v)); if (m.value && !m.invalid) g.cm('lb-method', m.value, label + ' balance' + (m.note ? ' — ' + m.note : '')); else g.note(label, 'balance: ' + (m.none || m.invalid), 'warning'); break; }
+                    // The proxy timeouts cover upgraded connections too: there is no
+                    // tunnel-only key (the ConfigMap timeout-tunnel maps the same way).
+                    case 'tunnel-timeout': {
+                        let t = msToNginxTime(v);
+                        if (!t) { g.note(label, raw + ' "' + v + '" is not a count of milliseconds; it is not migrated.', 'warning'); break; }
+                        g.cm('proxy-read-timeout', t.value, label + ' tunnel_timeout — no tunnel-only timeout, so this raises it for all upstream traffic');
+                        g.cm('proxy-send-timeout', t.value, label + ' tunnel_timeout');
+                        g.note(label, 'tunnel_timeout becomes the proxy timeouts, which cover WebSocket and every other request: set read-timeout and send-timeout per VirtualServer upstream where only some backends hold connections open.', 'warning');
+                        break;
+                    }
+                    case 'queue-timeout': g.note(label, 'queue_timeout is the NGINX Plus VirtualServer upstreams[].queue.timeout (with max-conns); NGINX Open Source rejects a queue and answers at once.', 'warning'); break;
                     case 'retries': g.note(label, 'retries is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream-tries, or VirtualServer upstreams[].next-upstream-tries, which counts the first attempt too, so set it to ' + ((haproxyInt(v) || 0) + 1) + ' for retries ' + v + '.'); break;
                     case 'redispatch': g.note(label, 'Retrying on another server is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream (default "error timeout").'); break;
                     case 'httplog': case 'log-format': g.cm('log-format', LOG_FORMAT_HTTP, label + ' ' + raw + ' — TODO: rewrite as NGINX variables'); g.todo('configmap.log-format', 'rewrite the Defaults log format with NGINX variables'); break;

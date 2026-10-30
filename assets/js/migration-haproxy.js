@@ -676,6 +676,13 @@
             return a;
         }
 
+        // ingress.go Update / service.SetDefaultBackend: HAProxy makes an
+        // Ingress's defaultBackend the default backend of its http and https
+        // frontends, for every unmatched request on any host (the last Ingress
+        // processed wins). NGINX Ingress Controller uses it only as the "/" of
+        // that Ingress's own hosts (ingress.go, v5.7.0).
+        let DEFAULT_BACKEND_NOTE = 'HAProxy sent every request no rule matched, on any host, to spec.defaultBackend; NGINX Ingress Controller uses it only for this Ingress\'s own hosts, as their "/" when no path covers it, and answers other unmatched requests with 404.';
+
         // NGINX Ingress Controller takes a session cookie name of letters,
         // digits and underscores only (validation isCookieName, v5.7.0).
         let COOKIE_NAME_RULE = 'NGINX Ingress Controller takes a session cookie name of letters, digits and underscores only (no "-" or "."), so the cookie is not migrated; rename it, and expect clients to lose their pinning once.';
@@ -1788,8 +1795,11 @@
                 upstreamField(f, service, 'read-timeout', st.value, label + ' server_timeout (milliseconds)');
                 upstreamField(f, service, 'send-timeout', st.value, label + ' server_timeout covers both directions');
             }
+            // HAProxy's retries counts the attempts after the first; NGINX's
+            // next-upstream-tries counts every attempt, the first included
+            // (verified on nginx 1.31.7: tries 3 reached three servers).
             let retries = haproxyInt(get(['retries']));
-            if (retries !== null && retries >= 0) upstreamField(f, service, 'next-upstream-tries', retries, label + ' retries');
+            if (retries !== null && retries >= 0) upstreamField(f, service, 'next-upstream-tries', retries + 1, label + ' retries ' + retries + ' + the first attempt');
             let cookie = get(['cookie']);
             let cookieName = cookie === undefined ? null : str((isMap(cookie) ? cookie.name : cookie) || 'SERVERID');
             if (cookieName !== null && cookieNameOk(cookieName)) upstreamField(f, service, 'sessionCookie', { enable: true, name: cookieName, path: '/' }, label + ' cookie');
@@ -2020,7 +2030,7 @@
                 comments.push(c);
             });
             if (model.hostless.length) ctx.note('host', model.hostless.length + ' path(s) belong to a rule with no host; a VirtualServer needs a host, so they are not migrated.', 'warning');
-            if (model.defaultBackend) ctx.note('default-backend', 'spec.defaultBackend has no VirtualServer equivalent; requests for unknown paths get 404. Keep an Ingress for it, or add a catch-all route.', 'warning');
+            if (model.defaultBackend) ctx.note('default-backend', DEFAULT_BACKEND_NOTE + ' A VirtualServer has no defaultBackend: keep an Ingress for it (annotation-first), or add a catch-all route.', 'warning');
             if (f.policies.some(function(p) { return p.plus; })) ctx.note('modsecurity', 'The waf Policy needs NGINX Plus with F5 WAF for NGINX.', 'warning');
             return { docs: docs, comments: comments };
         }
@@ -2144,6 +2154,7 @@
             };
             if (spec.backend && !spec.defaultBackend) { spec.defaultBackend = spec.backend; delete spec.backend; }
             if (spec.defaultBackend) spec.defaultBackend = v1Backend(spec.defaultBackend);
+            if (spec.defaultBackend) ctx.note('default-backend', DEFAULT_BACKEND_NOTE + (Array.isArray(spec.rules) && spec.rules.length ? '' : ' This Ingress has no rules, which NGINX Ingress Controller rejects: give it a rule, host-less with -allow-empty-ingress-host for a catch-all.'), 'warning');
             let canaryServices = f.canary.map(function(c) { return c.service; });
             // A route-acl Service's own rule carried only HAProxy's custom route
             // (route.go AddCustomRoute adds no map entry for it); kept, it
@@ -2277,7 +2288,12 @@
                 g.cm('log-format', LOG_FORMAT_HTTP, 'TODO: log-format, in NGINX variables');
                 g.todo('configmap.log-format', 'rewrite the HAProxy log-format "' + x.value + '" with NGINX variables (%ci is $remote_addr, %ST is $status, %Tr is $upstream_response_time)');
             },
-            'log-format-tcp': function(x, g) {
+            // tcp-services.go reads log-format-tcp from the tcp-services
+            // ConfigMap only (--configmap-tcp-services); in the controller
+            // ConfigMap HAProxy ignores it.
+            'log-format-tcp': function(x, g, run) {
+                let inTcp = run.configMaps.some(function(c) { return c.tcp.length && c.options['log-format-tcp']; });
+                if (!inTcp) { g.note('log-format-tcp', 'HAProxy reads log-format-tcp only from the tcp-services ConfigMap (the one --configmap-tcp-services names), so in the controller ConfigMap it did nothing; nothing is migrated.', 'warning'); return; }
                 g.cm('stream-log-format', LOG_FORMAT_TCP, 'TODO: log-format-tcp');
                 g.todo('configmap.stream-log-format', 'rewrite the HAProxy log-format-tcp "' + x.value + '" with NGINX stream variables');
             },
@@ -2449,7 +2465,7 @@
                         break;
                     }
                     case 'balance': { let m = haproxyLbMethod(balanceString(v)); if (m.value && !m.invalid) g.cm('lb-method', m.value, label + ' balance' + (m.note ? ' — ' + m.note : '')); else g.note(label, 'balance: ' + (m.none || m.invalid), 'warning'); break; }
-                    case 'retries': g.note(label, 'retries is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream-tries, or VirtualServer upstreams[].next-upstream-tries.'); break;
+                    case 'retries': g.note(label, 'retries is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream-tries, or VirtualServer upstreams[].next-upstream-tries, which counts the first attempt too, so set it to ' + ((haproxyInt(v) || 0) + 1) + ' for retries ' + v + '.'); break;
                     case 'redispatch': g.note(label, 'Retrying on another server is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream (default "error timeout").'); break;
                     case 'httplog': case 'log-format': g.cm('log-format', LOG_FORMAT_HTTP, label + ' ' + raw + ' — TODO: rewrite as NGINX variables'); g.todo('configmap.log-format', 'rewrite the Defaults log format with NGINX variables'); break;
                     case 'tcplog': g.cm('stream-log-format', LOG_FORMAT_TCP, label + ' tcplog — TODO: rewrite as NGINX stream variables'); break;

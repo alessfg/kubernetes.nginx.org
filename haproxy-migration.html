@@ -238,11 +238,13 @@
             <div class="install-box"><h3>Helm (example)</h3>
                 <pre><code>helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress \
   --set controller.ingressClass.name=nginx \
+  --set controller.config.name=nginx-config \
   --set controller.enableSnippets=true \
   --set controller.enableTLSPassthrough=true</code></pre>
             </div>
             <p>Keep only the flags your migrated resources need:</p>
             <ul class="doc-list">
+                <li><strong><code>controller.config.name</code></strong> &mdash; The examples on this page write the ConfigMap <code>nginx-config</code>, the name the manifests install. The chart names it after the release instead (<code>nginx-ingress</code> for this command) unless this is set, and NGINX Ingress Controller reads only the ConfigMap its <code>-nginx-configmaps</code> flag names, so keys written to any other one are silently unused.</li>
                 <li><strong><code>controller.enableSnippets</code></strong> &mdash; Off by default. With it off, NGINX Ingress Controller rejects any resource that carries a snippet, and every HAProxy <code>*-config-snippet</code> becomes one, as does a deny list inside an allow list. The ConfigMap snippet keys work without it.</li>
                 <li><strong><code>controller.enableTLSPassthrough</code></strong> &mdash; Off by default. <code>ssl-passthrough</code> becomes a TransportServer on the built-in <code>tls-passthrough</code> listener, which exists only with this flag.</li>
                 <li><strong><code>controller.globalConfiguration.create</code></strong> &mdash; Off by default. <code>tcp-services</code> entries and TCP custom resources become TransportServers on listeners a GlobalConfiguration declares: list them under <code>controller.globalConfiguration.spec</code>, and expose their ports on the controller Service.</li>
@@ -2852,7 +2854,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>spec.defaultBackend</code></td>
-                            <td><span class="badge badge-ingress">Ingress</span> <code>spec.defaultBackend</code> (honored 1:1)</td>
+                            <td><span class="badge badge-ingress">Ingress</span> <code>spec.defaultBackend</code> (its own hosts only)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -2873,13 +2875,26 @@ metadata:
   name: my-app
 spec:
   ingressClassName: nginx  # was haproxy
-  defaultBackend:  # honored as-is by NGINX Ingress Controller
+  defaultBackend:
     service:
       name: fallback-svc
       port:
-        number: 80</code></pre></div>
+        number: 80
+  # NGINX Ingress Controller rejects an Ingress with no rules. This host-less
+  # rule makes it the catch-all, and needs -allow-empty-ingress-host
+  # (Helm controller.allowEmptyIngressHost=true).
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fallback-svc
+                port:
+                  number: 80</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>spec.defaultBackend</code> is honored 1:1. NGINX Ingress Controller's host-less default server otherwise returns <code>404</code> (matching HAProxy's built-in). There is no <code>--default-backend-service</code> flag equivalent — a cluster-wide fallback is a host-less catch-all Ingress carrying only <code>spec.defaultBackend</code>. (The separate <code>-default-server-tls-secret</code> flag is a TLS concern, not routing.)</div>
+                            <div class="info-box warning"><strong>Scope changes:</strong> HAProxy makes an Ingress's <code>spec.defaultBackend</code> the default backend of its HTTP and HTTPS frontends, so every request no rule matches, on any host, goes there (the last Ingress processed wins). NGINX Ingress Controller uses it only for that Ingress's own hosts, as their <code>/</code> when no path covers it, and answers every other unmatched request from its default server with <code>404</code>. It also rejects an Ingress with no <code>rules</code>, so a cluster-wide fallback is a host-less rule, as above, with <code>-allow-empty-ingress-host</code>. There is no <code>--default-backend-service</code> flag equivalent. (The separate <code>-default-server-tls-secret</code> flag is a TLS concern, not routing.)</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>Wildcard host <code>*.example.com</code></td>
@@ -3926,7 +3941,7 @@ spec:
 #   annotations:
 #     nginx.org/policies: "client-mtls-policy"</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HAProxy <code>client-ca</code> Secrets carry the CA under <code>tls.crt</code>; NGINX Ingress Controller reads the bundle from <code>ca.crt</code> (optional CRL under <code>ca.crl</code>). Add that key; since v5.7.0 the Secret can stay <code>Opaque</code>. Requires TLS termination on the host (NGINX Ingress Controller ignores ingressMTLS for a TLS-disabled host). Verification failures return <strong>HTTP 400</strong> (not 500). On mergeable Ingress it must sit on the master. Ingress-attachable since v5.5.0.</div>
+                            <div class="info-box note"><strong>Note:</strong> HAProxy <code>client-ca</code> Secrets carry the CA under <code>tls.crt</code>; NGINX Ingress Controller reads the bundle from <code>ca.crt</code> (optional CRL under <code>ca.crl</code>). Add that key; since v5.7.0 the Secret can stay <code>Opaque</code>. Requires TLS termination on the host: on a host without TLS, NGINX Ingress Controller rejects the Policy and the whole host answers <code>500</code>. Verification failures return <strong>HTTP 400</strong> (not 500). On mergeable Ingress it must sit on the master. Ingress-attachable since v5.5.0.</div>
                         
                             <div class="info-box note"><strong>Note:</strong> Scope shift — HAProxy configures client mTLS controller-wide (ConfigMap); NGINX Ingress Controller's <code>ingressMTLS</code> attaches per VirtualServer (<code>spec.policies</code>) or per Ingress (<code>nginx.org/policies</code>, since v5.5.0), so apply the Policy to every host that needs it. On mergeable Ingresses it must sit on the master.</div>
                         </div></td></tr>
@@ -4291,12 +4306,15 @@ data:
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># The tcp-services ConfigMap (--configmap-tcp-services), not the
+# controller ConfigMap: HAProxy reads log-format-tcp only here.
+apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: haproxy-kubernetes-ingress
+  name: tcp-services
   namespace: haproxy-controller
 data:
+  "5432": "databases/postgres:5432"
   log-format-tcp: "%ci:%cp [%t] %ft %b/%s %B %ts"</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: v1
 kind: ConfigMap
@@ -4305,9 +4323,36 @@ metadata:
 data:
   stream-log-format: |  # TODO: log-format-tcp
     $remote_addr [$time_local] $protocol $status
-    $bytes_sent $bytes_received $session_time</code></pre></div>
+    $bytes_sent $bytes_received $session_time
+---
+apiVersion: k8s.nginx.org/v1
+kind: GlobalConfiguration
+metadata:
+  name: nginx-configuration
+  namespace: nginx-ingress
+spec:
+  listeners:
+    - name: postgres-5432-tcp
+      port: 5432
+      protocol: TCP
+---
+apiVersion: k8s.nginx.org/v1
+kind: TransportServer
+metadata:
+  name: postgres-5432
+  namespace: databases
+spec:
+  listener:  # the "5432" entry
+    name: postgres-5432-tcp
+    protocol: TCP
+  upstreams:
+    - name: backend
+      service: postgres
+      port: 5432
+  action:
+    pass: backend</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>Hand-translation required:</strong> tcplog tokens become NGINX stream <code>$</code>-variables (<code>%ci:%cp</code> → <code>$remote_addr:$remote_port</code>, <code>%B</code> → <code>$bytes_sent</code>). <code>stream-log-format</code> applies globally to <strong>all</strong> TransportServer traffic (not per TCP service).</div>
+                            <div class="info-box warning"><strong>Hand-translation required:</strong> tcplog tokens become NGINX stream <code>$</code>-variables (<code>%ci:%cp</code> → <code>$remote_addr:$remote_port</code>, <code>%B</code> → <code>$bytes_sent</code>). <code>stream-log-format</code> applies globally to <strong>all</strong> TransportServer traffic (not per TCP service). HAProxy reads <code>log-format-tcp</code> only from the tcp-services ConfigMap; in the controller ConfigMap it does nothing, and TCP custom resources set their own format.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>syslog-server</code></td>
@@ -4803,7 +4848,7 @@ spec:
       connect-timeout: 5s  # connect_timeout (ms)
       read-timeout: 50s  # server_timeout (ms)
       send-timeout: 50s  # server_timeout covers both directions
-      next-upstream-tries: 3  # retries
+      next-upstream-tries: 4  # retries 3 + the first attempt
       sessionCookie:
         enable: true
         name: SERVERID  # cookie
@@ -4967,14 +5012,14 @@ spec:
     - name: backend
       service: app-svc
       port: 80
-      next-upstream-tries: 3  # retries
+      next-upstream-tries: 4  # retries 3 + the first attempt
       next-upstream: "error timeout http_502 http_503 http_504"  # retry_on
   routes:
     - path: /
       action:
         pass: backend</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>retries</code> → <code>next-upstream-tries</code>; <code>redispatch</code>/<code>retry_on</code> → <code>next-upstream</code> (NGINX default <code>"error timeout"</code>). HAProxy retry conditions are bare status codes; NGINX names them <code>http_5xx</code>-style, and only from its fixed vocabulary.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>retries</code> → <code>next-upstream-tries</code> plus one: HAProxy counts the retries after the first attempt, NGINX every attempt (verified on nginx 1.31.7); <code>redispatch</code>/<code>retry_on</code> → <code>next-upstream</code> (NGINX default <code>"error timeout"</code>). HAProxy retry conditions are bare status codes; NGINX names them <code>http_5xx</code>-style, and only from its fixed vocabulary.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>acl_list</code> / <code>http_request_rule_list</code> / <code>server_switching_rule_list</code> / <code>stick_table</code></td>
@@ -5300,10 +5345,10 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/proxy-next-upstream-tries: "3"  # retries
-    # VirtualServer: upstreams[].next-upstream-tries: 3</code></pre></div>
+    nginx.org/proxy-next-upstream-tries: "4"  # retries 3 + the first attempt
+    # VirtualServer: upstreams[].next-upstream-tries: 4</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Retries are per-resource in NGINX Ingress Controller — <code>nginx.org/proxy-next-upstream-tries</code> (or VirtualServer <code>upstreams[].next-upstream-tries</code>). No global ConfigMap key.</div>
+                            <div class="info-box note"><strong>Note:</strong> Retries are per-resource in NGINX Ingress Controller — <code>nginx.org/proxy-next-upstream-tries</code> (or VirtualServer <code>upstreams[].next-upstream-tries</code>). No global ConfigMap key. It counts every attempt, the first included, where HAProxy's <code>retries</code> counts only the retries, so add one.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>queue_timeout</code> / <code>tunnel_timeout</code> / <code>*_fin_timeout</code> / <code>check_timeout</code> / <code>compression</code> / <code>error_files</code></td>
@@ -6448,7 +6493,7 @@ spec:
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --default-backend-port=6061  # HAProxy default</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No flag — the port is a field on the catch-all resource:
-#   Ingress spec.defaultBackend.service.port.number
+#   its rule's backend.service.port.number
 # (the --default-backend-service row has the full manifest)
 #
 # NGINX Ingress Controller's own service ports
@@ -6458,7 +6503,7 @@ args:
   - -prometheus-metrics-listen-port=9113  # /metrics
   - -ready-status-port=8081               # /nginx-ready</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> set the port on the catch-all <code>spec.defaultBackend.service.port</code>. HAProxy keeps its own controller endpoints (Prometheus, pprof) on the separate <code>--controller-port</code> (6060) and this backend port at 6061; NGINX Ingress Controller splits its endpoints across three ports instead — status 8080, metrics 9113, readiness 8081.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> set the port on the catch-all Ingress's backend. HAProxy keeps its own controller endpoints (Prometheus, pprof) on the separate <code>--controller-port</code> (6060) and this backend port at 6061; NGINX Ingress Controller splits its endpoints across three ports instead — status 8080, metrics 9113, readiness 8081.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--default-backend-service</code></td>
@@ -6468,22 +6513,28 @@ args:
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --default-backend-service=haproxy-controller/default-backend</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No flag — deploy a host-less catch-all instead.
-# Without one, NGINX Ingress Controller's default
-# server answers unmatched requests with 404.
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No flag — deploy a host-less catch-all instead, which needs
+# -allow-empty-ingress-host (Helm controller.allowEmptyIngressHost=true).
+# Without one, NGINX Ingress Controller's default server
+# answers unmatched requests with 404.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: default-backend
 spec:
   ingressClassName: nginx
-  defaultBackend:
-    service:
-      name: default-backend-svc
-      port:
-        number: 80</code></pre></div>
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: default-backend-svc
+                port:
+                  number: 80</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> no NGINX Ingress Controller flag routes unmatched traffic to a Service — deploy a host-less catch-all Ingress with <code>spec.defaultBackend</code> (or a catch-all VirtualServer). NGINX Ingress Controller's default server returns 404.</div>
+                            <div class="info-box warning"><strong>No direct equivalent:</strong> no NGINX Ingress Controller flag routes unmatched traffic to a Service — deploy a host-less catch-all Ingress (it must have a rule: NGINX Ingress Controller rejects an Ingress with only <code>spec.defaultBackend</code>), with <code>-allow-empty-ingress-host</code> on. NGINX Ingress Controller's default server returns 404.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--disable-http</code></td>

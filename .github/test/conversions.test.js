@@ -396,3 +396,13 @@ test('a canary leg applies under its own path only', () => {
     assert.ok(routes.find((r) => r.path === '/beta').matches, '/beta carries the canary');
     assert.equal(routes.find((r) => r.path === '/').matches, undefined, '/ does not');
 });
+
+test('a Backend CR\'s retries becomes next-upstream-tries plus one', () => {
+    /* HAProxy's retries counts the attempts after the first (configuration.txt
+       3.2, "retries"); NGINX's proxy_next_upstream_tries counts every attempt
+       (nginx 1.31.7: tries 3 reached three servers). A one-to-one copy made
+       one attempt fewer. */
+    const backend = Y.stringify({ apiVersion: 'ingress.v3.haproxy.org/v3', kind: 'Backend', metadata: { name: 'be' }, spec: { retries: 3 } });
+    const r = run(stream(ingressWith({}), service('app-svc', { 'haproxy.org/cr-backend': 'be' }), backend));
+    assert.equal(kinds(r, 'VirtualServer')[0].spec.upstreams[0]['next-upstream-tries'], 4);
+});

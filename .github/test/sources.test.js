@@ -36,6 +36,27 @@ for (const mod of MODULES) {
         }
     });
 
+    test(`${mod.name}: defines every property migration-core.js reads off MIGRATION_SOURCE`, () => {
+        /* test-analyzer.js holds the contract and runs it for ingress-nginx
+           only; this reads its list, so the two cannot drift, and runs it for
+           every source. The end-of-life banner is optional: migration-core.js
+           returns when eolCompact is absent, and only an archived source has
+           one. A missing property renders a blank panel, not an error. */
+        const fs = require('node:fs');
+        const path = require('node:path');
+        const script = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'test-analyzer.js'), 'utf8');
+        const list = script.match(/const CONTRACT = \[([\s\S]*?)\n\];/);
+        assert.ok(list, 'could not read CONTRACT out of test-analyzer.js');
+        const keys = [...list[1].replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/'([^']+)'/g)].map((m) => m[1]);
+        assert.ok(keys.length > 20, keys.length + ' keys read');
+        const OPTIONAL = /^(eolCompact\.|storage\.eolCollapsed$)/;
+        const { source } = loadAnalyzer(mod.file);
+        const dig = (o, k) => k.split('.').reduce((acc, p) => (acc == null ? acc : acc[p]), o);
+        const missing = keys.filter((k) => !OPTIONAL.test(k) && (dig(source, k) === undefined || dig(source, k) === null));
+        assert.deepEqual(missing, []);
+        if (source.eolCompact) assert.ok(source.storage.eolCollapsed, 'an end-of-life banner needs its storage key');
+    });
+
     test(`${mod.name}: empty and foreign input produce no findings and no warnings`, () => {
         const { source, warnings } = loadAnalyzer(mod.file);
         for (const input of ['', 'apiVersion: v1\nkind: Service\nmetadata:\n  name: plain\nspec:\n  ports:\n    - port: 80']) {

@@ -164,3 +164,141 @@ test('each card shows the HAProxy objects behind its own resource', () => {
     const rl = items.find((it) => /rate-limit$/.test(it.category)).old.yaml;
     assert.deepEqual(rl.match(/haproxy\.org\/[a-z-]+/g).sort(), ['haproxy.org/rate-limit-period', 'haproxy.org/rate-limit-requests', 'haproxy.org/rate-limit-status-code']);
 });
+
+/* Every mapped key, under every value that tells HAProxy's readers apart, under
+   both strategies. HAProxy never rejects an Ingress over a value: it logs and
+   keeps what it had, so a value it could not read must migrate to nothing, and
+   what does migrate must pass NGINX Ingress Controller v5.7.0's own checks
+   (internal/k8s/validation.go, pkg/apis/configuration/validation, configmaps.go).
+   The analyzer used to copy "5 seconds" into proxy-read-timeout and
+   "10.0.0.0/8, bogus" into an accessControl Policy, both refused. */
+const SPREAD = ['', 'true', 'false', 't', '1', 'on', 'yes', 'off', '0', '-1', '5', '100abc', '5 seconds', '500us', '30s', 'x y z',
+    '10.0.0.0/8, bogus', 'https://a.com,https://b.com', 'Cookie', 'GET,FOO', '302', 'default/name'];
+const nicTime = (s) => typeof s === 'string' && s.trim() !== '' && /^(\d+y)??\s*(\d+M)??\s*(\d+w)??\s*(\d+d)??\s*(\d+h)??\s*(\d+m)??\s*(\d+s?)??\s*(\d+ms)??$/.test(s);
+const nicLb = (s) => ['round_robin', 'least_conn', 'ip_hash', 'random', 'random two', 'random two least_conn', 'least_time header', 'least_time last_byte', 'least_time header inflight', 'least_time last_byte inflight'].includes(s) || /^hash \S+( consistent)?$/.test(s);
+const nicAddress = (s) => /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(s) || (/^[0-9a-fA-F:.]+(\/\d{1,3})?$/.test(s) && s.includes(':'));
+const nicHeader = /^[-A-Za-z0-9!#$%&'*+.^_`|~]+$/;
+function refused(d) {
+    const out = [];
+    const ann = (d.metadata && d.metadata.annotations) || {};
+    const check = (k, ok) => { if (k in ann && !ok(String(ann[k]))) out.push(k + '=' + ann[k]); };
+    ['nginx.org/proxy-read-timeout', 'nginx.org/proxy-send-timeout', 'nginx.org/proxy-connect-timeout'].forEach((k) => check(k, nicTime));
+    ['nginx.org/max-conns', 'nginx.org/max-fails'].forEach((k) => check(k, (v) => /^\d+$/.test(v)));
+    check('nginx.org/lb-method', nicLb);
+    ['nginx.org/ssl-redirect', 'nginx.org/redirect-to-https'].forEach((k) => check(k, (v) => /^(1|t|T|TRUE|true|True|0|f|F|FALSE|false|False)$/.test(v)));
+    check('nginx.org/http-redirect-code', (v) => ['301', '302', '307', '308'].includes(v));
+    check('nginx.org/limit-req-burst', (v) => /^\d+$/.test(v) && v !== '0');
+    check('nginx.org/limit-req-reject-code', (v) => +v >= 400 && +v <= 599);
+    ['nginx.org/proxy-set-headers', 'nginx.org/add-header'].forEach((k) => check(k, (v) => v.split(',').every((e) => nicHeader.test(e.split(':')[0].trim()))));
+    const s = d.spec || {};
+    if (d.kind === 'Policy') {
+        const rl = s.rateLimit;
+        if (rl && (rl.burst !== undefined && !(rl.burst > 0) || rl.rejectCode < 400 || rl.rejectCode > 599)) out.push('rateLimit ' + JSON.stringify(rl));
+        const ac = s.accessControl;
+        if (ac) [].concat(ac.allow || [], ac.deny || []).filter((x) => !nicAddress(String(x))).forEach((x) => out.push('accessControl ' + x));
+        const c = s.cors;
+        if (c) {
+            (c.allowHeaders || []).filter((h) => h !== '*' && (!nicHeader.test(h) || /^(cookie|host|origin|connection|referer|set-cookie|proxy-.*|sec-.*)$/i.test(h))).forEach((h) => out.push('cors header ' + h));
+            (c.allowMethods || []).filter((m) => !['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'].includes(m)).forEach((m) => out.push('cors method ' + m));
+            (c.allowOrigin || []).filter((o) => o !== '*' && !/^https?:\/\/[^/\s]+$/.test(o)).forEach((o) => out.push('cors origin ' + o));
+        }
+    }
+    if (d.kind === 'VirtualServer') {
+        for (const u of s.upstreams || []) {
+            ['read-timeout', 'send-timeout', 'connect-timeout'].forEach((f) => { if (u[f] !== undefined && !nicTime(String(u[f]))) out.push('upstream ' + f + '=' + u[f]); });
+            if (u['lb-method'] !== undefined && !nicLb(u['lb-method'])) out.push('upstream lb-method=' + u['lb-method']);
+            if (u['max-conns'] !== undefined && !(u['max-conns'] >= 0)) out.push('upstream max-conns=' + u['max-conns']);
+            if (u.sessionCookie && !/^[_A-Za-z0-9]+$/.test(u.sessionCookie.name)) out.push('sessionCookie.name=' + u.sessionCookie.name);
+            if (u.healthCheck) ['interval', 'read-timeout'].forEach((f) => { if (u.healthCheck[f] !== undefined && !nicTime(String(u.healthCheck[f]))) out.push('healthCheck ' + f + '=' + u.healthCheck[f]); });
+        }
+        if (s.tls && s.tls.redirect && ![301, 302, 307, 308].includes(s.tls.redirect.code)) out.push('tls.redirect.code=' + s.tls.redirect.code);
+    }
+    if (d.kind === 'ConfigMap') {
+        const data = d.data || {};
+        ['proxy-read-timeout', 'proxy-send-timeout', 'proxy-connect-timeout', 'keepalive-timeout', 'worker-shutdown-timeout'].forEach((k) => { if (k in data && !nicTime(String(data[k]))) out.push(k + '=' + data[k]); });
+        ['worker-connections', 'keepalive'].forEach((k) => { if (k in data && !/^\d+$/.test(String(data[k]))) out.push(k + '=' + data[k]); });
+        if ('worker-processes' in data && !/^(\d+|auto)$/.test(String(data['worker-processes']))) out.push('worker-processes=' + data['worker-processes']);
+        if ('lb-method' in data && !nicLb(data['lb-method'])) out.push('lb-method=' + data['lb-method']);
+        // http-snippets reach nginx.conf unchecked: a bad time there fails the
+        // reload for every resource on the controller.
+        String(data['http-snippets'] || '').split('\n').forEach((l) => { const m = l.match(/^\s*(\w+_timeout)\s+(.*);$/); if (m && !nicTime(m[2])) out.push('http-snippets ' + l.trim()); });
+    }
+    return out;
+}
+
+test('every value of every key migrates to something NGINX Ingress Controller accepts, or to a note', () => {
+    const broken = [];
+    let runs = 0;
+    const inputs = ANNOTATIONS.flatMap((k) => SPREAD.map((v) => ({ at: k + '="' + v + '"', yaml: ingress({ ['haproxy.org/' + k]: v }) })))
+        .concat(CONFIGMAP.flatMap((k) => SPREAD.map((v) => ({ at: 'ConfigMap ' + k + '="' + v + '"', yaml: ingress({}) + '---\n' + configMap({ [k]: v }) }))));
+    for (const c of inputs) for (const strategy of ['crd', 'annotation']) {
+        runs++;
+        const r = run(c.yaml, strategy);
+        for (const d of r.docs) if (d) for (const e of refused(d)) broken.push(c.at + ' / ' + strategy + ': ' + e);
+        const said = JSON.stringify(r.plan.infoNotes);
+        if (/did not say why/.test(said)) broken.push(c.at + ' / ' + strategy + ': lost');
+        if (/undefined|NaN|\[object Object\]/.test(r.text + said)) broken.push(c.at + ' / ' + strategy + ': undefined or NaN in the output');
+    }
+    assert.ok(runs > 3000, runs + ' runs');
+    assert.deepEqual(broken.slice(0, 40), [], broken.length + ' problems');
+});
+
+test('each value is read as HAProxy v3.2.12 reads it', () => {
+    /* The readers differ per annotation (pkg/annotations, pkg/utils): booleans
+       are utils.GetBoolValue (ParseBool plus on/off/enabled/disabled, not
+       "yes"), or annotations.Bool (only "true"), or input == "true"; times are
+       utils.ParseTime (an int64 and one suffix, bare is milliseconds); the
+       gates are the processors' own. Each row: an input, then what the
+       migration must, and must not, contain. */
+    const ROWS = [
+        ['cors-enable yes is not a boolean: no CORS', { 'cors-enable': 'yes' }, null, /kind: Policy/],
+        ['cors-enable t is true', { 'cors-enable': 't' }, /cors:/, null],
+        ['cors-max-age 1500 is 1s, truncated', { 'cors-enable': 'true', 'cors-max-age': '1500' }, /maxAge: 1 /, null],
+        ['an unknown CORS method voids the methods header', { 'cors-enable': 'true', 'cors-allow-methods': 'GET, FOO' }, null, /allowMethods/],
+        ['ssl-redirect yes: no redirect, TLS or not', { 'ssl-redirect': 'yes' }, null, /redirect:/],
+        ['ssl-redirect t: a redirect', { 'ssl-redirect': 't' }, /redirect:[\s\S]*enable: true/, null],
+        ['ssl-passthrough 1: off (annotations.Bool)', { 'ssl-passthrough': '1' }, /kind: VirtualServer/, /TransportServer/],
+        ['server-ssl yes: plaintext', { 'server-ssl': 'yes' }, null, /tls:\s*# server-ssl/],
+        ['check t: checks on, so no max-fails 0', { check: 't' }, null, /max-fails/],
+        ['check off: max-fails 0', { check: 'off' }, /max-fails: 0/, null],
+        ['forwarded-for 0: false', { 'forwarded-for': '0' }, /disable-forwarded-headers/, null],
+        ['auth-secret without auth-type: no authentication', { 'auth-secret': 'users' }, null, /basicAuth|basic-auth-secret/],
+        ['an unset realm is Protected-Content', { 'auth-type': 'basic-auth', 'auth-secret': 'users' }, /realm: Protected-Content/, null],
+        ['spaces in a realm become dashes', { 'auth-type': 'basic-auth', 'auth-secret': 'users', 'auth-realm': 'Members Only' }, /realm: Members-Only/, null],
+        ['both cookie annotations: no cookie', { 'cookie-persistence': 'A', 'cookie-persistence-no-dynamic': 'B' }, null, /sessionCookie/],
+        ['a bad address voids the allow-list', { 'allow-list': '10.0.0.0/8, nope' }, null, /accessControl/],
+        ['rate-limit-requests 100r does not parse: no limit', { 'rate-limit-requests': '100r' }, null, /rateLimit/],
+        ['rate-limit-requests 1: no burst field', { 'rate-limit-requests': '1' }, /rate: "?1r\/s/, /burst/],
+        ['a status code HAProxy cannot send falls back to 403', { 'rate-limit-requests': '5', 'rate-limit-status-code': '302' }, /rejectCode: 403/, null],
+        ['timeout-server 5 seconds: nothing', { 'timeout-server': '5 seconds' }, null, /read-timeout/],
+        ['timeout-server 500us: ParseTime has no microseconds', { 'timeout-server': '500us' }, null, /read-timeout/],
+        ['load-balance random is two draws', { 'load-balance': 'random' }, /lb-method: random two/, null],
+        ['load-balance ROUNDROBIN is invalid, so roundrobin', { 'load-balance': 'ROUNDROBIN' }, /lb-method: round_robin/, null],
+        ['pod-maxconn 100abc: nothing', { 'pod-maxconn': '100abc' }, null, /max-conns/],
+        ['check false stops check-http', { check: 'false', 'check-http': '/healthz' }, null, /healthCheck/],
+        ['a request-redirect-code HAProxy refuses: no redirect', { 'request-redirect': 'example.com', 'request-redirect-code': '305' }, null, /redirect:\s*\n\s*url/]
+    ];
+    const broken = [];
+    for (const [label, ann, want, not] of ROWS) {
+        const r = run(ingress(Object.fromEntries(Object.entries(ann).map(([k, v]) => ['haproxy.org/' + k, v]))), 'crd');
+        if (want && !want.test(r.text)) broken.push(label + ': missing ' + want);
+        if (not && not.test(r.text)) broken.push(label + ': has ' + not);
+        if (!r.plan.infoNotes.some((n) => Object.keys(ann).some((k) => n.code.includes(k) || n.message.includes(k))) && !want) broken.push(label + ': says nothing');
+    }
+    const cm = (data) => run(ingress({}) + '---\n' + configMap(data), 'crd');
+    if (/basicAuth|ingressMTLS/.test(cm({ 'client-crt-optional': 'true' }).text)) broken.push('client-crt-optional without client-ca made a Policy');
+    if (!/verifyClient: "?on/.test(cm({ 'client-ca': 'ca', 'client-crt-optional': '1' }).text)) broken.push('client-crt-optional 1 relaxed verification (annotations.Bool)');
+    if (/client_\w+_timeout 5 seconds/.test(cm({ 'timeout-client': '5 seconds' }).text)) broken.push('timeout-client 5 seconds reached http-snippets');
+    if (/worker-connections/.test(cm({ maxconn: 'lots' }).text)) broken.push('maxconn lots reached nginx-config');
+    assert.deepEqual(broken, []);
+});
+
+test('a backend checked with server-ca names the certificate name NGINX checks', () => {
+    /* HAProxy's server-ca verifies the chain only (service/ca.go: verify
+       required, no verifyhost). NGINX with verifyServer also checks the name
+       against proxy_ssl_name, $proxy_host unless sslName is set — the
+       VirtualServer upstream name, which no certificate carries. */
+    const r = run(ingress({ 'haproxy.org/server-ca': 'default/backend-ca' }), 'crd');
+    assert.match(r.text, /sslName: web\.default\.svc|sslName: web\.svc/);
+    assert.ok(r.plan.infoNotes.some((n) => /checks its name/.test(n.message)), 'the name check is called out');
+});

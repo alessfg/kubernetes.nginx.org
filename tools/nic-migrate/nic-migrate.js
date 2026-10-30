@@ -499,14 +499,14 @@ function main() {
         // The engine analyzes the parsed object, re-emitted: what it reads is
         // exactly what was parsed, whatever the input's form.
         const result = engine.analyze(yaml.stringifyAll([doc].concat(own)), strategy);
-        return { desc, result, sourceFile, gaps: sortGaps(detect(desc, result)) };
+        return { desc, result, sourceFile, gaps: sortGaps(detect(desc, result, srcInfo)) };
     });
     // A run with no unit but global settings (a ConfigMap or CRs alone) is
     // still reported, as the page reports it.
     if (!items.length && context.length) {
         const result = engine.analyze(yaml.stringifyAll(context), strategy);
         const desc = { kind: 'controller', name: 'controller settings', namespace: null, ingressClassName: null, classAnnotation: null, hosts: [], paths: 0, services: [], hasTls: false, tlsSecrets: [], annotations: context.map((d) => d.kind) };
-        items.push({ desc, result, sourceFile: null, gaps: sortGaps(detect(desc, result)) });
+        items.push({ desc, result, sourceFile: null, gaps: sortGaps(detect(desc, result, srcInfo)) });
     }
 
     if (!items.length) {

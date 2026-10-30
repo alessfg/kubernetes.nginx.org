@@ -820,6 +820,32 @@ test('haproxy: the analyzer produces a plan for an annotated Ingress', () => {
     assert.match(r.yaml, /lb-method: "?least_conn/);
 });
 
+test('haproxy: an unmapped annotation is named as a gap, and snippets warn about HAProxy directives', () => {
+    /* The gap read unknown keys with ingress-nginx's prefix only, so under
+       --source haproxy the report counted "1 unrecognized" and named none; the
+       snippet gap blamed ingress-nginx's modules. */
+    const hap = resolveSource('haproxy');
+    const hapEngine = createEngine('haproxy');
+    const ing = [
+        'apiVersion: networking.k8s.io/v1', 'kind: Ingress', 'metadata:', '  name: web-app',
+        '  annotations:',
+        '    haproxy.org/not-a-real-annotation: "1"',
+        '    haproxy.org/backend-config-snippet: "http-send-name-header x-dst"',
+        'spec:', '  rules:', '    - host: app.example.com', '      http:', '        paths:',
+        '          - path: /', '            pathType: Prefix', '            backend:',
+        '              service:', '                name: app-svc', '                port:',
+        '                  number: 80',
+    ].join('\n');
+    const result = hapEngine.analyze(ing, 'crd');
+    const gaps = detect(describeIngress(ing, hap.prefixes), result, hap);
+    const note = gaps.find((g) => g.id === 'unrecognized');
+    assert.ok(note, 'expected unrecognized, got: ' + gaps.map((g) => g.id).join(', '));
+    assert.match(note.message, /not-a-real-annotation/);
+    const snip = gaps.find((g) => g.id === 'snippet-passthrough');
+    assert.match(snip.message, /HAProxy directives/);
+    assert.doesNotMatch(snip.message, /more_set_headers/);
+});
+
 /* HAProxy keeps an application's settings on the Ingress, the Services it
    routes to, the controller ConfigMap and its CRs, and applies them per
    backend (Service > Ingress > ConfigMap). convert hands the assembler the

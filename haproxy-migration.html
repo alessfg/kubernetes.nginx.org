@@ -795,7 +795,7 @@ metadata:
 spec:
   basicAuth:
     secret: dashboard-users  # auth-secret
-    realm: Restricted Area  # auth-realm
+    realm: Restricted-Area  # auth-realm (HAProxy turns spaces into dashes)
 ---
 apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
@@ -832,10 +832,10 @@ metadata:
   name: my-app
   annotations:
     nginx.org/basic-auth-secret: "dashboard-users"  # auth-secret
-    nginx.org/basic-auth-realm: "Restricted Area"  # auth-realm</code></pre></div>
+    nginx.org/basic-auth-realm: "Restricted-Area"  # auth-realm (HAProxy turns spaces into dashes)</code></pre></div>
                                 </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HAProxy defaults the realm to <code>Protected Content</code> when basic auth is active; NGINX Ingress Controller emits no realm unless you set one — set it explicitly to preserve the browser prompt text. See the <code>auth-secret</code> row for the full setup.</div>
+                            <div class="info-box note"><strong>Note:</strong> HAProxy replaces every space in the realm with a dash, so <code>Restricted Area</code> reached browsers as <code>Restricted-Area</code>, and an unset realm as <code>Protected-Content</code>. NGINX Ingress Controller keeps the realm as written, and with none it turns basic auth off (<code>auth_basic ""</code>), so always set it. See the <code>auth-secret</code> row for the full setup.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/auth-secret</code></td>
@@ -885,7 +885,7 @@ metadata:
 spec:
   basicAuth:
     secret: dashboard-users  # the htpasswd file, under the key "htpasswd"
-    realm: "Restricted Area"
+    realm: Restricted-Area  # auth-realm (HAProxy turns spaces into dashes)
 ---
 # 3. Reference from VirtualServer (basicAuth is NOT Ingress-attachable)
 apiVersion: k8s.nginx.org/v1
@@ -940,7 +940,7 @@ metadata:
   name: my-app
   annotations:
     nginx.org/basic-auth-secret: "dashboard-users"  # auth-secret (namespace-local)
-    nginx.org/basic-auth-realm: "Restricted Area"   # auth-realm</code></pre></div>
+    nginx.org/basic-auth-realm: "Restricted-Area"   # auth-realm (HAProxy turns spaces into dashes)</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box warning"><strong>Secret must be converted:</strong> HAProxy's <code>auth-secret</code> Secret is <code>Opaque</code> with <strong>one key per user</strong> (each value the base64 of that user's <code>crypt(3)</code> hash). NGINX Ingress Controller needs a single htpasswd <em>file</em> under the key <code>htpasswd</code>; since v5.7.0 the Secret can stay <code>Opaque</code>. Base64-decode each per-user value, join them into <code>user:hash</code> lines, then base64 the whole file. MD5-crypt (<code>$1$</code>) and apr1 (<code>$apr1$</code>) hashes port directly; SHA-crypt (<code>$5$</code>/<code>$6$</code>) works only where the host <code>crypt()</code> supports it, and plaintext is rejected on both sides.</div>

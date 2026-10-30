@@ -163,23 +163,81 @@ test('load-balance: verified value map incl. no-equivalent fallbacks', () => {
     assert.ok(first.plan.infoNotes.some((n) => /load-balance: first/.test(n.code)), 'the note names the value');
 });
 
-test('allow-list beside deny-list: one allow Policy, and the denied addresses inside it still denied', () => {
-    /* HAProxy denies a client outside allow-list OR inside deny-list. NGINX
-       Ingress Controller applies only the allow Policy when a resource
-       references both, so two Policies dropped the deny list without a word.
-       A denied address inside an allowed range must still be denied. */
-    const yaml = ingressWith({ 'haproxy.org/allow-list': '10.0.0.0/8', 'haproxy.org/deny-list': '10.1.2.3,192.168.1.1' });
-    for (const strategy of ['crd', 'annotation']) {
-        const r = run(yaml, strategy);
-        const pols = kinds(r, 'Policy');
-        assert.equal(pols.length, 1, strategy + ': a deny Policy is ignored beside an allow one');
-        assert.deepEqual(pols[0].spec.accessControl, { allow: ['10.0.0.0/8'] }, strategy);
-        const snippet = strategy === 'crd' ? kinds(r, 'VirtualServer')[0].spec.routes[0]['location-snippets'] : ann(r)['nginx.org/location-snippets'];
-        assert.match(snippet, /deny 10\.1\.2\.3;/, strategy + ': the denied address inside the allowed range');
-        assert.doesNotMatch(snippet, /192\.168\.1\.1/, strategy + ': outside every allowed range, allow-only blocks it');
+/* What NGINX does with a request from `ip`, given the access rules NGINX
+   Ingress Controller v5.7.0 renders from a resource. A Policy in spec.policies
+   or nginx.org/policies renders at server level (nginx.virtualserver.tmpl
+   183-195, nginx.ingress.tmpl 84-96); a route's own Policy in the location,
+   after its snippets (328, then 348-359); location-snippets in the location.
+   NGINX checks the location's rules and inherits the server's only when the
+   location has none, and the first allow or deny that matches decides. */
+function inRange(ip, cidr) {
+    const [base, bits] = cidr.includes('/') ? cidr.split('/') : [cidr, '32'];
+    const n = (a) => a.split('.').reduce((acc, o) => (acc << 8) + Number(o), 0) >>> 0;
+    const mask = Number(bits) === 0 ? 0 : (0xFFFFFFFF << (32 - Number(bits))) >>> 0;
+    return ((n(ip) & mask) >>> 0) === ((n(base) & mask) >>> 0);
+}
+function accessRules(acl) {
+    const out = [];
+    for (const a of acl.allow || []) out.push(['allow', a]);
+    if ((acl.allow || []).length) out.push(['deny', 'all']);
+    for (const d of acl.deny || []) out.push(['deny', d]);
+    if ((acl.deny || []).length) out.push(['allow', 'all']);
+    return out;
+}
+function snippetRules(text) {
+    return String(text || '').split('\n').map((l) => l.trim().match(/^(allow|deny) (\S+);$/)).filter(Boolean).map((m) => [m[1], m[2]]);
+}
+function decide(rules, ip) {
+    for (const [verb, who] of rules) if (who === 'all' || inRange(ip, who)) return verb === 'allow' ? 200 : 403;
+    return 200;
+}
+function nginxAccess(r, strategy, ip) {
+    const policies = Object.fromEntries(kinds(r, 'Policy').map((p) => [p.metadata.name, p.spec.accessControl || {}]));
+    let server = [], location = [];
+    if (strategy === 'crd') {
+        const vs = kinds(r, 'VirtualServer')[0];
+        for (const ref of vs.spec.policies || []) server = server.concat(accessRules(policies[ref.name] || {}));
+        const route = vs.spec.routes[0];
+        location = snippetRules(route['location-snippets']);
+        for (const ref of route.policies || []) location = location.concat(accessRules(policies[ref.name] || {}));
+    } else {
+        const a = ann(r);
+        for (const name of String(a['nginx.org/policies'] || '').split(',').filter(Boolean)) server = server.concat(accessRules(policies[name] || {}));
+        location = snippetRules(a['nginx.org/location-snippets']);
     }
-    // A deny list on its own is still a deny Policy.
-    assert.deepEqual(kinds(run(ingressWith({ 'haproxy.org/deny-list': '10.1.2.3' })), 'Policy')[0].spec.accessControl, { deny: ['10.1.2.3'] });
+    return decide(location.length ? location : server, ip);
+}
+
+test('allow-list beside deny-list: NGINX answers each client as HAProxy did', () => {
+    /* HAProxy denies a client outside allow-list OR inside deny-list
+       (reqDeny.go). NGINX Ingress Controller applies only the allow list when
+       a resource references allow and deny Policies, so the denies are a
+       snippet; but a deny in a location snippet beside a server-level allow
+       Policy stopped the location inheriting the allow list, and every address
+       outside it was let in (verified on nginx 1.31.7: 203.0.113.5 got 200).
+       The test used to check only that the deny appeared. */
+    const cases = [
+        [{ 'haproxy.org/allow-list': '10.0.0.0/8, 192.168.0.0/16', 'haproxy.org/deny-list': '10.1.2.3,172.16.0.0/12' },
+            { '10.1.2.3': 403, '10.9.9.9': 200, '192.168.1.1': 200, '172.16.0.1': 403, '203.0.113.5': 403 }],
+        // A deny holding an allowed range denies all of it.
+        [{ 'haproxy.org/allow-list': '10.1.0.0/16', 'haproxy.org/deny-list': '10.0.0.0/8' },
+            { '10.1.5.5': 403, '10.9.9.9': 403, '203.0.113.5': 403 }],
+        // A deny range that overlaps nothing allowed: allow-only blocks it.
+        [{ 'haproxy.org/allow-list': '10.0.0.0/8', 'haproxy.org/deny-list': '192.168.1.1' },
+            { '10.9.9.9': 200, '192.168.1.1': 403, '203.0.113.5': 403 }],
+        // Either list alone.
+        [{ 'haproxy.org/allow-list': '10.0.0.0/8' }, { '10.9.9.9': 200, '203.0.113.5': 403 }],
+        [{ 'haproxy.org/deny-list': '10.1.2.3' }, { '10.1.2.3': 403, '203.0.113.5': 200 }]
+    ];
+    const broken = [];
+    for (const [annotations, want] of cases) for (const strategy of ['crd', 'annotation']) {
+        const r = run(ingressWith(annotations), strategy);
+        for (const ip of Object.keys(want)) {
+            const got = nginxAccess(r, strategy, ip);
+            if (got !== want[ip]) broken.push(strategy + ' ' + JSON.stringify(annotations) + ': ' + ip + ' got ' + got + ', HAProxy ' + want[ip]);
+        }
+    }
+    assert.deepEqual(broken, []);
 });
 
 test('5.7: server-proto h2 becomes proxy-http-version "2", on the annotation and the upstream field', () => {

@@ -12,7 +12,7 @@
             'nginx-ingress-controller': 'NGINX Ingress Controller',
             'nginx-gateway-fabric': 'NGINX Gateway Fabric',
             'migration-tool': 'NGINX Ingress Migration Tool',
-            'haproxy-migration-tool': 'HAProxy Migration',
+            'haproxy-migration-tool': 'HAProxy Migration Tool',
             'ingress2gateway': 'ingress2gateway'
         };
 

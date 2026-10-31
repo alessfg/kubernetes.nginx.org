@@ -290,7 +290,7 @@ test('cors-respond-to-options is answered by the cors Policy, not reported as un
 
 test('a backend setting is read Service first, then Ingress, then ConfigMap, per Service', () => {
     /* service.New(): a Service's annotations, then the Ingress's, then the
-       ConfigMap's (v3.2.12). Two Services resolving differently keep their own
+       ConfigMap's (v3.2.19). Two Services resolving differently keep their own
        values; one ConfigMap value for all is the global key. */
     const two = Y.stringify({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app', annotations: { 'haproxy.org/load-balance': 'leastconn' } }, spec: { rules: [{ host: 'app.example.com', http: { paths: [
         { path: '/a', pathType: 'Prefix', backend: { service: { name: 'svc-a', port: { number: 80 } } } },

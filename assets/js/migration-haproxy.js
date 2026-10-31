@@ -12,7 +12,7 @@
     (function() {
         'use strict';
         // Bump when updating the Version Reference (see the release checklist in CLAUDE.md).
-        const HAPROXY_VERSION = 'v3.2.12';
+        const HAPROXY_VERSION = 'v3.2.19';
         const HAPROXY_RELEASE_URL = 'https://github.com/haproxytech/kubernetes-ingress/releases/tag/' + HAPROXY_VERSION;
 
 
@@ -199,7 +199,7 @@
 
         const HAPROXY_MAPPINGS = [
             // Access control & real IP
-            { keys: ['annotation:allow-list', 'annotation:deny-list', 'annotation:blacklist', 'annotation:whitelist'], source: 'allow-list / deny-list (+ deprecated blacklist/whitelist)', nic: 'Policy CRD accessControl allow[]/deny[] (+ nginx.org/policies on Ingress)', type: 'policy', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'accessControl' },
+            { keys: ['annotation:allow-list', 'annotation:deny-list', 'annotation:blacklist', 'annotation:whitelist'], source: 'allow-list / deny-list (+ deprecated blacklist/whitelist)', nic: 'Policy CRD accessControl allow[]/deny[] (+ nginx.org/policies on Ingress)', type: 'policy', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'accessControl', verified: { haproxy: 'v3.2.19', nic: 'v5.7.0' } },
             { keys: ['annotation:src-ip-header'], source: 'src-ip-header', nic: 'ConfigMap real-ip-header + set-real-ip-from + real-ip-recursive (global)', type: 'configmap', category: 'Access control', anchor: 'access-control', section: 'oss', grouped: true, generator: 'srcIpHeader' },
             { keys: ['configmap:proxy-protocol'], source: 'proxy-protocol (inbound)', nic: 'ConfigMap proxy-protocol + set-real-ip-from + real-ip-header: proxy_protocol', type: 'configmap', category: 'Client mTLS & PROXY protocol', anchor: 'client-mtls-proxy', section: 'configmap', grouped: true, generator: 'controller' },
             { keys: ['annotation:send-proxy-protocol'], source: 'send-proxy-protocol', nic: 'No direct equivalent — PROXY-to-backend does not exist for HTTP upstreams; TCP/UDP only via TransportServer serverSnippets (proxy_protocol on; sends PROXY v1 only, requires -enable-snippets)', type: 'unsupported', category: 'Backend TLS', anchor: 'backend-tls', section: 'oss', grouped: true },
@@ -242,9 +242,9 @@
             { keys: ['annotation:check-http', 'annotation:check-interval', 'annotation:timeout-check'], source: 'check-http / check-interval / timeout-check', nic: 'VirtualServer upstreams[].healthCheck (NGINX Plus)', type: 'virtualserver', category: 'Active health checks', anchor: 'active-health-checks', section: 'plus', grouped: true, plusRequired: true, generator: 'activeHealthCheck' },
 
             // Load balancing
-            { keys: ['annotation:load-balance'], source: 'load-balance', nic: 'nginx.org/lb-method / ConfigMap lb-method / VirtualServer upstreams[].lb-method', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'loadBalance' },
+            { keys: ['annotation:load-balance'], source: 'load-balance', nic: 'nginx.org/lb-method / ConfigMap lb-method / VirtualServer upstreams[].lb-method', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'loadBalance', verified: { haproxy: 'v3.2.19', nic: 'v5.7.0' } },
             { keys: ['annotation:scale-server-slots'], source: 'scale-server-slots', nic: 'Not applicable — no pre-allocated server slots; NGINX Ingress Controller re-resolves endpoints on change', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'notApplicable' },
-            { keys: ['annotation:standalone-backend'], source: 'standalone-backend', nic: 'Not applicable — NGINX Ingress Controller already generates one upstream per Ingress/VirtualServer', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'notApplicable' },
+            { keys: ['annotation:standalone-backend'], source: 'standalone-backend', nic: 'Not applicable — NGINX Ingress Controller already generates one upstream per Ingress/VirtualServer', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'notApplicable', verified: { haproxy: 'v3.2.19', nic: 'v5.7.0' } },
 
             // Miscellaneous (not applicable on NIC)
             { keys: ['annotation:abortonclose', 'configmap:clean-certs'], source: 'abortonclose / clean-certs', nic: 'Not applicable — NGINX Ingress Controller architecture makes these unnecessary (see notes)', type: 'annotation', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss', grouped: true, generator: 'notApplicable' },
@@ -260,11 +260,11 @@
             { keys: ['configmap:timeout-client-fin', 'configmap:timeout-server-fin'], source: 'timeout-client-fin / timeout-server-fin', nic: 'No direct equivalent — NGINX has no half-closed (FIN_WAIT) timeout knobs', type: 'unsupported', category: 'Timeouts', anchor: 'static-timeouts', section: 'configmap', grouped: true },
             { keys: ['configmap:http-connection-mode', 'configmap:http-keep-alive', 'configmap:http-server-close'], source: 'http-connection-mode (+ deprecated aliases)', nic: 'Split: ConfigMap keepalive (upstream count) + keepalive-timeout (client)', type: 'configmap', category: 'Connection handling', anchor: 'static-connection-handling', section: 'configmap', grouped: true, generator: 'controller' },
             { keys: ['configmap:maxconn', 'configmap:nbthread'], source: 'maxconn / nbthread', nic: 'ConfigMap worker-connections / worker-processes (approximate — model differs)', type: 'configmap', category: 'Connection handling', anchor: 'static-connection-handling', section: 'configmap', grouped: true, generator: 'controller' },
-            { keys: ['annotation:pod-maxconn'], source: 'pod-maxconn', nic: 'nginx.org/max-conns (VirtualServer upstreams[].max-conns)', type: 'annotation', category: 'Connection handling', anchor: 'connection-handling', section: 'oss', grouped: true, generator: 'podMaxconn' },
+            { keys: ['annotation:pod-maxconn'], source: 'pod-maxconn', nic: 'nginx.org/max-conns (VirtualServer upstreams[].max-conns)', type: 'annotation', category: 'Connection handling', anchor: 'connection-handling', section: 'oss', grouped: true, generator: 'podMaxconn', verified: { haproxy: 'v3.2.19', nic: 'v5.7.0' } },
 
             // TLS & certificates
             { keys: ['configmap:ssl-certificate'], source: 'ssl-certificate', nic: '-default-server-tls-secret controller flag (+ per-app spec.tls)', type: 'annotation', category: 'TLS & certificates', anchor: 'static-tls-certificates', section: 'configmap', grouped: true, generator: 'controller' },
-            { keys: ['annotation:ssl-passthrough'], source: 'ssl-passthrough', nic: 'TransportServer TLS_PASSTHROUGH (+ -enable-tls-passthrough flag)', type: 'transportserver', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', grouped: true, generator: 'sslPassthrough' },
+            { keys: ['annotation:ssl-passthrough'], source: 'ssl-passthrough', nic: 'TransportServer TLS_PASSTHROUGH (+ -enable-tls-passthrough flag)', type: 'transportserver', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', grouped: true, generator: 'sslPassthrough', verified: { haproxy: 'v3.2.19', nic: 'v5.7.0' } },
             { keys: ['configmap:tls-alpn'], source: 'tls-alpn', nic: 'ConfigMap http2 (HTTP/2 on/off only — no general ALPN control)', type: 'configmap', category: 'TLS & certificates', anchor: 'static-tls-certificates', section: 'configmap', grouped: true, generator: 'controller' },
             { keys: ['configmap:generate-certificates-signer'], source: 'generate-certificates-signer', nic: 'No direct equivalent — NGINX Ingress Controller has no on-the-fly certificate signing; pre-issue certificates via cert-manager', type: 'unsupported', category: 'TLS & certificates', anchor: 'static-tls-certificates', section: 'configmap', grouped: true },
             { keys: ['configmap:quic-alt-svc-max-age'], source: 'quic-alt-svc-max-age', nic: 'No direct equivalent — NGINX Ingress Controller has no QUIC or HTTP/3 support', type: 'unsupported', category: 'TLS & certificates', anchor: 'static-tls-certificates', section: 'configmap', grouped: true },
@@ -308,7 +308,7 @@
 
         // --- Input: the run as HAProxy reads it --------------------------------
         // HAProxy keeps one application's settings on four kinds of object, and
-        // resolves them per backend (pkg/service/service.go, v3.2.12): a Service's
+        // resolves them per backend (pkg/service/service.go, v3.2.19): a Service's
         // own annotations, then the Ingress routing to it, then the controller
         // ConfigMap, then the built-in default. Frontend settings (auth, CORS,
         // rate limits, redirects, rewrites, headers) are the Ingress's, then the
@@ -321,7 +321,7 @@
         function isMap(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
         function str(v) { return v === null || v === undefined ? '' : String(v); }
 
-        // --- Values as HAProxy reads them (v3.2.12) ----------------------------
+        // --- Values as HAProxy reads them (v3.2.19) ----------------------------
         // HAProxy never rejects an Ingress over a bad value: the processor logs
         // the error and the setting keeps what it had (annotations.go,
         // ingress.handleAnnotations, service.getBackendModel). What that leaves
@@ -424,6 +424,7 @@
             return {
                 name: md.name ? str(md.name) : null,
                 namespace: md.namespace ? str(md.namespace) : null,
+                created: md.creationTimestamp ? str(md.creationTimestamp) : null,
                 apiVersion: str(doc.apiVersion),
                 ingressClassName: spec.ingressClassName ? str(spec.ingressClassName) : (annotations['kubernetes.io/ingress.class'] ? str(annotations['kubernetes.io/ingress.class']) : null),
                 annotations: annotations,
@@ -676,11 +677,12 @@
             return a;
         }
 
-        // ingress.go Update / service.SetDefaultBackend: HAProxy makes an
+        // default_backend.go setIngressDefaultBackend: HAProxy makes an
         // Ingress's defaultBackend the default backend of its http and https
-        // frontends, for every unmatched request on any host (the last Ingress
-        // processed wins). NGINX Ingress Controller uses it only as the "/" of
-        // that Ingress's own hosts (ingress.go, v5.7.0).
+        // frontends, for every unmatched request on any host; of several, the
+        // Ingress lowest by namespace/name (walkRun). NGINX Ingress Controller
+        // uses it only as the "/" of that Ingress's own hosts (ingress.go,
+        // v5.7.0).
         let DEFAULT_BACKEND_NOTE = 'HAProxy sent every request no rule matched, on any host, to spec.defaultBackend; NGINX Ingress Controller uses it only for this Ingress\'s own hosts, as their "/" when no path covers it, and answers other unmatched requests with 404.';
 
         // NGINX Ingress Controller takes a session cookie name of letters,
@@ -733,8 +735,14 @@
                 // accessControl.go checks every address before it adds the
                 // rule: one that is not an IP or CIDR (net.ParseIP/ParseCIDR,
                 // as NGINX Ingress Controller checks a Policy) voids that list.
+                // Empty entries are skipped since v3.2.13; a list of nothing
+                // else is an error too ("no valid address found").
                 let voided = function(x, n) {
                     if (!x || pattern(x)) return false;
+                    if (str(x.value).trim() !== '' && !splitCommaList(x.value).length) {
+                        ctx.note(n, n + ' "' + x.value + '" holds no address, so HAProxy logged an error and applied no ' + n + '. Nothing is migrated for it.', 'warning');
+                        return true;
+                    }
                     let bad = splitCommaList(x.value).filter(function(s) { return !isAddress(s); });
                     if (!bad.length) return false;
                     ctx.note(n, n + ' holds "' + bad.join('", "') + '", which is not an IP address or CIDR, so HAProxy logged an error and applied no ' + n + '. Nothing is migrated for it.', 'warning');
@@ -1245,7 +1253,7 @@
             notApplicable: function(a, f, ctx, entry) {
                 let NA = {
                     'scale-server-slots': 'NGINX Ingress Controller has no pre-allocated server slots; it updates endpoints on change. Remove.',
-                    'standalone-backend': 'NGINX Ingress Controller already builds a separate upstream per resource, so the shared-backend conflict this works around does not exist.',
+                    'standalone-backend': 'HAProxy gave this Ingress a backend of its own instead of sharing the one the first Ingress to route to the Service built. NGINX Ingress Controller builds an upstream per resource already, so its backend settings carry over without it. Remove.',
                     'abortonclose': 'NGINX already aborts the upstream request when the client goes away (proxy_ignore_client_abort off), as abortonclose did. Remove.',
                     'clean-certs': 'NGINX Ingress Controller loads certificates from Secrets and manages its own files. Remove.'
                 };
@@ -1344,14 +1352,16 @@
                 ctx.note('pod-maxconn', n === 0 ? 'pod-maxconn 0 is no limit in HAProxy, and max-conns 0 is no limit in NGINX.' : 'HAProxy divides pod-maxconn by the controller replicas itself; NGINX Ingress Controller applies the value per replica, so divide it by your replica count.');
             },
 
-            // ingress.go: annotations.Bool, so passthrough only for "true";
-            // GetBoolValue still logs an error for a value it cannot read.
+            // ssl-passthrough is decided per path by walkRun (Service, Ingress,
+            // ConfigMap; annotations.Bool, so only "true"), and buildAll
+            // places what it decided. This explains a value that is not "true";
+            // GetBoolValue still logs an error for one it cannot read.
             sslPassthrough: function(a, f, ctx) {
                 ctx.use('ssl-passthrough');
                 let v = str(a['ssl-passthrough'].value);
                 if (v === 'true') { f.passthrough = a['ssl-passthrough']; return; }
                 ctx.note('ssl-passthrough', v === 'false' || v === '' ? 'Passthrough is off; nothing to migrate.'
-                    : 'HAProxy turns ssl-passthrough on only for the exact value "true"' + (haproxyBool(v) === null ? ' (and logged an error for "' + v + '")' : '') + ', so "' + v + '" left it off; the Ingress migrates as HTTP.', v === 'false' || v === '' ? 'note' : 'warning');
+                    : 'HAProxy turns ssl-passthrough on only for the exact value "true"' + (haproxyBool(v) === null ? ' (and logged an error for "' + v + '")' : '') + ', so "' + v + '" left it off.', v === 'false' || v === '' ? 'note' : 'warning');
             },
 
             ingressClass: function(a, f, ctx) {
@@ -1403,7 +1413,7 @@
 
         // Which mapping reads a bare name, and how: the translator key, and
         // whether HAProxy reads it per backend (Service > Ingress > ConfigMap)
-        // or per frontend (Ingress > ConfigMap). Scopes from the v3.2.12
+        // or per frontend (Ingress > ConfigMap). Scopes from the v3.2.19
         // annotation table and annotations.go Frontend()/Backend().
         let BACKEND_KEYS = ['abortonclose', 'backend-config-snippet', 'check', 'check-http', 'check-interval', 'cookie-persistence', 'cookie-persistence-no-dynamic',
             'forwarded-for', 'load-balance', 'pod-maxconn', 'scale-server-slots', 'send-proxy-protocol', 'server-ca', 'server-crt', 'server-proto', 'server-ssl',
@@ -1416,6 +1426,12 @@
         // ConfigMap-only keys (handler/https.go reads them once) whose NGINX
         // Ingress Controller form is per resource: every Ingress gets them.
         let PER_RESOURCE_CM = ['client-ca', 'client-crt-optional'];
+        // annotations.BackendNames() (v3.2.19): the Backend() registry in its
+        // order, then the backend snippet and cr-backend. What an Ingress loses
+        // when another one owns the backend it routes to.
+        let BACKEND_NAMES = ['abortonclose', 'timeout-check', 'timeout-server', 'load-balance', 'check', 'check-interval', 'cookie-persistence',
+            'pod-maxconn', 'send-proxy-protocol', 'server-ssl', 'server-crt', 'server-ca', 'server-proto', 'check-http', 'forwarded-for',
+            'backend-config-snippet', 'cr-backend'];
 
         let NAME_TO_TRANSLATOR = {};
         HAPROXY_MAPPINGS.forEach(function(m, idx) {
@@ -1460,31 +1476,39 @@
         // The settings HAProxy applies to one Ingress, resolved against the run.
         // Frontend: Ingress, then ConfigMap. Backend: per Service — its own
         // annotations, then the Ingress's, then the ConfigMap's — unless a
-        // cr-backend CR replaces them. Returns { frontend, perService }.
-        function resolve(model, run) {
+        // cr-backend CR replaces them, or another Ingress owns the backend
+        // (walkRun), when only the Service's own and the ConfigMap's apply.
+        // ssl-passthrough is per path, from the walk, and is not a frontend
+        // key. Returns { frontend, perService, services }.
+        function resolve(model, run, walk) {
             let cm = controllerOptions(run);
             let frontend = {};
             let from = function(kind, name) { return { kind: kind, name: name }; };
             FRONTEND_KEYS.forEach(function(k) {
+                if (k === 'ssl-passthrough') return;
                 if (model.haproxy[k]) frontend[k] = { value: model.haproxy[k].value, from: from('Ingress', model.name) };
                 else if (cm[k]) frontend[k] = { value: cm[k].value, from: from('ConfigMap', null) };
             });
-            // ingress.go: annotations.Bool, so passthrough only for "true".
-            let pt = model.haproxy['ssl-passthrough'] || cm['ssl-passthrough'];
-            let passthrough = !!pt && str(pt.value) === 'true';
-            if (!passthrough) PER_RESOURCE_CM.forEach(function(k) { if (cm[k]) frontend[k] = { value: cm[k].value, from: from('ConfigMap', null) }; });
+            // ConfigMap-only TLS settings reach every Ingress with HTTP traffic.
+            let anyHttp = !walk || !model.hosts.length || model.hosts.some(function(h) { return h.paths.some(function(p) { return !walk.passthrough.get(p); }); });
+            if (anyHttp) PER_RESOURCE_CM.forEach(function(k) { if (cm[k]) frontend[k] = { value: cm[k].value, from: from('ConfigMap', null) }; });
             if (model.haproxy['ingress.class']) frontend['ingress.class'] = { value: model.haproxy['ingress.class'].value, from: from('Ingress', model.name) };
             let services = [];
             let seen = {};
             model.hosts.forEach(function(h) { h.paths.forEach(function(p) { if (p.backend && p.backend.service && !seen[p.backend.service]) { seen[p.backend.service] = true; services.push(p.backend.service); } }); });
             if (model.defaultBackend && model.defaultBackend.service && !seen[model.defaultBackend.service]) services.push(model.defaultBackend.service);
             let perService = {};
+            let lost = (walk && walk.dropped.get(model)) || [];
             services.forEach(function(name) {
                 let svc = findService(run, model.namespace, name);
                 let s = { service: svc, settings: {}, routeAcl: null, crBackend: null };
+                // Owned by another Ingress: the owner's definition stands, so
+                // this Ingress's own backend annotations are not read.
+                let owned = lost.find(function(x) { return x.service === name; });
+                if (owned) s.ownedBy = owned;
                 let lookup = function(k) {
                     if (svc && svc.haproxy[k]) return { value: svc.haproxy[k].value, from: from('Service', name) };
-                    if (model.haproxy[k]) return { value: model.haproxy[k].value, from: from('Ingress', model.name) };
+                    if (model.haproxy[k] && !owned) return { value: model.haproxy[k].value, from: from('Ingress', model.name) };
                     if (cm[k]) return { value: cm[k].value, from: from('ConfigMap', null) };
                     return null;
                 };
@@ -1501,6 +1525,76 @@
                 perService[name] = s;
             });
             return { frontend: frontend, perService: perService, services: services };
+        }
+
+        // --- The walk: what HAProxy decides across Ingresses (v3.2.19) ----------
+        // controller.go walks namespaces by name and, in each, Ingresses by
+        // creationTimestamp then name (sortedIngresses); a paste without
+        // timestamps ties, and the name settles it, as there. Three things are
+        // decided on that walk, not per Ingress:
+        //   - ssl-passthrough per path (ingress.SSLPassthroughEnabled): the
+        //     Service the path routes to, then the Ingress, then the ConfigMap,
+        //     annotations.Bool, so only the exact "true";
+        //   - a backend (namespace, Service, port) belongs to the first Ingress
+        //     to route to it (handlePath, BackendsProcessed). A later one in the
+        //     other passthrough mode gets no route at all; one that agrees is
+        //     routed but its own backend annotations are dropped
+        //     (servableWithBackendOwnedByOther). standalone-backend "true", on
+        //     the Service, Ingress or ConfigMap, gives it its own backend;
+        //   - the frontends' default backend is the spec.defaultBackend of the
+        //     Ingress lowest by namespace/name (default_backend.go).
+        // Returns { order, passthrough: Map(path object → bool), dropped:
+        // Map(model → [{ service, owner, keys }]), unrouted: Map(model →
+        // [{ service, host, path, owner, ownerPassthrough }]), defaultBackend:
+        // model }. Keyed by path object, so a canary merge keeps them.
+        function walkRun(run) {
+            let cm = controllerOptions(run);
+            let key = function(m) { return (m.namespace || '') + '/' + (m.name || ''); };
+            let order = run.ingresses.slice().sort(function(a, b) {
+                let ns = (a.namespace || '').localeCompare(b.namespace || '');
+                if (ns) return ns;
+                let ta = a.created ? Date.parse(a.created) : NaN, tb = b.created ? Date.parse(b.created) : NaN;
+                if (!isNaN(ta) && !isNaN(tb) && ta !== tb) return ta - tb;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+            let lookup = function(k, svc, m) {
+                if (svc && svc.haproxy[k]) return svc.haproxy[k].value;
+                if (m.haproxy[k]) return m.haproxy[k].value;
+                return cm[k] ? cm[k].value : undefined;
+            };
+            let owners = {};
+            let walk = { order: order, passthrough: new Map(), dropped: new Map(), unrouted: new Map(), defaultBackend: null };
+            order.forEach(function(m) {
+                m.hosts.forEach(function(h) {
+                    h.paths.forEach(function(p) {
+                        let b = p.backend;
+                        if (!b || !b.service) return;
+                        let svc = findService(run, m.namespace, b.service);
+                        let pt = str(lookup('ssl-passthrough', svc, m)) === 'true';
+                        walk.passthrough.set(p, pt);
+                        let standalone = str(lookup('standalone-backend', svc, m)) === 'true';
+                        let bk = (m.namespace || '') + '/' + b.service + ':' + str(b.port) + (standalone ? '@' + m.name : '');
+                        let o = owners[bk];
+                        if (!o) { owners[bk] = { model: m, passthrough: pt }; return; }
+                        if (o.model === m) return;
+                        if (o.passthrough !== pt) {
+                            let list = walk.unrouted.get(m) || [];
+                            if (!list.some(function(x) { return x.service === b.service; })) list.push({ service: b.service, owner: o.model.name, ownerPassthrough: o.passthrough, path: p.path, host: h.host });
+                            walk.unrouted.set(m, list);
+                            return;
+                        }
+                        // Only the Ingress's own backend annotations are lost:
+                        // the Service's are shared and win over both.
+                        let declared = BACKEND_NAMES.filter(function(n) { return m.haproxy[n]; });
+                        if (!declared.length) return;
+                        let list = walk.dropped.get(m) || [];
+                        if (!list.some(function(x) { return x.service === b.service; })) list.push({ service: b.service, owner: o.model.name, keys: declared });
+                        walk.dropped.set(m, list);
+                    });
+                });
+                if (m.defaultBackend && m.defaultBackend.service && (!walk.defaultBackend || key(m) < key(walk.defaultBackend))) walk.defaultBackend = m;
+            });
+            return walk;
         }
 
         // Backend settings resolved the same for every Service are Ingress-wide
@@ -1596,10 +1690,11 @@
         }
 
         // Build the resources for one Ingress.
-        function migrateIngress(model, run, strategy, options) {
+        function migrateIngress(model, run, strategy, options, walk) {
             options = options || {};
             let ctx = makeCtx(model, strategy);
-            let resolved = resolve(model, run);
+            walk = walk || walkRun(run);
+            let resolved = resolve(model, run, walk);
             ctx.services = resolved.services;
             ctx.hasTls = model.tls.length > 0;
             let f = { upstream: {}, upstreamComments: {}, svc: {}, proxy: {}, location: [], server: [], policies: [], ann: {} };
@@ -1664,8 +1759,12 @@
             });
             // Annotations on the Ingress that HAProxy reads for no backend and no
             // frontend in this run (Service-only keys, or keys it does not know).
+            let ptAnn = model.haproxy['ssl-passthrough'] || controllerOptions(run)['ssl-passthrough'];
+            if (ptAnn) addSetting('ssl-passthrough', { value: ptAnn.value, from: { kind: model.haproxy['ssl-passthrough'] ? 'Ingress' : 'ConfigMap', name: model.haproxy['ssl-passthrough'] ? model.name : null } });
             Object.keys(model.haproxy).forEach(function(k) {
-                if (resolved.frontend[k] || groups[k] || k === 'ingress.class' || k === 'cr-backend') return;
+                if (resolved.frontend[k] || groups[k] || k === 'ingress.class' || k === 'cr-backend' || k === 'ssl-passthrough') return;
+                // Owned by another Ingress: walkRun reports it below.
+                if (BACKEND_KEYS.indexOf(k) !== -1 && resolved.services.some(function(n) { return resolved.perService[n].ownedBy; })) { ctx.use(k); return; }
                 if (k === 'route-acl') { ctx.note('route-acl', 'HAProxy reads route-acl from a Service only, so on this Ingress it did nothing; nothing is migrated.', 'warning'); return; }
                 // A backend key that reached no Service: replaced by a cr-backend
                 // CR (reported below), or there is no backend to carry it.
@@ -1725,8 +1824,7 @@
 
             f.canary = canaryFor(model, resolved, ctx);
 
-            let out = f.passthrough ? buildPassthrough(model, f, ctx, options)
-                : strategy === 'crd' ? buildCrd(model, resolved, f, ctx, options) : buildIngress(model, resolved, f, ctx, options);
+            let out = buildAll(model, resolved, f, ctx, options, walk, strategy);
 
             // Every recognised setting must be findable in the output.
             let named = {};
@@ -2042,31 +2140,128 @@
             return { docs: docs, comments: comments };
         }
 
-        // TLS passthrough: a TransportServer per host on the built-in listener.
-        function buildPassthrough(model, f, ctx, options) {
-            let docs = [];
+        // Every host of the Ingress, as HAProxy routed it. A host with a
+        // passthrough path is a TransportServer: route.go keys the sni map on
+        // the host alone, so HAProxy sent all of the host's TLS to one
+        // passthrough backend, and NGINX Ingress Controller gives a host to
+        // one resource. The other hosts go to the strategy's builder. A path
+        // walkRun left unrouted (its backend owned in the other mode) is
+        // dropped with a note.
+        function buildAll(model, resolved, f, ctx, options, walk, strategy) {
+            let ptHosts = [], httpHosts = [];
+            let unrouted = walk.unrouted.get(model) || [];
+            model.hosts.forEach(function(h) {
+                let pt = [], http = [];
+                h.paths.forEach(function(p) {
+                    let mode = walk.passthrough.get(p);
+                    if (p.backend && unrouted.some(function(u) { return u.service === p.backend.service && u.host === h.host && u.path === p.path; })) return;
+                    (mode ? pt : http).push(p);
+                });
+                if (pt.length) ptHosts.push({ host: h, pt: pt, http: http });
+                else if (http.length) httpHosts.push(Object.assign({}, h, { paths: http }));
+            });
+            unrouted.forEach(function(u) {
+                ctx.note('ssl-passthrough', 'HAProxy did not route ' + (u.host ? u.host : '') + u.path + ' to Service ' + u.service + ' at all: Ingress ' + u.owner + ' built that backend first with ssl-passthrough ' + (u.ownerPassthrough ? 'on' : 'off') + ', and a backend has one mode. Nothing is migrated for the path; set standalone-backend: "true" to give it its own backend, or agree the mode on the Service.', 'warning');
+            });
+            (walk.dropped.get(model) || []).forEach(function(d) {
+                ctx.note('backend', 'HAProxy did not apply this Ingress\'s ' + d.keys.join(', ') + ' to Service ' + d.service + ': Ingress ' + d.owner + ' routed to it first and owns the backend. The migration leaves them out, as HAProxy did; to keep them, move them to the Service, which both share.', 'warning');
+            });
+            let docs = [], comments = [];
+            if (ptHosts.length) {
+                let out = buildPassthrough(model, ptHosts, resolved, f, ctx, options);
+                docs = docs.concat(out.docs); comments = comments.concat(out.comments);
+            }
+            if (httpHosts.length || !ptHosts.length) {
+                let rest = ptHosts.length ? Object.assign({}, model, { hosts: httpHosts, hostless: model.hostless, defaultBackend: model.defaultBackend }) : model;
+                let out = strategy === 'crd' ? buildCrd(rest, resolved, f, ctx, options) : buildIngress(rest, resolved, f, ctx, options);
+                docs = docs.concat(out.docs); comments = comments.concat(out.comments);
+            } else {
+                // Nothing but passthrough: the HTTP settings had no HTTP route.
+                let idle = Object.keys(f.seen || {}).filter(function(k) { return k !== 'ssl-passthrough' && !PASSTHROUGH_KEYS[k]; });
+                if (idle.length) ctx.note('ssl-passthrough', 'Not migrated, because they never applied to passthrough traffic: ' + idle.join(', ') + '.');
+                idle.forEach(function(k) { ctx.consumed[k] = true; ctx.passthroughIdle = true; });
+                f.policies = [];
+            }
+            if (walk.defaultBackend && model.defaultBackend && walk.defaultBackend !== model) {
+                ctx.note('default-backend', 'HAProxy ignored this spec.defaultBackend: several Ingresses set one, and HAProxy uses that of the Ingress lowest by namespace/name, ' + (walk.defaultBackend.namespace ? walk.defaultBackend.namespace + '/' : '') + walk.defaultBackend.name + '.', 'warning');
+            }
+            return { docs: docs, comments: comments };
+        }
+
+        // What a TCP-mode passthrough backend still applies (service.go
+        // getBackendModel; Backend() minus check-http and forwarded-for) and
+        // the frontend rules the ssl frontend renders as tcp-request rules
+        // (ingress.go declareRules, rules/reqDeny.go, reqCapture.go).
+        let PASSTHROUGH_KEYS = { 'allow-list': true, whitelist: true, 'deny-list': true, blacklist: true, 'load-balance': true, 'pod-maxconn': true,
+            'timeout-server': true, 'request-capture': true, 'request-capture-len': true };
+        // TransportServer loadBalancingMethod (validation/transportserver.go,
+        // v5.7.0): no ip_hash, and a hash keyed on $remote_addr only.
+        let STREAM_LB = { round_robin: true, least_conn: true, random: true, 'random two': true, 'random two least_conn': true,
+            'least_time connect': true, 'least_time first_byte': true, 'least_time last_byte': true, 'least_time last_byte inflight': true };
+
+        // TLS passthrough: a TransportServer per host on the built-in listener,
+        // to the backend whose name sorts first (maps.Compare keeps the lowest
+        // sni row: namespace_svc_<service>_<port>).
+        function buildPassthrough(model, hosts, resolved, f, ctx, options) {
+            let docs = [], comments = [];
             let used = {};
             let cls = targetClass(model, options);
-            model.hosts.forEach(function(h) {
-                let p = h.paths.find(function(x) { return x.backend && x.backend.service; });
-                if (!p) return;
+            let rowName = function(p) { return (model.namespace || '') + '_svc_' + p.backend.service + '_' + str(p.backend.port); };
+            // allow-list and deny-list, which the ssl frontend enforced with
+            // tcp-request content reject: serverSnippets, denies first. The
+            // TransportServer server sees the client address: the passthrough
+            // listener passes it with the PROXY protocol and the server sets
+            // set_real_ip_from unix: (verified on nginx 1.31.7).
+            let acl = [];
+            f.policies.filter(function(p) { return p.spec.accessControl; }).forEach(function(p) {
+                let ac = p.spec.accessControl;
+                (p.denyFirst || []).forEach(function(d) { acl.push('deny ' + d + ';'); });
+                if (ac.allow) { ac.allow.forEach(function(a) { acl.push('allow ' + a + ';'); }); acl.push('deny all;'); }
+                else (ac.deny || []).forEach(function(d) { acl.push('deny ' + d + ';'); });
+            });
+            let aclSource = f.policies.filter(function(p) { return p.spec.accessControl; }).map(function(p) { return (p.sources || []).map(function(x) { return src(x, x.name); }).join(' + '); }).join(' + ');
+            hosts.forEach(function(entry) {
+                let h = entry.host;
+                let p = entry.pt.slice().sort(function(a, b) { return rowName(a) < rowName(b) ? -1 : rowName(a) > rowName(b) ? 1 : 0; })[0];
                 let md = { name: resourceName(model, h.host, options, used) };
                 if (model.namespace) md.namespace = model.namespace;
-                let spec = {};
+                let spec = {}, c = {};
                 if (cls) spec.ingressClassName = cls;
                 spec.listener = { name: 'tls-passthrough', protocol: 'TLS_PASSTHROUGH' };
+                c['spec.listener'] = src(f.passthrough, 'ssl-passthrough');
                 spec.host = h.host;
-                spec.upstreams = [{ name: dnsName(p.backend.service), service: p.backend.service, port: upstreamPort(p.backend.port, ctx, 'spec.upstreams.0.port') }];
-                spec.action = { pass: dnsName(p.backend.service) };
+                let up = { name: dnsName(p.backend.service), service: p.backend.service, port: upstreamPort(p.backend.port, ctx, 'spec.upstreams.0.port') };
+                let fields = Object.assign({}, f.upstream);
+                Object.keys(f.svc[p.backend.service] || {}).forEach(function(k) { fields[k] = f.svc[p.backend.service][k].value; });
+                let note = function(k) { return (f.svc[p.backend.service] && f.svc[p.backend.service][k] ? f.svc[p.backend.service][k].comment : f.upstreamComments[k]) || k; };
+                if (fields['lb-method'] !== undefined) {
+                    let lb = String(fields['lb-method']);
+                    if (lb === 'ip_hash') { up.loadBalancingMethod = 'hash $remote_addr consistent'; c['spec.upstreams.0.loadBalancingMethod'] = note('lb-method') + ' — a TransportServer has no ip_hash'; }
+                    else if (STREAM_LB[lb]) { up.loadBalancingMethod = lb; c['spec.upstreams.0.loadBalancingMethod'] = note('lb-method'); }
+                    else ctx.note('load-balance', 'A TransportServer balances a TLS stream without reading it, so ' + lb + ' (from ' + note('lb-method') + ') has no form here; it balances round_robin.', 'warning');
+                }
+                if (fields['max-conns'] !== undefined) { up.maxConns = fields['max-conns']; c['spec.upstreams.0.maxConns'] = note('max-conns'); }
+                spec.upstreams = [up];
+                if (fields['read-timeout'] !== undefined) { spec.sessionParameters = { timeout: fields['read-timeout'] }; c['spec.sessionParameters.timeout'] = note('read-timeout') + ' — HAProxy applies timeout server to TCP mode too'; }
+                let params = {};
+                if (fields['connect-timeout'] !== undefined) { params.connectTimeout = fields['connect-timeout']; c['spec.upstreamParameters.connectTimeout'] = note('connect-timeout'); }
+                if (fields['next-upstream-tries'] !== undefined) { params.nextUpstream = true; params.nextUpstreamTries = fields['next-upstream-tries']; c['spec.upstreamParameters.nextUpstreamTries'] = note('next-upstream-tries'); }
+                if (Object.keys(params).length) spec.upstreamParameters = params;
+                if (acl.length) { spec.serverSnippets = snippetBlock(acl); c['spec.serverSnippets'] = (aclSource || 'allow-list / deny-list') + ' — HAProxy enforced them on passthrough (tcp-request content reject)'; }
+                spec.action = { pass: up.name };
                 docs.push({ apiVersion: NIC_API, kind: 'TransportServer', metadata: md, spec: spec });
+                comments.push(c);
+                if (entry.pt.length > 1 && entry.pt.some(function(x) { return x.backend.service !== p.backend.service; })) {
+                    ctx.note('ssl-passthrough', 'Host ' + h.host + ' has ' + entry.pt.length + ' passthrough paths to different Services. HAProxy keys passthrough on the host alone and kept the backend that sorts first, Service ' + p.backend.service + '; the others never received traffic.', 'warning');
+                }
+                if (entry.http.length) {
+                    ctx.note('ssl-passthrough', 'Host ' + h.host + ' also has HTTP paths (' + entry.http.map(function(x) { return x.path; }).join(', ') + '). HAProxy sent all of the host\'s TLS to Service ' + p.backend.service + ' and served those paths on plain HTTP only; NGINX Ingress Controller gives a host to one resource, so they are not migrated. Give them a host of their own.', 'warning');
+                }
             });
-            ctx.note('ssl-passthrough', 'TLS passthrough is off by default in NGINX Ingress Controller: install with controller.enableTLSPassthrough=true (Helm) or -enable-tls-passthrough. As with HAProxy, the HTTP settings on this Ingress stop applying to it.', 'warning');
+            ctx.note('ssl-passthrough', 'TLS passthrough is off by default in NGINX Ingress Controller: install with controller.enableTLSPassthrough=true (Helm) or -enable-tls-passthrough.', 'warning');
+            if (acl.length) ctx.note('ssl-passthrough', 'The access lists are TransportServer serverSnippets, which need the -enable-snippets controller flag: a TransportServer takes no Policy.', 'warning');
             if (ctx.strategy === 'annotation') ctx.note('ssl-passthrough', 'TLS passthrough has no Ingress form in NGINX Ingress Controller; it is a TransportServer under either strategy.');
-            // HAProxy hands the TLS stream to the backend; nothing HTTP applies.
-            let idle = Object.keys(f.seen || {}).filter(function(k) { return k !== 'ssl-passthrough'; });
-            if (idle.length) ctx.note('ssl-passthrough', 'Not migrated, because they never applied to passthrough traffic: ' + idle.join(', ') + '.');
-            idle.forEach(function(k) { ctx.consumed[k] = true; ctx.passthroughIdle = true; });
-            return { docs: docs, comments: docs.map(function() { return { 'spec.listener': src(f.passthrough, 'ssl-passthrough') }; }) };
+            return { docs: docs, comments: comments };
         }
 
         // Annotation-first: the Ingress, every rule and TLS entry kept.
@@ -2675,9 +2870,14 @@
                 canary.hosts.forEach(function(ch) { let h = base.hosts.find(function(x) { return x.host === ch.host; }); if (h) h.paths = h.paths.concat(ch.paths); });
                 merged.set(stable, base);
             });
+            // One walk for the run: passthrough per path, backend ownership
+            // and the default backend are decided across Ingresses.
+            let walk = walkRun(run);
             let results = models.map(function(m) {
                 if (pairs.has(m)) return { model: m, out: null };
-                return { model: m, out: migrateIngress(merged.get(m) || m, run, strategy, options) };
+                let mm = merged.get(m) || m;
+                if (mm !== m) { if (walk.dropped.has(m)) walk.dropped.set(mm, walk.dropped.get(m)); if (walk.unrouted.has(m)) walk.unrouted.set(mm, walk.unrouted.get(m)); if (walk.defaultBackend === m) walk.defaultBackend = mm; }
+                return { model: m, out: migrateIngress(mm, run, strategy, options, walk) };
             });
             results.forEach(function(r) {
                 if (r.out) return;

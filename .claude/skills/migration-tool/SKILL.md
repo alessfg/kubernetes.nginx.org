@@ -74,7 +74,7 @@ shape below is illustrative:
 | `anchor` | the `<h3 id>` this row lives under |
 | `section` | `oss` or `plus` — where the analyzer's "See Reference Guide" link points (`plus-mappings` or `mappings`) |
 | `dualApproach` | the row offers both an annotation and a CRD; the chosen strategy picks which one the analyzer emits |
-| `verified` | the NIC tag the four-point accuracy check below was last done against |
+| `verified` | the NIC tag the four-point accuracy check below was last done against; a source that still moves records both, `{ haproxy: 'v3.2.19', nic: 'v5.7.0' }` (`sources.test.js` checks the shape) |
 | `nicMapping.annotations` | keyed **by community annotation name**, each with a target `key` and a `transform` |
 | `templateFn` | the translator in `TRANSLATORS` that turns this mapping's annotations into fragments; it must exist, and every translator must be named (asserted) |
 | `nicMapping.crdKind` | the kind of resource the mapping's CRD form produces, for the reference row and the mapping index |

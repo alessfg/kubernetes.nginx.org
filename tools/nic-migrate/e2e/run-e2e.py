@@ -60,15 +60,15 @@ NAME_SUFFIX = '-nic'
 NIC_CHART = 'oci://ghcr.io/nginx/charts/nginx-ingress'
 NIC_CHART_VERSION = '2.8.0'
 COMMUNITY_REPO = 'https://kubernetes.github.io/ingress-nginx'
-# HAProxy Kubernetes Ingress Controller v3.2.12, the version the HAProxy guide
+# HAProxy Kubernetes Ingress Controller v3.2.19, the version the HAProxy guide
 # is written against (HAPROXY_VERSION in assets/js/migration-haproxy.js).
 HAPROXY_NS = 'haproxy-controller'
 HAPROXY_CLASS = 'haproxy'
 HAPROXY_REPO = 'https://haproxytech.github.io/helm-charts'
-HAPROXY_CHART_VERSION = '1.52.1'
+HAPROXY_CHART_VERSION = '1.54.4'
 # The controller release that chart ships, which check-versions.py compares
 # with HAPROXY_VERSION and install_haproxy() with the running image.
-HAPROXY_APP_VERSION = '3.2.12'
+HAPROXY_APP_VERSION = '3.2.19'
 # The controller ConfigMap keys haproxy-source.yaml declares. Helm owns that
 # ConfigMap, so they are set through the chart; --self-test checks they agree.
 HAPROXY_CONFIG = {'timeout-server': '120s'}
@@ -586,7 +586,7 @@ CASES = [
 COMMUNITY_CASES = CASES
 
 # The HAProxy fixture (haproxy-source.yaml). Each case pins what HAProxy
-# v3.2.12 does, so stage 1 proves the fixture before anything is compared.
+# v3.2.19 does, so stage 1 proves the fixture before anything is compared.
 HAPROXY_CASES = [
     dict(name='root-routes-to-web', host='shop.example.com', path='/',
          expect_status=200, expect_app='web'),

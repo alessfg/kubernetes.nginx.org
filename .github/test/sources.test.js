@@ -209,3 +209,30 @@ test('haproxy: what a reader sees names each product in full', () => {
     text.split('\n').forEach((l, i) => walk(l, 'haproxy-migration.html text line ' + (i + 1)));
     assert.deepEqual([...found], []);
 });
+
+test('haproxy: a verified: tag names both pinned sources', (t) => {
+    /* A mapping's verified: is set in the commit that checks it
+       (migration-tool). ingress-nginx's source is archived, so its tag is one
+       NGINX Ingress Controller version; HAProxy moves too, so this one is
+       { haproxy, nic }, and a bump on either side leaves the mapping behind.
+       The count is reported, never failed, as test-analyzer.js reports
+       ingress-nginx's; a tag of any other shape fails. */
+    const fs = require('node:fs'), path = require('node:path');
+    const { ROOT } = require('./lib/load.js');
+    const mod = fs.readFileSync(path.join(ROOT, 'assets/js/migration-haproxy.js'), 'utf8');
+    const haproxy = mod.match(/const HAPROXY_VERSION = '([^']+)'/)[1];
+    const { tool } = loadAnalyzer('assets/js/migration-haproxy.js');
+    const nic = 'v' + String(tool.NIC.VERSION).replace(/^v/, '');
+    const lines = mod.split('\n').filter((l) => /^\s*\{ keys: \[/.test(l));
+    const malformed = [];
+    let tagged = 0, behind = 0;
+    for (const l of lines) {
+        if (!/verified:/.test(l)) continue;
+        const m = l.match(/verified: \{ haproxy: '(v[\d.]+)', nic: '(v[\d.]+)' \}/);
+        if (!m) { malformed.push(l.match(/keys: \[([^\]]*)\]/)[1]); continue; }
+        tagged++;
+        if (m[1] !== haproxy || m[2] !== nic) behind++;
+    }
+    assert.deepEqual(malformed, [], 'verified: must be { haproxy: \'vX.Y.Z\', nic: \'vX.Y.Z\' }');
+    t.diagnostic(`${tagged} of ${lines.length} HAProxy mapping(s) record a verified: tag; ${behind} behind ${haproxy} / ${nic}, ${lines.length - tagged} carry none.`);
+});

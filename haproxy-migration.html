@@ -194,11 +194,11 @@
 
         <div class="tool-page active" id="page-getting-started">
         <div class="info-box note" style="margin: 0 0 var(--space-2x);"><strong>Migrating from HAProxy?</strong> The HAProxy Kubernetes Ingress Controller is actively maintained &mdash; this guide is for teams standardizing on the NGINX data plane. It translates HAProxy's annotations, ConfigMap, and Global/Defaults/Backend/TCP CRDs into the NGINX Ingress Controller's ConfigMap + annotation + VirtualServer/Policy model, resource by resource.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.19" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.19</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
 
         <section id="overview">
             <h2 id="migration-overview">Overview</h2>
-            <p>This interactive guide helps you migrate from the HAProxy Kubernetes Ingress Controller (<code>haproxytech/kubernetes-ingress</code>) to NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). It covers the <code>haproxy.org/</code> annotations at all three HAProxy scopes (ConfigMap, Ingress, and Service &mdash; note that NGINX Ingress Controller has <strong>no Service-level annotation tier</strong>), the controller ConfigMap, the <code>ingress.v3.haproxy.org</code> CRDs (Global, Defaults, Backend, TCP, Frontend and ValidationRules) along with the superseded <code>ingress.v1.haproxy.org</code> group that v3.2.12 still serves, the legacy <code>tcp-services</code> ConfigMap, and <code>route-acl</code> canary routing &mdash; across three tabs:</p>
+            <p>This interactive guide helps you migrate from the HAProxy Kubernetes Ingress Controller (<code>haproxytech/kubernetes-ingress</code>) to NGINX Ingress Controller (<code>nginx/kubernetes-ingress</code>). It covers the <code>haproxy.org/</code> annotations at all three HAProxy scopes (ConfigMap, Ingress, and Service &mdash; note that NGINX Ingress Controller has <strong>no Service-level annotation tier</strong>), the controller ConfigMap, the <code>ingress.v3.haproxy.org</code> CRDs (Global, Defaults, Backend, TCP, Frontend and ValidationRules) along with the superseded <code>ingress.v1.haproxy.org</code> group that v3.2.19 still serves, the legacy <code>tcp-services</code> ConfigMap, and <code>route-acl</code> canary routing &mdash; across three tabs:</p>
             <ul class="doc-list">
                 <li><strong>Getting started</strong> &mdash; Why teams migrate, NGINX Ingress Controller CRD overviews, installation, and a migration checklist</li>
                 <li><strong>HAProxy config analyzer</strong> &mdash; Paste annotated Ingress/Service manifests, the HAProxy ConfigMap, or Global/Defaults/Backend/TCP CRs and get automatic migration suggestions with ready-to-use YAML</li>
@@ -434,7 +434,7 @@
         </div><!-- /.tool-page #page-getting-started -->
 
         <div class="tool-page" id="page-analyzer" hidden="until-found">
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.19" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.19</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
         <!-- YAML Migration Analyzer -->
         <section id="analyzer">
             <h2 id="yaml-analyzer">HAProxy config analyzer</h2>
@@ -500,7 +500,7 @@ spec:
         </div><!-- /.tool-page #page-analyzer -->
 
         <div class="tool-page" id="page-reference" hidden="until-found">
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.12" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.12</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-haproxy-release-link href="https://github.com/haproxytech/kubernetes-ingress/releases/tag/v3.2.19" target="_blank" rel="noopener">HAProxy Kubernetes Ingress Controller <span data-haproxy-version>v3.2.19</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
         <!-- Key Differences -->
         <section id="differences">
             <h2 id="key-differences">Key differences</h2>
@@ -1613,7 +1613,7 @@ metadata:
 
             <!-- Deprecated -->
             <h3 id="deprecated">Deprecated</h3>
-            <div class="info-box note"><strong>Deprecated by HAProxy:</strong> these annotations still work at v3.2.12 but log a deprecation warning. Each migrates exactly as its current-name equivalent under <a href="#access-control">Access control</a> — there is no separate NGINX Ingress Controller construct for the alias.</div>
+            <div class="info-box note"><strong>Deprecated by HAProxy:</strong> these annotations still work at v3.2.19 but log a deprecation warning. Each migrates exactly as its current-name equivalent under <a href="#access-control">Access control</a> — there is no separate NGINX Ingress Controller construct for the alias.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="deprecated"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -2083,11 +2083,11 @@ metadata:
     haproxy.org/standalone-backend: "true"</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not needed — NGINX Ingress Controller already
 # generates a separate upstream per
-# Ingress/VirtualServer, so the shared-backend
-# conflict this annotation works around does not
-# exist. Remove.</code></pre></div>
+# Ingress/VirtualServer, so the shared backend
+# this annotation opts out of does not exist.
+# Remove.</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Not applicable:</strong> HAProxy merges Ingresses on the same Service and port into one backend; NGINX Ingress Controller isolates upstreams per resource, so there is no conflict to opt out of. Deliberate combining is expressed with mergeable Ingresses.</div>
+                            <div class="info-box note"><strong>Not applicable:</strong> HAProxy builds one backend per Service and port, owned by the first Ingress to route to it (oldest, then by name). A later Ingress loses its own backend annotations to it, or gets no route at all when its <code>ssl-passthrough</code> differs; <code>standalone-backend</code> gives it a backend of its own. NGINX Ingress Controller isolates upstreams per resource, so each Ingress keeps its settings without it. The analyzer applies the ownership rule to what it migrates, and names any setting HAProxy dropped.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2826,7 +2826,7 @@ metadata:
 spec:
   ingressClassName: nginx  # must match the -ingress-class flag (default "nginx")</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Move the class to <code>spec.ingressClassName</code>. HAProxy Kubernetes Ingress Controller v3.2.12 never reads the <code>kubernetes.io/ingress.class</code> annotation: it treated such an Ingress as classless. NGINX Ingress Controller does read it, and it overrides <code>spec.ingressClassName</code>, so remove it. NGINX Ingress Controller requires an IngressClass named after its <code>-ingress-class</code> flag (spec.controller <code>nginx.org/ingress-controller</code>) to exist — it fails to start otherwise — and Ingresses must match it <strong>exactly</strong> (no classless fallthrough).</div>
+                            <div class="info-box note"><strong>Note:</strong> Move the class to <code>spec.ingressClassName</code>. HAProxy Kubernetes Ingress Controller v3.2.19 never reads the <code>kubernetes.io/ingress.class</code> annotation: it treated such an Ingress as classless. NGINX Ingress Controller does read it, and it overrides <code>spec.ingressClassName</code>, so remove it. NGINX Ingress Controller requires an IngressClass named after its <code>-ingress-class</code> flag (spec.controller <code>nginx.org/ingress-controller</code>) to exist — it fails to start otherwise — and Ingresses must match it <strong>exactly</strong> (no classless fallthrough).</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>pathType</code><br>(Exact / Prefix / ImplementationSpecific)</td>
@@ -2917,7 +2917,7 @@ spec:
                 port:
                   number: 80</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>Scope changes:</strong> HAProxy makes an Ingress's <code>spec.defaultBackend</code> the default backend of its HTTP and HTTPS frontends, so every request no rule matches, on any host, goes there (the last Ingress processed wins). NGINX Ingress Controller uses it only for that Ingress's own hosts, as their <code>/</code> when no path covers it, and answers every other unmatched request from its default server with <code>404</code>. It also rejects an Ingress with no <code>rules</code>, so a cluster-wide fallback is a host-less rule, as above, with <code>-allow-empty-ingress-host</code>. There is no <code>--default-backend-service</code> flag equivalent. (The separate <code>-default-server-tls-secret</code> flag is a TLS concern, not routing.)</div>
+                            <div class="info-box warning"><strong>Scope changes:</strong> HAProxy makes an Ingress's <code>spec.defaultBackend</code> the default backend of its HTTP and HTTPS frontends, so every request no rule matches, on any host, goes there; when several Ingresses set one, the Ingress lowest by namespace and name wins. NGINX Ingress Controller uses it only for that Ingress's own hosts, as their <code>/</code> when no path covers it, and answers every other unmatched request from its default server with <code>404</code>. It also rejects an Ingress with no <code>rules</code>, so a cluster-wide fallback is a host-less rule, as above, with <code>-allow-empty-ingress-host</code>. There is no <code>--default-backend-service</code> flag equivalent. (The separate <code>-default-server-tls-secret</code> flag is a TLS concern, not routing.)</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>Wildcard host <code>*.example.com</code></td>
@@ -3271,7 +3271,8 @@ spec:
   action:
     pass: backend</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> TLS passthrough becomes a separate <code>TransportServer</code> (SNI-routed, <code>spec.host</code> required, <code>spec.tls</code> forbidden) — the HTTP-mode annotations on the original Ingress no longer apply to this traffic. Like HAProxy, which needs a host for a passthrough route, NGINX Ingress Controller has no catch-all SNI route; enable the feature with <code>-enable-tls-passthrough</code> (port via <code>-tls-passthrough-port</code>).</div>
+                            <div class="info-box note"><strong>Note:</strong> TLS passthrough becomes a separate <code>TransportServer</code> (SNI-routed, <code>spec.host</code> required, <code>spec.tls</code> forbidden). HAProxy reads <code>ssl-passthrough</code> per path, from the Service the path routes to first, then the Ingress, then the ConfigMap, and keys the route on the host alone, so a host with one passthrough path sends all its TLS there. NGINX Ingress Controller gives a host to one resource, so such a host is the TransportServer; another host of the same Ingress stays a VirtualServer. Like HAProxy, which needs a host for a passthrough route, NGINX Ingress Controller has no catch-all SNI route; enable the feature with <code>-enable-tls-passthrough</code> (port via <code>-tls-passthrough-port</code>).</div>
+                            <div class="info-box note"><strong>What still applies:</strong> HAProxy enforces <code>allow-list</code> and <code>deny-list</code> on passthrough traffic, and the backend's <code>load-balance</code>, <code>pod-maxconn</code> and <code>timeout-server</code>. They carry over: the access lists as the TransportServer's <code>serverSnippets</code> (the <code>-enable-snippets</code> flag; a TransportServer takes no Policy), the rest as <code>loadBalancingMethod</code>, <code>maxConns</code> and <code>sessionParameters.timeout</code>. The HTTP annotations do not apply to this traffic.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -3559,7 +3560,7 @@ spec:
 
             <h3 id="enterprise">Enterprise features</h3>
             <div class="info-box note"><strong>Why NGINX Plus:</strong> NGINX Ingress Controller answers below — F5 WAF for NGINX, F5 DoS for NGINX, zone synchronization, active health checks — are its <strong>NGINX Plus</strong> capabilities, backed by an F5 subscription. Running them means the NGINX Plus image, the license token Secret (NGINX Ingress Controller exits at startup without it; Helm <code>controller.mgmt.licenseTokenSecretName</code>), and for the WAF and DoS modules the <code>-enable-app-protect</code> and <code>-enable-app-protect-dos</code> flags.</div>
-            <div class="info-box note"><strong>Where to find the HAProxy side:</strong> no module below has an annotation, a ConfigMap key, a CRD field or a controller flag; the community controller (v3.2.12) has none for any Enterprise feature, and the HAProxy Enterprise Kubernetes Ingress Controller adds one only for its ModSecurity WAF (the <code>modsecurity</code> row). Their settings are HAProxy configuration, and it reaches a cluster two ways, both shown in the examples. Directives that belong <em>inside</em> a section the controller generates travel in the <code>global-config-snippet</code> and <code>frontend-config-snippet</code> ConfigMap keys, because a second file cannot reopen a section the controller already wrote. Whole new sections travel in a secondary config file mounted at <code>/etc/haproxy/haproxy-aux.cfg</code>, which the controller loads alongside its own generated config, watches for changes, and never rewrites. Running the controller in external mode puts all of it back into one config file you own. So there <em>is</em> something to inventory in the cluster — two ConfigMaps and a volume mount — but nothing that names the feature, and the contents are HAProxy's configuration language, which is re-authored rather than translated.</div>
+            <div class="info-box note"><strong>Where to find the HAProxy side:</strong> no module below has an annotation, a ConfigMap key, a CRD field or a controller flag; the community controller (v3.2.19) has none for any Enterprise feature, and the HAProxy Enterprise Kubernetes Ingress Controller adds one only for its ModSecurity WAF (the <code>modsecurity</code> row). Their settings are HAProxy configuration, and it reaches a cluster two ways, both shown in the examples. Directives that belong <em>inside</em> a section the controller generates travel in the <code>global-config-snippet</code> and <code>frontend-config-snippet</code> ConfigMap keys, because a second file cannot reopen a section the controller already wrote. Whole new sections travel in a secondary config file mounted at <code>/etc/haproxy/haproxy-aux.cfg</code>, which the controller loads alongside its own generated config, watches for changes, and never rewrites. Running the controller in external mode puts all of it back into one config file you own. So there <em>is</em> something to inventory in the cluster — two ConfigMaps and a volume mount — but nothing that names the feature, and the contents are HAProxy's configuration language, which is re-authored rather than translated.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="enterprise"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -4233,7 +4234,7 @@ data:
 
             <!-- Deprecated -->
             <h3 id="static-deprecated">Deprecated</h3>
-            <div class="info-box note"><strong>Deprecated by HAProxy:</strong> both keys are aliases of <code>http-connection-mode</code> and log a deprecation warning at v3.2.12. Migrate them as that key does, under <a href="#static-connection-handling">Connection handling</a>.</div>
+            <div class="info-box note"><strong>Deprecated by HAProxy:</strong> both keys are aliases of <code>http-connection-mode</code> and log a deprecation warning at v3.2.19. Migrate them as that key does, under <a href="#static-connection-handling">Connection handling</a>.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="static-deprecated"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
@@ -4798,7 +4799,7 @@ data:
 
             <!-- CRD overview -->
             <h3 id="crd-overview">CRD overview</h3>
-            <div class="info-box note"><strong>Write v3:</strong> current CRs use <code>ingress.v3.haproxy.org/v3</code> &mdash; Global, Defaults, Backend, TCP, plus Frontend and ValidationRules. The older <code>ingress.v1.haproxy.org/v1</code> group is superseded: v3.2.12 still serves it and this tool still reads it, but write no new ones. Both fold into NGINX Ingress Controller's global <code>nginx-config</code> ConfigMap, per-app VirtualServer fields, or the GlobalConfiguration CRD. Each row below names where that CR lands; the per-field tables that follow give every field, and the analyzer emits complete YAML for a pasted CR.</div>
+            <div class="info-box note"><strong>Write v3:</strong> current CRs use <code>ingress.v3.haproxy.org/v3</code> &mdash; Global, Defaults, Backend, TCP, plus Frontend and ValidationRules. The older <code>ingress.v1.haproxy.org/v1</code> group is superseded: v3.2.19 still serves it and this tool still reads it, but write no new ones. Both fold into NGINX Ingress Controller's global <code>nginx-config</code> ConfigMap, per-app VirtualServer fields, or the GlobalConfiguration CRD. Each row below names where that CR lands; the per-field tables that follow give every field, and the analyzer emits complete YAML for a pasted CR.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="crd-overview"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>

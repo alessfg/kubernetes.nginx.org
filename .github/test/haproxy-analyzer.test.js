@@ -246,7 +246,7 @@ test('every value of every key migrates to something NGINX Ingress Controller ac
     assert.deepEqual(broken.slice(0, 40), [], broken.length + ' problems');
 });
 
-test('each value is read as HAProxy v3.2.12 reads it', () => {
+test('each value is read as HAProxy v3.2.19 reads it', () => {
     /* The readers differ per annotation (pkg/annotations, pkg/utils): booleans
        are utils.GetBoolValue (ParseBool plus on/off/enabled/disabled, not
        "yes"), or annotations.Bool (only "true"), or input == "true"; times are
@@ -270,6 +270,10 @@ test('each value is read as HAProxy v3.2.12 reads it', () => {
         ['spaces in a realm become dashes', { 'auth-type': 'basic-auth', 'auth-secret': 'users', 'auth-realm': 'Members Only' }, /realm: Members-Only/, null],
         ['both cookie annotations: no cookie', { 'cookie-persistence': 'A', 'cookie-persistence-no-dynamic': 'B' }, null, /sessionCookie/],
         ['a bad address voids the allow-list', { 'allow-list': '10.0.0.0/8, nope' }, null, /accessControl/],
+        // accessControl.go since v3.2.13: empty entries skipped (a trailing
+        // comma voided the whole list before), and none at all is an error.
+        ['an empty entry is skipped', { 'allow-list': '10.0.0.1,,10.0.0.2,' }, /allow:[^\n]*\n\s+- "?10\.0\.0\.1"?\n\s+- "?10\.0\.0\.2"?\n/, null],
+        ['a list of no address applies none', { 'allow-list': ' , ' }, null, /accessControl/],
         ['rate-limit-requests 100r does not parse: no limit', { 'rate-limit-requests': '100r' }, null, /rateLimit/],
         ['rate-limit-requests 1: no burst field', { 'rate-limit-requests': '1' }, /rate: "?1r\/s/, /burst/],
         ['a status code HAProxy cannot send falls back to 403', { 'rate-limit-requests': '5', 'rate-limit-status-code': '302' }, /rejectCode: 403/, null],
@@ -304,4 +308,107 @@ test('a backend checked with server-ca names the certificate name NGINX checks',
     const r = run(ingress({ 'haproxy.org/server-ca': 'default/backend-ca' }), 'crd');
     assert.match(r.text, /sslName: web\.default\.svc|sslName: web\.svc/);
     assert.ok(r.plan.infoNotes.some((n) => /checks its name/.test(n.message)), 'the name check is called out');
+});
+
+/* ------------------------------------------------- v3.2.19: decided on the walk */
+
+const doc = (o) => Y.stringify(o);
+const svc = (name, ann) => doc({ apiVersion: 'v1', kind: 'Service', metadata: { name, annotations: ann || {} }, spec: { ports: [{ port: 443 }] } });
+const ing = (name, host, paths, ann, extra) => doc(Object.assign({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: Object.assign({ name, annotations: ann || {} }, extra && extra.metadata) },
+    { spec: Object.assign({ rules: [{ host, http: { paths: paths.map(([p, s]) => ({ path: p, pathType: 'Prefix', backend: { service: { name: s, port: { number: 443 } } } })) } }] }, extra && extra.spec) }));
+const kinds = (r, k) => r.docs.filter((d) => d && d.kind === k);
+const said = (r, re) => r.plan.infoNotes.some((n) => re.test(n.message));
+
+test('ssl-passthrough is read per path, from the Service first (v3.2.19)', () => {
+    /* ingress.SSLPassthroughEnabled: the Service a path routes to, then the
+       Ingress, then the ConfigMap. 3.2.12 read the Ingress and ConfigMap only,
+       so a Service's annotation did nothing and the analyzer followed. */
+    const r = run([svc('tls-app', { 'haproxy.org/ssl-passthrough': 'true' }), ing('app', 'a.example.com', [['/', 'tls-app']])].join('---\n'));
+    assert.equal(kinds(r, 'TransportServer').length, 1, 'a Service-level ssl-passthrough is a TransportServer');
+    assert.equal(kinds(r, 'VirtualServer').length, 0);
+    // The Service's "false" wins over the Ingress's "true".
+    const off = run([svc('web', { 'haproxy.org/ssl-passthrough': 'false' }), ing('app', 'a.example.com', [['/', 'web']], { 'haproxy.org/ssl-passthrough': 'true' })].join('---\n'));
+    assert.equal(kinds(off, 'TransportServer').length, 0, 'the Service value overrides the Ingress one');
+    assert.equal(kinds(off, 'VirtualServer').length, 1);
+});
+
+test('one Ingress can hold passthrough and HTTP hosts', () => {
+    /* Per path, so per host here: a.example.com to a TLS-terminating Service
+       is a TransportServer, b.example.com stays a VirtualServer. */
+    const two = doc({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'mix' }, spec: { rules: [
+        { host: 'a.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'tls-app', port: { number: 443 } } } }] } },
+        { host: 'b.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 443 } } } }] } }] } });
+    const r = run([svc('tls-app', { 'haproxy.org/ssl-passthrough': 'true' }), svc('web'), two].join('---\n'));
+    assert.deepEqual(kinds(r, 'TransportServer').map((d) => d.spec.host), ['a.example.com']);
+    assert.deepEqual(kinds(r, 'VirtualServer').map((d) => d.spec.host), ['b.example.com']);
+    // A host with a passthrough path and an HTTP path: HAProxy keyed the sni
+    // map on the host, so all its TLS went to the passthrough backend.
+    const mixed = run([svc('tls-app', { 'haproxy.org/ssl-passthrough': 'true' }), svc('web'), ing('m', 'a.example.com', [['/', 'tls-app'], ['/api', 'web']])].join('---\n'));
+    assert.equal(kinds(mixed, 'TransportServer').length, 1);
+    assert.equal(kinds(mixed, 'VirtualServer').length, 0, 'NGINX Ingress Controller gives a host to one resource');
+    assert.ok(said(mixed, /also has HTTP paths \(\/api\)/), 'the HTTP path left behind is named');
+});
+
+test('allow-list and deny-list on a passthrough Ingress reach the TransportServer', () => {
+    /* The ssl frontend enforced them: rules/reqDeny.go renders tcp-request
+       content reject in tcp mode, scoped by txn.sni_match (3.2.12 too). The
+       analyzer listed them as never applying and dropped them. On NGINX
+       Ingress Controller they are serverSnippets: verified on nginx 1.31.7
+       behind the passthrough listener's PROXY protocol, 10.5.5.5 admitted,
+       10.1.2.3 and 192.168.1.9 refused, all three admitted without them. */
+    const r = run(ing('pt', 'a.example.com', [['/', 'tls-app']], { 'haproxy.org/ssl-passthrough': 'true', 'haproxy.org/allow-list': '10.0.0.0/8', 'haproxy.org/deny-list': '10.1.2.3' }));
+    const ts = kinds(r, 'TransportServer');
+    assert.equal(ts.length, 1);
+    assert.equal(ts[0].spec.serverSnippets, 'deny 10.1.2.3;\nallow 10.0.0.0/8;\ndeny all;\n');
+    assert.ok(!said(r, /never applied to passthrough traffic: .*allow-list/), 'not reported as idle');
+    assert.ok(said(r, /-enable-snippets/));
+    const only = run(ing('pt', 'a.example.com', [['/', 'tls-app']], { 'haproxy.org/ssl-passthrough': 'true', 'haproxy.org/deny-list': '192.0.2.0/24' }));
+    assert.equal(kinds(only, 'TransportServer')[0].spec.serverSnippets, 'deny 192.0.2.0/24;\n');
+});
+
+test('a passthrough backend keeps the backend settings HAProxy applies in tcp mode', () => {
+    /* getBackendModel runs Backend() in tcp mode too: load-balance, pod-maxconn
+       and timeout-server shape the passthrough backend. */
+    const r = run(ing('pt', 'a.example.com', [['/', 'tls-app']], { 'haproxy.org/ssl-passthrough': 'true', 'haproxy.org/load-balance': 'leastconn', 'haproxy.org/pod-maxconn': '50', 'haproxy.org/timeout-server': '30s' }));
+    const ts = kinds(r, 'TransportServer')[0];
+    assert.equal(ts.spec.upstreams[0].loadBalancingMethod, 'least_conn');
+    assert.equal(ts.spec.upstreams[0].maxConns, 50);
+    assert.equal(ts.spec.sessionParameters.timeout, '30s');
+    // source has no ip_hash in a TransportServer: a hash on the client address.
+    const src = run(ing('pt', 'a.example.com', [['/', 'tls-app']], { 'haproxy.org/ssl-passthrough': 'true', 'haproxy.org/load-balance': 'source' }));
+    assert.equal(kinds(src, 'TransportServer')[0].spec.upstreams[0].loadBalancingMethod, 'hash $remote_addr consistent');
+});
+
+test('a backend shared by two Ingresses is the first one\'s (v3.2.19)', () => {
+    /* handlePath: the first Ingress to route to a backend, by creation time
+       then name, constitutes it. A later one in the same mode is routed but
+       its own backend annotations are dropped; in the other mode it gets no
+       route at all. */
+    const older = ing('a-first', 'a.example.com', [['/', 'web']], { 'haproxy.org/load-balance': 'leastconn' });
+    const newer = ing('b-second', 'b.example.com', [['/', 'web']], { 'haproxy.org/load-balance': 'source', 'haproxy.org/pod-maxconn': '10' });
+    const r = run([svc('web'), older, newer].join('---\n'));
+    const vs = kinds(r, 'VirtualServer');
+    const lb = (host) => vs.find((d) => d.spec.host === host).spec.upstreams[0]['lb-method'];
+    assert.equal(lb('a.example.com'), 'least_conn');
+    assert.equal(lb('b.example.com'), undefined, 'the second Ingress\'s load-balance never applied');
+    assert.ok(said(r, /did not apply this Ingress's load-balance, pod-maxconn to Service web: Ingress a-first/));
+    // creationTimestamp decides before the name does.
+    const aged = run([svc('web'), ing('a-first', 'a.example.com', [['/', 'web']], { 'haproxy.org/load-balance': 'leastconn' }, { metadata: { creationTimestamp: '2026-01-02T00:00:00Z' } }),
+        ing('b-second', 'b.example.com', [['/', 'web']], { 'haproxy.org/load-balance': 'source' }, { metadata: { creationTimestamp: '2026-01-01T00:00:00Z' } })].join('---\n'));
+    assert.equal(kinds(aged, 'VirtualServer').find((d) => d.spec.host === 'b.example.com').spec.upstreams[0]['lb-method'], 'ip_hash');
+    // The other mode: no route.
+    const split = run([svc('web'), ing('a-first', 'a.example.com', [['/', 'web']]), ing('b-second', 'b.example.com', [['/', 'web']], { 'haproxy.org/ssl-passthrough': 'true' })].join('---\n'));
+    assert.equal(kinds(split, 'TransportServer').length, 0);
+    assert.ok(said(split, /did not route b\.example\.com\/ to Service web at all/));
+    // standalone-backend gives the second its own backend.
+    const own = run([svc('web'), older, ing('b-second', 'b.example.com', [['/', 'web']], { 'haproxy.org/load-balance': 'source', 'haproxy.org/standalone-backend': 'true' })].join('---\n'));
+    assert.equal(kinds(own, 'VirtualServer').find((d) => d.spec.host === 'b.example.com').spec.upstreams[0]['lb-method'], 'ip_hash');
+});
+
+test('the frontends\' default backend is the lowest Ingress by namespace/name (v3.2.19)', () => {
+    /* default_backend.go pickDefaultBackend; 3.2.12 let the last Ingress
+       processed win, in Go map order. */
+    const withDefault = (name) => doc({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name }, spec: { defaultBackend: { service: { name: name + '-svc', port: { number: 80 } } } } });
+    const r = run([withDefault('zeta'), withDefault('alpha')].join('---\n'), 'annotation');
+    assert.ok(said(r, /HAProxy ignored this spec\.defaultBackend: .* alpha\./), 'the loser names the winner');
 });

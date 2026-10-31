@@ -208,12 +208,21 @@
        starting with `badge-`; it now skips only the five names that
        migration-core.js builds at runtime.
 
-       Family 5 is left unused in case an annotation badge is ever added. If
-       it is: teal is the one colour group whose darkest value is still too
+       ── Teal went to the controller-flag badge ──────────────────────────────
+       Family 5 was held for an annotation badge, which never came; the
+       controller-flag badge (a cell whose answer is a flag of NGINX Ingress
+       Controller, not a resource) took it on 2026-10-31. Production has no
+       flag badge, so there was no hue to translate, and the four free
+       families were measured instead (CIEDE2000 to the nearest existing
+       badge): teal 13.4 on the fill and 19.9 on the label; olive 10.4, beside
+       New; group 8 9.2, beside NGINX Plus; yellow 3.90:1, under 4.5:1. The
+       fill is Ice rather than Light Cyan, 13.4 from VirtualServer against 11.0.
+       Teal is the one colour group whose darkest value is still too
        light to use as the label. Elm #28837E only reaches 4.01:1 on Light
        Cyan and 3.59:1 on Ice, both below the 4.5:1 minimum. Darkening Elm
        while keeping its hue gives #1D5E5A, which reaches 6.64:1 — the same
        approach --n550 and --blue-text use. Production's #005250 is darker still.
+       On Ice it is 5.95:1.
 
        ── Why ConfigMap uses the second-lightest pink ────────────────────────
        Picking the nearest colour group is not enough on its own. Groups 2 and
@@ -258,6 +267,7 @@
        nearest neighbour is the New badge at 10.4, which is the separation
        Plus and GlobalConfiguration already ship at. */
     --badge-ingress-fg: #4F6E22; --badge-ingress-bg: #D1F1A2;  /* 6  Green Leaf / Gossip   */
+    --badge-flag-fg:   #1D5E5A;  --badge-flag-bg:   #A2F3F4;  /* 5  Elm (derived) / Ice   */
     /* The one neutral, and production agrees: GlobalConfiguration is grey. */
     --badge-gc-fg:     var(--n600);  --badge-gc-bg: var(--n200);
 
@@ -543,6 +553,7 @@
         --badge-plus-fg:   #F5DFE3;  --badge-plus-bg:   rgba(245, 223, 227, 0.16);
         --badge-new-fg:    #DAF7D5;  --badge-new-bg:    rgba(218, 247, 213, 0.16);
         --badge-ingress-fg: #D1F1A2; --badge-ingress-bg: rgba(209, 241, 162, 0.16);
+        --badge-flag-fg:   #A2F3F4;  --badge-flag-bg:   rgba(162, 243, 244, 0.16);
         --badge-gc-fg:     var(--n200);  --badge-gc-bg: rgba(230, 233, 243, 0.16);
 
         /* The code surface is its own world and does not follow the theme —

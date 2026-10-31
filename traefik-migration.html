@@ -1375,14 +1375,14 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>headers</code><br>(security: <code>browserXssFilter</code>, <code>contentSecurityPolicy</code>, <code>contentSecurityPolicyReportOnly</code>, <code>contentTypeNosniff</code>, <code>customBrowserXSSValue</code>, <code>customFrameOptionsValue</code>, <code>frameDeny</code>, <code>permissionsPolicy</code>, <code>referrerPolicy</code>)</td>
-                            <td><code>nginx.org/add-header</code> <span class="badge badge-new">New v5.5.0</span><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>action.proxy.responseHeaders.add</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>action.proxy.responseHeaders.add</code><span class="or-text">— or —</span><code>nginx.org/add-header</code> <span class="badge badge-new">New v5.5.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
 kind: Middleware
@@ -1413,7 +1413,7 @@ metadata:
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> Traefik builds these response headers from dedicated toggles; the F5 NGINX Ingress Controller has no per-header toggles — you emit the literal header name and value yourself. <code>nginx.org/add-header</code> is new in v5.5.0; values may not contain <code>$</code>, newlines, or unescaped double quotes, and comma-containing values (such as multi-directive <code>Permissions-Policy</code>) break the comma-separated list — use the CRD approach for those. <code>browserXssFilter</code>/<code>customBrowserXSSValue</code> emit <code>X-XSS-Protection</code>, which is deprecated and ignored by modern browsers; <code>contentSecurityPolicyReportOnly</code> emits the report-only <code>Content-Security-Policy-Report-Only</code> header.</div>
                             </div>
-                            <div class="approach-content" data-approach="crd">
+                            <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
 kind: Middleware
@@ -1594,14 +1594,14 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.entrypoints</code></td>
-                            <td><code>nginx.org/listen-ports</code> / <code>nginx.org/listen-ports-ssl</code><span class="or-text">— or —</span><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> <code>listeners</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.listener</code></td>
+                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> <code>listeners</code> + <span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.listener</code><span class="or-text">— or —</span><code>nginx.org/listen-ports</code> / <code>nginx.org/listen-ports-ssl</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -1620,7 +1620,7 @@ metadata:
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> <code>web</code>/<code>websecure</code> map to the F5 NGINX Ingress Controller's default ports 80/443 — if those are the only entryPoints in play, simply remove the annotation. On mergeable Ingress, <code>listen-ports</code> belongs on the master (not minions); host-less Ingress resources use the <code>-default-http-listener-port</code> / <code>-default-https-listener-port</code> flags instead.</div>
                             </div>
-                            <div class="approach-content" data-approach="crd">
+                            <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -2572,14 +2572,14 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Middleware redirectScheme</code></td>
-                            <td><code>nginx.org/http-redirect-code</code> <span class="badge badge-new">New v5.4.0</span> + <code>nginx.org/redirect-to-https</code><span class="or-text">— or —</span><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.redirect</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.redirect</code><span class="or-text">— or —</span><code>nginx.org/http-redirect-code</code> <span class="badge badge-new">New v5.4.0</span> + <code>nginx.org/redirect-to-https</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="approach-tabs">
-                                <button class="approach-tab active" data-action="switchApproach" data-approach="annotation">Annotation Approach (Recommended)</button>
-                                <button class="approach-tab" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
-                            <div class="approach-content active" data-approach="annotation">
+                            <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
 kind: Middleware
@@ -2605,7 +2605,7 @@ spec:
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> <code>nginx.org/redirect-to-https</code> redirects based on the <code>X-Forwarded-Proto</code> header — the right choice when TLS terminates at an external load balancer in front of the controller. When the controller terminates TLS itself, <code>nginx.org/ssl-redirect</code> covers the same redirect based on the connection scheme and already defaults to <code>true</code> once the Ingress has a <code>tls</code> section (the <code>nginx.org/</code> spelling is new in v5.4.0; the legacy <code>ingress.kubernetes.io/ssl-redirect</code> spelling is still accepted). <code>nginx.org/http-redirect-code</code> (301, 302, 307, or 308; default 301) sets the status code for both redirect types and is also available as the ConfigMap key <code>http-redirect-code</code>.</div>
                             </div>
-                            <div class="approach-content" data-approach="crd">
+                            <div class="approach-content active" data-approach="crd">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
 kind: Middleware

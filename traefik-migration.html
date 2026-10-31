@@ -192,7 +192,7 @@
 
         <div class="tool-page active" id="page-getting-started">
         <div class="info-box note" style="margin: 0 0 var(--space-2x);"><strong>Migrating from Traefik?</strong> Traefik Proxy is an actively maintained project — this guide is for teams standardizing on the NGINX data plane. It translates Traefik's IngressRoute + Middleware model into the F5 NGINX Ingress Controller's VirtualServer + Policy model, resource by resource.</div>
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.6" target="_blank" rel="noopener">Traefik Proxy <span data-traefik-version>v3.7.6</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.17" target="_blank" rel="noopener">Traefik Proxy <span data-traefik-version>v3.7.17</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
 
         <section id="overview">
             <h2 id="migration-overview">Overview</h2>
@@ -389,7 +389,7 @@
         </div><!-- /.tool-page #page-getting-started -->
 
         <div class="tool-page" id="page-analyzer" hidden="until-found">
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.6" target="_blank" rel="noopener">Traefik Proxy <span data-traefik-version>v3.7.6</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.17" target="_blank" rel="noopener">Traefik Proxy <span data-traefik-version>v3.7.17</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
         <!-- YAML Migration Analyzer -->
         <section id="analyzer">
             <h2 id="yaml-analyzer">Traefik config analyzer</h2>
@@ -425,7 +425,7 @@ spec:
                     <button class="strategy-option active" data-action="setStrategy" data-strategy="crd" aria-pressed="true">CRD-first (recommended)</button>
                     <button class="strategy-option" data-action="setStrategy" data-strategy="annotation" aria-pressed="false">Annotation-first</button>
                 </div>
-                <span class="strategy-desc" id="strategyDesc">Prefer Policy CRDs and VirtualServer — Traefik CRDs always convert to NIC CRDs</span>
+                <span class="strategy-desc" id="strategyDesc">VirtualServers and Policies throughout; an Ingress stays one only where a setting has no VirtualServer form</span>
             </div>
             <div class="analyzer-actions">
                 <button class="btn btn-primary" data-action="analyzeYaml">Analyze YAML</button>
@@ -456,7 +456,7 @@ spec:
         </div><!-- /.tool-page #page-analyzer -->
 
         <div class="tool-page" id="page-reference" hidden="until-found">
-        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.6" target="_blank" rel="noopener">Traefik Proxy <span data-traefik-version>v3.7.6</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
+        <div class="info-box note" style="margin: 0 0 var(--space-3x);"><strong>Version reference:</strong> This tool is based on <a data-traefik-release-link href="https://github.com/traefik/traefik/releases/tag/v3.7.17" target="_blank" rel="noopener">Traefik Proxy <span data-traefik-version>v3.7.17</span></a> and <a data-nic-release-link href="https://github.com/nginx/kubernetes-ingress/releases/tag/v5.7.0" target="_blank" rel="noopener">F5 NGINX Ingress Controller <span data-nic-version>v5.7.0</span></a>.</div>
         <!-- Key Differences -->
         <section id="differences">
             <h2 id="key-differences">Key differences</h2>

@@ -78,13 +78,13 @@ const SOURCES = {
            kind to gate on. The page documents it; the CLI cannot read it. */
         kinds: ['Ingress', 'IngressRoute', 'IngressRouteTCP', 'IngressRouteUDP',
                 'Middleware', 'MiddlewareTCP', 'ServersTransport', 'ServersTransportTCP',
-                'TLSOption', 'TLSStore', 'TraefikService'],
-        // Every Traefik kind is a unit: an IngressRoute is self-contained
-        // until --whole-input joins it to the Middlewares it names.
-        units: ['Ingress', 'IngressRoute', 'IngressRouteTCP', 'IngressRouteUDP',
-                'Middleware', 'MiddlewareTCP', 'ServersTransport', 'ServersTransportTCP',
-                'TLSOption', 'TLSStore', 'TraefikService'],
-        kubectl: ['ingress', 'ingressroutes.traefik.io', 'ingressroutetcps.traefik.io', 'ingressrouteudps.traefik.io',
+                'TLSOption', 'TLSStore', 'TraefikService', 'Service'],
+        // The routing resources are migrated one by one; Middlewares,
+        // TraefikServices, TLSOptions, ServersTransports and Services are the
+        // run each is resolved against, as Traefik resolves a router's
+        // references (service.* annotations live on the Service).
+        units: ['Ingress', 'IngressRoute', 'IngressRouteTCP', 'IngressRouteUDP'],
+        kubectl: ['ingress', 'service', 'ingressroutes.traefik.io', 'ingressroutetcps.traefik.io', 'ingressrouteudps.traefik.io',
             'middlewares.traefik.io', 'middlewaretcps.traefik.io', 'serverstransports.traefik.io', 'serverstransporttcps.traefik.io',
             'tlsoptions.traefik.io', 'tlsstores.traefik.io', 'traefikservices.traefik.io'],
         unit: 'resource'

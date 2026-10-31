@@ -171,8 +171,11 @@ test('haproxy: what a reader sees names each product in full', () => {
     const fs = require('node:fs'), path = require('node:path');
     const { ROOT } = require('./lib/load.js');
     const { source } = loadAnalyzer('assets/js/migration-haproxy.js');
-    // Page copy and analyzer output are American English (AGENTS.md).
-    const BAD = /\b(NIC|NGF)\b|F5 NGINX Ingress Controller|behaviour|\b\w*([Nn]ormalis|[Rr]ecognis|[Oo]rganis|[Hh]onour|[Cc]olour)\w*/;
+    // Page copy and analyzer output are American English (AGENTS.md). A bare
+    // OSS is out too: NGINX Open Source in full, and HAProxy's own edition is
+    // the community controller. This list copied the ingress-nginx one before
+    // it learned OSS, and 27 sat on the page unseen.
+    const BAD = /\b(NIC|NGF|OSS)\b|F5 NGINX Ingress Controller|behaviour|\b\w*([Nn]ormalis|[Rr]ecognis|[Oo]rganis|[Hh]onour|[Cc]olour)\w*/;
     const found = new Set();
     const walk = (o, where) => {
         if (typeof o === 'string') { if (BAD.test(o)) found.add(where + ': ' + o.match(new RegExp('.{0,40}' + BAD.source + '.{0,20}'))[0]); return; }

@@ -412,3 +412,22 @@ test('the frontends\' default backend is the lowest Ingress by namespace/name (v
     const r = run([withDefault('zeta'), withDefault('alpha')].join('---\n'), 'annotation');
     assert.ok(said(r, /HAProxy ignored this spec\.defaultBackend: .* alpha\./), 'the loser names the winner');
 });
+
+test('CRD-first keeps an Ingress where only an Ingress carries a setting', () => {
+    /* CRD by default, an Ingress where a setting has no CRD form: a rule with
+       no host (a VirtualServer needs one) and spec.defaultBackend (a
+       VirtualServer has none) keep the Ingress, as annotation-first builds
+       it, and say why. An ordinary Ingress still becomes a VirtualServer. */
+    const rules = (host) => [{ host, http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }];
+    const doc = (spec) => Y.stringify({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app' }, spec });
+    const kinds = (r) => [...new Set((r.text.match(/^kind: \w+/gm) || []).map((k) => k.slice(6)))];
+    const kept = (r) => r.plan.infoNotes.some((n) => /Kept as an Ingress under CRD-first/.test(n.message) && n.severity === 'warning');
+    for (const spec of [{ rules: rules(undefined) }, { defaultBackend: { service: { name: 'err', port: { number: 80 } } }, rules: rules('a.example.com') }]) {
+        const r = run(doc(spec), 'crd');
+        assert.deepEqual(kinds(r), ['Ingress'], JSON.stringify(spec));
+        assert.ok(kept(r), 'the reason is a warning');
+    }
+    const plain = run(doc({ rules: rules('a.example.com') }), 'crd');
+    assert.deepEqual(kinds(plain), ['VirtualServer']);
+    assert.ok(!kept(plain));
+});

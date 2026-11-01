@@ -754,7 +754,7 @@ process.stdout.write(JSON.stringify(out));
 # Which analyzer strategy a tab demonstrates. CRD-first replaces the Ingress
 # with a VirtualServer; annotation-first keeps the Ingress, so a Policy that
 # attaches through nginx.org/policies (`ingress-policy`) is annotation-first.
-TAB_STRATEGY = {'crd': 'crd', 'annotation': 'annotation', 'policy': 'annotation',
+TAB_STRATEGY = {'crd': 'crd', 'annotation': 'annotation', 'ingress': 'annotation', 'policy': 'annotation',
                 'ingress-policy': 'annotation', 'vs-policy': 'crd', 'crd-headers': 'crd'}
 
 

@@ -1690,6 +1690,21 @@
         }
 
         // Build the resources for one Ingress.
+        // What an Ingress carries that no VirtualServer can, each a reason it
+        // stays an Ingress under CRD-first: an nginx.org annotation buildCrd
+        // has no field for, a rule with no host (a VirtualServer needs one),
+        // or spec.defaultBackend (a VirtualServer has none). A host served by
+        // passthrough is a TransportServer either way and is not counted.
+        let VS_FORMS = /^nginx\.org\/(basic-auth|limit-req|proxy-set-headers|add-header|proxy-hide-headers|upstream-vhost|lb-method|proxy-http-version|max-fails|max-conns|proxy-(read|send)-timeout|sticky-cookie-services)/;
+        function ingressOnly(model, f, walk) {
+            let why = [];
+            let noForm = Object.keys(f.ann).filter(function(k) { return !VS_FORMS.test(k); });
+            if (noForm.length) why.push(noForm.join(', ') + ' (no VirtualServer field carries ' + (noForm.length > 1 ? 'them' : 'it') + ')');
+            if (model.hostless.length) why.push('a rule with no host (a VirtualServer needs one)');
+            if (model.defaultBackend && (!walk.defaultBackend || walk.defaultBackend === model)) why.push('spec.defaultBackend (a VirtualServer has none)');
+            return why;
+        }
+
         function migrateIngress(model, run, strategy, options, walk) {
             options = options || {};
             let ctx = makeCtx(model, strategy);
@@ -1823,6 +1838,21 @@
             });
 
             f.canary = canaryFor(model, resolved, ctx);
+
+            // CRD-first, except where only an Ingress carries a setting: the
+            // Ingress stays one, as annotation-first builds it, with the reason.
+            // nic-migrate's virtualserver target asks for VirtualServers
+            // regardless (keepIngress false) and is told what it loses.
+            if (strategy === 'crd') {
+                let why = ingressOnly(model, f, walk);
+                if (why.length && options.keepIngress === false) ctx.note('strategy', 'A VirtualServer was asked for, and loses what only an Ingress carries: ' + why.join('; ') + '. Annotation-first (or --target ingress) keeps it.', 'warning');
+                else if (why.length) {
+                    let kept = migrateIngress(model, run, 'annotation', options, walk);
+                    kept.notes.unshift({ name: 'strategy', message: 'Kept as an Ingress under CRD-first: ' + why.join('; ') + '. A VirtualServer would lose ' + (why.length > 1 ? 'them' : 'it') + '.', severity: 'warning' });
+                    kept.keptIngress = why;
+                    return kept;
+                }
+            }
 
             let out = buildAll(model, resolved, f, ctx, options, walk, strategy);
 
@@ -1974,7 +2004,7 @@
             if (Object.keys(f.ann).length) {
                 // A setting that became only an annotation has no VirtualServer field.
                 Object.keys(f.ann).forEach(function(k) {
-                    if (/^nginx\.org\/(basic-auth|limit-req|proxy-set-headers|add-header|proxy-hide-headers|upstream-vhost|lb-method|proxy-http-version|max-fails|max-conns|proxy-(read|send)-timeout|sticky-cookie-services)/.test(k)) return;
+                    if (VS_FORMS.test(k)) return;
                     ctx.note((ctx.annComments[k] || k).split(' ')[0], k + ' has no VirtualServer form; keep an Ingress for it (annotation-first).', 'warning');
                 });
             }
@@ -2356,7 +2386,13 @@
             };
             if (spec.backend && !spec.defaultBackend) { spec.defaultBackend = spec.backend; delete spec.backend; }
             if (spec.defaultBackend) spec.defaultBackend = v1Backend(spec.defaultBackend);
-            if (spec.defaultBackend) ctx.note('default-backend', DEFAULT_BACKEND_NOTE + (Array.isArray(spec.rules) && spec.rules.length ? '' : ' This Ingress has no rules, which NGINX Ingress Controller rejects: give it a rule, host-less with -allow-empty-ingress-host for a catch-all.'), 'warning');
+            // NGINX Ingress Controller rejects an Ingress with no rules
+            // (validation.go: spec.rules Required). HAProxy sent every unmatched
+            // request to the defaultBackend, so a host-less rule to it is the
+            // catch-all, which needs -allow-empty-ingress-host.
+            let catchAll = spec.defaultBackend && isMap(spec.defaultBackend.service) && !(Array.isArray(spec.rules) && spec.rules.length);
+            if (catchAll) spec.rules = [{ http: { paths: [{ path: '/', pathType: 'Prefix', backend: JSON.parse(JSON.stringify(spec.defaultBackend)) }] } }];
+            if (spec.defaultBackend) ctx.note('default-backend', DEFAULT_BACKEND_NOTE + (catchAll ? ' This Ingress had no rules, which NGINX Ingress Controller rejects, so it gets a host-less rule to the same Service: the catch-all, which needs the -allow-empty-ingress-host controller flag (Helm controller.allowEmptyIngressHost=true).' : ''), 'warning');
             let canaryServices = f.canary.map(function(c) { return c.service; });
             // A route-acl Service's own rule carried only HAProxy's custom route
             // (route.go AddCustomRoute adds no map entry for it); kept, it
@@ -3425,7 +3461,7 @@
                     initial: 'crd',
                     descriptions: {
                         annotation: 'Swap to nginx.org/* annotations where possible, use CRDs only when needed',
-                        crd: 'Prefer Policy CRDs and VirtualServer — HAProxy CRs always convert to NGINX Ingress Controller resources'
+                        crd: 'Policy CRDs and VirtualServers; an Ingress stays one only where a setting has no VirtualServer form. HAProxy CRs always convert to NGINX Ingress Controller resources'
                     }
                 },
                 samplePresets: SAMPLE_PRESETS,

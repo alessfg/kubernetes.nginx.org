@@ -469,7 +469,7 @@ spec:
                     <button class="strategy-option active" data-action="setStrategy" data-strategy="crd" aria-pressed="true">CRD-first (recommended)</button>
                     <button class="strategy-option" data-action="setStrategy" data-strategy="annotation" aria-pressed="false">Annotation-first</button>
                 </div>
-                <span class="strategy-desc" id="strategyDesc">Prefer Policy CRDs and VirtualServer — HAProxy CRs always convert to NGINX Ingress Controller resources</span>
+                <span class="strategy-desc" id="strategyDesc">Policy CRDs and VirtualServers; an Ingress stays one only where a setting has no VirtualServer form. HAProxy CRs always convert to NGINX Ingress Controller resources</span>
             </div>
             <div class="analyzer-actions">
                 <button class="btn btn-primary" data-action="analyzeYaml">Analyze YAML</button>
@@ -2897,8 +2897,7 @@ kind: Ingress
 metadata:
   name: my-app
 spec:
-  ingressClassName: nginx  # was haproxy
-  defaultBackend:
+  defaultBackend:  # kept as an Ingress: a VirtualServer has none
     service:
       name: fallback-svc
       port:
@@ -2936,15 +2935,32 @@ metadata:
   name: my-app
 spec:
   rules:
-    - host: "*.example.com"  # leading-label wildcard</code></pre></div>
+    - host: "*.example.com"  # leading-label wildcard
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
 spec:
-  ingressClassName: nginx  # the only edit
   rules:
-    - host: "*.example.com"  # passes through unchanged (leading-label only)</code></pre></div>
+    - host: "*.example.com"  # passes through unchanged (leading-label only)
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content" data-approach="crd">
@@ -2955,13 +2971,30 @@ metadata:
   name: my-app
 spec:
   rules:
-    - host: "*.example.com"  # leading-label wildcard</code></pre></div>
+    - host: "*.example.com"  # leading-label wildcard
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                     <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: my-app
 spec:
-  host: "*.example.com"  # passes through unchanged (leading-label only)</code></pre></div>
+  host: "*.example.com"  # passes through unchanged (leading-label only)
+  upstreams:
+    - name: backend-svc
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend-svc</code></pre></div>
                                 </div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Leading-label wildcards (<code>*.example.com</code>) port unchanged. NGINX Ingress Controller, like HAProxy, does not support mid-label or bare-suffix wildcards, and <code>spec.host</code> must be single and unique across Ingress and VirtualServer resources.</div>

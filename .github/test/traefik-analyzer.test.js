@@ -97,6 +97,8 @@ test('a middleware Traefik refuses to build fails its route, which migrates as n
         ['replacePathRegex', { regex: '[', replacement: '/' }],
         ['replacePathRegex', { regex: '(?<=x)y', replacement: '/' }],
         ['compress', { includedContentTypes: ['text/html'], excludedContentTypes: ['text/css'] }],
+        ['compress', { encodings: ['gzip'], defaultEncoding: 'br' }],
+        ['compress', { includedContentTypes: ['not a type'] }],
         ['headers', {}],
         ['errors', { status: ['500'] }]
     ];
@@ -132,6 +134,38 @@ test('rate-limit burst is Traefik\'s less one, with noDelay, and absent at 0', (
     assert.equal(rl({ average: 0 }), undefined, 'average 0 is no limit (rate.Inf)');
     assert.equal(rl({ average: 100, period: '1m' }).rate, '100r/m');
     assert.equal(rl({ average: 10, period: '1m30s' }).rate !== undefined, true, 'a compound duration is a period');
+});
+
+test('inFlightReq amount 0 refused every request, and the route answers 429', () => {
+    // oxy connlimit: a request is refused once the count reaches the limit,
+    // so a limit of 0 refuses them all; limit_conn takes no 0.
+    const r = run(paste(route(['m']), mw('m', 'inFlightReq', { amount: 0 })));
+    assert.deepEqual(apiRoute(r).action, { return: { code: 429, type: 'text/plain', body: 'Too Many Requests' } });
+    assert.equal(r.plan.configMap, null, 'no limit_conn_zone for a route that refuses everything');
+});
+
+test('HSTS is sent as Traefik sent it: none at stsSeconds 0, preload only when asked', () => {
+    // unrolled/secure sends the header only when STSSeconds is not 0;
+    // nginx.ingress.tmpl appends preload whenever nginx.org/hsts is on.
+    const ing = doc({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app', annotations: { 'traefik.ingress.kubernetes.io/router.middlewares': 'default-h@kubernetescrd' } }, spec: { rules: [{ host: 'a.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }] } });
+    const ann = (o) => kinds(run(paste(ing, mw('h', 'headers', o)), 'annotation'), 'Ingress')[0].metadata.annotations || {};
+    assert.deepEqual(ann({ stsSeconds: 0, frameDeny: true })['nginx.org/hsts'], undefined);
+    assert.ok(!/Strict-Transport-Security/.test(ann({ stsSeconds: 0, frameDeny: true })['nginx.org/add-header'] || ''));
+    assert.equal(ann({ stsSeconds: 600, stsPreload: true })['nginx.org/hsts'], 'true');
+    const noPreload = ann({ stsSeconds: 600 });
+    assert.equal(noPreload['nginx.org/hsts'], undefined, 'nginx.org/hsts would add preload');
+    assert.equal(noPreload['nginx.org/add-header'], 'Strict-Transport-Security: max-age=600: always');
+});
+
+test('redirectRegex matches the whole URL and keeps what it does not replace', () => {
+    // redirect.go: rawURL is scheme://host plus the request URI, and
+    // ReplaceAllString keeps the rest; checked on nginx 1.31.7.
+    const snip = (o) => apiRoute(run(paste(route(['m']), mw('m', 'redirectRegex', o))))['location-snippets'];
+    const full = snip({ regex: '^https?://a.example.com/old/(.*)', replacement: 'https://a.example.com/new/${1}', permanent: true });
+    assert.match(full, /^set \$traefik_url \$scheme:\/\/\$host\$request_uri;$/m);
+    assert.match(full, /^if \(\$traefik_url ~ "\^https\?:\/\/a\.example\.com\/old\/\(\.\*\)"\) \{ return 308 "https:\/\/a\.example\.com\/new\/\$1"; \}$/m);
+    const part = snip({ regex: '/v1/', replacement: '/v2/' });
+    assert.match(part, /~ "\^\(\.\*\?\)\(\?:\/v1\/\)\(\.\*\)\$"\) \{ return 307 "\$1\/v2\/\$2"; \}/);
 });
 
 test('retry attempts count the first try, as next-upstream-tries does', () => {
@@ -182,4 +216,102 @@ test('an annotated Ingress is a VirtualServer under CRD-first, and an Ingress wh
 test('passthrough with several SNIs is a TransportServer each', () => {
     const r = run(doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'IngressRouteTCP', metadata: { name: 'pt' }, spec: { routes: [{ match: 'HostSNI(`a.example.com`) || HostSNI(`b.example.com`)', services: [{ name: 'tls', port: 443 }] }], tls: { passthrough: true } } }));
     assert.deepEqual(kinds(r, 'TransportServer').map((t) => t.spec.host).sort(), ['a.example.com', 'b.example.com']);
+});
+
+test('a TLSOption Traefik refuses fails its routers; one it builds converts its names', () => {
+    // buildTLSConfig (pkg/tls/tlsmanager.go) at v3.7.17, probed with go test.
+    const opt = (name, spec) => doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'TLSOption', metadata: { name, namespace: 'default' }, spec });
+    const ir = (o) => route([], { tls: Object.assign({ secretName: 'a-tls' }, o ? { options: { name: o } } : {}) });
+    // An unknown cipher refuses the option, and with it every router naming it.
+    const down = run(paste(ir('strict'), opt('strict', { cipherSuites: ['TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256', 'NOPE'] })));
+    assert.equal(kinds(down, 'VirtualServer').length, 0);
+    assert.ok(said(down, /cipherSuites names NOPE/));
+    // The default option applies to a router naming none.
+    assert.equal(kinds(run(paste(ir(), opt('default', { curvePreferences: ['prime256v1'] }))), 'VirtualServer').length, 0, 'prime256v1 is not a Traefik curve name');
+    // Go names become OpenSSL names; RC4 is gone from OpenSSL 3.5.
+    const cm = kinds(run(paste(ir(), opt('default', { cipherSuites: ['TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256', 'TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305', 'TLS_RSA_WITH_RC4_128_SHA'], curvePreferences: ['CurveP521', 'secp384r1', 'X25519'] }))), 'ConfigMap')[0].data;
+    assert.equal(cm['ssl-ciphers'], 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-CHACHA20-POLY1305');
+    assert.match(cm['http-snippets'], /^ssl_ecdh_curve secp521r1:secp384r1:X25519;$/m);
+    // An unknown version is ignored, not refused: Go's default stands in.
+    const v = run(paste(ir(), opt('default', { minVersion: 'VersionTLS99', maxVersion: 'VersionTLS12' })));
+    assert.equal(kinds(v, 'ConfigMap')[0].data['ssl-protocols'], 'TLSv1.2');
+    // secretNames with no clientAuthType required a certificate, and the
+    // host's VirtualServer takes the ingressMTLS Policy at spec level.
+    const m = run(paste(ir('mtls'), opt('mtls', { clientAuth: { secretNames: ['ca-a', 'ca-b'] } })));
+    const pol = kinds(m, 'Policy').find((p) => p.spec.ingressMTLS);
+    assert.equal(pol.spec.ingressMTLS.verifyClient, 'on');
+    assert.equal(pol.spec.ingressMTLS.clientCertSecret, 'mtls-client-ca');
+    assert.deepEqual(kinds(m, 'VirtualServer')[0].spec.policies, [{ name: 'mtls-mtls' }]);
+    // A verifying clientAuthType with no CA is refused.
+    assert.equal(kinds(run(paste(ir('v'), opt('v', { clientAuth: { clientAuthType: 'VerifyClientCertIfGiven' } }))), 'VirtualServer').length, 0);
+});
+
+test('a ServersTransport is the egressMTLS Policy and upstream fields of the routes that name it', () => {
+    const st = (spec) => doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'ServersTransport', metadata: { name: 'secure' }, spec });
+    const ir = doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'IngressRoute', metadata: { name: 'app' }, spec: { routes: [
+        { match: 'Host(`a.example.com`) && PathPrefix(`/api`)', kind: 'Rule', services: [{ name: 'api', port: 443, serversTransport: 'secure' }] },
+        { match: 'Host(`a.example.com`)', kind: 'Rule', services: [{ name: 'web', port: 80 }] }] } });
+    const r = run(paste(ir, st({ serverName: 'api.internal', rootCAs: [{ secret: 'ca' }], minVersion: 'VersionTLS12', maxVersion: 'VersionTLS13', cipherSuites: ['TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384'], forwardingTimeouts: { dialTimeout: '5s' }, maxIdleConnsPerHost: 16 })));
+    const em = kinds(r, 'Policy').find((p) => p.spec.egressMTLS).spec.egressMTLS;
+    assert.equal(em.ciphers, 'ECDHE-RSA-AES256-GCM-SHA384');
+    assert.equal(em.protocols, 'TLSv1.2 TLSv1.3');
+    const vs = kinds(r, 'VirtualServer')[0];
+    const api = vs.spec.routes.find((x) => x.path === '/api');
+    assert.deepEqual(api.policies, [{ name: 'secure-egress-mtls' }], 'only the route whose service names it');
+    const up = vs.spec.upstreams.find((u) => u.service === 'api');
+    assert.deepEqual(up.tls, { enable: true }, 'port 443: Traefik spoke HTTPS');
+    assert.equal(up['connect-timeout'], '5s');
+    assert.equal(up.keepalive, 16);
+    assert.equal(vs.spec.upstreams.find((u) => u.service === 'web').tls, undefined);
+    // minVersion with no maxVersion: Traefik v3.7.17 discards the TLS config.
+    assert.ok(said(run(paste(ir, st({ rootCAs: [{ secret: 'ca' }], minVersion: 'VersionTLS12' }))), /discards the TLS settings/));
+});
+
+test('services[] scheme, health checks and PROXY protocol carry over', () => {
+    const svc = (extra) => doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'IngressRoute', metadata: { name: 'app' }, spec: { routes: [{ match: 'Host(`a.example.com`)', kind: 'Rule', services: [Object.assign({ name: 'web', port: 8443 }, extra)] }] } });
+    const up = (r) => kinds(r, 'VirtualServer')[0].spec.upstreams[0];
+    assert.deepEqual(up(run(svc({ scheme: 'https' }))).tls, { enable: true });
+    assert.equal(up(run(svc({}))).tls, undefined);
+    // A Service port named https* is HTTPS to Traefik (parseServiceProtocol).
+    const named = doc({ apiVersion: 'v1', kind: 'Service', metadata: { name: 'web' }, spec: { ports: [{ name: 'https-web', port: 8443 }] } });
+    assert.deepEqual(up(run(paste(svc({}), named))).tls, { enable: true });
+    // passiveHealthCheck is max_fails / fail_timeout, with Traefik's defaults.
+    const p = up(run(svc({ passiveHealthCheck: {} })));
+    assert.equal(p['max-fails'], 1);
+    assert.equal(p['fail-timeout'], '10s');
+    const h = up(run(svc({ healthCheck: { path: '/healthz', interval: '10s' } })));
+    assert.deepEqual(h.healthCheck, { enable: true, path: '/healthz', interval: '10s', 'read-timeout': '5s' });
+    // PROXY protocol: Traefik sends v2 by default, NGINX 1.31.4+ too with "v2".
+    const tcp = (pp) => kinds(run(doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'IngressRouteTCP', metadata: { name: 't' }, spec: { entryPoints: ['mqtt'], routes: [{ match: 'HostSNI(`*`)', services: [{ name: 'mqtt', port: 1883, proxyProtocol: pp }] }] } })), 'TransportServer')[0].spec.serverSnippets;
+    assert.equal(tcp({}).trim(), 'proxy_protocol v2;');
+    assert.equal(tcp({ version: 1 }).trim(), 'proxy_protocol on;');
+});
+
+test('what a reader sees names each product in full', () => {
+    /* The rule analyzer.test.js holds ingress-nginx to and sources.test.js
+       HAProxy: "NGINX Ingress Controller" and "NGINX Open Source" in full,
+       never NIC, NGF, OSS or the F5 prefix, in page copy, the mapping text, the
+       analyzer's output over the presets and every middleware, and every
+       string literal in the module. American spelling in all of it. */
+    const fs = require('node:fs'), path = require('node:path');
+    const { ROOT } = require('./lib/load.js');
+    const BAD = /\b(NIC|NGF|OSS)\b|F5 NGINX Ingress Controller|behaviour|\b\w*([Nn]ormalis|[Rr]ecognis|[Oo]rganis|[Hh]onour|[Cc]olour)\w*/;
+    const found = new Set();
+    const walk = (o, where) => {
+        if (typeof o === 'string') { if (BAD.test(o)) found.add(where + ': ' + o.match(new RegExp('.{0,40}' + BAD.source + '.{0,20}'))[0]); return; }
+        if (o && typeof o === 'object') for (const k of Object.keys(o)) walk(o[k], where);
+    };
+    const mod = fs.readFileSync(path.join(ROOT, 'assets/js/migration-traefik.js'), 'utf8');
+    mod.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+        .forEach((l, i) => { for (const m of l.replace(/\/\/.*$/, '').matchAll(/'((?:[^'\\]|\\.)*)'/g)) walk(m[1], 'migration-traefik.js line ' + (i + 1)); });
+    walk(source.strings, 'strings');
+    walk(source.analyzer.strategies, 'strategies');
+    walk(source.analyzer.mappings, 'mappings');
+    const inputs = Object.values(source.analyzer.samplePresets);
+    for (const [type, opts] of Object.entries(OPTIONS)) for (const [opt, values] of Object.entries(opts)) inputs.push(paste(route(['m']), mw('m', type, { [opt]: values[0] })));
+    for (const y of inputs) for (const s of ['annotation', 'crd']) walk(analyze(source, y, s).plan, 'plan');
+    const html = fs.readFileSync(path.join(ROOT, 'traefik-migration.html'), 'utf8').replace(/<!--[\s\S]*?-->|<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>/g, '');
+    const text = html.replace(/<[^>]+>/g, ' ') + '\n' + [...html.matchAll(/(?:aria-label|title|alt|content)="([^"]*)"/g)].map((m) => m[1]).join('\n');
+    text.split('\n').forEach((l, i) => walk(l, 'traefik-migration.html text line ' + (i + 1)));
+    assert.deepEqual([...found], []);
 });

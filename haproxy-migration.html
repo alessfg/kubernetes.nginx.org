@@ -4537,7 +4537,7 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info main"  # syslog-server (main: the log-format key's format)</code></pre></div>
+  access-log: "syslog:server=10.0.0.1:514,facility=local0 main"  # syslog-server (main: the log-format key's format)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Access log only — there is no ConfigMap key to send the NGINX <em>error</em> log to syslog (only <code>error-log-level</code> controls its verbosity). Single destination (no multi-server fan-out); HAProxy <code>format</code>/<code>length</code>/<code>minlevel</code> fields have no equivalent. NGINX Ingress Controller ignores any <code>access-log</code> value that does not start with <code>syslog:</code>. If HAProxy logged to <code>stdout</code>, that is already the NGINX Ingress Controller default — leave it unset.</div>
                         </div></td></tr>
@@ -5739,7 +5739,7 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info main"
+  access-log: "syslog:server=10.0.0.1:514,facility=local0 main"
   log-format: |
     $remote_addr - $remote_user [$time_local] "$request" $status
     # TODO: hand-translate the HAProxy %-tokens</code></pre></div>

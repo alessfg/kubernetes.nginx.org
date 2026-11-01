@@ -96,7 +96,7 @@ function convert(model, engine, opts) {
 function convertAll(models, engine, opts, runDocs) {
     const strategy = opts.strategy || (opts.target === 'ingress' ? 'annotation' : 'crd');
     const outs = engine.migrateMany(models.map((m) => m.doc), strategy, planOptions(opts), runDocs);
-    const results = outs.map((o, i) => Object.assign(format(models[i], o.out, opts), { mergedInto: o.mergedInto }));
+    const results = outs.map((o, i) => Object.assign(format(models[i], o.out, opts), { mergedInto: o.mergedInto, mergeNote: o.mergeNote || null }));
     // A source that resolves settings across the run (HAProxy) also returns
     // what belongs to the controller: ConfigMap keys, a GlobalConfiguration
     // and TransportServers. Its keys join the merge document; its resources

@@ -88,11 +88,16 @@ test('cors: maxAge always emitted (HAProxy default 5s vs NIC default 86400)', ()
     assert.equal(kinds(run(ingressWith({ 'haproxy.org/cors-enable': 'true' })), 'Policy')[0].spec.cors.maxAge, 5);
 });
 
-test('syslog-server: HAProxy levels err/warning translate to nginx error/warn', () => {
+test('syslog-server: level filters what HAProxy sent, and nginx severity is not that', () => {
+    /* configuration.txt (log): level sends only messages at least as
+       important, and connections are logged at info. nginx's severity= sets
+       the level of each message instead, so it is never written: info and
+       debug keep nginx's default, and err or warning sent no access log. */
     const log = (level) => cm(run(configMap({ 'syslog-server': `address:10.0.0.5, port:514, facility:local0, level:${level}` })))['access-log'];
-    assert.match(log('err'), /severity=error/);
-    assert.match(log('warning'), /severity=warn\b/);
-    assert.match(log('info'), /severity=info/);
+    assert.equal(log('info'), 'syslog:server=10.0.0.5:514,facility=local0 main');
+    assert.equal(log('debug'), 'syslog:server=10.0.0.5:514,facility=local0 main');
+    assert.equal(log('err'), undefined);
+    assert.equal(log('warning'), undefined);
 });
 
 test('ssl-redirect: code is always explicit, defaults to the HAProxy 302, and 303 clamps to 302', () => {

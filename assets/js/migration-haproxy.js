@@ -2630,7 +2630,16 @@
                 if (targets.length > 1) g.note('syslog-server', 'HAProxy sent its log to ' + targets.length + ' targets; NGINX Ingress Controller sends the access log to one, so only the first is migrated.', 'warning');
                 let dest = 'syslog:server=' + t.address + (t.port ? ':' + t.port : '');
                 if (t.facility) dest += ',facility=' + t.facility;
-                if (t.level) { let l = t.level.toLowerCase(); dest += ',severity=' + (l === 'err' ? 'error' : l === 'warning' ? 'warn' : l); }
+                // level filters what HAProxy sends (only messages at least as
+                // important); connections are logged at info. So info or debug
+                // sends them at info, nginx's own severity, and anything more
+                // important sent no access log at all. nginx's severity= stamps
+                // a level on each message, a different thing, so it is not set.
+                let lv = t.level ? t.level.toLowerCase() : null;
+                if (lv && ['emerg', 'alert', 'crit', 'err', 'warning', 'notice'].indexOf(lv) !== -1) {
+                    g.note('syslog-server', 'level ' + t.level + ' sent only messages at least that important, and HAProxy logs connections at info, so no access log reached ' + t.address + '. NGINX Ingress Controller would send every request there; not migrated. Its error log stays on stderr (error-log-level).', 'warning');
+                    return;
+                }
                 // "main" is the format the log-format key defines; without a
                 // name NGINX logs in its predefined combined format, and a
                 // migrated log-format is never used (nginx.tmpl, v5.7.0).

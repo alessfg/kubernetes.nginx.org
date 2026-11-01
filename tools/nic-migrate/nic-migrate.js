@@ -310,7 +310,9 @@ function runConvert(sources, engine, strategy, opts, srcInfo) {
     for (const r of all) {
         if (r.converted.mergedInto !== null && r.converted.mergedInto !== undefined) {
             const into = all[r.converted.mergedInto];
-            into.converted.notes.push('canary Ingress ' + r.model.name + ' merged into this VirtualServer');
+            // The source says why it merged (a Traefik host shared by several
+            // IngressRoutes); otherwise it was a canary Ingress.
+            into.converted.notes.push(r.converted.mergeNote || ('canary Ingress ' + r.model.name + ' merged into this VirtualServer'));
             into.converted.notes.push(...r.converted.notes.map((n) => r.model.name + ': ' + n));
         }
     }

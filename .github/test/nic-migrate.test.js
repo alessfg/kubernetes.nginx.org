@@ -1113,6 +1113,19 @@ test('traefik: --whole-input resolves a Middleware reference that per-document c
     assert.match(together.yaml, /rateLimit/, 'the Middleware became a rateLimit Policy');
 });
 
+test('traefik convert: a note goes to the resource it names, not one whose name prefixes it', () => {
+    /* Notes were routed by prefix, so "IngressRoute shop-b" landed on
+       IngressRoute shop (seen in the e2e). */
+    const ir = (name, host) => ['apiVersion: traefik.io/v1alpha1', 'kind: IngressRoute', 'metadata:', '  name: ' + name, '  namespace: default', 'spec:', '  routes:',
+        '    - match: Host(`' + host + '`)', '      kind: Rule', '      services:', '        - name: web', '          port: 80'].join('\n');
+    const r = cli(['convert', '--source', 'traefik', '--target', 'ingress', '--class', 'nginx-nic', '--json'], [ir('shop', 'a.example.com'), ir('shop-b', 'b.example.com')].join('\n---\n'));
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    const notesOf = (name) => JSON.stringify(out.ingresses.filter((x) => x.name === name).map((x) => x.notes));
+    assert.match(notesOf('shop-b'), /IngressRoute shop-b has no Ingress form/);
+    assert.doesNotMatch(notesOf('shop'), /shop-b/);
+});
+
 test('traefik convert: IngressRoutes on one host become one VirtualServer with their Policies', () => {
     /* convert --source traefik was refused while the module had no whole-run
        assembler. Middlewares, TLSOptions and Services are the run each router
@@ -1131,6 +1144,8 @@ test('traefik convert: IngressRoutes on one host become one VirtualServer with t
     assert.ok(rl, 'the rateLimit Policy');
     assert.equal(rl.spec.rateLimit.burst, 49, 'Traefik burst 50, less the request NGINX always admits');
     assert.doesNotMatch(r.stdout, /# Source: rate-limit/, 'a Middleware is not a unit of its own');
+    assert.match(r.stderr + r.stdout, /IngressRoute web-root shares host app\.example\.com; merged into this VirtualServer/);
+    assert.doesNotMatch(r.stderr + r.stdout, /canary/, 'nothing here is a canary');
 });
 
 test('convert and report say what the page says about a community Ingress the community controller refused', () => {

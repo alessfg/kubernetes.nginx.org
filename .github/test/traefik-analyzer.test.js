@@ -168,6 +168,33 @@ test('redirectRegex matches the whole URL and keeps what it does not replace', (
     assert.match(part, /~ "\^\(\.\*\?\)\(\?:\/v1\/\)\(\.\*\)\$"\) \{ return 307 "\$1\/v2\/\$2"; \}/);
 });
 
+test('a router with tls serves no plain HTTP, and the migration says so', () => {
+    /* GetRoutersByEntryPoints puts a router with tls on the HTTPS handler
+       only, whatever entry points it names: plain HTTP got 404 (seen on
+       Traefik v3.7.17 in the e2e). A VirtualServer with a TLS secret serves
+       plain HTTP too. An Ingress's spec.tls only loads the certificate. */
+    const ir = (tls) => doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'IngressRoute', metadata: { name: 'app' }, spec: Object.assign({ entryPoints: ['web', 'websecure'], routes: [{ match: 'Host(`a.example.com`)', kind: 'Rule', services: [{ name: 'web', port: 80 }] }] }, tls ? { tls: { secretName: 'a-tls' } } : {}) });
+    assert.ok(said(run(ir(true)), /HTTPS only and answered plain HTTP with 404/));
+    assert.ok(!said(run(ir(false)), /HTTPS only/));
+    const ing = doc({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app' }, spec: { tls: [{ hosts: ['a.example.com'], secretName: 'a-tls' }], rules: [{ host: 'a.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }] } });
+    assert.ok(!said(run(ing), /HTTPS only/), 'spec.tls alone leaves the router plain HTTP');
+});
+
+test('a chain is flattened, and said so, whether an IngressRoute or an Ingress names it', () => {
+    const chained = paste(mw('ips', 'ipAllowList', { sourceRange: ['10.0.0.0/8'] }), mw('both', 'chain', { middlewares: [{ name: 'ips' }] }));
+    const ing = doc({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app', annotations: { 'traefik.ingress.kubernetes.io/router.middlewares': 'default-both@kubernetescrd' } }, spec: { rules: [{ host: 'a.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }] } });
+    assert.ok(said(run(paste(chained, route(['both']))), /has no chain/));
+    for (const strategy of ['crd', 'annotation']) assert.ok(said(run(paste(chained, ing), strategy), /has no chain/), strategy);
+});
+
+test('under annotation-first an IngressRoute is still a VirtualServer, and the migration says why', () => {
+    const r = run(route([]), 'annotation');
+    assert.equal(kinds(r, 'VirtualServer').length, 1);
+    assert.equal(kinds(r, 'Ingress').length, 0);
+    assert.ok(said(r, /IngressRoute app has no Ingress form/));
+    assert.ok(!said(run(route([])), /has no Ingress form/), 'CRD-first asked for the VirtualServer');
+});
+
 test('retry attempts count the first try, as next-upstream-tries does', () => {
     // retry.go: attempts == 1 is a single call.
     const up = kinds(run(paste(route(['m']), mw('m', 'retry', { attempts: 3 }))), 'VirtualServer')[0].spec.upstreams.find((u) => u['next-upstream-tries']);

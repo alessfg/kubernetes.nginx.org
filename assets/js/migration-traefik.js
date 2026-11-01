@@ -1310,10 +1310,10 @@
                     let paths = facts.paths.length ? facts.paths : [{ type: 'prefix', value: '/' }];
                     let ups = resolveServices(r.services, run, ir.namespace, ctx, rl);
                     let frags = mergeFragments(chain.mws.filter(function(m) { return !m.missing && !m.external; }).map(function(m) { return fragmentsFor(m, ctx, cache); }));
-                    (chain.chains || []).forEach(function(c) { ctx.note('Middleware ' + c.name + ' (chain)', 'A chain is its middlewares in order; NGINX Ingress Controller has no chain, so each one is applied to the route directly.'); });
+                    (chain.chains || []).forEach(function(c) { ctx.note('Middleware ' + c.name + ' (chain)', CHAIN_NOTE); });
                     hosts.forEach(function(host) {
                         paths.forEach(function(p) {
-                            entries.push({ host: host, namespace: ir.namespace, path: p, conds: matchConditions(facts, ctx, rl), upstreams: ups, f: frags, tls: ir.tls,
+                            entries.push({ host: host, namespace: ir.namespace, path: p, conds: matchConditions(facts, ctx, rl), upstreams: ups, f: frags, tls: ir.tls, routerTls: !!ir.tls,
                                 source: { kind: 'IngressRoute', name: ir.name, route: ri, match: r.match }, mws: chain.mws, ingressClassName: ir.ingressClassName, entryPoints: ir.entryPoints, priority: r.priority });
                         });
                     });
@@ -1517,10 +1517,22 @@
                 c['spec.tls.redirect.code'] = tr.source + (tr.code === 308 ? ' permanent — 308 keeps the method (Traefik: 301 for GET)' : ' — 307 keeps the method (Traefik: 302 for GET)');
                 if (!spec.tls.secret) ctx.note(tr.source, 'Host ' + host + ' has no TLS here, so the redirect leads to an HTTPS server NGINX Ingress Controller does not serve for it; add the host\'s TLS Secret.', 'warning');
                 // tls.redirect turns away plain HTTP for the whole host: a route
-                // that served plain HTTP without the redirect loses that. One on
-                // websecure only never saw plain HTTP.
-                let plainServed = entries.filter(function(e) { return !e.f.tlsRedirect && !(list(e.entryPoints).length && list(e.entryPoints).every(function(ep) { return ep === 'websecure'; })); });
+                // that served plain HTTP without the redirect loses that. A
+                // router with tls serves no plain HTTP on any entry point
+                // (GetRoutersByEntryPoints), so only one without tls did.
+                let plainServed = entries.filter(function(e) { return !e.f.tlsRedirect && !e.routerTls; });
                 if (plainServed.length) ctx.note(tr.source, 'tls.redirect redirects plain HTTP for the whole host; ' + plainServed.map(function(e) { return e.source.name; }).filter(function(v, i, a) { return a.indexOf(v) === i; }).join(', ') + ' also served plain HTTP without the redirect, which it no longer does.', 'warning');
+                // On a router with tls the middleware never ran: Traefik served
+                // that router over HTTPS only, so nothing reached it to redirect.
+                // tls.redirect does what the HTTPS-only host amounted to.
+                if (entries.filter(function(e) { return e.f.tlsRedirect; }).every(function(e) { return e.routerTls; })) ctx.note(tr.source, 'The routers that list it have TLS, so Traefik served them over HTTPS only and the redirect never ran (plain HTTP got 404). tls.redirect sends plain HTTP to HTTPS instead, the usual intent.');
+            } else if (entries.length && entries.every(function(e) { return e.routerTls; }) && spec.tls && spec.tls.secret) {
+                // Every router on the host has tls (an IngressRoute's tls, an
+                // Ingress's router.tls; spec.tls only loads the certificate),
+                // so Traefik served it over HTTPS only: plain HTTP got 404. A
+                // VirtualServer with a TLS secret serves plain HTTP too, and
+                // cannot refuse it; tls.redirect is the usual intent.
+                ctx.note('Host ' + host, 'Every router on this host has TLS (IngressRoute tls, or router.tls on an Ingress), so Traefik served it over HTTPS only and answered plain HTTP with 404. A VirtualServer with a TLS secret also serves plain HTTP; set spec.tls.redirect (enable: true) to send it to HTTPS instead.', 'warning');
             }
             spec.routes = routes.map(function(r, ri) {
                 let out = { path: r.path };
@@ -1681,6 +1693,7 @@
                 entryPoints: str(get('router.entrypoints')).split(',').map(function(s) { return s.trim(); }).filter(Boolean)
             };
         }
+        const CHAIN_NOTE = 'A chain is its middlewares in order; NGINX Ingress Controller has no chain, so each one is applied to the route directly.';
         function ingressPathFacts(p, cfg, ctx, label) {
             if (p.pathType === 'Exact') return { type: 'exact', value: p.path };
             if (p.pathType === 'Prefix') return { type: 'prefix', value: p.path };
@@ -1704,6 +1717,7 @@
             let missing = chain.mws.filter(function(x) { return x.missing; });
             if (missing.length) { ctx.note(label, 'router.middlewares names ' + missing.map(function(x) { return x.ref.raw; }).join(', ') + ', which is not in the paste. Traefik refuses a router whose middleware does not exist; paste it to migrate this Ingress.', 'warning'); return { entries: [], cfg: cfg, down: true }; }
             let frags = mergeFragments(chain.mws.filter(function(x) { return !x.missing && !x.external; }).map(function(x) { return fragmentsFor(x, ctx, cache); }));
+            (chain.chains || []).forEach(function(c) { ctx.note('Middleware ' + c.name + ' (chain)', CHAIN_NOTE); });
             let entries = [];
             m.hosts.forEach(function(h) {
                 h.paths.forEach(function(p) {
@@ -1716,7 +1730,7 @@
                     let up = { service: p.backend.service, port: p.backend.port, weight: 1, sticky: sa.sticky, passHostHeader: sa.passHostHeader, serversTransport: sa.serversTransport, ingressScheme: sa.scheme };
                     let f = frags;
                     if (sa.frags) f = mergeFragments([sa.frags, frags]);
-                    entries.push({ host: h.host, namespace: m.namespace, path: pf, conds: [], upstreams: [up], f: f, tls: h.tlsSecret !== null ? { secretName: h.tlsSecret || null, certResolver: cfg.certResolver, options: cfg.tlsOptions ? { name: cfg.tlsOptions } : null } : (cfg.tls ? { secretName: null, certResolver: cfg.certResolver } : null),
+                    entries.push({ host: h.host, namespace: m.namespace, path: pf, conds: [], upstreams: [up], f: f, routerTls: cfg.tls, tls: h.tlsSecret !== null ? { secretName: h.tlsSecret || null, certResolver: cfg.certResolver, options: cfg.tlsOptions ? { name: cfg.tlsOptions } : null } : (cfg.tls ? { secretName: null, certResolver: cfg.certResolver } : null),
                         source: { kind: 'Ingress', name: m.name, match: 'Host(`' + h.host + '`) && ' + (pf.type === 'exact' ? 'Path' : pf.type === 'regex' ? 'PathRegexp' : 'PathPrefix') + '(`' + p.path + '`)' }, mws: chain.mws, ingressClassName: m.ingressClassName, svcAnn: sa, entryPoints: cfg.entryPoints });
                 });
             });
@@ -2309,6 +2323,10 @@
                 }
                 if (!m.hosts.length && !m.hostless.length && m.defaultBackend) ctx.note('Ingress ' + (m.name || ''), 'Has only a defaultBackend, which NGINX Ingress Controller rejects (an Ingress needs a rule); give it a host-less rule with -allow-empty-ingress-host for a catch-all.', 'warning');
             });
+            if (strategy === 'annotation') run.ingressRoutes.forEach(function(ir) {
+                if (entries.some(function(e) { return e.source.kind === 'IngressRoute' && e.source.name === ir.name; }))
+                    ctx.note('IngressRoute ' + ir.name, 'IngressRoute ' + ir.name + ' has no Ingress form (its match rules, middlewares and services are VirtualServer fields), so it is a VirtualServer under annotation-first too.');
+            });
             // Group the route entries by namespace and host.
             let groups = {}, order = [];
             entries.forEach(function(e) { let k = (e.namespace || '') + '\u0000' + e.host; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(e); });
@@ -2553,25 +2571,33 @@
             let units = docs.map(function(d) { return { kind: str(d && d.kind), name: str(d && d.metadata && d.metadata.name) }; });
             let outFor = units.map(function() { return { docs: [], comments: [], notes: [], todos: [], unsupported: [], unrecognized: [], configMap: null, sources: [] }; });
             let mergedInto = units.map(function() { return null; });
+            let mergeNote = units.map(function() { return null; });
             let indexOf = function(kind, name) { return units.findIndex(function(u) { return u.kind === kind && u.name === name; }); };
             all.results.forEach(function(r) {
                 let owners = r.model ? [indexOf('Ingress', r.model.name)] : (r.entries || []).map(function(e) { return indexOf(e.source.kind, e.source.name); }).filter(function(i, k, a) { return i !== -1 && a.indexOf(i) === k; });
                 if (!owners.length || owners[0] === -1) return;
                 r.docs.forEach(function(d, i) { outFor[owners[0]].docs.push(d); outFor[owners[0]].comments.push(r.comments[i]); });
-                owners.slice(1).forEach(function(o) { if (mergedInto[o] === null) mergedInto[o] = owners[0]; });
+                owners.slice(1).forEach(function(o) {
+                    if (mergedInto[o] !== null) return;
+                    mergedInto[o] = owners[0];
+                    let host = r.entries && r.entries[0] && r.entries[0].host;
+                    mergeNote[o] = units[o].kind + ' ' + units[o].name + (host ? ' shares host ' + host : '') + '; merged into this VirtualServer';
+                });
             });
             all.tcp.docs.forEach(function(d, i) {
                 let o = units.findIndex(function(u) { return /^IngressRoute(TCP|UDP)$/.test(u.kind) && d.metadata.name.indexOf(dnsName(u.name)) === 0; });
                 if (o !== -1) { outFor[o].docs.push(d); outFor[o].comments.push(all.tcp.comments[i]); }
             });
-            // Notes go to the unit they name, else to the controller.
+            // Notes go to the unit they name (the label alone, or with
+            // " route N"), else to the controller: a prefix would give
+            // IngressRoute shop-b's notes to IngressRoute shop.
             let rest = [];
             all.ctx.notes.forEach(function(n) {
-                let o = units.findIndex(function(u) { return str(n.code).indexOf(u.kind + ' ' + u.name) === 0; });
+                let o = units.findIndex(function(u) { let label = u.kind + ' ' + u.name, c = str(n.code); return c === label || c.indexOf(label + ' ') === 0; });
                 (o !== -1 ? outFor[o].notes : rest).push({ name: n.code, message: n.message, severity: n.severity });
             });
             let g = all.controller;
-            let outs = outFor.map(function(o, i) { return { out: o, mergedInto: mergedInto[i] }; });
+            let outs = outFor.map(function(o, i) { return { out: o, mergedInto: mergedInto[i], mergeNote: mergeNote[i] }; });
             outs.controller = { docs: g.docs, comments: g.comments, notes: rest, todos: all.ctx.todos, unsupported: [], unrecognised: [], cmData: g.cm, cmComments: g.cmComments };
             return outs;
         }

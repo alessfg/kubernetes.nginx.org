@@ -884,7 +884,20 @@ TRAEFIK_ROUTERS = r'^kind: (Ingress|IngressRoute|IngressRouteTCP|IngressRouteUDP
 
 def complete_traefik(old, new, strategy):
     if re.search(TRAEFIK_ROUTERS, old, re.M):
-        return with_spec(old) if 'kind: Ingress' in old else old
+        # Per document: a Middleware's spec is not the Ingress's.
+        return '\n---\n'.join(with_spec(d) if re.search(r'^kind: Ingress\s*$', d, re.M) else d
+                               for d in re.split(r'^---\s*$\n?', old, flags=re.M))
+    # A MiddlewareTCP needs the IngressRouteTCP that names it, on the entry
+    # point and Service the TransportServer shows.
+    tcp = re.findall(r'^kind: MiddlewareTCP\s*\nmetadata:\s*\n(?:\s+[\w-]+:.*\n)*?\s+name:\s*(\S+)', old + '\n', re.M)
+    if tcp:
+        ep = re.search(r'^\s+listener:\s*\n\s+name:\s*([\w-]+)', new, re.M)
+        port = re.search(r'^\s+port:\s*(\d+)', new, re.M)
+        return (old.rstrip('\n') + '\n---\napiVersion: traefik.io/v1alpha1\nkind: IngressRouteTCP\nmetadata:\n  name: my-app\nspec:\n'
+                '  entryPoints:\n    - %s\n  routes:\n    - match: HostSNI(`*`)\n      middlewares:\n%s'
+                '      services:\n        - name: %s\n          port: %s\n'
+                % (ep.group(1) if ep else 'tcp', ''.join('        - name: %s\n' % n for n in tcp),
+                   backend_service(new), port.group(1) if port else '80'))
     names = lambda kind: re.findall(r'^kind: %s\s*\nmetadata:\s*\n(?:\s+[\w-]+:.*\n)*?\s+name:\s*(\S+)' % kind, old + '\n', re.M)
     mws, tss = names('Middleware'), names('TraefikService')
     if not mws and not tss:
@@ -1601,6 +1614,14 @@ NO_RESOURCE_TABS = {('haproxy-migration.html', 'crd-frontend', t): 'a Frontend C
                     'GlobalConfiguration listeners and ConfigMap keys the reader sets, which the analyzer names in notes'
                     for t in ['crd#binds', 'annotation#binds', '(single)#ssl', '(single)#accept_proxy', '(single)#httplog',
                               '(single)#http_request_rule_list', '(single)#binds']}
+NO_RESOURCE_TABS.update({
+    ('traefik-migration.html', 'routing', '(single)#HostRegexp(...)'):
+        'a regex host has no VirtualServer form, and the analyzer cannot list the hosts it matched',
+    ('traefik-migration.html', 'tls-certificates', '(single)#TLSOption spec.sniStrict'):
+        'sniStrict is the controller running without -default-server-tls-secret, which the analyzer names in a note',
+    ('traefik-migration.html', 'tls-certificates', '(single)#TLSStore'):
+        'Traefik picks a store certificate by the SANs in its Secret, which the paste does not hold; '
+        'the analyzer names each Secret in a note'})
 
 
 def mapping_keys():

@@ -287,6 +287,10 @@ python3 tools/nic-migrate/e2e/run-e2e.py --skip-cluster
 # The HAProxy Kubernetes Ingress Controller as the source, either target
 python3 tools/nic-migrate/e2e/run-e2e.py --source haproxy
 python3 tools/nic-migrate/e2e/run-e2e.py --source haproxy --target ingress
+
+# Traefik Proxy as the source, either target
+python3 tools/nic-migrate/e2e/run-e2e.py --source traefik
+python3 tools/nic-migrate/e2e/run-e2e.py --source traefik --target ingress
 ```
 
 Needs `kubectl`, `helm`, `node`, and `openssl`, plus `kind` and `docker` unless
@@ -298,7 +302,18 @@ place. The fixture is `manifests/haproxy-source.yaml`: the Ingress, the
 annotated Services HAProxy reads backend settings from, and the controller
 ConfigMap, which the runner sets through the chart (`HAPROXY_CONFIG`) instead
 of applying it. The chart's image tag must match `HAPROXY_APP_VERSION` unless
-you pass `--source-chart`. CI runs both sources.
+you pass `--source-chart`.
+
+With `--source traefik` the fixture is `manifests/traefik-source.yaml`:
+Middlewares and IngressRoutes on the same two hosts and three backends. The
+runner installs the chart with the image tag `TRAEFIK_APP_VERSION`, which
+`check-versions.py` holds to the release the Traefik guide is written against.
+An IngressRoute has no Ingress form, so `--target ingress` still converts it to
+a VirtualServer. One case is a known difference: Traefik serves a route with
+`tls` over HTTPS only and answers plain HTTP with 404, while the VirtualServer
+serves both (the analyzer says so and offers `tls.redirect`).
+
+CI runs every source.
 
 Every stage after the first compares against the recorded stage-1 baseline
 rather than against literals. The assertion is equivalence: each case goes to

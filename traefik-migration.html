@@ -2068,7 +2068,16 @@ spec:
                             </div>
                             <div class="approach-content active" data-approach="ingress-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                    <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: office-ips
+spec:
+  ipAllowList:
+    sourceRange:
+      - 203.0.113.0/24
+---
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
@@ -2080,7 +2089,7 @@ metadata:
 apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: office-ips-policy
+  name: my-app-allow
 spec:
   accessControl:
     allow:  # Middleware office-ips sourceRange
@@ -2092,28 +2101,48 @@ kind: Ingress
 metadata:
   name: my-app
   annotations:
-    nginx.org/policies: "office-ips-policy"  # default-office-ips@kubernetescrd
+    nginx.org/policies: "my-app-allow"  # default-office-ips@kubernetescrd
 # ... rest of Ingress spec</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> Convert each referenced Middleware first — see its row in this guide. Only some Policy types attach to Ingress via <code>nginx.org/policies</code> (requires <code>-enable-custom-resources</code>): <code>accessControl</code> and <code>cors</code> (v5.4.0+); <code>egressMTLS</code>, <code>externalAuth</code>, and <code>ingressMTLS</code> (v5.5.0+). <code>basicAuth</code> and <code>rateLimit</code> are not Ingress-attachable — on Ingress use the <code>nginx.org/basic-auth-*</code> and <code>nginx.org/limit-req-*</code> annotations instead.</div>
                             </div>
                             <div class="approach-content" data-approach="vs-policy">
                                 <div class="comparison">
-                                    <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                    <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: office-ips
+spec:
+  ipAllowList:
+    sourceRange:
+      - 203.0.113.0/24
+---
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
     # &lt;namespace&gt;-&lt;name&gt;@kubernetescrd
     traefik.ingress.kubernetes.io/router.middlewares: default-office-ips@kubernetescrd</code></pre></div>
-                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Convert the referenced Middleware to a Policy
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-allow
+spec:
+  accessControl:
+    allow:  # Middleware office-ips sourceRange
+      - 203.0.113.0/24
+---
+# 2. Attach it on the VirtualServer
+apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: my-app
 spec:
   host: app.example.com
   policies:
-    - name: office-ips-policy  # default-office-ips@kubernetescrd
+    - name: my-app-allow  # default-office-ips@kubernetescrd
   upstreams:
     - name: backend
       service: backend-svc
@@ -2217,11 +2246,16 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.tls</code></td>
-                            <td><span class="badge badge-ingress">Ingress</span> <code>spec.tls[].secretName</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.tls.secret</code><span class="or-text">— or —</span><span class="badge badge-ingress">Ingress</span> <code>spec.tls[].secretName</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
+                            </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
@@ -2229,24 +2263,88 @@ metadata:
     traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   ingressClassName: traefik
-  rules:
-    - host: app.example.com
-# ... paths omitted</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app  # annotation removed — TLS comes from spec.tls
-spec:
-  ingressClassName: nginx
   tls:
     - hosts:
-        - app.example.com  # router.tls: "true"
+        - app.example.com
       secretName: app-tls-secret
   rules:
     - host: app.example.com
-# ... paths omitted</code></pre></div>
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  tls:
+    secret: app-tls-secret  # spec.tls[].secretName; router.tls needs no field
+  upstreams:
+    - name: backend-svc
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend-svc</code></pre></div>
+                                </div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The NGINX Ingress Controller derives TLS from the Ingress <code>spec.tls</code> block (on VirtualServer: <code>spec.tls.secret</code>) — no annotation needed. With TLS configured, HTTP requests are redirected to HTTPS by default (<code>nginx.org/ssl-redirect</code> defaults to true).</div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls-secret
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># The annotation is removed: TLS comes from spec.tls
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls-secret
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> <code>router.tls</code> makes the router HTTPS-only: Traefik answers plain HTTP for that host with 404. NGINX Ingress Controller derives TLS from <code>spec.tls</code> with no annotation, and by default answers plain HTTP too: a VirtualServer serves it unless <code>spec.tls.redirect</code> is enabled, and an Ingress redirects it to HTTPS (<code>nginx.org/ssl-redirect</code> defaults to true).</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.tls.certresolver</code><br><code>traefik.ingress.kubernetes.io/router.tls.domains.n.main</code> / <code>.sans</code></td>
@@ -2914,6 +3012,35 @@ spec:
                                     <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
+  name: office-ips
+spec:
+  ipAllowList:
+    sourceRange:
+      - 203.0.113.0/24
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-cors
+spec:
+  headers:
+    accessControlAllowOriginList:
+      - https://app.example.com
+    accessControlAllowMethods:
+      - GET
+      - POST
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: auth-check
+spec:
+  forwardAuth:
+    address: http://auth-svc.default.svc:8080/check
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
   name: secure-api
 spec:
   chain:
@@ -2937,31 +3064,93 @@ spec:
       services:
         - name: backend-svc
           port: 80</code></pre></div>
-                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No chain construct — convert each chained Middleware to its own
-# Policy (see its row in this guide), then list the Policies directly.
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. No chain construct — each chained Middleware becomes its own
+#    Policy (see its row in this guide)
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-allow
+spec:
+  accessControl:
+    allow:  # office-ips (ipAllowList)
+      - 203.0.113.0/24
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: api-cors-cors
+spec:
+  cors:  # api-cors (headers CORS)
+    allowOrigin:
+      - https://app.example.com
+    allowMethods:
+      - GET
+      - POST
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: auth-check-external-auth
+spec:
+  externalAuth:  # auth-check (forwardAuth)
+    authURI: /check
+    authServiceName: default/auth-svc
+    authServicePorts:
+      - 8080
+---
+# 2. List the Policies directly, in chain order
 apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: my-app
 spec:
   host: api.example.com
-  policies:                    # chain.middlewares — list order is preserved
-    - name: office-ips-policy  # office-ips (ipAllowList → accessControl)
-    - name: api-cors-policy    # api-cors (headers CORS → cors)
-    - name: auth-check-policy  # auth-check (forwardAuth → externalAuth)
+  policies:  # chain.middlewares — list order is preserved
+    - name: my-app-allow
+    - name: api-cors-cors
+    - name: auth-check-external-auth
   upstreams:
-    - name: backend
+    - name: backend-svc
       service: backend-svc
       port: 80
   routes:
     - path: /
       action:
-        pass: backend</code></pre></div>
+        pass: backend-svc</code></pre></div>
                                 </div>
                             </div>
                             <div class="approach-content" data-approach="annotation">
                                 <div class="comparison">
                                     <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: office-ips
+spec:
+  ipAllowList:
+    sourceRange:
+      - 203.0.113.0/24
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-cors
+spec:
+  headers:
+    accessControlAllowOriginList:
+      - https://app.example.com
+    accessControlAllowMethods:
+      - GET
+      - POST
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: auth-check
+spec:
+  forwardAuth:
+    address: http://auth-svc.default.svc:8080/check
+---
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: secure-api
@@ -2970,17 +3159,79 @@ spec:
     middlewares:            # applied in order
       - name: office-ips    # ipAllowList
       - name: api-cors      # headers (CORS)
-      - name: auth-check    # forwardAuth</code></pre></div>
-                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No chain construct — convert each chained Middleware to its own
-# Policy, then attach them all with one comma-separated list.
+      - name: auth-check    # forwardAuth
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
   annotations:
-    # chain.middlewares — comma-list order is preserved
-    nginx.org/policies: "office-ips-policy,api-cors-policy,auth-check-policy"
-# ... rest of Ingress spec</code></pre></div>
+    traefik.ingress.kubernetes.io/router.middlewares: default-secure-api@kubernetescrd
+spec:
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. No chain construct — each chained Middleware becomes its own
+#    Policy (see its row in this guide)
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: my-app-allow
+spec:
+  accessControl:
+    allow:  # office-ips (ipAllowList)
+      - 203.0.113.0/24
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: api-cors-cors
+spec:
+  cors:  # api-cors (headers CORS)
+    allowOrigin:
+      - https://app.example.com
+    allowMethods:
+      - GET
+      - POST
+---
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: auth-check-external-auth
+spec:
+  externalAuth:  # auth-check (forwardAuth)
+    authURI: /check
+    authServiceName: default/auth-svc
+    authServicePorts:
+      - 8080
+---
+# 2. Attach them all with one comma-separated list, in chain order
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/policies: "my-app-allow,api-cors-cors,auth-check-external-auth"  # chain.middlewares — list order is preserved
+spec:
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80</code></pre></div>
                                 </div>
                                 <div class="info-box note"><strong>Note:</strong> <code>nginx.org/policies</code> requires the <code>-enable-custom-resources</code> flag. Only some Policy types attach to Ingress resources: <code>accessControl</code> and <code>cors</code> since v5.4.0; <code>egressMTLS</code>, <code>externalAuth</code>, and <code>ingressMTLS</code> since v5.5.0. Policy types that are not Ingress-attachable (such as <code>basicAuth</code> and <code>rateLimit</code>) use their annotation equivalents (<code>nginx.org/basic-auth-secret</code>, <code>nginx.org/limit-req-rate</code>) on the same Ingress instead.</div>
                             </div>
@@ -4538,6 +4789,15 @@ spec:
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-ratelimit
+spec:
+  rateLimit:
+    average: 100
+    burst: 50
+---
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: production-api
@@ -4558,7 +4818,22 @@ spec:
           weight: 1
   tls:
     secretName: api-tls</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. The route's Middleware becomes a Policy (see Rate limiting)
+apiVersion: k8s.nginx.org/v1
+kind: Policy
+metadata:
+  name: api-ratelimit-rate-limit
+spec:
+  rateLimit:
+    rate: "100r/s"  # average/period
+    key: ${binary_remote_addr}
+    zoneSize: "10M"
+    rejectCode: 429  # Traefik answers 429
+    burst: 49  # burst 50, less the request NGINX always admits
+    noDelay: true
+---
+# 2. The IngressRoute becomes a VirtualServer
+apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: production-api
@@ -4566,8 +4841,8 @@ spec:
   host: api.example.com  # Host(`api.example.com`)
   tls:
     secret: api-tls  # tls.secretName
-  policies:
-    - name: api-ratelimit-policy  # from routes[].middlewares (converted rateLimit Policy)
+  policies:  # routes[].middlewares
+    - name: api-ratelimit-rate-limit
   upstreams:
     - name: api-v1  # services[].name
       service: api-v1
@@ -4579,11 +4854,13 @@ spec:
     - path: /api  # Host(`api.example.com`) &amp;&amp; PathPrefix(`/api`)
       splits:
         - weight: 75  # weight 3 normalized (splits must sum to 100)
-          action: { pass: api-v1 }
+          action:
+            pass: api-v1
         - weight: 25  # weight 1 normalized (splits must sum to 100)
-          action: { pass: api-v2 }</code></pre></div>
+          action:
+            pass: api-v2</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>entryPoints: [websecure]</code> maps to the standard HTTPS listener. Custom entry points/ports map to GlobalConfiguration HTTP listeners referenced via VirtualServer <code>spec.listener</code>, or <code>nginx.org/listen-ports</code> on Ingress. Each middleware converts per its own section — <code>api-ratelimit</code> becomes a <code>rateLimit</code> Policy referenced from <code>policies[]</code> (see <a href="#rate-limiting">Rate limiting &amp; concurrency</a>); middlewares without Policy equivalents (rewrites, headers, …) move into the route's <code>action.proxy</code> instead (see <a href="#rewrites">Rewrites</a> and <a href="#headers">CORS &amp; headers</a>). Traefik service weights are relative; <code>splits[]</code> weights are percentages that must sum to 100 (minimum two splits).</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>entryPoints: [websecure]</code> maps to the standard HTTPS listener. Custom entry points/ports map to GlobalConfiguration HTTP listeners referenced via VirtualServer <code>spec.listener</code>, or <code>nginx.org/listen-ports</code> on Ingress. Each middleware converts per its own section — <code>api-ratelimit</code> becomes a <code>rateLimit</code> Policy referenced from <code>policies[]</code> (see <a href="#rate-limiting">Rate limiting &amp; concurrency</a>); middlewares without Policy equivalents (rewrites, headers, …) move into the route's <code>action.proxy</code> instead (see <a href="#rewrites">Rewrites</a> and <a href="#headers">CORS &amp; headers</a>). Traefik service weights are relative; <code>splits[]</code> weights are percentages that must sum to 100 (minimum two splits). An IngressRoute with <code>tls</code> is HTTPS-only — Traefik answers plain HTTP with 404 — while a VirtualServer with a TLS secret also serves plain HTTP; set <code>spec.tls.redirect</code> (<code>enable: true</code>) to send it to HTTPS instead.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td>No direct equivalent</td>
@@ -4926,7 +5203,19 @@ spec:
   inFlightConn:
     amount: 100
 # attach via IngressRouteTCP routes[].middlewares</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Closest equivalent: per-upstream-server connection cap
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Define the TCP listener once per cluster
+apiVersion: k8s.nginx.org/v1
+kind: GlobalConfiguration
+metadata:
+  name: nginx-configuration
+  namespace: nginx-ingress  # -global-configuration=nginx-ingress/nginx-configuration
+spec:
+  listeners:
+    - name: mqtt  # entryPoints: mqtt
+      port: 1883  # the port the entryPoint listened on
+      protocol: TCP
+---
+# 2. Closest equivalent: per-upstream-server connection cap
 # (NOT per-client-IP like inFlightConn)
 apiVersion: k8s.nginx.org/v1
 kind: TransportServer
@@ -4934,7 +5223,7 @@ metadata:
   name: conn-limit-ts
 spec:
   listener:
-    name: mqtt  # your GlobalConfiguration TCP listener
+    name: mqtt  # GlobalConfiguration listener above
     protocol: TCP
   upstreams:
     - name: backend
@@ -4962,14 +5251,26 @@ spec:
       - 10.0.0.0/8
       - 172.16.0.0/12
 # attach via IngressRouteTCP routes[].middlewares</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># TransportServer has no ACL field — use serverSnippets
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># 1. Define the TCP listener once per cluster
+apiVersion: k8s.nginx.org/v1
+kind: GlobalConfiguration
+metadata:
+  name: nginx-configuration
+  namespace: nginx-ingress  # -global-configuration=nginx-ingress/nginx-configuration
+spec:
+  listeners:
+    - name: mqtt  # entryPoints: mqtt
+      port: 1883  # the port the entryPoint listened on
+      protocol: TCP
+---
+# 2. TransportServer has no ACL field — use serverSnippets
 apiVersion: k8s.nginx.org/v1
 kind: TransportServer
 metadata:
   name: office-ips-ts
 spec:
   listener:
-    name: mqtt  # your GlobalConfiguration TCP listener
+    name: mqtt  # GlobalConfiguration listener above
     protocol: TCP
   serverSnippets: |
     allow 10.0.0.0/8;  # sourceRange

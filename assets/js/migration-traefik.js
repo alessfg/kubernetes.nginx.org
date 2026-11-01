@@ -282,7 +282,9 @@
             let ann = isMap(md && md.annotations) ? md.annotations : {};
             Object.keys(ann).forEach(function(k) {
                 if (k.indexOf(TRAEFIK_ANNOTATION_PREFIX) !== 0) return;
-                let suffix = k.slice(TRAEFIK_ANNOTATION_PREFIX.length);
+                // paerser matches a label to a field case-insensitively
+                // (labels_decode.go: strings.EqualFold), so .httpOnly is .httponly.
+                let suffix = k.slice(TRAEFIK_ANNOTATION_PREFIX.length).toLowerCase();
                 out[suffix] = { value: str(ann[k]), key: k, lookup: suffix.replace(/^router\.tls\.domains\.\d+\./, 'router.tls.domains.n.') };
             });
             return out;
@@ -375,6 +377,16 @@
                 m.type = types[0] || null;
                 m.extraTypes = types.slice(1);
                 m.options = m.type && isMap(spec[m.type]) ? spec[m.type] : (m.type ? {} : null);
+                // spec.plugin.<name>: a plugin from Traefik's static
+                // configuration, which is how Traefik Hub ships its middlewares
+                // (jwt, oidc, apiKey, coraza…). The plugin name is the type.
+                if (m.type === 'plugin' && isMap(m.options)) {
+                    let names = Object.keys(m.options);
+                    m.plugin = true;
+                    m.type = names[0] || 'plugin';
+                    m.options = names[0] && isMap(m.options[names[0]]) ? m.options[names[0]] : {};
+                    m.pluginCount = names.length;
+                }
             }
             return m;
         }
@@ -449,6 +461,9 @@
                 run[p[0]].forEach(function(c) { add('kind:' + p[1], p[1] + ' ' + c.name, '', p[1] + ' ' + c.name); });
             });
             run.unknown.forEach(function(c) { add('kind:' + c.kind, c.kind + ' ' + c.name, '', c.kind + ' ' + c.name); });
+            run.ingressRoutes.forEach(function(ir) { ir.routes.forEach(function(r) { r.services.forEach(function(s) {
+                ['healthCheck', 'passiveHealthCheck'].forEach(function(k) { if (isMap(s[k])) add('service:' + k, 'IngressRoute ' + ir.name + ' service ' + str(s.name) + ' ' + k, '', 'IngressRoute ' + ir.name); });
+            }); }); });
             if (run.services.some(function(s) { return Object.keys(s.traefik).length; })) {
                 warnings.push({ title: 'Service annotations detected', message: 'Traefik reads its service.* annotations from the Service an Ingress routes to, not from the Ingress; NGINX Ingress Controller reads none from Services. Each one is applied to the routes that reach that Service in the migrated resources.' });
             }
@@ -482,8 +497,13 @@
             compress: function(o) {
                 if (list(o.excludedContentTypes).length && list(o.includedContentTypes).length) return 'sets excludedContentTypes and includedContentTypes, which are mutually exclusive';
                 if (o.encodings !== undefined && !list(o.encodings).length) return 'lists no encoding';
-                let bad = list(o.encodings).filter(function(e) { return ['gzip', 'br', 'zstd', 'identity'].indexOf(str(e)) === -1; });
-                return bad.length ? 'names an unsupported encoding (' + bad.join(', ') + ')' : null;
+                let encs = o.encodings === undefined ? ['gzip', 'br', 'zstd'] : list(o.encodings).map(str);
+                let bad = encs.filter(function(e) { return ['gzip', 'br', 'zstd'].indexOf(e) === -1; });
+                if (bad.length) return 'names an unsupported encoding (' + bad.join(', ') + ')';
+                if (o.defaultEncoding !== undefined && str(o.defaultEncoding) !== '' && encs.indexOf(str(o.defaultEncoding)) === -1) return 'has defaultEncoding ' + o.defaultEncoding + ', which encodings does not list';
+                // mime.ParseMediaType: a type/subtype token pair.
+                let mt = list(o.includedContentTypes).concat(list(o.excludedContentTypes)).map(str).filter(function(t) { return !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+(\s*;.*)?$/.test(t); });
+                return mt.length ? 'has "' + mt[0] + '", which is not a media type' : null;
             },
             errors: function(o) { return statusCodes(o.status) === null ? 'has a status entry that is not a code or range' : (o.service ? null : 'names no service'); },
             // An empty address builds (NewForward does not check it); only a bad
@@ -518,6 +538,8 @@
         };
         function refusedBecause(mw) {
             if (!mw || !mw.type) return null;
+            // findPluginConfig: exactly one plugin per Middleware.
+            if (mw.plugin && mw.pluginCount !== 1) return 'plugin names ' + (mw.pluginCount ? mw.pluginCount + ' plugins' : 'no plugin') + ', and Traefik takes exactly one';
             let check = REFUSED[mw.type];
             return check ? check(isMap(mw.options) ? mw.options : {}) : null;
         }
@@ -530,6 +552,7 @@
         //   f.upstream[field]   VirtualServer upstream field for the route's upstreams
         //   f.proxy             route action.proxy fields (requestHeaders, responseHeaders, rewritePath)
         //   f.redirect          { url, code } — the route redirects instead of proxying
+        //   f.deny              { code } — the route answers that status instead of proxying
         //   f.errorPages        routes[].errorPages entries
         //   f.location          location-snippets lines
         //   f.policies          [{ name, spec, ingress: 'nginx.org/policies'|'nginx.com/policies'|null, comments, plus }]
@@ -567,7 +590,21 @@
                 if (max) { f.upstream['client-max-body-size'] = { value: max, source: mw.label + ' maxRequestBodyBytes' }; f.ann['nginx.org/client-max-body-size'] = { value: max, source: mw.label }; }
                 if (mem) f.upstream['client-body-buffer-size'] = { value: mem, source: mw.label + ' memRequestBodyBytes' };
                 if (o.maxResponseBodyBytes !== undefined || o.memResponseBodyBytes !== undefined) ctx.note(mw.label, 'NGINX has no response-body cap: maxResponseBodyBytes and memResponseBodyBytes are not migrated (tune proxy buffering instead).', 'warning');
-                if (o.retryExpression) ctx.note(mw.label, 'retryExpression has no equivalent; next-upstream conditions are the nearest.', 'warning');
+                // retryExpression (oxy buffer): retried while it holds, attempt
+                // counting the first try, at most 10. IsNetworkError() is a 502
+                // or 504 from the last try, which NGINX's error, timeout and
+                // http_502/http_504 cover; Attempts() < N is N tries in all.
+                if (o.retryExpression) {
+                    let ex = str(o.retryExpression).replace(/\s+/g, '');
+                    let m = ex.match(/^IsNetworkError\(\)(?:&&Attempts\(\)(<=|<)(\d+))?$/) || ex.match(/^Attempts\(\)(<=|<)(\d+)&&IsNetworkError\(\)$/);
+                    if (m) {
+                        let tries = m[2] === undefined ? 11 : Math.min(11, m[1] === '<=' ? +m[2] + 1 : +m[2]);
+                        f.upstream['next-upstream'] = { value: 'error timeout http_502 http_504', source: mw.label + ' retryExpression IsNetworkError() — a 502 or 504 from the last try' };
+                        if (tries > 1) f.upstream['next-upstream-tries'] = { value: tries, source: mw.label + ' retryExpression — ' + tries + ' tries in all (Attempts() counts the first)' };
+                        f.ann['nginx.org/proxy-next-upstream'] = { value: 'error timeout http_502 http_504', source: mw.label + ' retryExpression' };
+                        if (tries > 1) f.ann['nginx.org/proxy-next-upstream-tries'] = { value: String(tries), source: mw.label + ' retryExpression' };
+                    } else ctx.note(mw.label, 'retryExpression "' + cmt(o.retryExpression) + '" has no next-upstream form the analyzer can read (it reads IsNetworkError() and Attempts() < N); set next-upstream and next-upstream-tries by hand.', 'warning');
+                }
                 if (!max && !mem && o.maxResponseBodyBytes === undefined && o.memResponseBodyBytes === undefined && !o.retryExpression) ctx.note(mw.label, 'Sets no limit, so Traefik buffered with its defaults; NGINX buffers request bodies by default. Nothing to migrate.');
             },
 
@@ -578,12 +615,23 @@
                 ctx.note(mw.label, 'NGINX Ingress Controller has no expression-based circuit breaker: the expression "' + cmt(o.expression) + '" becomes passive failure counting (max-fails 3 within fail-timeout). Active health checks are NGINX Plus (upstreams[].healthCheck).', 'warning');
             },
 
+            // gzip in the route's location, as Traefik compressed per router:
+            // every type but application/grpc unless includedContentTypes
+            // lists some (gzip_types *), at least minResponseBodyBytes (1024
+            // when unset or not positive), proxied responses included.
             compress: function(o, f, ctx, mw) {
-                let min = o.minResponseBodyBytes === undefined ? 1024 : goInt(o.minResponseBodyBytes);
-                f.http.push('gzip on;', 'gzip_min_length ' + (min === null ? 1024 : min) + ';', 'gzip_proxied any;',
-                    'gzip_types ' + (list(o.includedContentTypes).length ? list(o.includedContentTypes).join(' ') : 'text/plain text/css application/json application/javascript text/xml application/xml') + ';');
-                f.httpSource = mw.label;
-                ctx.note(mw.label, 'NGINX Ingress Controller has no compression key, so gzip is http-snippets (global, every resource). Brotli and zstd need modules the image does not ship.' + (list(o.excludedContentTypes).length ? ' excludedContentTypes has no gzip form; gzip_types lists what to compress instead.' : ''), 'warning');
+                let min = goInt(o.minResponseBodyBytes);
+                if (min === null || min <= 0) min = 1024;
+                let inc = list(o.includedContentTypes).map(function(t) { return str(t).split(';')[0].trim(); });
+                let src = mw.label;
+                f.location.push({ line: 'gzip on;', source: src }, { line: 'gzip_min_length ' + min + ';', source: src }, { line: 'gzip_proxied any;', source: src },
+                    { line: 'gzip_types ' + (inc.length ? inc.join(' ') : '*') + ';', source: src });
+                let encs = o.encodings === undefined ? ['gzip', 'br', 'zstd'] : list(o.encodings).map(str);
+                let notes = [];
+                if (encs.indexOf('gzip') === -1) notes.push('encodings lists no gzip, the one NGINX Open Source ships, so the route compresses with gzip anyway; leave it out to keep Traefik\'s choice');
+                else if (encs.some(function(e) { return e !== 'gzip'; })) notes.push('Brotli and zstd need NGINX modules the image does not ship, so clients that asked for them get gzip');
+                if (list(o.excludedContentTypes).length) notes.push('excludedContentTypes has no gzip form: gzip_types lists what to compress, so the route compresses every type (*), excluded ones included; list the types to compress instead');
+                ctx.note(mw.label, 'gzip in location-snippets (-enable-snippets), on the routes that used the middleware.' + (notes.length ? ' ' + notes.join('. ') + '.' : ''), notes.length ? 'warning' : 'note');
             },
 
             contentType: function(o, f, ctx, mw) { ctx.note(mw.label, 'NGINX passes Content-Type through and never sniffs it: nothing to migrate.'); },
@@ -648,15 +696,16 @@
                 if (o.referrerPolicy) sec.push(header('Referrer-Policy', o.referrerPolicy));
                 if (o.permissionsPolicy) sec.push(header('Permissions-Policy', o.permissionsPolicy));
                 sec.forEach(function(h) { f.resAdd.push({ h: h, source: mw.label + ' security headers' }); });
-                // HSTS: Traefik sends it only over TLS, as add_header does on an HTTPS server.
-                // STSSeconds set at all is a secure header (HasSecureHeadersDefined:
-                // != nil), so 0 sends max-age=0, which tells browsers to drop HSTS.
+                // HSTS: unrolled/secure sends it when STSSeconds is not 0, over
+                // TLS only (forceSTSHeader aside), as add_header does on an
+                // HTTPS server. stsSeconds 0 builds the middleware and sends
+                // no header.
                 let sts = goInt(o.stsSeconds);
-                if (sts !== null && sts >= 0) {
+                if (sts !== null && sts > 0) {
                     f.hsts = { maxAge: sts, includeSubdomains: o.stsIncludeSubdomains === true, preload: o.stsPreload === true, source: mw.label };
-                    if (sts === 0) ctx.note(mw.label, 'stsSeconds 0 sent Strict-Transport-Security: max-age=0, which tells browsers to forget HSTS for the host; it is kept.');
-                } else if (o.stsSeconds !== undefined) ctx.note(mw.label, 'stsSeconds "' + cmt(o.stsSeconds) + '" is not a whole number of seconds, which the Middleware CRD refuses; nothing is migrated for it.', 'warning');
-                if (o.forceSTSHeader) ctx.note(mw.label, 'forceSTSHeader also sent HSTS over plain HTTP; NGINX Ingress Controller sends it over HTTPS only, which is what browsers honour.');
+                } else if (sts === 0) ctx.note(mw.label, 'stsSeconds 0 sends no Strict-Transport-Security header; nothing to migrate.');
+                else if (o.stsSeconds !== undefined) ctx.note(mw.label, 'stsSeconds "' + cmt(o.stsSeconds) + '" is not a whole number of seconds, which the Middleware CRD refuses; nothing is migrated for it.', 'warning');
+                if (o.forceSTSHeader) ctx.note(mw.label, 'forceSTSHeader also sent HSTS over plain HTTP; NGINX Ingress Controller sends it over HTTPS only, which is what browsers honor.');
                 // CORS.
                 let hasCors = list(o.accessControlAllowOriginList).length || list(o.accessControlAllowOriginListRegex).length || list(o.accessControlAllowMethods).length
                     || list(o.accessControlAllowHeaders).length || o.accessControlAllowCredentials === true || list(o.accessControlExposeHeaders).length || o.accessControlMaxAge !== undefined;
@@ -697,12 +746,19 @@
                 let sc = isMap(o.sourceCriterion) ? o.sourceCriterion : {};
                 // inFlightReq groups by host unless told otherwise (New: requestHost by default).
                 let key = sc.requestHeaderName ? '$http_' + str(sc.requestHeaderName).toLowerCase().replace(/-/g, '_') : (sc.ipStrategy ? '$binary_remote_addr' : '$host');
+                // amount 0 (or unset): oxy's connlimit refuses a request once the
+                // count reaches the limit, so every request got 429. limit_conn
+                // takes no 0, so the route answers 429 itself.
+                if (n === null || n <= 0) {
+                    f.deny = { code: 429, source: mw.label + ' amount ' + (o.amount === undefined ? 'unset' : str(o.amount)) };
+                    ctx.note(mw.label, 'amount is ' + (o.amount === undefined ? 'unset' : str(o.amount)) + ', so Traefik refused every request with 429; the route answers 429 as it did.', 'warning');
+                    return;
+                }
                 let zone = dnsName(mw.name + '-conn').replace(/-/g, '_');
                 f.http.push('limit_conn_zone ' + key + ' zone=' + zone + ':10m;');
                 f.httpSource = mw.label;
-                f.location.push({ line: 'limit_conn ' + zone + ' ' + (n === null || n <= 0 ? 1 : n) + ';', source: mw.label });
+                f.location.push({ line: 'limit_conn ' + zone + ' ' + n + ';', source: mw.label });
                 f.location.push({ line: 'limit_conn_status 429;', source: mw.label + ' — Traefik answers 429' });
-                if (n === null || n <= 0) ctx.todo(mw.label, 'the concurrent-request limit: amount ' + str(o.amount) + ' is not a positive number');
                 ctx.note(mw.label, 'Concurrent-request limiting has no Policy: it is limit_conn in location-snippets with its zone in http-snippets, keyed as Traefik grouped (' + key + ').', 'warning');
             },
 
@@ -710,21 +766,48 @@
                 f.allow.push({ ranges: list(o.sourceRange).map(str), source: mw.label, mw: mw });
                 let code = goInt(o.rejectStatusCode);
                 if (code && code !== 403) ctx.note(mw.label, 'rejectStatusCode ' + code + ': the accessControl Policy always answers 403.', 'warning');
-                if (isMap(o.ipStrategy) && (o.ipStrategy.depth !== undefined || list(o.ipStrategy.excludedIPs).length)) {
-                    cm(f, 'set-real-ip-from', list(o.ipStrategy.excludedIPs).join(',') || '0.0.0.0/0', mw.label + ' ipStrategy — the trusted proxies');
-                    cm(f, 'real-ip-header', 'X-Forwarded-For', mw.label + ' ipStrategy');
-                    cm(f, 'real-ip-recursive', 'True', mw.label + ' ipStrategy');
-                    ctx.note(mw.label, 'ipStrategy is per middleware in Traefik and global in NGINX Ingress Controller (set-real-ip-from, real-ip-header): every resource then sees the forwarded client address. Set set-real-ip-from to the proxies in front.', 'warning');
+                // ipStrategy (IPStrategy.Get): depth N takes the Nth address
+                // from the right of X-Forwarded-For, and wins over excludedIPs,
+                // which takes the rightmost address not in the list. NGINX's
+                // real_ip without recursion takes the rightmost (depth 1); with
+                // recursion it skips trusted addresses (excludedIPs). Either way
+                // NGINX must trust the proxy in front, which only the reader
+                // knows: trusting 0.0.0.0/0 would let a client write its own
+                // address into the header and pass the allow list.
+                let ips = isMap(o.ipStrategy) ? o.ipStrategy : null;
+                let depth = ips ? goInt(ips.depth) : null;
+                let excl = ips ? list(ips.excludedIPs).map(str) : [];
+                if (ips && depth > 0) {
+                    cm(f, 'real-ip-header', 'X-Forwarded-For', mw.label + ' ipStrategy.depth');
+                    cm(f, 'set-real-ip-from', '10.0.0.0/8', 'TODO: the proxies in front of NGINX Ingress Controller (' + mw.label + ' ipStrategy); never 0.0.0.0/0');
+                    ctx.todo('nginx-config set-real-ip-from', 'the address range of the proxy in front of NGINX Ingress Controller, in place of 10.0.0.0/8 (never 0.0.0.0/0: a client could then write its own address into X-Forwarded-For and pass the allow list)');
+                    if (depth === 1) cm(f, 'real-ip-recursive', 'False', mw.label + ' ipStrategy.depth 1 — the rightmost address, as Traefik took');
+                    else ctx.note(mw.label, 'ipStrategy.depth ' + depth + ' took the ' + depth + 'th address from the right of X-Forwarded-For; NGINX takes the rightmost one, or skips the trusted ones (real-ip-recursive). List the ' + (depth - 1) + ' proxies between in set-real-ip-from and set real-ip-recursive to True for the same address.', 'warning');
+                    ctx.note(mw.label, 'ipStrategy is per middleware in Traefik and global in NGINX Ingress Controller: every resource then sees the address from X-Forwarded-For.', 'warning');
+                } else if (ips && excl.length) {
+                    cm(f, 'real-ip-header', 'X-Forwarded-For', mw.label + ' ipStrategy.excludedIPs');
+                    cm(f, 'set-real-ip-from', excl.join(','), mw.label + ' ipStrategy.excludedIPs — TODO: add the proxy in front of NGINX Ingress Controller');
+                    cm(f, 'real-ip-recursive', 'True', mw.label + ' ipStrategy.excludedIPs — the rightmost address not listed, as Traefik took');
+                    ctx.todo('nginx-config set-real-ip-from', 'the address range of the proxy in front of NGINX Ingress Controller, added to the excludedIPs');
+                    ctx.note(mw.label, 'ipStrategy is per middleware in Traefik and global in NGINX Ingress Controller: every resource then sees the address from X-Forwarded-For.', 'warning');
                 }
             },
 
             passTLSClientCert: function(o, f, ctx, mw) {
-                if (o.pem === true) f.reqSet.push({ h: header('X-Forwarded-Tls-Client-Cert', '${ssl_client_escaped_cert}'), source: mw.label + ' pem' });
+                // Traefik sends every certificate the client presented, as bare
+                // base64 (PEM without its BEGIN/END lines or newlines), comma
+                // joined; $ssl_client_escaped_cert is the leaf, URL-encoded
+                // PEM with those lines. info is one URL-encoded header of
+                // the chosen fields, Subject="…";Issuer="…".
+                if (o.pem === true) {
+                    f.reqSet.push({ h: header('X-Forwarded-Tls-Client-Cert', '${ssl_client_escaped_cert}'), source: mw.label + ' pem — the leaf as URL-encoded PEM' });
+                    ctx.note(mw.label, 'pem: Traefik sent each certificate of the chain as bare base64 (no BEGIN/END lines), comma-separated; NGINX sends the client certificate alone, as URL-encoded PEM. A backend that parses the header needs to accept that form.', 'warning');
+                }
                 if (isMap(o.info)) {
                     f.reqSet.push({ h: header('X-Forwarded-Tls-Client-Cert-Info', 'Subject="${ssl_client_s_dn}";Issuer="${ssl_client_i_dn}"'), source: mw.label + ' info' });
-                    ctx.note(mw.label, 'Traefik builds X-Forwarded-Tls-Client-Cert-Info field by field (info.subject, info.issuer, notAfter, sans); NGINX has the whole subject and issuer DNs, so the header carries those.', 'warning');
+                    ctx.note(mw.label, 'info: Traefik built X-Forwarded-Tls-Client-Cert-Info from the fields it lists (subject and issuer parts, serialNumber, notBefore, notAfter, sans), URL-encoded; NGINX has the whole subject and issuer DNs in RFC 2253 order, so the header carries those, unencoded.', 'warning');
                 }
-                ctx.note(mw.label, 'The certificate exists only when NGINX asks for it: attach an ingressMTLS Policy to the host as well.');
+                ctx.note(mw.label, 'NGINX has a client certificate only when the host asks for one, as Traefik did only under a TLSOption with clientAuth: the host needs the ingressMTLS Policy that TLSOption migrates to.');
             },
 
             rateLimit: function(o, f, ctx, mw) {
@@ -751,24 +834,36 @@
                 f.ann['nginx.org/limit-req-rate'] = { value: rate, source: mw.label };
                 if (burst > 0) { f.ann['nginx.org/limit-req-burst'] = { value: String(burst), source: mw.label }; f.ann['nginx.org/limit-req-no-delay'] = { value: 'true', source: mw.label }; }
                 f.ann['nginx.org/limit-req-reject-code'] = { value: '429', source: mw.label };
+                if (spec.key !== '${binary_remote_addr}') f.ann['nginx.org/limit-req-key'] = { value: spec.key, source: mw.label + ' sourceCriterion' };
                 if (rate !== perSec + 'r/s' && !/r\/m$/.test(rate)) ctx.note(mw.label, avg + ' per ' + period + 's is ' + perSec.toFixed(3) + ' per second; NGINX takes whole requests per second or minute, so ' + rate + ' is the nearest.', 'warning');
                 ctx.note(mw.label, 'Traefik delays a request up to half the token interval before refusing it; NGINX with noDelay refuses at once past the burst.');
                 if (o.redis) ctx.note(mw.label, 'Redis-backed limiting is cluster-wide; NGINX Ingress Controller counts per replica unless NGINX Plus zone synchronization shares the zone.', 'warning');
                 if (isMap(sc.ipStrategy)) ctx.note(mw.label, 'sourceCriterion.ipStrategy is global in NGINX Ingress Controller (set-real-ip-from, real-ip-header).', 'warning');
             },
 
+            // redirectRegex (redirect.go): the regex runs on the whole URL,
+            // scheme://host[:port] and the request URI with its query; a match
+            // is replaced (ReplaceAllString) and the rest of the URL kept, and
+            // a URL it does not match goes on unchanged. In location-snippets,
+            // the same URL in a variable, the match wrapped to keep what
+            // precedes and follows it, and return with the code.
             redirectRegex: function(o, f, ctx, mw) {
                 let permanent = o.permanent === true;
-                let replacement = str(o.replacement);
-                if (/\$\{?\d/.test(replacement)) {
-                    let to = replacement.replace(/\$\{(\d)\}/g, '$$$1');
-                    f.location.push({ line: 'rewrite ' + cmt(o.regex) + ' ' + cmt(to) + ' ' + (permanent ? 'permanent' : 'redirect') + ';', source: mw.label });
-                    ctx.note(mw.label, 'The replacement uses capture groups, which a VirtualServer redirect cannot, so it is an NGINX rewrite in location-snippets. Traefik matched the regex against the whole URL (scheme://host/path); rewrite matches the path only, so drop the scheme and host from the regex.', 'warning');
-                } else {
-                    f.redirect = { url: replacement || 'https://example.com', code: permanent ? 308 : 307, source: mw.label };
-                    if (!replacement) ctx.todo(mw.label, 'the redirect URL');
-                    ctx.note(mw.label, 'Traefik answered ' + (permanent ? '301 (GET) or 308' : '302 (GET) or 307') + '; NGINX takes one code, so ' + (permanent ? 308 : 307) + ', which keeps the method. The redirect applies to every request the route matches; Traefik redirected only those its regex matched.');
-                }
+                let code = permanent ? 308 : 307;
+                let re = str(o.regex);
+                let anchored = /^\^/.test(re);
+                let body = re.replace(/^\^/, '');
+                let groups = 0;
+                try { groups = new RegExp(body + '|').exec('').length - 1; } catch (e) { groups = 0; }
+                let tail = !/(\.\*\)?|\$)$/.test(body);
+                let shift = anchored ? 0 : 1;
+                if (groups + shift + (tail ? 1 : 0) > 9) { ctx.note(mw.label, 'The regex has more groups than an NGINX return can name; write the redirect by hand.', 'warning'); return; }
+                let to = str(o.replacement).replace(/\$\{(\d)\}/g, '$$$1').replace(/\$(\d)/g, function(_, d) { return '$' + (+d + shift); });
+                let pattern = '^' + (anchored ? '' : '(.*?)') + (anchored && !tail ? body : '(?:' + body + ')' + (tail ? '(.*)$' : ''));
+                let target = (anchored ? '' : '$1') + to + (tail ? '$' + (groups + shift + 1) : '');
+                f.location.push({ line: 'set $traefik_url $scheme://$host$request_uri;', source: mw.label + ' — the URL Traefik matched' });
+                f.location.push({ line: 'if ($traefik_url ~ "' + pattern.replace(/"/g, '\\"') + '") { return ' + code + ' "' + target.replace(/"/g, '\\"') + '"; }', source: mw.label + ' regex → replacement' });
+                ctx.note(mw.label, 'Traefik answered ' + (permanent ? '301 to GET and 308 to other methods' : '302 to GET and 307 to other methods') + '; NGINX takes one code, ' + code + ', which keeps the method. The redirect is location-snippets (-enable-snippets): a VirtualServer redirect takes a fixed URL and redirects every request on the route, where Traefik redirected only the URLs its regex matched.' + (/:\/\/[^/]*:\d/.test(re) ? ' $host carries no port; a regex that matches one needs $http_host in the set line.' : ''), 'warning');
             },
 
             redirectScheme: function(o, f, ctx, mw) {
@@ -789,7 +884,7 @@
 
             replacePathRegex: function(o, f, ctx, mw) {
                 f.rewrite = { kind: 'replacePathRegex', regex: str(o.regex), to: str(o.replacement).replace(/\$\{(\d)\}/g, '$$$1'), source: mw.label };
-                ctx.note(mw.label, 'Traefik also sent the original path in X-Replaced-Path, and its regex is RE2 (NGINX: PCRE); check the pattern. Since v3.7.17 Traefik answers 400 when the rewritten path is not canonical (".." or "//"); NGINX normalises the rewritten path instead.');
+                ctx.note(mw.label, 'Traefik also sent the original path in X-Replaced-Path, and its regex is RE2 (NGINX: PCRE); check the pattern. Since v3.7.17 Traefik answers 400 when the rewritten path is not canonical (".." or "//"); NGINX normalizes the rewritten path instead.');
             },
 
             retry: function(o, f, ctx, mw) {
@@ -823,8 +918,76 @@
             stripPrefixRegex: function(o, f, ctx, mw) {
                 f.rewrite = { kind: 'stripPrefixRegex', regexes: list(o.regex).map(str), source: mw.label };
                 ctx.note(mw.label, 'Traefik also sent the stripped prefix in X-Forwarded-Prefix, and its regex is RE2 (NGINX: PCRE); check the pattern.');
+            },
+
+            // --- Traefik Hub (spec.plugin.<name>) -------------------------------
+            // Each becomes the Policy that does its job, with what the options
+            // do not carry left as a TODO: an invalid Policy, or one naming a
+            // Secret that does not exist, answers 500, so the route stays
+            // closed until it is filled in, as Traefik's was.
+            jwt: function(o, f, ctx, mw) {
+                let spec = { realm: 'traefik' };
+                let c = { 'spec.jwt.realm': mw.label + ' — Traefik sends no realm; NGINX Ingress Controller requires one' };
+                if (o.jwksUrl) { spec.jwksURI = str(o.jwksUrl); c['spec.jwt.jwksURI'] = mw.label + ' jwksUrl'; }
+                else {
+                    spec.secret = dnsName(mw.name + '-jwk');
+                    c['spec.jwt.secret'] = mw.label + (o.signingSecret ? ' signingSecret' : o.publicKey ? ' publicKey' : ' jwksFile') + ' — as a JWK set in a Secret of type nginx.org/jwk, key jwk';
+                    ctx.todo(mw.label, 'the Secret ' + spec.secret + ' (type nginx.org/jwk, key jwk): the ' + (o.signingSecret ? 'signingSecret as an oct JWK' : o.publicKey ? 'publicKey as a JWK' : 'jwksFile') + '; NGINX reads keys only as a JWK set');
+                }
+                if (o.tokenKey) { spec.token = '$arg_' + str(o.tokenKey); c['spec.jwt.token'] = mw.label + ' tokenKey — the query parameter (Traefik also read form data)'; }
+                f.policies.push({ name: dnsName(mw.name + '-jwt'), spec: { jwt: spec }, ingress: null, plus: true, comments: c });
+                let lost = ['claims', 'forwardHeaders', 'usernameClaim', 'forwardAuthorization'].filter(function(k) { return o[k] !== undefined; });
+                ctx.note(mw.label, 'The jwt Policy needs NGINX Plus and attaches to a VirtualServer only.' + (lost.length ? ' ' + lost.join(', ') + ' have no jwt Policy field: claims checks and claim headers are NGINX Plus $jwt_claim_* variables in snippets.' : ''), 'warning');
+            },
+            oidc: function(o, f, ctx, mw) {
+                let spec = { issuer: str(o.issuer) || 'https://issuer.example.com', clientID: str(o.clientId) || 'client-id' };
+                let c = { 'spec.oidcNative.issuer': mw.label + ' issuer', 'spec.oidcNative.clientID': mw.label + ' clientId' };
+                if (!o.issuer) ctx.todo(mw.label, 'the issuer URL');
+                if (!o.clientId) ctx.todo(mw.label, 'the client ID');
+                spec.clientSecret = dnsName(mw.name + '-oidc-client');
+                c['spec.oidcNative.clientSecret'] = mw.label + ' clientSecret — a Secret of type nginx.org/oidc, key client-secret';
+                ctx.todo(mw.label, 'the Secret ' + spec.clientSecret + ' (type nginx.org/oidc, key client-secret) holding the client secret');
+                if (list(o.scopes).length) { spec.scope = list(o.scopes).map(str).join('+'); c['spec.oidcNative.scope'] = mw.label + ' scopes'; }
+                if (o.redirectUrl) { spec.redirectURI = str(o.redirectUrl); c['spec.oidcNative.redirectURI'] = mw.label + ' redirectUrl'; }
+                f.policies.push({ name: dnsName(mw.name + '-oidc'), spec: { oidcNative: spec }, ingress: 'nginx.org/policies', plus: true, comments: c });
+                let lost = ['claims', 'forwardHeaders', 'logoutUrl', 'loginUrl', 'disableLogin', 'session', 'stateCookie'].filter(function(k) { return o[k] !== undefined; });
+                ctx.note(mw.label, 'The oidcNative Policy needs NGINX Plus and NGINX Ingress Controller started with -enable-oidc.' + (lost.length ? ' ' + lost.join(', ') + ' have no oidcNative field; not migrated.' : ''), 'warning');
+            },
+            apiKey: function(o, f, ctx, mw) {
+                let ks = isMap(o.keySource) ? o.keySource : {};
+                let si = {};
+                if (ks.header) si.header = [str(ks.header)];
+                if (ks.query) si.query = [str(ks.query)];
+                if (!si.header && !si.query) { si.header = ['X-API-Key']; ctx.todo(mw.label, 'where clients send the key (Traefik read ' + (ks.cookie ? 'the cookie ' + ks.cookie + ', which the apiKey Policy cannot' : 'no keySource') + ')'); }
+                let spec = { suppliedIn: si, clientSecret: dnsName(mw.name + '-api-keys') };
+                f.policies.push({ name: dnsName(mw.name + '-api-key'), spec: { apiKey: spec }, ingress: null, comments: {
+                    'spec.apiKey.suppliedIn': mw.label + ' keySource', 'spec.apiKey.clientSecret': mw.label + ' secretValues — a Secret of type nginx.org/apikey, one client ID per key and its API key in clear' } });
+                ctx.todo(mw.label, 'the Secret ' + spec.clientSecret + ' (type nginx.org/apikey): one entry per client, the API key in clear; Traefik kept only hashes (secretValues), so the keys are issued again');
+                ctx.note(mw.label, 'The apiKey Policy attaches to a VirtualServer only.' + (ks.headerAuthScheme ? ' keySource.headerAuthScheme has no field: the Policy compares the whole header value.' : ''), 'warning');
+            },
+            coraza: function(o, f, ctx, mw) {
+                f.policies.push({ name: dnsName(mw.name + '-waf'), spec: { waf: { enable: true, apBundle: dnsName(mw.name) + '.tgz' } }, ingress: 'nginx.com/policies', plus: true,
+                    comments: { 'spec.waf.apBundle': mw.label + ' — the Coraza directives as an F5 WAF for NGINX policy bundle' } });
+                ctx.todo(mw.label, 'an F5 WAF for NGINX policy bundle (' + dnsName(mw.name) + '.tgz) that does what the ' + list(o.directives).length + ' Coraza directive(s) did; SecLang rules do not load in F5 WAF for NGINX');
+                ctx.note(mw.label, 'The waf Policy needs NGINX Plus with F5 WAF for NGINX. Coraza runs ModSecurity SecLang rules, which F5 WAF for NGINX does not read: the policy is written again.', 'warning');
+            },
+            distributedRateLimit: function(o, f, ctx, mw) {
+                let rl = { average: o.limit, period: o.period, burst: o.burst, sourceCriterion: o.sourceCriterion };
+                TRANSLATORS.rateLimit(rl, f, ctx, mw);
+                ctx.note(mw.label, 'Traefik Hub counted in Redis across replicas. NGINX Ingress Controller counts per replica unless NGINX Plus zone synchronization shares the zone (zone-sync ConfigMap keys).', 'warning');
+            },
+            digestAuth: function(o, f, ctx, mw) {
+                f.policies.push({ name: dnsName(mw.name + '-basic-auth'), spec: { basicAuth: { secret: dnsName(mw.name + '-htpasswd'), realm: str(o.realm) || 'traefik' } }, ingress: null,
+                    comments: { 'spec.basicAuth.secret': mw.label + ' — digest credentials re-issued as htpasswd, type nginx.org/htpasswd, key htpasswd', 'spec.basicAuth.realm': mw.label + (o.realm ? ' realm' : ' — Traefik\'s default realm') } });
+                f.ann['nginx.org/basic-auth-secret'] = { value: dnsName(mw.name + '-htpasswd'), source: mw.label };
+                f.ann['nginx.org/basic-auth-realm'] = { value: str(o.realm) || 'traefik', source: mw.label };
+                ctx.todo(mw.label, 'the Secret ' + dnsName(mw.name + '-htpasswd') + ' (type nginx.org/htpasswd): NGINX has no digest authentication, and a digest hash does not convert, so each user gets a new password');
             }
         };
+        // Hub middlewares with no Policy to do their job: a route carrying one
+        // is left out rather than served without it.
+        let FAIL_CLOSED = { hmac: 'HMAC request signing', ldap: 'LDAP authentication', opa: 'Open Policy Agent authorization',
+            oAuthClientCredentials: 'OAuth 2.0 client credentials', oAuthIntrospection: 'OAuth 2.0 token introspection' };
         TRANSLATORS.ipWhiteList = TRANSLATORS.ipAllowList;
 
         // --- Assembly ----------------------------------------------------------
@@ -872,7 +1035,7 @@
             return ctx;
         }
         function newFragments() {
-            return { upstream: {}, reqSet: [], resAdd: [], resHide: [], location: [], policies: [], allow: [], ann: {}, http: [], cm: {}, rewrite: null, redirect: null, tlsRedirect: null, hsts: null, errors: null };
+            return { upstream: {}, reqSet: [], resAdd: [], resHide: [], location: [], policies: [], allow: [], ann: {}, http: [], cm: {}, rewrite: null, redirect: null, deny: null, tlsRedirect: null, hsts: null, errors: null };
         }
 
         // A route's path, and the route's rewrite in VirtualServer terms. Traefik
@@ -887,6 +1050,9 @@
         function rewriteRoute(p, rw, ctx) {
             if (!rw) return { path: routePath(p) };
             let base = p.type === 'exact' ? escapeRe(p.value) + '$' : p.type === 'regex' ? null : escapeRe(p.value);
+            // The route's own match, as a lookahead a rewrite route keeps:
+            // PathRegexp is unanchored in Traefik (MatchString).
+            let guard = p.type === 'regex' ? '(?=.*?(?:' + p.value + '))' : '(?=' + base + ')';
             if (rw.kind === 'addPrefix') {
                 // The whole path, with the prefix in front.
                 if (base === null) return { path: routePath(p), rewritePath: null, todo: true };
@@ -894,23 +1060,56 @@
             }
             if (rw.kind === 'replacePath') return { path: routePath(p), rewritePath: rw.to || '/' };
             if (rw.kind === 'stripPrefix') {
-                // stripPrefix removes the first listed prefix the path starts with,
-                // and keeps a leading slash.
-                let pre = rw.prefixes.find(function(x) { return p.value.indexOf(x.replace(/\/$/, '')) === 0; }) || rw.prefixes[0];
+                // stripPrefix (forceSlash off, the v3 default) cuts the first
+                // listed prefix the path starts with, as a plain string, and
+                // restores a leading slash: ^PREFIX/?(.*)$ to /$1 does the
+                // same for every path (/api on /apix is /x). The route keeps
+                // its own match as a lookahead; a path the prefix misses goes
+                // through unchanged on the route's plain path.
+                let pre = rw.prefixes.find(function(x) { return p.type !== 'regex' && (p.value.indexOf(x) === 0 || x.indexOf(p.value) === 0); });
+                // A path the match takes that no listed prefix covers: the
+                // first prefix is cut, the rest are the reader's to route.
+                if (!pre) {
+                    pre = rw.prefixes[0];
+                    if (rw.prefixes.length > 1) ctx.note(rw.source, 'Several prefixes, and the route ' + routePath(p) + ' implies none of them: it strips ' + pre + '. Traefik cut whichever the path started with; add a route per prefix for the others.', 'warning');
+                }
                 if (!pre) return { path: routePath(p) };
-                let stem = escapeRe(pre.replace(/\/$/, ''));
-                return { path: '~ ^' + stem + '(?:/(.*))?$', rewritePath: '/$1' };
+                // On a prefix route under the strip prefix (PathPrefix(/api/v1),
+                // prefix /api) every path the route takes starts with it; on the
+                // route's own prefix (PathPrefix(/api), prefix /api) the guard
+                // adds nothing. Either way the strip covers the route alone.
+                let covers = p.type === 'prefix' && p.value.indexOf(pre) === 0;
+                let g = covers && pre.indexOf(p.value) === 0 ? '' : guard;
+                return { path: '~ ^' + g + escapeRe(pre) + '/?(.*)$', rewritePath: '/$1', plain: covers ? null : routePath(p) };
             }
             if (rw.kind === 'stripPrefixRegex') {
-                ctx.todo(rw.source, 'the rewrite for stripPrefixRegex "' + rw.regexes.join('", "') + '": capture what follows the prefix in the route regex and use it in rewritePath');
-                return { path: '~ ^(?:' + rw.regexes[0] + ')(.*)$', rewritePath: '/$1' };
+                // The leftmost match, cut only where it starts the path, then a
+                // leading slash restored. Anchoring the regex gives the same
+                // cut; the route's own match is kept as a lookahead.
+                if (rw.regexes.length > 1) ctx.note(rw.source, 'Several regexes: Traefik cut with the first one that starts the path; the route strips with the first listed. Make a route per regex for the others.', 'warning');
+                return { path: '~ ^' + guard + '(?:' + rw.regexes[0].replace(/^\^/, '') + ')/?(.*)$', rewritePath: '/$1', plain: routePath(p) };
             }
             if (rw.kind === 'replacePathRegex') {
-                // Traefik replaces the whole path when the regex matches anywhere in
-                // it, and passes a path it does not match unchanged; a lookahead
-                // keeps the route's own match.
-                let guard = base === null ? '' : '(?=' + base + ')';
-                return { path: '~ ^' + guard + '.*?' + rw.regex.replace(/^\^/, ''), rewritePath: rw.to, plain: routePath(p) };
+                // Traefik replaces what the regex matches (ReplaceAllString) and
+                // keeps the rest of the path; a path it does not match passes
+                // unchanged. rewritePath sets the whole path, so the route
+                // captures what precedes and follows the match and puts them
+                // back: ^(pre)(?:regex)(post)$, the regex's own groups shifted
+                // one along. A lookahead keeps the route's own match.
+                let anchored = /^\^/.test(rw.regex);
+                let body = rw.regex.replace(/^\^/, '');
+                let groups = 0;
+                try { groups = new RegExp(body + '|').exec('').length - 1; } catch (e) { groups = 0; }
+                if (groups + 2 > 9) { ctx.note(rw.source, 'The regex has ' + groups + ' groups; with what precedes and follows the match that is more than the nine a rewritePath can name. Rewrite the route by hand.', 'warning'); return { path: routePath(p), rewritePath: null, todo: true }; }
+                // An anchored regex has nothing before its match, and one that
+                // ends in .* or $ nothing after: those groups are left out.
+                let tail = !/(\.\*\)?|\$)$/.test(body);
+                let shift = anchored ? 0 : 1;
+                let to = rw.to.replace(/\$(\d)/g, function(_, i) { return +i === 0 ? '$0' : '$' + (+i + shift); });
+                if (/\$0/.test(to)) ctx.note(rw.source, 'The replacement names $0, the whole match, which a rewritePath cannot; write it out.', 'warning');
+                if (!anchored || tail) ctx.note(rw.source, 'Traefik replaces every match in the path; the route replaces the first. A regex that can match twice in one path needs a hand-written route.');
+                return { path: '~ ^' + guard + (anchored ? '' : '(.*?)') + (anchored && !tail ? body.replace(/\$$/, '') + '$' : '(?:' + body + ')' + (tail ? '(.*)$' : '')),
+                    rewritePath: (anchored ? '' : '$1') + to + (tail ? '$' + (groups + shift + 1) : ''), plain: routePath(p) };
             }
             return { path: routePath(p) };
         }
@@ -943,7 +1142,8 @@
                     }
                     return;
                 }
-                out.push({ service: str(s.name), port: s.port, weight: s.weight === undefined ? 1 : goInt(s.weight), passHostHeader: s.passHostHeader, sticky: s.sticky, serversTransport: s.serversTransport });
+                out.push({ service: str(s.name), port: s.port, weight: s.weight === undefined ? 1 : goInt(s.weight), passHostHeader: s.passHostHeader, sticky: s.sticky, serversTransport: s.serversTransport,
+                    scheme: s.scheme, healthCheck: s.healthCheck, passiveHealthCheck: s.passiveHealthCheck });
             });
             return out;
         }
@@ -987,12 +1187,19 @@
                     seen[key] = true;
                     let inner = middlewareChain(list(mw.options && mw.options.middlewares).map(function(r) { return mwRef(r, mw.namespace); }), run, ctx, seen);
                     out.mws = out.mws.concat(inner.mws);
-                    if (inner.down) out.down = inner.down;
+                    if (inner.down) { out.down = inner.down; out.closed = inner.closed; }
                     out.chains = (out.chains || []).concat([mw]);
                     return;
                 }
                 let why = refusedBecause(mw);
                 if (why) out.down = 'Middleware ' + mw.name + ' (' + mw.type + ') ' + why;
+                // Authentication with no Policy to carry it: leave the route out
+                // rather than serve it unauthenticated.
+                else if (FAIL_CLOSED[mw.type]) { out.down = 'Middleware ' + mw.name + ' (' + mw.type + ') is Traefik Hub ' + FAIL_CLOSED[mw.type] + ', which no NGINX Ingress Controller Policy does. The route is left out rather than migrated without it; put the check in an externalAuth service'; out.closed = true; }
+                // A type Traefik does not know builds nothing ("invalid
+                // middleware type"), which fails the router.
+                else if (!mw.plugin && !TRANSLATORS[TRANSLATOR_FOR[mw.type] || (mw.type === 'digestAuth' ? mw.type : null)] && !MAPPED_UNSUPPORTED[mw.type]) out.down = 'Middleware ' + mw.name + ' sets ' + (mw.type || 'no type') + ', which is not a Traefik v3.7.17 middleware type (a Traefik Hub one is under spec.plugin)'
+                else if (mw.plugin && !TRANSLATORS[TRANSLATOR_FOR[mw.type] || mw.type]) { out.down = 'Middleware ' + mw.name + ' is the plugin ' + mw.type + ', which NGINX Ingress Controller cannot run. The route is left out rather than migrated without it; reproduce it (snippets, an externalAuth service) and migrate the route by hand'; out.closed = true; }
                 out.mws.push(mw);
             });
             return out;
@@ -1011,24 +1218,21 @@
             let key = (mw.namespace || '') + '/' + mw.name;
             if (cache[key]) return cache[key];
             let f = newFragments();
-            let tr = TRANSLATORS[TRANSLATOR_FOR[mw.type]];
+            let tr = TRANSLATORS[TRANSLATOR_FOR[mw.type] || (mw.plugin || mw.type === 'digestAuth' ? mw.type : null)];
             mw.label = 'Middleware ' + mw.name + ' (' + mw.type + ')';
             if (tr) {
                 try { tr(mw.options || {}, f, ctx, mw); }
                 catch (e) { console.warn('Traefik translator failed for ' + mw.type + ':', e); }
                 f.policies.forEach(function(p) { p.from = p.from || [mw]; });
             } else if (MAPPED_UNSUPPORTED[mw.type]) {
-                f.unsupported = mw.type;
-            } else {
-                f.unknown = mw.type;
+                ctx.note(mw.label, 'Traefik rejected requests whose path carries the encoded characters this middleware does not allow; NGINX normalizes the path and has no per-route setting, so the route is migrated without that check.', 'warning');
             }
             if (mw.extraTypes && mw.extraTypes.length) ctx.note(mw.label, 'This Middleware also sets ' + mw.extraTypes.join(', ') + '; a Middleware holds one type, so Traefik read only ' + mw.type + '.', 'warning');
             cache[key] = f;
             return f;
         }
         // Middleware types the mapping table marks unsupported (no translator).
-        let MAPPED_UNSUPPORTED = { digestAuth: true, encodedCharacters: true, jwt: true, oidc: true, apiKey: true, waf: true, distributedRateLimit: true,
-            hmac: true, ldap: true, oAuth2ClientCredentials: true, oauth2ClientCredentials: true, oauth2TokenIntrospection: true, opa: true };
+        let MAPPED_UNSUPPORTED = { encodedCharacters: true };
 
         // Several fragment bundles (the route's middlewares, in order) as one.
         // Later headers of the same name replace earlier ones, as Traefik applies
@@ -1042,6 +1246,7 @@
                 x.resHide.forEach(function(r) { f.resHide.push(r); });
                 f.location = f.location.concat(x.location);
                 f.policies = f.policies.concat(x.policies);
+                if (x.deny) f.deny = x.deny;
                 f.allow = f.allow.concat(x.allow);
                 Object.keys(x.ann).forEach(function(k) { f.ann[k] = x.ann[k]; });
                 f.http = f.http.concat(x.http);
@@ -1083,7 +1288,9 @@
                     if (!r.match) { ctx.note(rl, 'has an empty match, so Traefik skipped it.', 'warning'); return; }
                     if (!r.facts) { ctx.note(rl, 'match "' + cmt(r.match) + '" does not parse as Traefik v3 rule syntax, so Traefik refused the router. Nothing is migrated for it.', 'warning'); return; }
                     let chain = middlewareChain(r.middlewares, run, ctx);
-                    if (chain.down) { ctx.note(rl, chain.down + ', so Traefik refused to build the router and its traffic got 404. Nothing is migrated for it; fix the middleware first.', 'warning'); return; }
+                    if (chain.down) { ctx.note(rl, chain.down + (chain.closed ? '.' : ', so Traefik refused to build the router and its traffic got 404. Nothing is migrated for it; fix the middleware first.'), 'warning'); return; }
+                    let tlsDown = ir.tls ? tlsOptionDown(run, ir.tls.options, ir.namespace) : null;
+                    if (tlsDown) { ctx.note(rl, tlsDown + ', so Traefik refused to build the router (router.go: "building router handler"). Nothing is migrated for it; fix the TLSOption first.', 'warning'); return; }
                     let missing = chain.mws.filter(function(m) { return m.missing; });
                     if (missing.length) { ctx.note(rl, 'Middleware ' + missing.map(function(m) { return m.ref.raw; }).join(', ') + ' is not in the paste. Traefik refuses a router whose middleware does not exist; paste it to migrate this route.', 'warning'); return; }
                     chain.mws.filter(function(m) { return m.external; }).forEach(function(m) { ctx.note(rl, 'Middleware ' + m.ref.raw + ' comes from another provider (@' + m.ref.provider + '); paste its definition as a Middleware to migrate it.', 'warning'); });
@@ -1130,21 +1337,27 @@
             // TLS: the IngressRoutes' tls, one secret for the host.
             let tlsList = entries.map(function(e) { return e.tls; }).filter(Boolean);
             let secrets = []; tlsList.forEach(function(t) { if (t.secretName && secrets.indexOf(str(t.secretName)) === -1) secrets.push(str(t.secretName)); });
-            if (tlsList.length) {
+            if (tlsList.length && (secrets.length || tlsList.some(function(t) { return t.certResolver; }))) {
                 spec.tls = {};
                 if (secrets.length) { spec.tls.secret = secrets[0]; c['spec.tls.secret'] = 'tls.secretName'; if (secrets.length > 1) ctx.note('Host ' + host, 'The IngressRoutes name different TLS Secrets (' + secrets.join(', ') + '); a VirtualServer takes one, so ' + secrets[0] + ' is used.', 'warning'); }
                 let resolver = tlsList.map(function(t) { return t.certResolver; }).find(Boolean);
                 if (resolver) {
-                    if (!secrets.length) spec.tls.secret = dnsName(host.replace(/^\*\./, 'wildcard.') + '-tls');
-                    spec.tls['cert-manager'] = { 'cluster-issuer': 'letsencrypt' };
-                    c['spec.tls.cert-manager.cluster-issuer'] = 'tls.certResolver ' + resolver + ' — the cert-manager ClusterIssuer that replaces it';
-                    ctx.todo('spec.tls.cert-manager.cluster-issuer', 'the cert-manager ClusterIssuer for ' + host + ' (Traefik\'s ACME resolver ' + resolver + ' has no NGINX Ingress Controller equivalent)');
-                } else if (!secrets.length) {
-                    ctx.note('Host ' + host, 'The IngressRoute has tls with no secretName, so Traefik served its default certificate (TLSStore). The VirtualServer needs a Secret, or NGINX Ingress Controller started with -wildcard-tls-secret.', 'warning');
+                    // cert-manager writes the certificate into this Secret; the
+                    // ClusterIssuer takes the resolver's place, under its name.
+                    if (!secrets.length) spec.tls.secret = dnsName(names[0] + '-tls');
+                    spec.tls['cert-manager'] = { 'cluster-issuer': dnsName(resolver) };
+                    // tls.domains[0].main names the certificate's subject.
+                    let dom = tlsList.map(function(t) { return list(t.domains)[0]; }).find(isMap);
+                    if (dom && dom.main) { spec.tls['cert-manager']['common-name'] = str(dom.main); c['spec.tls.cert-manager.common-name'] = 'tls.domains[0].main'; if (list(dom.sans).length) ctx.note('Host ' + host, 'tls.domains sans (' + list(dom.sans).join(', ') + '): cert-manager takes extra names on a Certificate (dnsNames), not on the VirtualServer.', 'warning'); }
+                    c['spec.tls.secret'] = 'cert-manager writes the certificate here';
+                    c['spec.tls.cert-manager.cluster-issuer'] = 'tls.certResolver ' + resolver + ' — a cert-manager ClusterIssuer of that name replaces it';
+                    ctx.note('Host ' + host, 'Traefik\'s ACME resolver ' + resolver + ' has no NGINX Ingress Controller equivalent: create a cert-manager ClusterIssuer named ' + dnsName(resolver) + ' (the same ACME server and challenge), and install cert-manager. Traefik\'s acme.json certificates are not Secrets; they are issued again.', 'warning');
                 }
-                let opts = tlsList.map(function(t) { return isMap(t.options) ? t.options.name : null; }).find(Boolean);
-                if (opts) ctx.note('Host ' + host, 'tls.options ' + opts + ': TLS versions and ciphers are global in NGINX Ingress Controller (ssl-protocols, ssl-ciphers in nginx-config); client certificates are an ingressMTLS Policy. See the TLSOption below.');
+            } else if (tlsList.length) {
+                ctx.note('Host ' + host, 'TLS is on with no secret and no resolver, so Traefik served its default certificate (TLSStore). The VirtualServer gets TLS once it names a Secret, or NGINX Ingress Controller serves its default with the -default-server-tls-secret controller flag; until then the host is plain HTTP.', 'warning');
             }
+            let opts = tlsList.map(function(t) { return isMap(t.options) ? t.options.name : null; }).find(Boolean);
+            if (opts) ctx.note('Host ' + host, 'tls.options ' + opts + ': TLS versions and ciphers are global in NGINX Ingress Controller (ssl-protocols, ssl-ciphers in nginx-config); client certificates are an ingressMTLS Policy. Paste the TLSOption to migrate it.');
             // Upstreams: one per (service, port) and per distinct field set.
             let upstreams = [], taken = {};
             let upFor = function(u, f, where) {
@@ -1152,7 +1365,7 @@
                 Object.keys(f.upstream).forEach(function(k) { fields[k] = f.upstream[k].value; });
                 let svc = findService(run, namespace, u.service);
                 let svcAnn = svc ? svc.traefik : {};
-                let key = u.service + ':' + str(u.port) + ':' + JSON.stringify(fields) + ':' + str(u.backup);
+                let key = u.service + ':' + str(u.port) + ':' + JSON.stringify(fields) + ':' + str(u.backup) + ':' + str(u.serversTransport) + ':' + str(u.scheme) + ':' + JSON.stringify([u.healthCheck || null, u.passiveHealthCheck || null, u.sticky || null]);
                 let existing = upstreams.find(function(x) { return x.key === key; });
                 if (existing) return existing.up.name;
                 let name = upstreamName(u.service + (upstreams.some(function(x) { return x.up.service === u.service; }) ? '-' + (upstreams.length + 1) : ''), u.port, taken);
@@ -1161,8 +1374,14 @@
                 Object.keys(f.upstream).forEach(function(k) { up[k] = f.upstream[k].value; uc[k] = f.upstream[k].source; });
                 if (u.backup) { up.backup = u.backup; up.backupPort = upstreamPort(u.backupPort, ctx, 'spec.upstreams.' + upstreams.length + '.backupPort'); uc.backup = u.via; }
                 if (u.sticky && isMap(u.sticky.cookie)) stickyCookie(up, uc, u.sticky.cookie, 'services[].sticky.cookie', ctx);
-                if (u.passHostHeader === false) ctx.note(where, 'passHostHeader: false sent the backend\'s own name as Host; NGINX sends the client\'s. Set Host with requestHeaders.', 'warning');
-                if (u.serversTransport) ctx.note(where, 'serversTransport ' + u.serversTransport + ': see the ServersTransport below for its egressMTLS Policy and upstream fields.');
+                if (u.passHostHeader === false) uc.passHostHeader = true;
+                // https: Traefik's scheme, a port 443 or a port named https*
+                // (parseServiceProtocol); NGINX speaks plain HTTP unless told.
+                let https = backendHttps(u, svc);
+                if (https && !up.tls) { up.tls = { enable: true }; uc.tls = https; }
+                upstreamHealth(u, up, uc, svc, ctx, where);
+                let st = u.serversTransport ? findNamed(run.serversTransports, str(u.serversTransport), namespace) : null;
+                if (st) { let su = serversTransportUpstream(st); Object.keys(su.fields).forEach(function(k) { if (up[k] === undefined) { up[k] = su.fields[k]; uc[k] = su.comments[k]; } }); }
                 upstreams.push({ key: key, up: up, comments: uc });
                 return name;
             };
@@ -1177,12 +1396,18 @@
                 let where = 'IngressRoute ' + e.source.name;
                 let legs = e.upstreams.filter(function(u) { return !u.unresolved || u.service; }).map(function(u) { return { name: upFor(u, f, where), weight: u.weight }; });
                 let action;
-                if (f.redirect) action = { redirect: { url: f.redirect.url, code: f.redirect.code } };
+                if (f.deny) action = { return: { code: f.deny.code, type: 'text/plain', body: 'Too Many Requests' } };
+                else if (f.redirect) action = { redirect: { url: f.redirect.url, code: f.redirect.code } };
                 else if (!legs.length) { action = { return: { code: 404, type: 'text/plain', body: 'Not Found' } }; ctx.note(where, 'This route names no service, so Traefik served nothing on it; it answers 404.'); }
                 else {
                     let proxy = {};
                     if (rw.rewritePath) proxy.rewritePath = rw.rewritePath;
-                    if (f.reqSet.length) proxy.requestHeaders = { set: f.reqSet.map(function(r) { return r.h; }) };
+                    let reqSet = f.reqSet.map(function(r) { return r.h; });
+                    // passHostHeader false: Traefik sent the backend's own address
+                    // as Host; the Service's cluster name is NGINX's nearest.
+                    let noHost = e.upstreams.find(function(u) { return u.passHostHeader === false; });
+                    if (noHost && !reqSet.some(function(h) { return h.name.toLowerCase() === 'host'; })) reqSet.unshift({ name: 'Host', value: noHost.service + '.' + (namespace || 'default') + '.svc.cluster.local' });
+                    if (reqSet.length) proxy.requestHeaders = { set: reqSet };
                     if (f.resAdd.length || f.resHide.length) {
                         proxy.responseHeaders = {};
                         if (f.resHide.length) proxy.responseHeaders.hide = f.resHide.map(function(r) { return r.name; });
@@ -1208,9 +1433,22 @@
                 if (ap) pols.unshift(ap);
                 pols.forEach(function(p) { if (!policyByName[p.name]) { policyByName[p.name] = p; } });
                 let refs = pols.map(function(p) { return p.name; });
+                // A ServersTransport's egressMTLS Policy (the controller pass
+                // writes it) on the routes whose service names it; NGINX takes
+                // one per route.
+                let st = e.upstreams.map(function(u) { return u.serversTransport && findNamed(run.serversTransports, str(u.serversTransport), namespace); }).find(Boolean);
+                if (st && serversTransportPolicy(st).em) refs.push(dnsName(st.name + '-egress-mtls'));
+                else e.upstreams.forEach(function(u) { if (u.serversTransport && !findNamed(run.serversTransports, str(u.serversTransport), namespace)) ctx.note(where, 'serversTransport ' + u.serversTransport + ' is not in the paste; paste it to migrate its backend TLS as an egressMTLS Policy.', 'warning'); });
                 let key = rw.path;
                 let target = byPath[key];
                 let piece = { conds: e.conds, action: action, refs: refs, f: f, e: e, rw: rw };
+                // A plain-HTTP router that only redirects to https is what
+                // tls.redirect does for the host: it takes no path, so the
+                // HTTPS router's route keeps it.
+                let httpOnly = list(e.entryPoints).length && list(e.entryPoints).every(function(ep) { return ep === 'web'; });
+                if (f.tlsRedirect && httpOnly && !piece.conds.length) piece.redirectOnly = true;
+                if (target && target.base.redirectOnly && !piece.redirectOnly) { target.base = piece; return; }
+                if (target && piece.redirectOnly) return;
                 if (target) {
                     if (!piece.conds.length && !target.base.conds.length) { ctx.note('Host ' + host, 'Two routes match ' + key + ' with nothing to tell them apart; Traefik took the longer rule (' + cmt(target.base.e.source.match.length >= e.source.match.length ? target.base.e.source.match : e.source.match) + '). That one is kept.', 'warning'); if (e.source.match.length > target.base.e.source.match.length) target.base = piece; return; }
                     if (!piece.conds.length) { target.matches = target.matches.concat(target.base.conds.length ? [target.base] : []); target.base = piece; }
@@ -1244,9 +1482,31 @@
                 comments.push(Object.keys(p.comments || {}).reduce(function(acc, k) { acc[k] = p.comments[k]; return acc; }, {}));
             });
             if (shared && shared.length) { spec.policies = shared.map(function(n) { return { name: n }; }); c['spec.policies'] = 'the route middlewares above'; }
+            // Client certificates: the ingressMTLS Policy of the TLSOption the
+            // host's TLS names (or the default one), which a VirtualServer
+            // takes at spec level only. The controller pass writes it.
+            let mtls = spec.tls && spec.tls.secret ? hostMTLS(run, tlsList, namespace) : null;
+            if (mtls) {
+                spec.policies = (spec.policies || []).concat([mtls.ref]);
+                c['spec.policies'] = (shared && shared.length ? 'the route middlewares above + ' : '') + 'TLSOption ' + mtls.option + ' clientAuth — the ingressMTLS Policy below';
+            }
             if (upstreams.length) {
                 spec.upstreams = upstreams.map(function(x) { return x.up; });
                 upstreams.forEach(function(x, i) { Object.keys(x.comments).forEach(function(k) { c['spec.upstreams.' + i + '.' + k] = x.comments[k]; }); });
+            }
+            // Entry points: web and websecure are NGINX's 80 and 443; any other
+            // is a port in Traefik's static configuration, so it becomes a
+            // GlobalConfiguration HTTP listener (port to fill in) the
+            // VirtualServer binds to (spec.listener.http, or .https with TLS).
+            let custom = [];
+            entries.forEach(function(e) { list(e.entryPoints).forEach(function(ep) { if (ep !== 'web' && ep !== 'websecure' && custom.indexOf(ep) === -1) custom.push(ep); }); });
+            if (custom.length) {
+                let tlsOn = !!spec.tls;
+                let lname = dnsName(custom[0]) + (tlsOn ? '-https' : '-http');
+                spec.listener = tlsOn ? { https: lname } : { http: lname };
+                c['spec.listener.' + (tlsOn ? 'https' : 'http')] = 'entryPoints ' + custom[0] + ' — a listener in the GlobalConfiguration';
+                (options._listeners = options._listeners || {})[lname] = { name: lname, protocol: 'HTTP', ssl: tlsOn, entryPoint: custom[0] };
+                if (custom.length > 1) ctx.note('Host ' + host, 'Routes on several custom entry points (' + custom.join(', ') + '); a VirtualServer binds one listener per scheme, so ' + custom[0] + ' is used.', 'warning');
             }
             // HTTPS redirect: redirectScheme https on any route.
             let tr = entries.map(function(e) { return e.f.tlsRedirect; }).find(Boolean);
@@ -1256,7 +1516,11 @@
                 c['spec.tls.redirect'] = tr.source + ' scheme https';
                 c['spec.tls.redirect.code'] = tr.source + (tr.code === 308 ? ' permanent — 308 keeps the method (Traefik: 301 for GET)' : ' — 307 keeps the method (Traefik: 302 for GET)');
                 if (!spec.tls.secret) ctx.note(tr.source, 'Host ' + host + ' has no TLS here, so the redirect leads to an HTTPS server NGINX Ingress Controller does not serve for it; add the host\'s TLS Secret.', 'warning');
-                if (entries.some(function(e) { return !e.f.tlsRedirect; })) ctx.note(tr.source, 'The redirect applied to the routes that listed it; tls.redirect applies to the whole host.', 'warning');
+                // tls.redirect turns away plain HTTP for the whole host: a route
+                // that served plain HTTP without the redirect loses that. One on
+                // websecure only never saw plain HTTP.
+                let plainServed = entries.filter(function(e) { return !e.f.tlsRedirect && !(list(e.entryPoints).length && list(e.entryPoints).every(function(ep) { return ep === 'websecure'; })); });
+                if (plainServed.length) ctx.note(tr.source, 'tls.redirect redirects plain HTTP for the whole host; ' + plainServed.map(function(e) { return e.source.name; }).filter(function(v, i, a) { return a.indexOf(v) === i; }).join(', ') + ' also served plain HTTP without the redirect, which it no longer does.', 'warning');
             }
             spec.routes = routes.map(function(r, ri) {
                 let out = { path: r.path };
@@ -1288,6 +1552,56 @@
             return { docs: docs, comments: comments, http: entries.map(function(e) { return e.f; }) };
         }
 
+        // Why Traefik spoke HTTPS to a backend, or null: services[].scheme,
+        // else port 443 or a Service port named https* (parseServiceProtocol).
+        function backendHttps(u, svc) {
+            if (u.scheme) return str(u.scheme).toLowerCase() === 'https' ? 'services[].scheme https' : null;
+            if (u.ingressScheme) return null;
+            let p = svc ? svc.ports.find(function(x) { return x.port === u.port || str(x.name) === str(u.port) || str(x.port) === str(u.port); }) : null;
+            if (str(u.port) === '443' || (p && p.port === 443)) return 'port 443 — Traefik speaks HTTPS to it';
+            if (p && /^https/.test(str(p.name))) return 'Service port "' + p.name + '" — Traefik speaks HTTPS to a port named https*';
+            return null;
+        }
+        // services[].healthCheck and .passiveHealthCheck. Traefik refuses an
+        // active check on a Service that is not ExternalName (loadServers),
+        // which drops the route; an ExternalName backend is NGINX Plus in
+        // NGINX Ingress Controller, as is upstreams[].healthCheck. The passive
+        // check is NGINX's own max_fails / fail_timeout, with the same
+        // defaults (1 failure in 10s).
+        function upstreamHealth(u, up, uc, svc, ctx, where) {
+            let hc = isMap(u.healthCheck) ? u.healthCheck : null;
+            if (hc) {
+                let out = { enable: true };
+                let c = [];
+                if (hc.path) { out.path = str(hc.path); c.push('path'); }
+                let iv = hc.interval !== undefined ? goDurationSeconds(hc.interval) : 30;
+                if (iv !== null && iv > 0) { out.interval = nginxTime(iv); c.push('interval' + (hc.interval === undefined ? ' (Traefik default 30s)' : '')); }
+                let to = hc.timeout !== undefined ? goDurationSeconds(hc.timeout) : 5;
+                if (to !== null && to > 0) { out['read-timeout'] = nginxTime(to); c.push('timeout' + (hc.timeout === undefined ? ' (Traefik default 5s)' : '')); }
+                if (goInt(hc.port)) { out.port = goInt(hc.port); c.push('port'); }
+                if (goInt(hc.status)) { out.statusMatch = String(goInt(hc.status)); c.push('status'); }
+                let hs = isMap(hc.headers) ? hc.headers : {};
+                if (hc.hostname) hs = Object.assign({ Host: str(hc.hostname) }, hs);
+                if (Object.keys(hs).length) { out.headers = Object.keys(hs).map(function(k) { return { name: k, value: str(hs[k]) }; }); c.push(hc.hostname ? 'hostname + headers' : 'headers'); }
+                up.healthCheck = out;
+                uc.healthCheck = 'services[].healthCheck (' + c.join(', ') + ') — NGINX Plus only';
+                let lost = [];
+                if (hc.method && str(hc.method).toUpperCase() !== 'GET') lost.push('method ' + hc.method + ' (NGINX Plus probes with GET)');
+                if (hc.scheme) lost.push('scheme (the probe uses the upstream\'s own)');
+                if (str(hc.mode) === 'grpc') lost.push('mode grpc (set upstreams[].type: grpc for a gRPC probe)');
+                if (hc.unhealthyInterval !== undefined) lost.push('unhealthyInterval (NGINX Plus probes every server at one interval)');
+                if (hc.followRedirects === false) lost.push('followRedirects false (NGINX Plus does not follow redirects; a 3xx passes by default)');
+                ctx.note(where, 'services[].healthCheck becomes upstreams[].healthCheck, which NGINX Ingress Controller accepts on NGINX Plus only' + (svc && svc.type && svc.type !== 'ExternalName' ? '; Traefik refused it here, since ' + u.service + ' is not an ExternalName Service' : ' (as is the ExternalName Service Traefik required for it)') + '.' + (lost.length ? ' Not carried over: ' + lost.join('; ') + '.' : ''), 'warning');
+            }
+            let pc = isMap(u.passiveHealthCheck) ? u.passiveHealthCheck : null;
+            if (pc) {
+                let n = pc.maxFailedAttempts === undefined ? 1 : goInt(pc.maxFailedAttempts);
+                let w = pc.failureWindow === undefined ? 10 : goDurationSeconds(pc.failureWindow);
+                if (n !== null && n > 0) { up['max-fails'] = n; uc['max-fails'] = 'services[].passiveHealthCheck.maxFailedAttempts' + (pc.maxFailedAttempts === undefined ? ' (Traefik default 1)' : ''); }
+                if (w !== null && w > 0) { up['fail-timeout'] = nginxTime(w); uc['fail-timeout'] = 'services[].passiveHealthCheck.failureWindow' + (pc.failureWindow === undefined ? ' (Traefik default 10s)' : ''); }
+                ctx.note(where, 'passiveHealthCheck becomes max-fails and fail-timeout. NGINX counts a connection error or timeout as a failure; Traefik also counted a 5xx response. Add next-upstream "error timeout http_500 http_502 http_503 http_504" to count those.');
+            }
+        }
         function stickyCookie(up, uc, ck, source, ctx) {
             let name = str(ck.name) || 'sticky';
             if (!cookieNameOk(name)) { ctx.note(source, 'Cookie name "' + name + '": NGINX Ingress Controller takes letters, digits and underscores only, so stickiness is not migrated; rename it (clients lose their pinning once).', 'warning'); return; }
@@ -1313,10 +1627,16 @@
             let host = null;
             run.ingressRoutes.forEach(function(ir) { ir.routes.forEach(function(r) { if (!host && r.facts && r.facts.hosts.length && r.services.some(function(s) { return str(s.name) === svcName; })) host = r.facts.hosts[0]; }); });
             if (host) {
-                let q = err.query || '/{status}.html';
-                route.errorPages = [{ codes: codes.slice(0, 50), redirect: { code: 302, url: 'https://' + host + q.replace(/\{status\}/g, String(codes[0])).replace(/\{originalStatus\}/g, String(codes[0])) } }];
+                // One entry per code when the query names the status, so each
+                // redirect carries its own; ${scheme} keeps the request's.
+                let q = err.query || '/';
+                let perCode = /\{(status|originalStatus)\}/.test(q);
+                let url = function(code) { return '${scheme}://' + host + q.replace(/\{status\}|\{originalStatus\}/g, String(code)); };
+                route.errorPages = perCode
+                    ? codes.slice(0, 50).map(function(code) { return { codes: [code], redirect: { code: 302, url: url(code) } }; })
+                    : [{ codes: codes.slice(0, 50), redirect: { code: 302, url: url(codes[0]) } }];
                 c[at + '.errorPages'] = err.source + ' — a redirect to the error Service\'s host; Traefik proxied it and kept the status';
-                ctx.note(err.source, 'Traefik proxied the error page from ' + svcName + ' and kept the error status; a VirtualServer redirects (302) to it instead, and its URL cannot carry each status. For the proxied behaviour use an Ingress with nginx.org/custom-http-errors.', 'warning');
+                ctx.note(err.source, 'Traefik proxied the error page from ' + svcName + ' and kept the error status; a VirtualServer redirects (302) to the page on ' + host + ' instead, so the client sees the redirect and then a 200. An Ingress with nginx.org/custom-http-errors and spec.defaultBackend proxies it as Traefik did.', 'warning');
             } else {
                 ctx.note(err.source, 'Traefik proxied the error page from Service ' + svcName + ', keeping the status. A VirtualServer cannot proxy an error page, and no route in the paste serves that Service to redirect to; an Ingress with nginx.org/custom-http-errors and spec.defaultBackend ' + svcName + ' does it as Traefik did.', 'warning');
             }
@@ -1377,8 +1697,10 @@
             let label = 'Ingress ' + (m.name || '');
             let cfg = ingressRouterConfig(m, ctx, run);
             if (cfg.down) { ctx.note(label, cfg.down + ' Nothing is migrated for it.', 'warning'); return { entries: [], cfg: cfg }; }
+            let tlsDown = cfg.tls ? tlsOptionDown(run, cfg.tlsOptions || null, m.namespace) : null;
+            if (tlsDown) { ctx.note(label, tlsDown + ', so Traefik refused every TLS router of this Ingress. Nothing is migrated for it; fix the TLSOption first.', 'warning'); return { entries: [], cfg: cfg, down: true }; }
             let chain = middlewareChain(cfg.middlewares, run, ctx);
-            if (chain.down) { ctx.note(label, chain.down + ', so Traefik refused every router of this Ingress and its traffic got 404. Nothing is migrated for it.', 'warning'); return { entries: [], cfg: cfg, down: true }; }
+            if (chain.down) { ctx.note(label, chain.down + (chain.closed ? '.' : ', so Traefik refused every router of this Ingress and its traffic got 404. Nothing is migrated for it.'), 'warning'); return { entries: [], cfg: cfg, down: true }; }
             let missing = chain.mws.filter(function(x) { return x.missing; });
             if (missing.length) { ctx.note(label, 'router.middlewares names ' + missing.map(function(x) { return x.ref.raw; }).join(', ') + ', which is not in the paste. Traefik refuses a router whose middleware does not exist; paste it to migrate this Ingress.', 'warning'); return { entries: [], cfg: cfg, down: true }; }
             let frags = mergeFragments(chain.mws.filter(function(x) { return !x.missing && !x.external; }).map(function(x) { return fragmentsFor(x, ctx, cache); }));
@@ -1391,15 +1713,14 @@
                     let svc = findService(run, m.namespace, p.backend.service);
                     let sa = svc ? serviceAnnotations(svc, ctx) : {};
                     if (sa.down) return;
-                    let up = { service: p.backend.service, port: p.backend.port, weight: 1, sticky: sa.sticky, passHostHeader: sa.passHostHeader, serversTransport: sa.serversTransport };
+                    let up = { service: p.backend.service, port: p.backend.port, weight: 1, sticky: sa.sticky, passHostHeader: sa.passHostHeader, serversTransport: sa.serversTransport, ingressScheme: sa.scheme };
                     let f = frags;
                     if (sa.frags) f = mergeFragments([sa.frags, frags]);
                     entries.push({ host: h.host, namespace: m.namespace, path: pf, conds: [], upstreams: [up], f: f, tls: h.tlsSecret !== null ? { secretName: h.tlsSecret || null, certResolver: cfg.certResolver, options: cfg.tlsOptions ? { name: cfg.tlsOptions } : null } : (cfg.tls ? { secretName: null, certResolver: cfg.certResolver } : null),
-                        source: { kind: 'Ingress', name: m.name, match: 'Host(`' + h.host + '`) && ' + (pf.type === 'exact' ? 'Path' : pf.type === 'regex' ? 'PathRegexp' : 'PathPrefix') + '(`' + p.path + '`)' }, mws: chain.mws, ingressClassName: m.ingressClassName, svcAnn: sa });
+                        source: { kind: 'Ingress', name: m.name, match: 'Host(`' + h.host + '`) && ' + (pf.type === 'exact' ? 'Path' : pf.type === 'regex' ? 'PathRegexp' : 'PathPrefix') + '(`' + p.path + '`)' }, mws: chain.mws, ingressClassName: m.ingressClassName, svcAnn: sa, entryPoints: cfg.entryPoints });
                 });
             });
             if (m.hostless.length) ctx.note(label, m.hostless.length + ' path(s) belong to a rule with no host: Traefik served them on every host. A VirtualServer needs a host; the migrated Ingress keeps them (NGINX Ingress Controller needs -allow-empty-ingress-host for a host-less rule).', 'warning');
-            if (cfg.entryPoints.length && cfg.entryPoints.some(function(e) { return e !== 'web' && e !== 'websecure'; })) ctx.note(label, 'router.entrypoints ' + cfg.entryPoints.join(', ') + ': custom entry points are GlobalConfiguration HTTP listeners (VirtualServer spec.listener) or nginx.org/listen-ports.', 'warning');
             return { entries: entries, cfg: cfg, frags: frags, chain: chain };
         }
         // service.* annotations of a Service, decoded as parseServiceConfig does;
@@ -1422,10 +1743,14 @@
             if (get('service.serverstransport') !== undefined) out.serversTransport = get('service.serverstransport');
             let scheme = get('service.serversscheme');
             if (scheme !== undefined) {
+                out.scheme = str(scheme);
                 let f = newFragments();
                 let s = str(scheme).toLowerCase();
                 if (s === 'https') { f.upstream.tls = { value: { enable: true }, source: 'Service ' + svc.name + ' service.serversscheme https' }; f.ann['nginx.org/ssl-services'] = { value: svc.name, source: 'service.serversscheme' }; }
-                else if (s === 'h2c') { f.upstream.type = { value: 'grpc', source: 'Service ' + svc.name + ' service.serversscheme h2c' }; f.ann['nginx.org/grpc-services'] = { value: svc.name, source: 'service.serversscheme' }; ctx.note(label, 'h2c is plaintext HTTP/2; NGINX speaks it to gRPC backends (type: grpc). A non-gRPC h2c backend needs proxy-http-version 2 instead.', 'warning'); }
+                // h2c is plaintext HTTP/2 with prior knowledge, which NGINX Ingress
+                // Controller speaks to any backend with proxy-http-version "2"
+                // (v5.7.0); a gRPC backend can use type: grpc instead.
+                else if (s === 'h2c') { f.upstream['proxy-http-version'] = { value: '2', source: label + ' service.serversscheme h2c' }; f.ann['nginx.org/proxy-http-version'] = { value: '2', source: 'service.serversscheme h2c' }; ctx.note(label, 'h2c (plaintext HTTP/2) becomes proxy-http-version "2". For a gRPC backend, upstreams[].type: grpc (or nginx.org/grpc-services) also gives gRPC error handling.'); }
                 else ctx.note(label, 'service.serversscheme ' + scheme + ' is NGINX\'s default (http); nothing to migrate.');
                 out.frags = f;
             }
@@ -1478,16 +1803,67 @@
             // the VirtualServer form, so it is reported.
             let req = f.reqSet.filter(function(r) { return annotationSafe(r.h.value) && r.h.value !== ''; });
             if (req.length) set('nginx.org/proxy-set-headers', req.map(function(r) { return r.h.name + ': ' + r.h.value; }).join(','), f.reqSet.map(function(r) { return r.source; }).filter(function(v, i, a) { return a.indexOf(v) === i; }).join(' + '));
+            // nginx.org/hsts always appends preload (nginx.ingress.tmpl), which
+            // asks browsers to put the domain on their preload lists: it fits a
+            // middleware that set stsPreload. Without it, the header is written
+            // as Traefik sent it, with nginx.org/add-header.
+            if (f.hsts && f.hsts.preload) { set('nginx.org/hsts', 'true', f.hsts.source); set('nginx.org/hsts-max-age', String(f.hsts.maxAge), f.hsts.source); if (f.hsts.includeSubdomains) set('nginx.org/hsts-include-subdomains', 'true', f.hsts.source); }
+            else if (f.hsts && f.resAdd.every(function(r) { return r.h.name.toLowerCase() !== 'strict-transport-security'; })) f.resAdd.push({ h: header('Strict-Transport-Security', 'max-age=' + f.hsts.maxAge + (f.hsts.includeSubdomains ? '; includeSubDomains' : '')), source: f.hsts.source + ' stsSeconds — nginx.org/hsts would add preload' });
             let res_ = f.resAdd.filter(function(r) { return annotationSafe(r.h.value); });
-            if (f.hsts) { set('nginx.org/hsts', 'true', f.hsts.source); set('nginx.org/hsts-max-age', String(f.hsts.maxAge), f.hsts.source); if (f.hsts.includeSubdomains) set('nginx.org/hsts-include-subdomains', 'true', f.hsts.source); if (f.hsts.preload) ctx.note(f.hsts.source, 'stsPreload: nginx.org/hsts has no preload; the hsts Policy on a VirtualServer does.', 'warning'); }
             if (res_.length) set('nginx.org/add-header', res_.map(function(r) { return r.h.name + ': ' + r.h.value + ': always'; }).join(','), f.resAdd.map(function(r) { return r.source; }).filter(function(v, i, a) { return a.indexOf(v) === i; }).join(' + '));
             if (f.resHide.length) set('nginx.org/proxy-hide-headers', f.resHide.map(function(r) { return r.name; }).join(','), f.resHide[0].source);
             let unsafe = f.reqSet.concat(f.resAdd).filter(function(r) { return !annotationSafe(r.h.value) || r.h.value === ''; });
             if (unsafe.length) ctx.note(label, 'Header values with a comma, colon, quote or $ (' + unsafe.map(function(r) { return r.h.name; }).join(', ') + ') do not survive the nginx.org header annotations, which split on commas and colons; they are left out. A VirtualServer carries them (CRD-first).', 'warning');
             if (f.location.length) { set('nginx.org/location-snippets', f.location.map(function(l) { return l.line; }).join('\n'), f.location.map(function(l) { return l.source; }).filter(function(v, i, a) { return a.indexOf(v) === i; }).join(' + ')); }
-            if (f.rewrite) ctx.note(f.rewrite.source, 'Path rewrites have no Ingress annotation that matches Traefik\'s; a VirtualServer route carries them (CRD-first).', 'warning');
+            // Path rewrites: nginx.org/path-regex makes every path a regex
+            // location and nginx.org/rewrite-target its one target, so the
+            // Ingress takes the VirtualServer route's regex and target when
+            // its paths all rewrite the same way. Every path then is a regex,
+            // so one with no rewrite, or a different one, needs the
+            // VirtualServer.
+            if (f.rewrite) {
+                // As regex locations: a prefix is ^<path>, an exact path
+                // ^<path>$, and a rewrite's own regex route stays as it is.
+                let asRegex = function(r, e) {
+                    if (/^~ \^/.test(r.path)) return r.path.replace(/^~ \^/, '');
+                    if (e.path.type === 'regex') return null;
+                    return escapeRe(e.path.value) + (e.path.type === 'exact' ? '$' : '');
+                };
+                let rws = res.entries.map(function(e) { return rewriteRoute(e.path, e.f.rewrite, ctx); });
+                let same = rws.length && rws.every(function(r, i) { return r.rewritePath && !r.plain && r.rewritePath === rws[0].rewritePath && asRegex(r, res.entries[i]) !== null; });
+                if (same) {
+                    set('nginx.org/path-regex', 'case_sensitive', f.rewrite.source);
+                    set('nginx.org/rewrite-target', rws[0].rewritePath, f.rewrite.source + ' — rewrite "^<path>" ' + rws[0].rewritePath + ' break');
+                    let byPath = {};
+                    res.entries.forEach(function(e, i) { byPath[e.path.value] = asRegex(rws[i], e); });
+                    list(spec.rules).forEach(function(r) { list(r && r.http && r.http.paths).forEach(function(p) { if (byPath[p.path] !== undefined) { p.path = byPath[p.path]; p.pathType = 'ImplementationSpecific'; } }); });
+                } else ctx.note(f.rewrite.source, (rws.some(function(r) { return r.plain; })
+                    ? 'Traefik rewrote only the paths its regex matched and passed the others on unchanged; nginx.org/path-regex makes every path of the Ingress a regex, so it cannot keep both. A VirtualServer carries the rewrite (CRD-first); the Ingress is migrated without it.'
+                    : 'The paths of this Ingress rewrite differently, or some not at all; nginx.org/rewrite-target takes one target for the whole Ingress. A VirtualServer carries the rewrites (CRD-first); the Ingress is migrated without them.'), 'warning');
+            }
             if (f.redirect) ctx.note(f.redirect.source, 'A redirect has no Ingress annotation; a VirtualServer route carries it (CRD-first).', 'warning');
-            if (f.tlsRedirect) { set('nginx.org/redirect-to-https', 'true', f.tlsRedirect.source); set('nginx.org/http-redirect-code', String(f.tlsRedirect.code), f.tlsRedirect.source); }
+            if (f.deny) { f.location.push({ line: 'return ' + f.deny.code + ';', source: f.deny.source }); set('nginx.org/location-snippets', f.location.map(function(l) { return l.line; }).join('\n'), f.location.map(function(l) { return l.source; }).filter(function(v, i, a) { return a.indexOf(v) === i; }).join(' + ')); }
+            // redirectScheme https: an Ingress with TLS already redirects plain
+            // HTTP by $scheme (nginx.org/ssl-redirect, on by default), as
+            // Traefik did by req.TLS; the code is http-redirect-code.
+            // nginx.org/redirect-to-https redirects on X-Forwarded-Proto only,
+            // which a client talking to NGINX directly never sends.
+            if (f.tlsRedirect) {
+                set('nginx.org/http-redirect-code', String(f.tlsRedirect.code), f.tlsRedirect.source + ' — the code of the redirect nginx.org/ssl-redirect (on by default with TLS) sends');
+                if (!list(spec.tls).length) ctx.note(f.tlsRedirect.source, 'The Ingress has no TLS, so NGINX Ingress Controller does not redirect it; add spec.tls. Behind a load balancer that terminates TLS, set nginx.org/redirect-to-https: "true" instead, which redirects on X-Forwarded-Proto.', 'warning');
+            }
+            // router.entrypoints: web and websecure are 80 and 443; another
+            // entry point's port is in Traefik's static configuration.
+            let eps = res.cfg && res.cfg.entryPoints || [];
+            let custom = eps.filter(function(e) { return e !== 'web' && e !== 'websecure'; });
+            if (custom.length) {
+                let plain = eps.indexOf('web') !== -1 ? ['80'] : [];
+                let ssl = eps.indexOf('websecure') !== -1 ? ['443'] : [];
+                custom.forEach(function(ep) { (/secure|https|tls/i.test(ep) ? ssl : plain).push('PORT-' + ep.toUpperCase()); });
+                if (plain.length) set('nginx.org/listen-ports', plain.join(','), 'router.entrypoints ' + eps.join(','));
+                if (ssl.length) set('nginx.org/listen-ports-ssl', ssl.join(','), 'router.entrypoints ' + eps.join(','));
+                ctx.todo('nginx.org/listen-ports', 'the port of entry point ' + custom.join(', ') + ' (Traefik\'s static configuration) in place of PORT-' + custom[0].toUpperCase());
+            }
             if (f.errors) {
                 let ce = customHTTPErrors(f.errors.codes);
                 if (ce.value) {
@@ -1513,6 +1889,14 @@
                 sticky.push({ svc: e.upstreams[0].service, v: 'serviceName=' + e.upstreams[0].service + ' ' + name + (age > 0 ? ' expires=' + nginxTime(age) : '') + ' path=' + (str(ck.path) || '/') + (ck.secure ? ' secure' : '') + (ck.httpOnly ? ' httponly' : '') });
             });
             if (sticky.length) set('nginx.org/sticky-cookie-services', sticky.map(function(s) { return s.v; }).join(';'), 'service.sticky.cookie (on the Service)');
+            // passhostheader false: Traefik sent the backend's address as Host.
+            // nginx.org/upstream-vhost (v5.6.0) sets one Host for every path of
+            // the Ingress, so it fits when one Service asked for it.
+            let noHost = res.entries.map(function(e) { return e.upstreams[0]; }).filter(function(u) { return u.passHostHeader === false; }).map(function(u) { return u.service; }).filter(function(v, i, a) { return a.indexOf(v) === i; });
+            if (noHost.length === 1 && !f.reqSet.some(function(r) { return r.h.name.toLowerCase() === 'host'; })) {
+                set('nginx.org/upstream-vhost', noHost[0] + '.' + (m.namespace || 'default') + '.svc.cluster.local', 'service.passhostheader "false" (on the Service ' + noHost[0] + ') — the Service\'s cluster name, NGINX\'s nearest to the backend address Traefik sent');
+                if (res.entries.some(function(e) { return e.upstreams[0].passHostHeader !== false; })) ctx.note(label, 'nginx.org/upstream-vhost applies to every path of the Ingress; Traefik kept the client\'s Host on the paths whose Service did not set passhostheader "false".', 'warning');
+            } else if (noHost.length > 1) ctx.note(label, 'Services ' + noHost.join(', ') + ' set passhostheader "false"; nginx.org/upstream-vhost takes one Host for the whole Ingress, so it is not set. A VirtualServer sets it per route (CRD-first).', 'warning');
             let cls = targetClass(m.ingressClassName, options);
             if (cls) spec.ingressClassName = cls; else delete spec.ingressClassName;
             let meta = md(dnsName((m.name || 'my-app') + (options.nameSuffix || '')), m.namespace);
@@ -1558,7 +1942,6 @@
                     let snis = r.facts.hostSNIs.filter(function(h) { return h !== '*'; });
                     let catchAll = r.facts.hostSNIs.indexOf('*') !== -1;
                     if (r.facts.hostRegexps.length) ctx.note(label, 'HostSNIRegexp has no TransportServer form; name each SNI.', 'warning');
-                    if (svc.proxyProtocol) ctx.note(label, 'services[].proxyProtocol: a TransportServer has no field for it; add "proxy_protocol on;" with serverSnippets (-enable-snippets).', 'warning');
                     let mws = r.middlewares.map(function(ref) { return findNamed(run.middlewaresTCP, ref.name, ref.namespace); });
                     let snippet = [];
                     mws.forEach(function(mw, i) {
@@ -1575,10 +1958,26 @@
                         } else ctx.note(mlabel, 'No TransportServer equivalent.', 'warning');
                     });
                     if (snippet === null) return;
+                    // services[].proxyProtocol: Traefik sends version 2 unless
+                    // told 1 (ProxyProtocol.SetDefaults). NGINX sends version 1
+                    // with "on" and version 2 with "v2" (1.31.4; NGINX Ingress
+                    // Controller 5.7.0 ships 1.31.7). Traefik deprecates the
+                    // field in favour of ServersTransportTCP.
+                    // A ServersTransportTCP the service names: its proxyProtocol
+                    // (the service's own wins), dialTimeout as connectTimeout
+                    // (the template always writes proxy_connect_timeout, so a
+                    // snippet would duplicate it). Backend TLS needs certificate
+                    // files a snippet cannot name, so it is reported.
+                    let stt = svc.serversTransport ? findNamed(run.serversTransportsTCP, str(svc.serversTransport), ir.namespace) : null;
+                    if (svc.serversTransport && !stt) ctx.note(label, 'serversTransport ' + svc.serversTransport + ' is not in the paste; paste the ServersTransportTCP to migrate it.', 'warning');
+                    let pp = isMap(svc.proxyProtocol) ? svc.proxyProtocol : (svc.proxyProtocol ? {} : (stt && isMap(stt.spec.proxyProtocol) ? stt.spec.proxyProtocol : null));
+                    if (pp && snippet) snippet.unshift('proxy_protocol ' + (goInt(pp.version) === 1 ? 'on' : 'v2') + ';');
+                    let dial = stt && stt.spec.dialTimeout !== undefined ? goDurationSeconds(stt.spec.dialTimeout) : null;
                     let base = { upstreams: [{ name: 'backend', service: str(svc.name), port: upstreamPort(svc.port, ctx, label + ' port') }], action: { pass: 'backend' } };
                     if (svc._maxConns) base.upstreams[0].maxConns = svc._maxConns;
                     let c0 = { 'spec.upstreams.0.service': label + ' route ' + (ri + 1) };
-                    if (snippet.length) { base.serverSnippets = snippetBlock(snippet); c0['spec.serverSnippets'] = 'MiddlewareTCP ipAllowList — a TransportServer takes no Policy (-enable-snippets)'; }
+                    if (dial !== null && dial > 0) { base.upstreamParameters = { connectTimeout: nginxTime(dial) }; c0['spec.upstreamParameters.connectTimeout'] = 'ServersTransportTCP ' + stt.name + ' dialTimeout'; }
+                    if (snippet.length) { base.serverSnippets = snippetBlock(snippet); c0['spec.serverSnippets'] = (pp ? (svc.proxyProtocol ? 'services[].proxyProtocol' : 'ServersTransportTCP ' + stt.name + ' proxyProtocol') + (snippet.length > 1 ? ' + MiddlewareTCP ipAllowList' : '') : 'MiddlewareTCP ipAllowList') + ' — a TransportServer has no field for it (-enable-snippets)'; }
                     if (pass) {
                         if (!snis.length) { ctx.note(label, 'TLS passthrough routes on SNI, and this route names no concrete host (HostSNI(`*`) is a catch-all a TransportServer cannot be).', 'warning'); return; }
                         snis.forEach(function(sni) {
@@ -1644,11 +2043,136 @@
         // fragments the middlewares wrote.
         let TLS_VERSIONS = ['VersionTLS10', 'VersionTLS11', 'VersionTLS12', 'VersionTLS13'];
         let TLS_NAMES = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'];
+        // buildTLSConfig ignores a version it does not name, so Go's default
+        // (TLS 1.2 to 1.3) stands in for it.
         function tlsProtocols(min, max) {
-            let lo = min ? TLS_VERSIONS.indexOf(str(min)) : 2;
-            let hi = max ? TLS_VERSIONS.indexOf(str(max)) : 3;
-            if (lo === -1 || hi === -1 || lo > hi) return null;
+            let lo = TLS_VERSIONS.indexOf(str(min)); if (lo === -1) lo = 2;
+            let hi = TLS_VERSIONS.indexOf(str(max)); if (hi === -1) hi = 3;
+            if (lo > hi) return null;
             return TLS_NAMES.slice(lo, hi + 1).join(' ');
+        }
+        // Traefik's cipher names (pkg/tls/cipher.go, the IANA names) as OpenSSL
+        // names, from `openssl ciphers -stdname`; null where the OpenSSL 3.5 in
+        // NGINX 1.31.7 has none (RC4, 3DES). '' for the TLS 1.3 suites and
+        // the fallback signal, which no cipher list sets: crypto/tls fixes the
+        // TLS 1.3 suites, and ssl_ciphers does not reach them.
+        let GO_CIPHERS = {
+            TLS_RSA_WITH_RC4_128_SHA: null, TLS_RSA_WITH_3DES_EDE_CBC_SHA: null, TLS_RSA_WITH_AES_128_CBC_SHA: 'AES128-SHA', TLS_RSA_WITH_AES_256_CBC_SHA: 'AES256-SHA',
+            TLS_RSA_WITH_AES_128_CBC_SHA256: 'AES128-SHA256', TLS_RSA_WITH_AES_128_GCM_SHA256: 'AES128-GCM-SHA256', TLS_RSA_WITH_AES_256_GCM_SHA384: 'AES256-GCM-SHA384',
+            TLS_ECDHE_ECDSA_WITH_RC4_128_SHA: null, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA: 'ECDHE-ECDSA-AES128-SHA', TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA: 'ECDHE-ECDSA-AES256-SHA',
+            TLS_ECDHE_RSA_WITH_RC4_128_SHA: null, TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA: null, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA: 'ECDHE-RSA-AES128-SHA', TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA: 'ECDHE-RSA-AES256-SHA',
+            TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256: 'ECDHE-ECDSA-AES128-SHA256', TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256: 'ECDHE-RSA-AES128-SHA256',
+            TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256: 'ECDHE-RSA-AES128-GCM-SHA256', TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256: 'ECDHE-ECDSA-AES128-GCM-SHA256',
+            TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384: 'ECDHE-RSA-AES256-GCM-SHA384', TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384: 'ECDHE-ECDSA-AES256-GCM-SHA384',
+            TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305: 'ECDHE-RSA-CHACHA20-POLY1305', TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256: 'ECDHE-RSA-CHACHA20-POLY1305',
+            TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305: 'ECDHE-ECDSA-CHACHA20-POLY1305', TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256: 'ECDHE-ECDSA-CHACHA20-POLY1305',
+            TLS_AES_128_GCM_SHA256: '', TLS_AES_256_GCM_SHA384: '', TLS_CHACHA20_POLY1305_SHA256: '', TLS_FALLBACK_SCSV: ''
+        };
+        // Traefik's curve names (pkg/tls/certificate.go CurveIDs) as the group
+        // names ssl_ecdh_curve takes (each checked with nginx -t on 1.31.7).
+        let GO_CURVES = { secp256r1: 'prime256v1', CurveP256: 'prime256v1', secp384r1: 'secp384r1', CurveP384: 'secp384r1', secp521r1: 'secp521r1', CurveP521: 'secp521r1',
+            x25519: 'X25519', X25519: 'X25519', x25519mlkem768: 'X25519MLKEM768', X25519MLKEM768: 'X25519MLKEM768',
+            secp256r1mlkem768: 'SecP256r1MLKEM768', SecP256r1MLKEM768: 'SecP256r1MLKEM768', secp384r1mlkem1024: 'SecP384r1MLKEM1024', SecP384r1MLKEM1024: 'SecP384r1MLKEM1024' };
+        let has = function(o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+        // Why Traefik refuses a TLSOption (buildTLSConfig errors), which fails
+        // every router naming it (router.go: "building router handler"); null
+        // when it builds.
+        function tlsOptionRefused(o) {
+            let badC = list(o.cipherSuites).map(str).filter(function(c) { return !has(GO_CIPHERS, c); });
+            if (badC.length) return 'cipherSuites names ' + badC.join(', ') + ', which Traefik does not know';
+            let badK = list(o.curvePreferences).map(str).filter(function(c) { return !has(GO_CURVES, c); });
+            if (badK.length) return 'curvePreferences names ' + badK.join(', ') + ', which Traefik does not know';
+            let ca = isMap(o.clientAuth) ? o.clientAuth : {};
+            let ty = str(ca.clientAuthType);
+            if (ty && ['NoClientCert', 'RequestClientCert', 'RequireAnyClientCert', 'VerifyClientCertIfGiven', 'RequireAndVerifyClientCert'].indexOf(ty) === -1) return 'clientAuthType ' + ty + ' is not one Traefik knows';
+            if ((ty === 'VerifyClientCertIfGiven' || ty === 'RequireAndVerifyClientCert') && !list(ca.secretNames).length) return 'clientAuthType ' + ty + ' verifies against a CA, and secretNames lists none';
+            return null;
+        }
+        // The pasted TLSOption a router names (the default one when it names
+        // none) and why Traefik refused it, or null. An IngressRoute names
+        // { name, namespace }; an Ingress names the provider ID
+        // <namespace>-<name>@kubernetescrd.
+        function tlsOptionDown(run, ref, namespace) {
+            let name = 'default', ns = namespace;
+            if (isMap(ref) && ref.name) { name = str(ref.name); ns = ref.namespace ? str(ref.namespace) : namespace; }
+            else if (typeof ref === 'string' && ref) {
+                let base = ref.replace(/@.*$/, '');
+                let hit = run.tlsOptions.find(function(t) { return (t.namespace || namespace || 'default') + '-' + t.name === base || t.name === base; });
+                if (!hit) return null;
+                name = hit.name; ns = hit.namespace;
+            }
+            let t = name === 'default' ? run.tlsOptions.find(function(x) { return x.name === 'default'; }) : findNamed(run.tlsOptions, name, ns);
+            let why = t ? tlsOptionRefused(t.spec) : null;
+            return why ? 'TLSOption ' + t.name + ' ' + why : null;
+        }
+        // The ingressMTLS Policy a host's TLS needs: { ref, option } when the
+        // TLSOption its routers name (or the default one) asks for a client
+        // certificate, else null.
+        function clientAuthType(o) {
+            let ca = isMap(o.clientAuth) ? o.clientAuth : {};
+            return str(ca.clientAuthType) || (list(ca.secretNames).length ? 'RequireAndVerifyClientCert' : 'NoClientCert');
+        }
+        function hostMTLS(run, tlsList, namespace) {
+            let ref = tlsList.map(function(t) { return t.options; }).find(Boolean);
+            let t = null;
+            if (isMap(ref) && ref.name) t = findNamed(run.tlsOptions, str(ref.name), ref.namespace ? str(ref.namespace) : namespace);
+            else if (typeof ref === 'string' && ref) { let base = ref.replace(/@.*$/, ''); t = run.tlsOptions.find(function(x) { return (x.namespace || namespace || 'default') + '-' + x.name === base || x.name === base; }) || null; }
+            else t = run.tlsOptions.find(function(x) { return x.name === 'default'; }) || null;
+            if (!t || tlsOptionRefused(t.spec) || clientAuthType(t.spec) === 'NoClientCert') return null;
+            let r = { name: dnsName(t.name + '-mtls') };
+            if ((t.namespace || 'default') !== (namespace || 'default')) r.namespace = t.namespace || 'default';
+            return { ref: r, option: t.name };
+        }
+        // A ServersTransport as an egressMTLS Policy spec, with what Traefik
+        // did with it: { em (null when it sets no TLS), c, notes, todo }.
+        // The CRD provider drops a version it does not name and resets a
+        // minVersion at or above maxVersion to VersionTLS12 with none; the
+        // transport then refuses a minimum with no maximum (it compares it
+        // with 0) and connects with Go's default TLS client.
+        function serversTransportPolicy(t) {
+            let label = 'ServersTransport ' + t.name;
+            let o = t.spec;
+            let em = {}, c = {}, notes = [], todo = null;
+            let note = function(m, sev) { notes.push({ message: m, severity: sev || 'note' }); };
+            let certs = list(o.certificatesSecrets).map(str);
+            if (certs.length) { em.tlsSecret = certs[0]; c['spec.egressMTLS.tlsSecret'] = label + ' certificatesSecrets — type kubernetes.io/tls'; }
+            let roots = list(o.rootCAs).filter(isMap).map(function(r) { return r.secret || r.configMap || null; }).filter(Boolean).map(str).concat(list(o.rootCAsSecrets).map(str));
+            if (roots.length) { em.trustedCertSecret = roots[0]; em.verifyServer = true; c['spec.egressMTLS.trustedCertSecret'] = label + ' rootCAs — a Secret of type nginx.org/ca, key ca.crt' + (list(o.rootCAs).some(function(r) { return isMap(r) && r.configMap; }) ? ' (re-create the ConfigMap as one)' : ''); c['spec.egressMTLS.verifyServer'] = 'rootCAs set — NGINX Ingress Controller verifies only when told'; }
+            if (o.insecureSkipVerify === true) em.verifyServer = false;
+            if (o.serverName) { em.serverName = true; em.sslName = str(o.serverName); c['spec.egressMTLS.sslName'] = label + ' serverName'; c['spec.egressMTLS.serverName'] = 'send it as SNI, as Traefik did'; }
+            else if (em.verifyServer) { note('Traefik verified the backend certificate against the backend\'s address; egressMTLS checks sslName, which defaults to the upstream\'s internal name. Set sslName to the name in the certificate (often <service>.<namespace>.svc).', 'warning'); todo = 'the name the backend certificate carries'; }
+            let minV = TLS_VERSIONS.indexOf(str(o.minVersion)) !== -1 ? str(o.minVersion) : '';
+            let maxV = TLS_VERSIONS.indexOf(str(o.maxVersion)) !== -1 ? str(o.maxVersion) : '';
+            [o.minVersion, o.maxVersion].forEach(function(v) { if (v && TLS_VERSIONS.indexOf(str(v)) === -1) note(str(v) + ' is not a version Traefik names (VersionTLS10…13), so Traefik ignored it.', 'warning'); });
+            if (minV && maxV && TLS_VERSIONS.indexOf(minV) >= TLS_VERSIONS.indexOf(maxV)) { minV = 'VersionTLS12'; maxV = ''; note('minVersion is not below maxVersion, so Traefik reset them to VersionTLS12 and no maximum.', 'warning'); }
+            if (minV && !maxV) note('Traefik v3.7.17 discards the TLS settings of a ServersTransport with a minimum version and no maximum (it compares the minimum with 0) and connects with Go\'s default TLS client. The egressMTLS Policy applies what this ServersTransport asks for, which Traefik never did: test the backend with it, or set maxVersion: VersionTLS13 in Traefik first.', 'warning');
+            let p = (minV || maxV) ? tlsProtocols(minV, maxV) : null;
+            if (p) { em.protocols = p; c['spec.egressMTLS.protocols'] = label + ' minVersion/maxVersion'; }
+            if (list(o.cipherSuites).length) {
+                let names = list(o.cipherSuites).map(str);
+                let unknown = names.filter(function(n) { return !has(GO_CIPHERS, n); });
+                let mapped = names.map(function(n) { return GO_CIPHERS[n]; }).filter(function(n, i, a) { return n && a.indexOf(n) === i; });
+                if (unknown.length) note('cipherSuites names ' + unknown.join(', ') + ', which Traefik does not know, so it fell back to the default suites; ciphers are not migrated.', 'warning');
+                else if (mapped.length) { em.ciphers = mapped.join(':'); c['spec.egressMTLS.ciphers'] = label + ' cipherSuites, as OpenSSL names'; }
+                if (!unknown.length && mapped.length < names.length) note('cipherSuites with no OpenSSL equivalent in the OpenSSL NGINX Ingress Controller ships (RC4, 3DES, TLS 1.3 suites) are left out.', 'warning');
+            }
+            return { em: Object.keys(em).length ? em : null, c: c, notes: notes, todo: todo };
+        }
+        // A ServersTransport's upstream fields: dialTimeout is connect-timeout,
+        // responseHeaderTimeout the nearest read-timeout (NGINX times every
+        // read), maxIdleConnsPerHost keepalive (0 is Go's default of 2, a
+        // negative value no reuse).
+        function serversTransportUpstream(t) {
+            let o = t.spec, out = {}, c = {};
+            let label = 'ServersTransport ' + t.name;
+            let ft = isMap(o.forwardingTimeouts) ? o.forwardingTimeouts : {};
+            let dial = ft.dialTimeout !== undefined ? goDurationSeconds(ft.dialTimeout) : null;
+            if (dial !== null && dial > 0) { out['connect-timeout'] = nginxTime(dial); c['connect-timeout'] = label + ' forwardingTimeouts.dialTimeout'; }
+            let rh = ft.responseHeaderTimeout !== undefined ? goDurationSeconds(ft.responseHeaderTimeout) : null;
+            if (rh !== null && rh > 0) { out['read-timeout'] = nginxTime(rh); c['read-timeout'] = label + ' forwardingTimeouts.responseHeaderTimeout (NGINX times every read, not just the headers)'; }
+            let k = o.maxIdleConnsPerHost !== undefined ? goInt(o.maxIdleConnsPerHost) : null;
+            if (k !== null && k !== 0) { out.keepalive = k < 0 ? 0 : k; c.keepalive = label + ' maxIdleConnsPerHost' + (k < 0 ? ' (negative: no reuse)' : ''); }
+            return { fields: out, comments: c };
         }
         function controllerPass(run, ctx, frags, listeners, options) {
             let g = { docs: [], comments: [], cm: {}, cmComments: {}, http: [], httpSources: [] };
@@ -1666,25 +2190,49 @@
                 let label = 'TLSOption ' + t.name;
                 let o = t.spec;
                 let isDefault = t.name === 'default';
+                let why = tlsOptionRefused(o);
+                if (why) { ctx.note(label, why + ', so Traefik refused it and every router naming it' + (isDefault ? ' (as the default, every TLS router naming no other)' : '') + ' failed. Nothing is migrated from it.', 'warning'); return; }
                 if (o.minVersion || o.maxVersion) {
+                    let unknown = [o.minVersion, o.maxVersion].filter(function(v) { return v && TLS_VERSIONS.indexOf(str(v)) === -1; });
+                    if (unknown.length) ctx.note(label, unknown.join(', ') + ' is not a version Traefik names (VersionTLS10…13), so Traefik ignored it and Go\'s default stood in.', 'warning');
                     let p = tlsProtocols(o.minVersion, o.maxVersion);
                     if (p) setCm('ssl-protocols', p, label + ' minVersion/maxVersion' + (isDefault ? '' : ' — global in NGINX Ingress Controller, per router in Traefik'));
-                    else ctx.note(label, 'minVersion/maxVersion are not TLS versions Traefik names (VersionTLS10…13), so Traefik refused the option; not migrated.', 'warning');
+                    else ctx.note(label, 'minVersion is above maxVersion, so no handshake could succeed; not migrated.', 'warning');
                 }
                 if (list(o.cipherSuites).length) {
-                    setCm('ssl-ciphers', list(o.cipherSuites).map(str).join(':'), label + ' cipherSuites — Go names; translate to OpenSSL names (ECDHE-RSA-AES256-GCM-SHA384…)');
-                    ctx.todo('nginx-config ssl-ciphers', 'translate ' + label + '\'s Go cipher names to OpenSSL names');
+                    let names = list(o.cipherSuites).map(str);
+                    let mapped = names.map(function(c) { return GO_CIPHERS[c]; }).filter(function(c, i, a) { return c && a.indexOf(c) === i; });
+                    let gone = names.filter(function(c) { return GO_CIPHERS[c] === null; });
+                    let fixed = names.filter(function(c) { return GO_CIPHERS[c] === ''; });
+                    if (mapped.length) {
+                        setCm('ssl-ciphers', mapped.join(':'), label + ' cipherSuites, as OpenSSL names');
+                        setCm('ssl-prefer-server-ciphers', 'true', label + ' — Go prefers the server\'s cipher order');
+                    } else ctx.note(label, 'No suite in cipherSuites has an OpenSSL name, so ssl-ciphers keeps its default.', 'warning');
+                    if (gone.length) ctx.note(label, gone.join(', ') + ': RC4 and 3DES are gone from the OpenSSL NGINX Ingress Controller ships, so ' + (gone.length > 1 ? 'they are' : 'it is') + ' left out.', 'warning');
+                    if (fixed.length) ctx.note(label, fixed.join(', ') + ': no cipher list sets ' + (fixed.length > 1 ? 'these' : 'this') + ' (TLS 1.3 suites are fixed in Go and in OpenSSL), so ' + (fixed.length > 1 ? 'they are' : 'it is') + ' left out.');
+                    if (!isDefault && mapped.length) ctx.note(label, 'ssl-ciphers applies to every host; Traefik applied cipherSuites only to the routers naming this TLSOption.', 'warning');
                 }
-                if (list(o.curvePreferences).length) { g.http.push('ssl_ecdh_curve ' + list(o.curvePreferences).map(str).join(':') + ';'); g.httpSources.push(label + ' curvePreferences'); }
+                if (list(o.curvePreferences).length) {
+                    let curves = list(o.curvePreferences).map(function(c) { return GO_CURVES[str(c)]; }).filter(function(c, i, a) { return a.indexOf(c) === i; });
+                    g.http.push('ssl_ecdh_curve ' + curves.join(':') + ';'); g.httpSources.push(label + ' curvePreferences, as OpenSSL names');
+                }
+                // secretNames with no clientAuthType required and verified a
+                // certificate: buildTLSConfig sets RequireAndVerifyClientCert
+                // whenever it has CAs.
                 if (isMap(o.clientAuth) && (list(o.clientAuth.secretNames).length || o.clientAuth.clientAuthType)) {
                     let types = { NoClientCert: 'off', VerifyClientCertIfGiven: 'optional', RequireAndVerifyClientCert: 'on', RequestClientCert: 'optional_no_ca', RequireAnyClientCert: 'optional_no_ca' };
-                    let ty = str(o.clientAuth.clientAuthType) || 'NoClientCert';
+                    let ty = clientAuthType(o);
                     if (ty !== 'NoClientCert') {
                         let secrets = list(o.clientAuth.secretNames).map(str);
-                        g.docs.push({ apiVersion: NIC_API, kind: 'Policy', metadata: md(dnsName(t.name + '-mtls'), t.namespace), spec: { ingressMTLS: { clientCertSecret: secrets[0] || 'client-ca', verifyClient: types[ty] || 'on', verifyDepth: 1 } } });
-                        g.comments.push({ 'spec.ingressMTLS.clientCertSecret': label + ' clientAuth.secretNames — type nginx.org/ca, key ca.crt' + (secrets.length > 1 ? ' (concatenate the ' + secrets.length + ' CA bundles)' : ''), 'spec.ingressMTLS.verifyClient': label + ' clientAuthType ' + ty });
-                        if (!secrets.length) ctx.todo(label, 'the CA Secret (type nginx.org/ca) for client certificates');
-                        ctx.note(label, 'Client certificates are per host in NGINX Ingress Controller: reference the ingressMTLS Policy from each VirtualServer that used this TLSOption.' + (ty === 'RequestClientCert' || ty === 'RequireAnyClientCert' ? ' ' + ty + ' has no exact match; optional_no_ca is nearest.' : ''), 'warning');
+                        // One CA Secret: NGINX takes one bundle, so several
+                        // secretNames are concatenated into one named for the
+                        // TLSOption.
+                        let caName = secrets.length === 1 ? secrets[0] : dnsName(t.name + '-client-ca');
+                        g.docs.push({ apiVersion: NIC_API, kind: 'Policy', metadata: md(dnsName(t.name + '-mtls'), t.namespace), spec: { ingressMTLS: { clientCertSecret: caName, verifyClient: types[ty] || 'on', verifyDepth: 1 } } });
+                        g.comments.push({ 'spec.ingressMTLS.clientCertSecret': label + ' clientAuth.secretNames — a Secret of type nginx.org/ca, key ca.crt' + (secrets.length > 1 ? ': concatenate ' + secrets.join(' + ') + ' into it' : ''), 'spec.ingressMTLS.verifyClient': label + ' clientAuthType ' + ty + (o.clientAuth.clientAuthType ? '' : ' (Traefik\'s default once secretNames are set)') });
+                        if (secrets.length > 1) ctx.todo(label, 'the Secret ' + caName + ' (type nginx.org/ca, key ca.crt) holding the CA bundles of ' + secrets.join(', ') + ', concatenated');
+                        if (!secrets.length) ctx.todo(label, 'the Secret ' + caName + ' (type nginx.org/ca, key ca.crt): Traefik requested a certificate without a CA, and ingressMTLS needs one even for optional_no_ca');
+                        ctx.note(label, 'Client certificates are per host in NGINX Ingress Controller: each VirtualServer whose TLS used this TLSOption' + (isDefault ? ' (the default, so every TLS host naming no other)' : '') + ' references the ingressMTLS Policy in spec.policies; an Ingress takes it in nginx.org/policies.' + (ty === 'RequestClientCert' || ty === 'RequireAnyClientCert' ? ' ' + ty + ' has no exact match; optional_no_ca is nearest.' : ''), 'warning');
                     }
                 }
                 if (o.sniStrict === true) ctx.note(label, 'sniStrict: NGINX Ingress Controller refuses an unknown SNI when the -default-server-tls-secret controller flag is left unset.');
@@ -1701,38 +2249,31 @@
             run.serversTransports.forEach(function(t) {
                 let label = 'ServersTransport ' + t.name;
                 let o = t.spec;
-                let em = {};
-                let c = {};
-                let certs = list(o.certificatesSecrets).map(str);
-                if (certs.length) { em.tlsSecret = certs[0]; c['spec.egressMTLS.tlsSecret'] = label + ' certificatesSecrets — type kubernetes.io/tls'; }
-                let roots = list(o.rootCAs).map(function(r) { return isMap(r) ? (r.secret || null) : null; }).filter(Boolean).concat(list(o.rootCAsSecrets).map(str));
-                if (roots.length) { em.trustedCertSecret = roots[0]; em.verifyServer = true; c['spec.egressMTLS.trustedCertSecret'] = label + ' rootCAs — type nginx.org/ca'; }
-                if (o.insecureSkipVerify === true) em.verifyServer = false;
-                if (o.serverName) { em.serverName = true; em.sslName = str(o.serverName); c['spec.egressMTLS.sslName'] = label + ' serverName'; }
-                else if (em.verifyServer) { ctx.note(label, 'Traefik verified the backend certificate against the backend\'s address; egressMTLS checks sslName, which defaults to the upstream\'s internal name. Set sslName to the name in the certificate (often <service>.<namespace>.svc).', 'warning'); ctx.todo(label + ' sslName', 'the name the backend certificate carries'); }
-                let p = tlsProtocols(o.minVersion, o.maxVersion);
-                if ((o.minVersion || o.maxVersion) && p) em.protocols = p;
-                if (list(o.cipherSuites).length) { ctx.note(label, 'cipherSuites are Go names; egressMTLS ciphers take OpenSSL names, so they are not migrated.', 'warning'); }
-                if (!Object.keys(em).length) { ctx.note(label, 'Sets no TLS: nothing for an egressMTLS Policy.' ); }
+                let pol = serversTransportPolicy(t);
+                pol.notes.forEach(function(n) { ctx.note(label, n.message, n.severity); });
+                if (pol.todo) ctx.todo(label + ' sslName', pol.todo);
+                if (!pol.em) ctx.note(label, 'Sets no TLS: nothing for an egressMTLS Policy.');
                 else {
-                    g.docs.push({ apiVersion: NIC_API, kind: 'Policy', metadata: md(dnsName(t.name + '-egress-mtls'), t.namespace), spec: { egressMTLS: em } });
-                    g.comments.push(c);
-                    ctx.note(label, 'egressMTLS sets the TLS parameters only; the upstream must speak HTTPS too (upstreams[].tls.enable, or nginx.org/ssl-services). Reference the Policy from the routes whose services named this ServersTransport.');
+                    g.docs.push({ apiVersion: NIC_API, kind: 'Policy', metadata: md(dnsName(t.name + '-egress-mtls'), t.namespace), spec: { egressMTLS: pol.em } });
+                    g.comments.push(pol.c);
+                    ctx.note(label, 'egressMTLS sets the TLS parameters only; an upstream speaks HTTPS when Traefik did (port 443, a port named https*, or scheme https), which sets upstreams[].tls.enable. The routes whose services named this ServersTransport reference the Policy.');
                 }
-                if (o.forwardingTimeouts || o.maxIdleConnsPerHost !== undefined) {
-                    let ft = isMap(o.forwardingTimeouts) ? o.forwardingTimeouts : {};
-                    let bits = [];
-                    if (ft.dialTimeout) bits.push('dialTimeout → connect-timeout ' + nginxTime(goDurationSeconds(ft.dialTimeout)));
-                    if (ft.responseHeaderTimeout) bits.push('responseHeaderTimeout → read-timeout ' + nginxTime(goDurationSeconds(ft.responseHeaderTimeout)) + ' (NGINX times every read, not just the headers)');
-                    if (o.maxIdleConnsPerHost !== undefined) bits.push('maxIdleConnsPerHost → keepalive ' + o.maxIdleConnsPerHost);
-                    if (bits.length) ctx.note(label, 'Set on the upstreams of the routes that use it: ' + bits.join('; ') + '.');
-                }
+                let ft = isMap(o.forwardingTimeouts) ? o.forwardingTimeouts : {};
+                let lost = ['idleConnTimeout', 'readIdleTimeout', 'pingTimeout'].filter(function(k) { return ft[k] !== undefined; }).concat(o.disableHTTP2 ? ['disableHTTP2'] : [], o.peerCertURI ? ['peerCertURI'] : []);
+                if (lost.length) ctx.note(label, lost.join(', ') + ' have no NGINX Ingress Controller field' + (o.disableHTTP2 ? ' (NGINX speaks HTTP/1.1 to a backend unless proxy-http-version says 2)' : '') + '; not migrated.', 'warning');
                 if (o.spiffe) ctx.note(label, 'spiffe has no NGINX Ingress Controller equivalent.', 'warning');
             });
-            run.serversTransportsTCP.forEach(function(t) { ctx.note('ServersTransportTCP ' + t.name, 'A TransportServer has no backend TLS fields; streamSnippets with proxy_ssl directives are the escape hatch (-enable-snippets).', 'warning'); });
+            run.serversTransportsTCP.forEach(function(t) {
+                let o = t.spec, lost = [];
+                if (o.tls) lost.push('tls (a TransportServer has no backend TLS; proxy_ssl directives in serverSnippets need the certificates as files in the controller pod)');
+                if (o.dialKeepAlive !== undefined) lost.push('dialKeepAlive (proxy_socket_keepalive on uses the kernel\'s keepalive timers)');
+                if (o.terminationDelay !== undefined) lost.push('terminationDelay');
+                if (lost.length) ctx.note('ServersTransportTCP ' + t.name, 'dialTimeout and proxyProtocol carry to the TransportServers whose services name it; no TransportServer field takes ' + lost.join('; ') + '.', 'warning');
+            });
+            Object.keys(options._listeners || {}).forEach(function(k) { listeners[k] = options._listeners[k]; });
             let ls = Object.keys(listeners).map(function(k) { return listeners[k]; });
             if (ls.length) {
-                g.docs.push({ apiVersion: NIC_API, kind: 'GlobalConfiguration', metadata: { name: 'nginx-configuration', namespace: 'nginx-ingress' }, spec: { listeners: ls.map(function(l, i) { return { name: l.name, port: 10000 + i, protocol: l.protocol }; }) } });
+                g.docs.push({ apiVersion: NIC_API, kind: 'GlobalConfiguration', metadata: { name: 'nginx-configuration', namespace: 'nginx-ingress' }, spec: { listeners: ls.map(function(l, i) { let o = { name: l.name, port: 10000 + i, protocol: l.protocol }; if (l.ssl) o.ssl = true; return o; }) } });
                 let gc = {};
                 ls.forEach(function(l, i) { gc['spec.listeners.' + i + '.port'] = 'TODO: the port entryPoint ' + l.entryPoint + ' listened on'; });
                 g.comments.push(gc);
@@ -1748,7 +2289,7 @@
         // host into VirtualServers; an Ingress whose settings need it, or under
         // annotation-first, as the migrated Ingress; TCP/UDP; the controller pass.
         function migrateAll(run, strategy, options) {
-            options = options || {};
+            options = Object.assign({}, options || {}, { _listeners: {} });
             let ctx = makeCtx();
             let cache = {};
             let entries = collectRoutes(run, ctx, cache);
@@ -1797,6 +2338,14 @@
             return { results: results, tcp: tcp, controller: g, ctx: ctx, cache: cache };
         }
 
+        // What NGINX Ingress Controller admits on NGINX Plus only: the jwt,
+        // oidc, oidcNative and waf Policies (validation/policy.go), active
+        // health checks and backup upstreams (rejectPlusResourcesInOSS).
+        function plusOnly(d) {
+            let s = d.spec || {};
+            if (d.kind === 'Policy') return !!(s.jwt || s.oidc || s.oidcNative || s.waf);
+            return (s.upstreams || []).some(function(u) { return u.healthCheck || u.backup; });
+        }
         function buildPlan(parsed, strategy, options) {
             let run = parsed.run || emptyRun();
             let all = migrateAll(run, strategy, options);
@@ -1850,7 +2399,7 @@
                     let group = byKind[kind];
                     if (!group) return;
                     blocks.push({ type: 'crd-group', kind: kind, countText: group.length + ' resource' + (group.length !== 1 ? 's' : ''),
-                        items: group.map(function(r) { return { category: r.doc.metadata.name + (r.doc.spec && r.doc.spec.host ? ' — ' + r.doc.spec.host : ''), plusRequired: !!(r.doc.spec && (r.doc.spec.waf || (r.doc.spec.upstreams || []).some(function(u) { return u.healthCheck || u.backup; }))), dualSuffix: null,
+                        items: group.map(function(r) { return { category: r.doc.metadata.name + (r.doc.spec && r.doc.spec.host ? ' — ' + r.doc.spec.host : ''), plusRequired: plusOnly(r.doc), dualSuffix: null,
                             old: { title: 'Traefik Proxy (current)', badge: null, yaml: r.old, collapsible: true }, new: { title: 'NGINX Ingress Controller (migrated)', badge: null, yaml: docYaml(r.doc, r.comments), collapsible: true } }; }) });
                 });
                 steps.push({ id: 'analyzer-step-3', title: 'CRD resources', countText: crd.length + ' resource' + (crd.length !== 1 ? 's' : ''), countCls: 'crd',
@@ -1933,7 +2482,7 @@
             // Ingress annotations — service.*
             { keys: ['annotation:service.nativelb'], source: 'service.nativelb (on the Service)', nic: 'nginx.org/use-cluster-ip', type: 'annotation', category: 'Ingress annotations', anchor: 'annotations', section: 'oss', grouped: true, generator: 'generateNativeLBSwap' },
             { keys: ['annotation:service.nodeportlb'], source: 'service.nodeportlb (on the Service)', nic: 'No direct equivalent — NGINX Ingress Controller balances pod endpoints (or the ClusterIP with use-cluster-ip), never NodePorts', type: 'unsupported', category: 'Ingress annotations', anchor: 'annotations', section: 'oss', grouped: true },
-            { keys: ['annotation:service.passhostheader'], source: 'service.passhostheader (on the Service)', nic: 'Default behavior (Host: $host) — override via VirtualServer requestHeaders.set', type: 'virtualserver', category: 'Ingress annotations', anchor: 'annotations', section: 'oss', grouped: true, generator: 'generatePassHostHeaderNote' },
+            { keys: ['annotation:service.passhostheader'], source: 'service.passhostheader (on the Service)', nic: 'VirtualServer action.proxy.requestHeaders.set (Host) — or — nginx.org/upstream-vhost', type: 'virtualserver', category: 'Ingress annotations', anchor: 'annotations', section: 'oss', grouped: true, generator: 'generatePassHostHeaderNote' },
             { keys: ['annotation:service.serversscheme'], source: 'service.serversscheme (on the Service)', nic: 'VirtualServer upstreams[].tls / type: grpc — or — nginx.org/ssl-services (https) / nginx.org/grpc-services (h2c)', type: 'annotation', category: 'Ingress annotations', anchor: 'annotations', section: 'oss', grouped: true, generator: 'generateServersSchemeSwap' },
             { keys: ['annotation:service.serverstransport'], source: 'service.serverstransport (on the Service)', nic: 'Policy CRD egressMTLS + VirtualServer upstream tuning', type: 'policy', category: 'Backend transport', anchor: 'backend-transport', section: 'oss', grouped: true, generator: 'generateServersTransportRefNote' },
             { keys: ['annotation:service.sticky.cookie', 'annotation:service.sticky.cookie.name', 'annotation:service.sticky.cookie.secure', 'annotation:service.sticky.cookie.samesite', 'annotation:service.sticky.cookie.domain', 'annotation:service.sticky.cookie.httponly', 'annotation:service.sticky.cookie.maxage', 'annotation:service.sticky.cookie.path'], source: 'service.sticky.cookie.* (on the Service)', nic: 'VirtualServer upstreams[].sessionCookie', type: 'virtualserver', category: 'Session affinity', anchor: 'session-affinity', section: 'oss', grouped: true, generator: 'generateStickyCookieVS' },
@@ -1944,11 +2493,11 @@
             { keys: ['middleware:buffering'], source: 'Middleware buffering', nic: 'VirtualServer upstreams[].client-max-body-size / client-body-buffer-size — or — nginx.org/client-max-body-size', type: 'virtualserver', category: 'Buffering & body size', anchor: 'buffering', section: 'oss', generator: 'generateBufferingVS' },
             { keys: ['middleware:chain'], source: 'Middleware chain', nic: 'Each chained middleware applied to the route in order (VirtualServer policies[] / nginx.org/policies)', type: 'policy', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss', generator: 'generateChainNote' },
             { keys: ['middleware:circuitBreaker'], source: 'Middleware circuitBreaker', nic: 'VirtualServer upstreams[].max-fails + fail-timeout (passive) — Plus: upstreams[].healthCheck (active)', type: 'virtualserver', category: 'Resilience', anchor: 'resilience', section: 'oss', generator: 'generateCircuitBreakerVS' },
-            { keys: ['middleware:compress'], source: 'Middleware compress', nic: 'ConfigMap http-snippets (gzip directives — no compression key exists)', type: 'configmap', category: 'Compression', anchor: 'compression', section: 'oss', generator: 'generateCompressConfigMap' },
+            { keys: ['middleware:compress'], source: 'Middleware compress', nic: 'VirtualServer routes[].location-snippets (gzip directives) — or — nginx.org/location-snippets', type: 'virtualserver', category: 'Compression', anchor: 'compression', section: 'oss', generator: 'generateCompressConfigMap' },
             { keys: ['middleware:contentType'], source: 'Middleware contentType', nic: 'No direct equivalent — NGINX proxies Content-Type untouched; Traefik-specific auto-detection control', type: 'unsupported', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss' },
             { keys: ['middleware:digestAuth'], source: 'Middleware digestAuth', nic: 'No direct equivalent — NGINX has no digest-auth module; re-issue credentials as htpasswd and use basicAuth', type: 'unsupported', category: 'Authentication', anchor: 'authentication', section: 'oss' },
             { keys: ['middleware:encodedCharacters'], source: 'Middleware encodedCharacters', nic: 'No direct equivalent — NGINX URI normalization is fixed; encoded-character allowances cannot be configured per route', type: 'unsupported', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss' },
-            { keys: ['middleware:errors'], source: 'Middleware errors', nic: 'nginx.org/custom-http-errors + spec.defaultBackend (proxies, as Traefik) — or — VirtualServer routes[].errorPages (redirect)', type: 'virtualserver', category: 'Error handling', anchor: 'error-handling', section: 'oss', generator: 'generateErrorPagesVS' },
+            { keys: ['middleware:errors'], source: 'Middleware errors', nic: 'nginx.org/custom-http-errors + spec.defaultBackend (proxies, as Traefik) — or — VirtualServer routes[].errorPages (redirect)', type: 'virtualserver', preferAnnotation: 'nginx.org/custom-http-errors proxies the error page from a Service and keeps the status, as Traefik does; a VirtualServer errorPages entry can only redirect or return', category: 'Error handling', anchor: 'error-handling', section: 'oss', generator: 'generateErrorPagesVS' },
             { keys: ['middleware:forwardAuth'], source: 'Middleware forwardAuth', nic: 'Policy CRD externalAuth', type: 'policy', category: 'Authentication', anchor: 'authentication', section: 'oss', generator: 'generateExternalAuthPolicy' },
             { keys: ['middleware:grpcWeb'], source: 'Middleware grpcWeb', nic: 'No direct equivalent — NGINX Ingress Controller has no gRPC-Web-to-gRPC translation (nginx.org/grpc-services proxies native gRPC only); keep a gRPC-Web proxy in the pod', type: 'unsupported', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss' },
             { keys: ['middleware:headers'], source: 'Middleware headers', nic: 'VirtualServer requestHeaders + responseHeaders, Policy CRD cors — or — nginx.org/add-header, nginx.org/proxy-set-headers, nginx.org/hsts*', type: 'policy', category: 'CORS & headers', anchor: 'headers', section: 'oss', generator: 'generateHeadersContributions' },
@@ -1956,8 +2505,8 @@
             { keys: ['middleware:ipAllowList', 'middleware:ipWhiteList'], source: 'Middleware ipAllowList', nic: 'Policy CRD accessControl', type: 'policy', category: 'Access control', anchor: 'access-control', section: 'oss', generator: 'generateAccessControlPolicy' },
             { keys: ['middleware:passTLSClientCert'], source: 'Middleware passTLSClientCert', nic: 'VirtualServer requestHeaders.set with ${ssl_client_escaped_cert} / ${ssl_client_s_dn} (+ ingressMTLS Policy)', type: 'virtualserver', category: 'Access control', anchor: 'access-control', section: 'oss', generator: 'generatePassTLSClientCertVS' },
             { keys: ['middleware:rateLimit'], source: 'Middleware rateLimit', nic: 'Policy CRD rateLimit — or — nginx.org/limit-req-rate + nginx.org/limit-req-burst', type: 'policy', category: 'Rate limiting & concurrency', anchor: 'rate-limiting', section: 'oss', dualApproach: true, generator: 'generateRateLimitPolicy' },
-            { keys: ['middleware:redirectRegex'], source: 'Middleware redirectRegex', nic: 'VirtualServer action.redirect (static URL) / location-snippets rewrite (captures)', type: 'virtualserver', category: 'Redirects', anchor: 'redirects', section: 'oss', generator: 'generateRedirectRegexVS' },
-            { keys: ['middleware:redirectScheme'], source: 'Middleware redirectScheme', nic: 'VirtualServer tls.redirect — or — nginx.org/redirect-to-https + nginx.org/http-redirect-code', type: 'virtualserver', category: 'Redirects', anchor: 'redirects', section: 'oss', dualApproach: true, generator: 'generateRedirectSchemeVS' },
+            { keys: ['middleware:redirectRegex'], source: 'Middleware redirectRegex', nic: 'VirtualServer routes[].location-snippets (the URL matched with if, return) — or — nginx.org/location-snippets', type: 'virtualserver', category: 'Redirects', anchor: 'redirects', section: 'oss', generator: 'generateRedirectRegexVS' },
+            { keys: ['middleware:redirectScheme'], source: 'Middleware redirectScheme', nic: 'VirtualServer tls.redirect — or — nginx.org/http-redirect-code (ssl-redirect is on by default with TLS)', type: 'virtualserver', category: 'Redirects', anchor: 'redirects', section: 'oss', dualApproach: true, generator: 'generateRedirectSchemeVS' },
             { keys: ['middleware:replacePath'], source: 'Middleware replacePath', nic: 'VirtualServer action.proxy.rewritePath — or — nginx.org/rewrites', type: 'virtualserver', category: 'Rewrites', anchor: 'rewrites', section: 'oss', generator: 'generateReplacePathVS' },
             { keys: ['middleware:replacePathRegex'], source: 'Middleware replacePathRegex', nic: 'VirtualServer regex path (~) + rewritePath with $1–$9 captures', type: 'virtualserver', category: 'Rewrites', anchor: 'rewrites', section: 'oss', generator: 'generateReplacePathRegexVS' },
             { keys: ['middleware:retry'], source: 'Middleware retry', nic: 'VirtualServer upstreams[].next-upstream + next-upstream-tries — or — nginx.org/proxy-next-upstream*', type: 'virtualserver', category: 'Resilience', anchor: 'resilience', section: 'oss', generator: 'generateRetryVS' },
@@ -1969,6 +2518,8 @@
 
             // Traefik CRDs
             { keys: ['kind:IngressRoute'], source: 'IngressRoute', nic: 'VirtualServer CRD', type: 'virtualserver', category: 'Routing (IngressRoute)', anchor: 'routing', section: 'oss', generator: 'generateVirtualServerFromIngressRoute' },
+            { keys: ['service:passiveHealthCheck'], source: 'IngressRoute services[].passiveHealthCheck', nic: 'VirtualServer upstreams[].max-fails + fail-timeout', type: 'virtualserver', category: 'Resilience', anchor: 'resilience', section: 'oss', generator: 'generateVirtualServerFromIngressRoute' },
+            { keys: ['service:healthCheck'], source: 'IngressRoute services[].healthCheck', nic: 'VirtualServer upstreams[].healthCheck (NGINX Plus)', type: 'virtualserver', category: 'Active health checks', anchor: 'active-health-checks', section: 'plus', plusRequired: true, generator: 'generateVirtualServerFromIngressRoute' },
             { keys: ['kind:IngressRouteTCP'], source: 'IngressRouteTCP', nic: 'TransportServer CRD (+ GlobalConfiguration listener)', type: 'transportserver', category: 'TCP & UDP', anchor: 'tcp-udp', section: 'oss', generator: 'generateTransportServerFromTCP' },
             { keys: ['kind:IngressRouteUDP'], source: 'IngressRouteUDP', nic: 'TransportServer CRD (UDP) + GlobalConfiguration listener', type: 'transportserver', category: 'TCP & UDP', anchor: 'tcp-udp', section: 'oss', generator: 'generateTransportServerFromUDP' },
             { keys: ['traefikservice:weighted'], source: 'TraefikService (weighted)', nic: 'VirtualServer routes[].splits', type: 'virtualserver', category: 'Traffic splitting', anchor: 'traffic-splitting', section: 'oss', generator: 'generateSplitsFromWeighted' },
@@ -1978,7 +2529,7 @@
             { keys: ['kind:TLSOption'], source: 'TLSOption', nic: 'ConfigMap ssl-protocols / ssl-ciphers + Policy ingressMTLS (clientAuth)', type: 'configmap', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', generator: 'generateTLSOptionContributions' },
             { keys: ['kind:TLSStore'], source: 'TLSStore', nic: '-default-server-tls-secret controller flag + per-host TLS Secrets', type: 'configmap', category: 'TLS & certificates', anchor: 'tls-certificates', section: 'oss', generator: 'generateTLSStoreNote' },
             { keys: ['kind:ServersTransport'], source: 'ServersTransport', nic: 'Policy CRD egressMTLS + VirtualServer upstream tuning', type: 'policy', category: 'Backend transport', anchor: 'backend-transport', section: 'oss', generator: 'generateEgressMTLSFromServersTransport' },
-            { keys: ['kind:ServersTransportTCP'], source: 'ServersTransportTCP', nic: 'No direct equivalent — TransportServer has no backend-TLS fields; use serverSnippets/streamSnippets as an escape hatch', type: 'unsupported', category: 'Backend transport', anchor: 'backend-transport', section: 'oss' },
+            { keys: ['kind:ServersTransportTCP'], source: 'ServersTransportTCP', nic: 'TransportServer upstreamParameters.connectTimeout + serverSnippets (proxy_protocol); no backend TLS', type: 'transportserver', category: 'Backend transport', anchor: 'backend-transport', section: 'oss', generator: 'generateTransportServerFromTCP' },
 
             // Traefik Hub (commercial) middlewares → NGINX Plus
             { keys: ['middleware:jwt'], source: 'Middleware jwt (Hub)', nic: 'Policy CRD jwt (NGINX Plus)', type: 'policy', category: 'JWT authentication', anchor: 'jwt-authentication', section: 'plus', plusRequired: true, generator: 'generateHubMiddlewareNote' },

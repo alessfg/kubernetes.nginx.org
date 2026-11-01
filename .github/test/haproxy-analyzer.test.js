@@ -431,3 +431,54 @@ test('CRD-first keeps an Ingress where only an Ingress carries a setting', () =>
     assert.deepEqual(kinds(plain), ['VirtualServer']);
     assert.ok(!kept(plain));
 });
+
+test('a Backend CR carries what HAProxy did with it: checks, retry_on, cookie, TLS', () => {
+    /* Each read from HAProxy 3.2 (configuration.txt, DEF_CHKINTR/RISETIME/
+       FALLTIME 2000/2/3) and NGINX Ingress Controller 5.7.0's fields. */
+    const cr = (spec) => Y.stringify({ apiVersion: 'ingress.v3.haproxy.org/v3', kind: 'Backend', metadata: { name: 'b' }, spec });
+    const ing = Y.stringify({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app', annotations: { 'haproxy.org/cr-backend': 'b' } },
+        spec: { rules: [{ host: 'a.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }] } });
+    const up = (spec) => { const r = run(cr(spec) + '---\n' + ing); return { r, u: r.docs.find((d) => d.kind === 'VirtualServer').spec.upstreams[0] }; };
+    // default_server check: an NGINX Plus healthCheck with HAProxy's defaults.
+    assert.deepEqual(up({ adv_check: 'httpchk', httpchk_params: { uri: '/healthz' }, default_server: { check: 'enabled' } }).u.healthCheck,
+        { enable: true, path: '/healthz', interval: '2s', fails: 3, passes: 2 });
+    assert.equal(up({ httpchk_params: { uri: '/x' } }).u.healthCheck, undefined, 'no check enabled, no probes');
+    // retry_on replaces HAProxy's default conn-failure.
+    assert.equal(up({ retries: 2, retry_on: '502 503 504' }).u['next-upstream'], 'http_502 http_503 http_504');
+    assert.equal(up({ retry_on: 'conn-failure response-timeout junk-response' }).u['next-upstream'], 'error timeout invalid_header');
+    // Cookie attributes HAProxy wrote.
+    assert.deepEqual(up({ cookie: { name: 'S', httponly: true, secure: true, domain: [{ value: 'example.com' }] } }).u.sessionCookie,
+        { enable: true, name: 'S', path: '/', httpOnly: true, secure: true, domain: 'example.com' });
+    // default_server ssl/verify/sni: tls.enable and an egressMTLS Policy.
+    const t = up({ default_server: { ssl: 'enabled', verify: 'required', sni: 'req.hdr(host)' } });
+    assert.deepEqual(t.u.tls, { enable: true });
+    const em = t.r.docs.find((d) => d.kind === 'Policy').spec.egressMTLS;
+    assert.equal(em.verifyServer, true);
+    assert.equal(em.sslName, 'a.example.com', 'req.hdr(host) on a one-host Ingress is that host');
+});
+
+test('the controller settings HAProxy read become NGINX settings that load', () => {
+    const cmap = (data) => configMap(data) + '---\n' + ingress({});
+    const g = (spec, kind) => Y.stringify({ apiVersion: 'ingress.v3.haproxy.org/v3', kind: kind || 'Global', metadata: { name: 'g' }, spec })
+        + '---\n' + configMap({ ['cr-' + (kind || 'Global').toLowerCase()]: 'g' }) + '---\n' + ingress({});
+    const cm = (r) => (r.docs.find((d) => d.kind === 'ConfigMap' && d.metadata.name === 'nginx-config') || { data: {} }).data;
+    // nginx refuses a directive twice: client_header_timeout is
+    // timeout-http-request's when both are set.
+    for (const r of [run(cmap({ 'timeout-client': '30s', 'timeout-http-request': '5s' })), run(g({ client_timeout: 30000, http_request_timeout: 5000 }, 'Defaults'))]) {
+        const lines = cm(r)['http-snippets'].trim().split('\n');
+        assert.equal(lines.filter((l) => /^client_header_timeout/.test(l)).length, 1, lines.join(' | '));
+        assert.ok(lines.includes('client_header_timeout 5s;'), lines.join(' | '));
+    }
+    // log-format tokens with an NGINX variable; %B is every byte sent.
+    assert.equal(cm(run(cmap({ 'log-format': '%ci:%cp [%tr] %ST %B' })))['log-format'], '$remote_addr:$remote_port [$time_local] $status $bytes_sent\n');
+    // Defaults compression: gzip of the listed types, proxied responses included.
+    assert.match(cm(run(g({ compression: { algorithms: ['gzip'], types: ['text/html'] } }, 'Defaults')))['http-snippets'], /gzip on;\ngzip_proxied any;\ngzip_types text\/html;/);
+    // Global: hard_stop_after, not grace, is the drain cap.
+    assert.equal(cm(run(g({ hard_stop_after: 1800000, grace: 30000 })))['worker-shutdown-timeout'], '30m');
+    const b = cm(run(g({ ssl_options: { default_bind_options: 'ssl-min-ver TLSv1.2 prefer-client-ciphers no-tls-tickets' } })));
+    assert.equal(b['ssl-protocols'], 'TLSv1.2 TLSv1.3');
+    assert.equal(b['ssl-prefer-server-ciphers'], 'false');
+    assert.match(b['http-snippets'], /ssl_session_tickets off;/);
+    assert.equal(cm(run(g({ nbthread: 4, cpu_maps: [{ process: '1/1-4', cpu_set: '0-3' }] })))['worker-cpu-affinity'], '0001 0010 0100 1000');
+    assert.equal(cm(run(g({ log_target_list: [{ address: '10.0.0.1:514', facility: 'local0', level: 'info' }] })))['access-log'], 'syslog:server=10.0.0.1:514,facility=local0,severity=info main');
+});

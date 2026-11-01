@@ -713,6 +713,25 @@
         // takes them: parseLogFormat splits on newlines and joins with spaces, so
         // a block reads like the default it starts from (nginx.tmpl, v5.7.0).
         let LOG_FORMAT_HTTP = '$remote_addr - $remote_user [$time_local] "$request"\n$status $body_bytes_sent "$http_referer" "$http_user_agent"\n';
+        // HAProxy log-format tokens (configuration.txt 3.2, 8.2.6) with an
+        // exact NGINX variable. %B is every byte sent to the client, headers
+        // included, as $bytes_sent. A token with none (%b, %s, %ft: HAProxy's
+        // own names; %Tr: milliseconds where NGINX logs seconds) stays a
+        // literal, which log_format accepts, and is listed.
+        let LOG_TOKENS = { '%ci': '$remote_addr', '%cp': '$remote_port', '%ST': '$status', '%B': '$bytes_sent', '%HM': '$request_method',
+            '%HU': '$request_uri', '%HV': '$server_protocol', '%r': '"$request"', '%tr': '$time_local', '%t': '$time_local', '%si': '$upstream_addr',
+            '%fi': '$server_addr', '%fp': '$server_port', '%ID': '$request_id', '%H': '$hostname' };
+        function haproxyLogFormatToNginx(fmt) {
+            let left = [];
+            let out = str(fmt).replace(/%\{[^}]*\}\w+|%\[[^\]]*\]|%[A-Za-z]+/g, function(t) {
+                if (LOG_TOKENS[t]) return LOG_TOKENS[t];
+                if (left.indexOf(t) === -1) left.push(t);
+                return t;
+            });
+            // NGINX Ingress Controller writes each line single-quoted and refuses
+            // a bare quote (ValidateSingleQuotedDirectiveValue).
+            return { value: out.replace(/\\?'/g, "\\'") + '\n', left: left };
+        }
         let LOG_FORMAT_TCP = '$remote_addr [$time_local] $protocol $status\n$bytes_sent $bytes_received $session_time\n';
         let SAMPLE_FETCH = /%\[|%\{|%[A-Za-z]{1,3}\b/;
 
@@ -1223,7 +1242,11 @@
                     return;
                 }
                 let x = a['check-http'] || a['check-interval'] || a['timeout-check'];
-                let hc = { enable: true };
+                // HAProxy probes every 2s and takes a server down after 3
+                // failed probes and up after 2 good ones (DEF_CHKINTR,
+                // DEF_FALLTIME, DEF_RISETIME); no annotation sets rise or
+                // fall. NGINX Plus defaults to 5s, 1 and 1, so they are written.
+                let hc = { enable: true, interval: '2s', fails: 3, passes: 2 };
                 if (a['check-http']) {
                     let parts = str(a['check-http'].value).trim().split(/\s+/).filter(Boolean);
                     if (parts.length) {
@@ -1237,7 +1260,7 @@
                     if (t) hc[p[1]] = t.value;
                     else invalidNote(ctx, p[0], a[p[0]].value, 'an HAProxy time', 'left it unset');
                 });
-                ctx.backend(x, 'healthCheck', hc, null, null, 'check-http / check-interval / timeout-check — NGINX Plus only');
+                ctx.backend(x, 'healthCheck', hc, null, null, 'check-http / check-interval / timeout-check — NGINX Plus only; interval, fails and passes are HAProxy\'s (2s, fall 3, rise 2) unless set');
                 ctx.note('check-http', 'Active health checks need NGINX Plus: NGINX Ingress Controller on NGINX Open Source rejects a VirtualServer with upstreams[].healthCheck. On an Ingress they are nginx.com/health-checks, also NGINX Plus.', 'warning');
             },
 
@@ -1349,7 +1372,7 @@
                 if (n === null) { invalidNote(ctx, 'pod-maxconn', x.value, 'a whole number', 'set no connection limit'); return; }
                 if (n < 0) { ctx.note('pod-maxconn', 'pod-maxconn ' + n + ' is below 0, which NGINX Ingress Controller refuses for max-conns; nothing is migrated.', 'warning'); return; }
                 ctx.backend(x, 'max-conns', n, 'nginx.org/max-conns', String(n), 'pod-maxconn');
-                ctx.note('pod-maxconn', n === 0 ? 'pod-maxconn 0 is no limit in HAProxy, and max-conns 0 is no limit in NGINX.' : 'HAProxy divides pod-maxconn by the controller replicas itself; NGINX Ingress Controller applies the value per replica, so divide it by your replica count.');
+                ctx.note('pod-maxconn', n === 0 ? 'pod-maxconn 0 is no limit in HAProxy, and max-conns 0 is no limit in NGINX.' : 'HAProxy divides pod-maxconn by the controller replicas itself; NGINX Ingress Controller applies the value per replica, so divide it by your replica count. HAProxy queued a request past the cap for up to timeout-queue (5s by default); NGINX Open Source refuses it at once (502). The queue is NGINX Plus (upstreams[].queue), with a size HAProxy never set.');
             },
 
             // ssl-passthrough is decided per path by walkRun (Service, Ingress,
@@ -1443,6 +1466,7 @@
             let ctx = {
                 strategy: strategy,
                 namespace: model.namespace,
+                hosts: (model.hosts || []).map(function(h) { return h.host; }),
                 consumed: {},
                 notes: [],
                 todos: [],
@@ -1906,6 +1930,23 @@
             return out;
         }
 
+        // HAProxy retry-on keywords (configuration.txt 3.2, "retry-on") as
+        // proxy_next_upstream conditions. NGINX's error covers a failed
+        // connection and a server that closed without answering; the rest
+        // name themselves. { value, lost } with value null for "none".
+        function retryOnToNextUpstream(v) {
+            let map = { 'conn-failure': ['error'], 'empty-response': ['error'], 'response-timeout': ['timeout'], 'junk-response': ['invalid_header'],
+                '403': ['http_403'], '404': ['http_404'], '429': ['http_429'], '500': ['http_500'], '502': ['http_502'], '503': ['http_503'], '504': ['http_504'],
+                'all-retryable-errors': ['error', 'timeout', 'invalid_header', 'http_500', 'http_502', 'http_503', 'http_504'] };
+            let out = [], lost = [];
+            str(v).trim().split(/\s+/).filter(Boolean).forEach(function(k) {
+                if (k === 'none') return;
+                if (map[k]) map[k].forEach(function(c) { if (out.indexOf(c) === -1) out.push(c); });
+                else lost.push(k);
+            });
+            return { value: out.length ? out.join(' ') : (/\bnone\b/.test(str(v)) ? 'off' : null), lost: lost };
+        }
+
         // A Backend CR's fields, onto the upstreams of the Service it serves.
         function backendCRToUpstream(cr, service, f, ctx) {
             let config = cr.config || {};
@@ -1935,14 +1976,88 @@
             // (verified on nginx 1.31.7: tries 3 reached three servers).
             let retries = haproxyInt(get(['retries']));
             if (retries !== null && retries >= 0) upstreamField(f, service, 'next-upstream-tries', retries + 1, label + ' retries ' + retries + ' + the first attempt');
+            let retryOn = get(['retry-on']);
+            if (retryOn !== undefined) {
+                let r = retryOnToNextUpstream(retryOn);
+                if (r.value) upstreamField(f, service, 'next-upstream', r.value, label + ' retry_on');
+                if (r.lost.length) ctx.note('cr-backend', label + ' retry_on ' + r.lost.join(', ') + ': NGINX retries on none of these (it has no condition for 401, 408, 421, 425, 501 or 0-RTT rejection); left out.', 'warning');
+            }
             let cookie = get(['cookie']);
             let cookieName = cookie === undefined ? null : str((isMap(cookie) ? cookie.name : cookie) || 'SERVERID');
-            if (cookieName !== null && cookieNameOk(cookieName)) upstreamField(f, service, 'sessionCookie', { enable: true, name: cookieName, path: '/' }, label + ' cookie');
+            // httponly, secure and domain are attributes HAProxy writes on the
+            // cookie (configuration.txt 3.2, "cookie"); maxidle and maxlife
+            // limit how long HAProxy honours it, server side, and set no Expires.
+            if (cookieName !== null && cookieNameOk(cookieName)) {
+                let sc = { enable: true, name: cookieName, path: '/' };
+                if (isMap(cookie) && cookie.httponly === true) sc.httpOnly = true;
+                if (isMap(cookie) && cookie.secure === true) sc.secure = true;
+                let doms = isMap(cookie) && Array.isArray(cookie.domain) ? cookie.domain.map(function(d) { return isMap(d) ? str(d.value) : str(d); }).filter(Boolean) : [];
+                if (doms.length) sc.domain = doms[0];
+                upstreamField(f, service, 'sessionCookie', sc, label + ' cookie');
+                let lost = isMap(cookie) ? ['indirect', 'nocache', 'postonly', 'preserve', 'dynamic', 'maxidle', 'maxlife', 'attr'].filter(function(k) { return cookie[k] !== undefined && cookie[k] !== false; }) : [];
+                if (doms.length > 1) lost.push('domain ' + doms.slice(1).join(', '));
+                if (isMap(cookie) && cookie.type && ['insert', 'rewrite', 'prefix'].indexOf(str(cookie.type)) > 0) lost.push('type ' + cookie.type + ' (NGINX inserts its own cookie)');
+                if (lost.length) ctx.note('cr-backend', label + ' cookie ' + lost.join(', ') + ': no sessionCookie field; NGINX inserts and reads the cookie itself.');
+            }
             else if (cookieName !== null) ctx.note('cr-backend', label + ' cookie "' + cookieName + '": ' + COOKIE_NAME_RULE, 'warning');
             let ds = get(['default-server']);
             let maxconn = isMap(ds) ? haproxyInt(ds.maxconn) : null;
             if (maxconn !== null && maxconn >= 0) upstreamField(f, service, 'max-conns', maxconn, label + ' default_server.maxconn');
-            if (get(['check', 'httpchk-params', 'adv-check']) !== undefined) ctx.note('cr-backend', label + ' runs active health checks, which need NGINX Plus (upstreams[].healthCheck); NGINX Open Source marks a server failed only when real requests fail.', 'warning');
+            // default_server ssl turns TLS on to every server; verify required
+            // checks the chain against ssl_cafile, a path in the HAProxy pod
+            // (no Secret to point at), and sni sends a name. The upstream's
+            // tls.enable is the scheme; the egressMTLS Policy the rest.
+            if (isMap(ds) && str(ds.ssl).toLowerCase() === 'enabled') {
+                upstreamField(f, service, 'tls', { enable: true }, label + ' default_server.ssl');
+                let em = {}, ec = {};
+                if (str(ds.verify).toLowerCase() === 'required') {
+                    em.trustedCertSecret = 'backend-ca'; em.verifyServer = true;
+                    ec['spec.egressMTLS.trustedCertSecret'] = 'TODO: a Secret of type nginx.org/ca holding ' + (ds.ssl_cafile ? str(ds.ssl_cafile) : 'the CA') + ' under ca.crt (' + label + ' default_server.ssl_cafile is a file in the HAProxy pod)';
+                    ec['spec.egressMTLS.verifyServer'] = label + ' default_server.verify required';
+                    ctx.todo('spec.egressMTLS.trustedCertSecret', 'a Secret of type nginx.org/ca with the CA ' + label + ' verified backends against (ssl_cafile ' + (ds.ssl_cafile ? str(ds.ssl_cafile) : 'unset') + ')');
+                }
+                if (ds.ssl_certificate) { em.tlsSecret = 'backend-client-cert'; ec['spec.egressMTLS.tlsSecret'] = 'TODO: a Secret of type kubernetes.io/tls holding ' + str(ds.ssl_certificate) + ' (' + label + ' default_server.ssl_certificate)'; ctx.todo('spec.egressMTLS.tlsSecret', 'a kubernetes.io/tls Secret with the client certificate ' + str(ds.ssl_certificate)); }
+                let sni = str(ds.sni);
+                if (sni) {
+                    em.serverName = true; ec['spec.egressMTLS.serverName'] = label + ' default_server.sni — send the name as SNI';
+                    // str(name) is that name; req.hdr(host) the client's Host,
+                    // which is fixed when the Ingress serves one host.
+                    let fixed = /^str\(([^)]+)\)$/.exec(sni);
+                    let hostSni = /^req\.hdr\(host\)/i.test(sni) && ctx.hosts && ctx.hosts.length === 1;
+                    if (fixed) { em.sslName = fixed[1]; ec['spec.egressMTLS.sslName'] = label + ' default_server.sni'; }
+                    else if (hostSni) { em.sslName = ctx.hosts[0]; ec['spec.egressMTLS.sslName'] = label + ' default_server.sni ' + sni + ' — the one host this Ingress serves'; }
+                    else { em.sslName = 'backend.example.com'; ec['spec.egressMTLS.sslName'] = 'TODO: one name for every request — HAProxy sent sni ' + sni + ' per request, which has no fixed form'; ctx.todo('spec.egressMTLS.sslName', 'the name the backend certificate carries (HAProxy sent sni ' + sni + ' per request)'); }
+                }
+                if (em.verifyServer && !em.sslName) ctx.note('cr-backend', label + ' verify required: HAProxy checked the chain only; NGINX also checks the name, against $proxy_host unless sslName is set. Set sslName to a name the backend certificate carries.', 'warning');
+                if (Object.keys(em).length) f.policies.push({ name: ctx.name('egress-mtls'), spec: { egressMTLS: em }, onIngress: true, comments: ec });
+                if (ds.verifyhost) ctx.note('cr-backend', label + ' default_server.verifyhost ' + ds.verifyhost + ': set it as the egressMTLS sslName.', 'warning');
+            }
+            // Active checks: default_server check (enabled) probes each server,
+            // as option httpchk (adv_check, httpchk_params) says, every inter
+            // ms, taking it down after fall failures and up after rise passes
+            // (HAProxy defaults 2000, 3 and 2). upstreams[].healthCheck is the
+            // NGINX Plus form; its defaults (5s, 1, 1) differ, so all are set.
+            let dsCheck = isMap(ds) ? str(ds.check).toLowerCase() : '';
+            if (dsCheck === 'enabled') {
+                let hc = { enable: true };
+                let hp = get(['httpchk-params']);
+                let uri = isMap(hp) ? str(hp.uri) : '';
+                if (uri) hc.path = uri;
+                if (isMap(hp) && hp.method && str(hp.method).toUpperCase() !== 'GET') ctx.note('cr-backend', label + ' httpchk_params.method ' + hp.method + ': NGINX Plus health checks always probe with GET.');
+                let inter = msToNginxTime(ds.inter === undefined ? 2000 : ds.inter);
+                if (inter) hc.interval = inter.value;
+                let fall = haproxyInt(ds.fall), rise = haproxyInt(ds.rise);
+                hc.fails = fall !== null && fall > 0 ? fall : 3;
+                hc.passes = rise !== null && rise > 0 ? rise : 2;
+                let ct = msToNginxTime(get(['check-timeout']));
+                if (ct) hc['read-timeout'] = ct.value;
+                let adv = str(get(['adv-check']));
+                if (adv && adv !== 'httpchk') ctx.note('cr-backend', label + ' adv_check ' + adv + ': NGINX Plus probes HTTP on a VirtualServer upstream; a ' + adv + ' probe is a TransportServer health check with match send/expect.', 'warning');
+                upstreamField(f, service, 'healthCheck', hc, label + ' default_server check, inter, rise, fall' + (uri ? ', httpchk_params.uri' : '') + ' — NGINX Plus only');
+                ctx.note('cr-backend', label + ' runs active health checks: upstreams[].healthCheck, which NGINX Ingress Controller accepts on NGINX Plus only. NGINX Open Source marks a server failed only when real requests fail (max-fails, default 1 in 10s).', 'warning');
+            } else if (get(['httpchk-params', 'adv-check']) !== undefined) {
+                ctx.note('cr-backend', label + ' configures health checks (adv_check, httpchk_params) but default_server.check is not enabled, so HAProxy ran none; nothing is migrated.');
+            }
             let rules = ['acl-list', 'http-request-rule-list', 'http-response-rule-list', 'server-switching-rule-list', 'stick-table'].filter(function(n) { return get([n]) !== undefined; });
             if (rules.length) ctx.note('cr-backend', label + ': ' + rules.join(', ') + ' do not carry over as data; re-express them as VirtualServer matches, Policies or snippets.', 'warning');
             ctx.consumed['cr-backend'] = true;
@@ -2523,8 +2638,9 @@
                 g.note('syslog-server', 'Only the access log can go to syslog, to one server; the error log stays on stderr (error-log-level sets its level).');
             },
             'log-format': function(x, g) {
-                g.cm('log-format', LOG_FORMAT_HTTP, 'TODO: log-format, in NGINX variables');
-                g.todo('configmap.log-format', 'rewrite the HAProxy log-format "' + x.value + '" with NGINX variables (%ci is $remote_addr, %ST is $status, %Tr is $upstream_response_time)');
+                let lf = haproxyLogFormatToNginx(x.value);
+                g.cm('log-format', lf.value, 'log-format' + (lf.left.length ? ' — TODO: ' + lf.left.join(' ') + ' have no NGINX variable' : ''));
+                if (lf.left.length) g.todo('configmap.log-format', 'replace ' + lf.left.join(', ') + ' in the log format: HAProxy names (%b backend, %s server, %ft frontend) and timers (%Tr in milliseconds; NGINX $upstream_response_time is seconds) have no exact NGINX variable');
             },
             // tcp-services.go reads log-format-tcp from the tcp-services
             // ConfigMap only (--configmap-tcp-services); in the controller
@@ -2550,11 +2666,15 @@
             },
             // http-snippets reach nginx.conf unchecked: only a time NGINX
             // parses may go in, or the reload fails for every resource.
-            'timeout-client': function(x, g) {
+            // timeout-client bounds client inactivity, timeout-http-request
+            // the wait for a whole request: client_header_timeout is the
+            // latter's when both are set.
+            'timeout-client': function(x, g, run) {
                 let t = cmTime(g, 'timeout-client', x, '50s');
                 if (!t) return;
-                g.http('client_body_timeout ' + t.value + ';', 'timeout-client'); g.http('client_header_timeout ' + t.value + ';', 'timeout-client'); g.http('send_timeout ' + t.value + ';', 'timeout-client');
-                g.note('timeout-client', 'NGINX Ingress Controller has no ConfigMap key for client-side timeouts; http-snippets sets client_body_timeout, client_header_timeout and send_timeout.');
+                let header = !(run && controllerOptions(run)['timeout-http-request']);
+                g.http('client_body_timeout ' + t.value + ';', 'timeout-client'); if (header) g.http('client_header_timeout ' + t.value + ';', 'timeout-client'); g.http('send_timeout ' + t.value + ';', 'timeout-client');
+                g.note('timeout-client', 'NGINX Ingress Controller has no ConfigMap key for client-side timeouts; http-snippets sets ' + (header ? 'client_body_timeout, client_header_timeout and send_timeout.' : 'client_body_timeout and send_timeout; client_header_timeout is timeout-http-request\'s.'));
             },
             'timeout-http-request': function(x, g) {
                 let t = cmTime(g, 'timeout-http-request', x, '5s');
@@ -2645,6 +2765,66 @@
             if (on) connectionMode(name, g, name);
         }
 
+        // ssl-default-bind-options (configuration.txt 3.2): ssl-min-ver and
+        // ssl-max-ver bound the protocols, no-sslv3/no-tlsv1x drop one,
+        // no-tls-tickets turns tickets off, prefer-client-ciphers lets the
+        // client choose. ssl-protocols lists what is left.
+        function bindOptions(v, src, g) {
+            let names = ['SSLv3', 'TLSv1.0', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'];
+            let on = [false, false, false, true, true];
+            let toks = str(v).trim().split(/\s+/);
+            let left = [];
+            for (let i = 0; i < toks.length; i++) {
+                let t = toks[i].toLowerCase();
+                if ((t === 'ssl-min-ver' || t === 'ssl-max-ver') && toks[i + 1]) {
+                    let at = names.indexOf(toks[++i]);
+                    if (at === -1) { left.push(t + ' ' + toks[i]); continue; }
+                    // min-ver: every version from it up; max-ver: none above it.
+                    for (let j = 0; j < names.length; j++) {
+                        if (t === 'ssl-min-ver') on[j] = j >= at;
+                        else if (j > at) on[j] = false;
+                    }
+                } else if (/^no-(sslv3|tlsv1\d)$/.test(t)) {
+                    let n = { 'no-sslv3': 'SSLv3', 'no-tlsv10': 'TLSv1.0', 'no-tlsv11': 'TLSv1.1', 'no-tlsv12': 'TLSv1.2', 'no-tlsv13': 'TLSv1.3' }[t];
+                    on[names.indexOf(n)] = false;
+                } else if (t === 'no-tls-tickets') g.http('ssl_session_tickets off;', src + ' no-tls-tickets');
+                else if (t === 'prefer-client-ciphers') g.cm('ssl-prefer-server-ciphers', 'false', src + ' prefer-client-ciphers');
+                else left.push(toks[i]);
+            }
+            // NGINX names TLS 1.0 "TLSv1".
+            let protos = names.filter(function(n, j) { return on[j] && n !== 'SSLv3'; }).map(function(n) { return n === 'TLSv1.0' ? 'TLSv1' : n; });
+            if (protos.length) g.cm('ssl-protocols', protos.join(' '), src);
+            if (left.length) g.note(src.split(' ')[0] + ' ' + src.split(' ')[1], left.join(' ') + ': no NGINX Ingress Controller key; not migrated.', 'warning');
+        }
+        // cpu_maps [{process "1/1-4", cpu_set "0-3"}]: HAProxy threads 1..n
+        // on CPUs a..b, one each. With nbthread workers, NGINX takes one mask
+        // per worker; anything else (ranges of unequal length, several
+        // processes) is left to the reader.
+        function cpuMapMasks(v, nbthread) {
+            let maps = Array.isArray(v) ? v : [];
+            if (maps.length !== 1 || !isMap(maps[0])) return null;
+            let p = /^(\d+)\/(\d+)-(\d+)$/.exec(str(maps[0].process)), c = /^(\d+)-(\d+)$/.exec(str(maps[0].cpu_set));
+            if (!p || !c) return null;
+            let threads = +p[3] - +p[2] + 1, cpus = +c[2] - +c[1] + 1;
+            if (threads !== cpus || (nbthread !== null && nbthread !== threads) || +c[2] > 63) return null;
+            let masks = [];
+            for (let i = 0; i < cpus; i++) { let bits = ''; for (let b = +c[2]; b >= 0; b--) bits += b === +c[1] + i ? '1' : '0'; masks.push(bits.replace(/^0+(?=.)/, '').padStart(+c[2] + 1, '0')); }
+            return masks.join(' ');
+        }
+        // log_target_list [{address, facility, level}]: HAProxy sends access
+        // logs at info, so a target whose level lets info through gets them,
+        // as nginx's syslog access_log (severity info) sends them.
+        function logTargets(v, label, g) {
+            let ts = (Array.isArray(v) ? v : []).filter(isMap).filter(function(t) { return t.address; });
+            if (!ts.length) { g.note(label, 'log targets name no address; nothing is migrated.', 'warning'); return; }
+            let t = ts[0];
+            let levels = ['emerg', 'alert', 'crit', 'err', 'warning', 'notice', 'info', 'debug'];
+            let lv = t.level ? levels.indexOf(str(t.level)) : 7;
+            if (lv !== -1 && lv < 6) { g.note(label, 'log target ' + t.address + ' takes level ' + t.level + ' and above, so HAProxy sent it no access logs (they are info); nothing is migrated.'); return; }
+            g.cm('access-log', 'syslog:server=' + str(t.address) + (t.facility ? ',facility=' + str(t.facility) : '') + ',severity=info main', label + ' log_target_list address' + (t.facility ? ', facility' : '') + ' — access logs at info, as HAProxy sent them');
+            if (ts.length > 1) g.note(label, 'NGINX Ingress Controller sends access logs to one syslog server; ' + ts.slice(1).map(function(x) { return x.address; }).join(', ') + ' are left out.', 'warning');
+        }
+
         function globalCR(cr, g) {
             let flat = {};
             Object.keys(cr.config || {}).forEach(function(raw) {
@@ -2673,14 +2853,24 @@
                         else g.cm('worker-rlimit-nofile', String(n), label + ' ulimit_n');
                         break;
                     }
-                    case 'hard-stop-after': case 'grace': { let t = msToNginxTime(v); if (t) g.cm('worker-shutdown-timeout', t.value, label + ' ' + k + ' (milliseconds)'); else g.note(label, k + ' "' + v + '" is not a count of milliseconds; it is not migrated.', 'warning'); break; }
+                    // hard-stop-after caps how long an old worker drains, as
+                    // worker_shutdown_timeout does; grace is how long HAProxy
+                    // keeps accepting after a stop signal, which NGINX has not.
+                    case 'hard-stop-after': { let t = msToNginxTime(v); if (t) g.cm('worker-shutdown-timeout', t.value, label + ' hard_stop_after (milliseconds) — how long an old worker may drain'); else g.note(label, k + ' "' + v + '" is not a count of milliseconds; it is not migrated.', 'warning'); break; }
+                    case 'grace': g.note(label, 'grace: HAProxy kept accepting connections for ' + (msToNginxTime(v) ? msToNginxTime(v).value : v) + ' after a stop signal; NGINX stops accepting at once and drains (worker-shutdown-timeout). A preStop sleep on the NGINX Ingress Controller Pod gives the same window.'); break;
                     case 'ssl-default-bind-ciphers': g.cm('ssl-ciphers', v, label + ' ssl_default_bind_ciphers'); break;
-                    case 'ssl-default-bind-options': g.cm('ssl-protocols', 'TLSv1.2 TLSv1.3', label + ' ssl_default_bind_options — TODO: derive from "' + v + '"'); g.todo('configmap.ssl-protocols', 'derive the protocols from "' + v + '"'); break;
+                    case 'ssl-default-bind-options': bindOptions(v, label + ' ssl_default_bind_options', g); break;
                     // The key holds the DH parameters, not a path
                     // (MainServerSSLDHParamFileContent): NGINX Ingress Controller writes the file.
                     case 'ssl-dh-param-file': g.cm('ssl-dhparam-file', '-----BEGIN DH PARAMETERS-----\n# TODO: paste the contents of ' + v + '\n-----END DH PARAMETERS-----\n', label + ' ssl_dh_param_file — the key takes the PEM content, not a path'); g.todo('configmap.ssl-dhparam-file', 'paste the contents of ' + v); break;
-                    case 'cpu-maps': case 'cpu-set': case 'cpu-policy': g.cm('worker-cpu-affinity', 'auto', label + ' ' + k + ' — TODO: translate to NGINX CPU masks'); g.todo('configmap.worker-cpu-affinity', 'translate ' + k + ' to NGINX CPU masks'); break;
-                    case 'log-targets': case 'log': g.cm('access-log', 'syslog:server=127.0.0.1:514 main', label + ' log targets — TODO: the syslog address'); g.todo('configmap.access-log', 'the syslog address from the Global log targets'); break;
+                    case 'cpu-maps': {
+                        let mask = cpuMapMasks(v, haproxyInt(flat.nbthread));
+                        if (mask) g.cm('worker-cpu-affinity', mask, label + ' cpu_maps — one CPU per worker, as HAProxy pinned one per thread');
+                        else { g.cm('worker-cpu-affinity', 'auto', label + ' cpu_maps — TODO: NGINX masks, one per worker'); g.todo('configmap.worker-cpu-affinity', 'one CPU mask per worker for cpu_maps ' + JSON.stringify(v)); }
+                        break;
+                    }
+                    case 'cpu-set': case 'cpu-policy': g.note(label, k + ': NGINX has no CPU set or policy; worker-cpu-affinity pins workers.', 'warning'); break;
+                    case 'log-targets': case 'log': logTargets(v, label, g); break;
                     case 'daemon': case 'master-worker': case 'pidfile': case 'localpeer': case 'chroot': case 'user': case 'uid': case 'group': case 'gid': case 'default-path': managed.push(k); break;
                     default: dropped.push(k);
                 }
@@ -2705,7 +2895,15 @@
                         if (k === 'server-timeout') { g.cm('proxy-read-timeout', t.value, label + ' server_timeout (milliseconds)'); g.cm('proxy-send-timeout', t.value, label + ' server_timeout covers both directions'); }
                         else if (k === 'connect-timeout') g.cm('proxy-connect-timeout', t.value, label + ' connect_timeout (milliseconds)');
                         else if (k === 'http-keep-alive-timeout') g.cm('keepalive-timeout', t.value, label + ' http_keep_alive_timeout (milliseconds)');
-                        else g.http('client_header_timeout ' + t.value + ';', label + ' ' + raw);
+                        else if (k === 'http-request-timeout') g.http('client_header_timeout ' + t.value + ';', label + ' ' + raw + ' — reading the request headers, the closest bound');
+                        else {
+                            // client_timeout: client inactivity, both directions;
+                            // client_header_timeout is http_request_timeout's when set.
+                            let hasReq = Object.keys(cr.config).some(function(r) { return String(r).toLowerCase().replace(/_/g, '-') === 'http-request-timeout'; });
+                            g.http('client_body_timeout ' + t.value + ';', label + ' ' + raw);
+                            g.http('send_timeout ' + t.value + ';', label + ' ' + raw + ' (the write side)');
+                            if (!hasReq) g.http('client_header_timeout ' + t.value + ';', label + ' ' + raw);
+                        }
                         break;
                     }
                     case 'balance': { let m = haproxyLbMethod(balanceString(v)); if (m.value && !m.invalid) g.cm('lb-method', m.value, label + ' balance' + (m.note ? ' — ' + m.note : '')); else g.note(label, 'balance: ' + (m.none || m.invalid), 'warning'); break; }
@@ -2720,11 +2918,32 @@
                         break;
                     }
                     case 'queue-timeout': g.note(label, 'queue_timeout is the NGINX Plus VirtualServer upstreams[].queue.timeout (with max-conns); NGINX Open Source rejects a queue and answers at once.', 'warning'); break;
-                    case 'retries': g.note(label, 'retries is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream-tries, or VirtualServer upstreams[].next-upstream-tries, which counts the first attempt too, so set it to ' + ((haproxyInt(v) || 0) + 1) + ' for retries ' + v + '.'); break;
+                    case 'retries': g.note(label, 'retries is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream-tries, or VirtualServer upstreams[].next-upstream-tries, which counts the first attempt too, so set it to ' + ((haproxyInt(v) || 0) + 1) + ' for retries ' + v + '.'); break; break;
                     case 'redispatch': g.note(label, 'Retrying on another server is per resource in NGINX Ingress Controller: nginx.org/proxy-next-upstream (default "error timeout").'); break;
-                    case 'httplog': case 'log-format': g.cm('log-format', LOG_FORMAT_HTTP, label + ' ' + raw + ' — TODO: rewrite as NGINX variables'); g.todo('configmap.log-format', 'rewrite the Defaults log format with NGINX variables'); break;
+                    // log_format wins over httplog's built-in format.
+                    case 'httplog': if (Object.keys(cr.config).some(function(r) { return String(r).toLowerCase().replace(/_/g, '-') === 'log-format'; })) break;
+                        g.cm('log-format', LOG_FORMAT_HTTP, label + ' httplog — HAProxy\'s built-in HTTP format; NGINX\'s combined format is the nearest'); break;
+                    case 'log-format': {
+                        let lf = haproxyLogFormatToNginx(v);
+                        g.cm('log-format', lf.value, label + ' log_format' + (lf.left.length ? ' — TODO: ' + lf.left.join(' ') + ' have no NGINX variable' : ''));
+                        if (lf.left.length) g.todo('configmap.log-format', 'replace ' + lf.left.join(', ') + ' in the log format: HAProxy names (%b backend, %s server, %ft frontend) and timers (%Tr in milliseconds; NGINX $upstream_response_time is seconds) have no exact NGINX variable');
+                        break;
+                    }
                     case 'tcplog': g.cm('stream-log-format', LOG_FORMAT_TCP, label + ' tcplog — TODO: rewrite as NGINX stream variables'); break;
                     case 'forwardfor': g.note(label, 'forwardfor: NGINX Ingress Controller sends X-Forwarded-For by default.'); break;
+                    // compression algo/type (configuration.txt 3.2): gzip of the
+                    // listed response types, every type when none is listed, of
+                    // what the servers send — gzip_proxied any, since NGINX
+                    // compresses no proxied response by default.
+                    case 'compression': {
+                        let algos = isMap(v) ? (Array.isArray(v.algorithms) ? v.algorithms : (Array.isArray(v.algos_res) ? v.algos_res : [])).map(str) : [];
+                        let types = isMap(v) ? (Array.isArray(v.types) ? v.types : (Array.isArray(v.types_res) ? v.types_res : [])).map(str) : [];
+                        if (algos.length && algos.indexOf('gzip') === -1) { g.note(label, 'compression algorithms ' + algos.join(', ') + ': NGINX compresses with gzip only; not migrated.', 'warning'); break; }
+                        g.http('gzip on;', label + ' compression'); g.http('gzip_proxied any;', label + ' compression — HAProxy compressed server responses');
+                        g.http('gzip_types ' + (types.length ? types.join(' ') : '*') + ';', label + ' compression.types');
+                        if (algos.some(function(a) { return a !== 'gzip'; })) g.note(label, 'compression ' + algos.filter(function(a) { return a !== 'gzip'; }).join(', ') + ': NGINX offers gzip only.');
+                        break;
+                    }
                     case 'mode': g.note(label, 'mode is structural in NGINX Ingress Controller: HTTP is an Ingress or VirtualServer, TCP a TransportServer.'); break;
                     default: none.push(raw);
                 }
@@ -2781,7 +3000,14 @@
             // Controller (HasCorrectIngressClass); one chosen for the run applies.
             g.ingressClass = (options && options.ingressClass) || null;
             let http = [];
-            g.http = function(line, source) { if (!http.some(function(h) { return h.line === line; })) http.push({ line: line, source: source }); };
+            // One line per directive: nginx refuses a directive twice in a
+            // block ("is duplicate", nginx 1.31.7), which fails every reload.
+            g.http = function(line, source) {
+                let d = line.split(/\s/)[0];
+                let at = http.findIndex(function(h) { return h.line.split(/\s/)[0] === d; });
+                if (at === -1) http.push({ line: line, source: source });
+                else if (http[at].line !== line) g.note(source, 'Sets ' + d + ', which ' + http[at].source + ' already set (' + http[at].line + '); nginx takes a directive once, so the first is kept.', 'warning');
+            };
             g.listeners = [];
             let cm = controllerOptions(run);
             if (run.configMaps.filter(function(c) { return Object.keys(c.options).length; }).length > 1) g.note('ConfigMap', 'The paste holds more than one HAProxy ConfigMap; HAProxy reads one. Their keys were merged, the first value kept.', 'warning');

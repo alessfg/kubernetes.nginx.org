@@ -1011,7 +1011,7 @@ metadata:
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: backend-tls-policy
+  name: my-app-egress-mtls
 spec:
   egressMTLS:
     trustedCertSecret: backend-ca  # server-ca — CA under key "ca.crt"
@@ -1021,12 +1021,27 @@ spec:
     # The name the backend certificate must carry. HAProxy checked only the
     # chain; NGINX also checks the name, $proxy_host (the upstream name) unless set.
     sslName: backend-svc.default.svc
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "backend-tls-policy"
-# On a plain Ingress, egressMTLS only sets proxy_ssl_* — it does NOT switch the
-# upstream to HTTPS. Always pair it with nginx.org/ssl-services (see the server-ssl row).</code></pre></div>
+---
+# Attached at spec.policies of the host's VirtualServer, or on an Ingress
+# through nginx.org/policies
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:
+    - name: my-app-egress-mtls
+  upstreams:
+    - name: backend-svc
+      service: backend-svc
+      port: 80
+      tls:  # server-ssl: egressMTLS sets proxy_ssl_* only; this
+        enable: true  # switches the upstream to HTTPS (nginx.org/ssl-services on an Ingress)
+  routes:
+    - path: /
+      action:
+        pass: backend-svc</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>The CA key changes:</strong> HAProxy's <code>server-ca</code> Secret carries the CA under <code>tls.crt</code>; NGINX Ingress Controller reads the bundle from <code>ca.crt</code>. Add that key; since v5.7.0 the Secret can stay <code>Opaque</code>, so the existing one can be reused. <code>verifyServer</code> defaults to <strong>false</strong>, so set it to <code>true</code> explicitly or the backend certificate is never verified.</div>
                             <div class="info-box warning"><strong>The name is checked too:</strong> HAProxy's <code>server-ca</code> sets <code>verify required</code> and no <code>verifyhost</code>, so it checked the certificate chain only. With <code>verifyServer</code>, NGINX also checks the certificate's name against <code>sslName</code>, which defaults to <code>$proxy_host</code>: on a VirtualServer that is the generated upstream name (<code>vs_&lt;namespace&gt;_&lt;name&gt;_&lt;upstream&gt;</code>), which no certificate carries, so every request fails with <code>502</code>. Set <code>sslName</code> to a name in the backend certificate's subjectAltName (the analyzer uses <code>&lt;service&gt;.&lt;namespace&gt;.svc</code>, the name NGINX Ingress Controller checks on an Ingress), and <code>serverName: true</code> if the backend needs SNI.</div>
@@ -1048,16 +1063,31 @@ metadata:
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: backend-tls-policy
+  name: my-app-egress-mtls
 spec:
   egressMTLS:
     tlsSecret: client-cert  # server-crt (kubernetes.io/tls, same namespace as the Policy)
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "backend-tls-policy"
-# On a plain Ingress, egressMTLS only sets proxy_ssl_* — it does NOT switch the
-# upstream to HTTPS. Always pair it with nginx.org/ssl-services (see the server-ssl row).</code></pre></div>
+---
+# Attached at spec.policies of the host's VirtualServer, or on an Ingress
+# through nginx.org/policies
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  policies:
+    - name: my-app-egress-mtls
+  upstreams:
+    - name: backend-svc
+      service: backend-svc
+      port: 80
+      tls:  # server-ssl: egressMTLS sets proxy_ssl_* only; this
+        enable: true  # switches the upstream to HTTPS (nginx.org/ssl-services on an Ingress)
+  routes:
+    - path: /
+      action:
+        pass: backend-svc</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> <code>server-crt</code> presents a client certificate to the backend; on its own <code>verifyServer</code> stays <code>false</code> (HAProxy <code>verify none</code>), so the upstream certificate is not checked — merge with <code>server-ca</code> for mutual TLS. Always pair with <code>nginx.org/ssl-services</code> so the upstream actually uses HTTPS.</div>
                         </div></td></tr>
@@ -3482,8 +3512,6 @@ spec:
         interval: 2s     # default_server.inter
         passes: 2        # rise
         fails: 3         # fall
-      max-fails: 3       # NGINX Open Source fallback: passive ejection
-      fail-timeout: 10s
   routes:
     - path: /
       action:
@@ -3516,6 +3544,9 @@ spec:
       healthCheck:
         enable: true  # NGINX Plus only
         path: /healthz  # check-http
+        interval: 2s  # HAProxy's inter default (NGINX Plus: 5s)
+        fails: 3  # HAProxy's fall default (NGINX Plus: 1)
+        passes: 2  # HAProxy's rise default (NGINX Plus: 1)
   routes:
     - path: /
       action:
@@ -3548,6 +3579,8 @@ spec:
       healthCheck:  # NGINX Plus only
         enable: true
         interval: 10s  # check-interval
+        fails: 3  # HAProxy's fall default (NGINX Plus: 1)
+        passes: 2  # HAProxy's rise default (NGINX Plus: 1)
   routes:
     - path: /
       action:
@@ -3580,6 +3613,9 @@ spec:
       healthCheck:  # NGINX Plus only
         enable: true
         read-timeout: 5s  # timeout-check
+        interval: 2s  # HAProxy's inter default (NGINX Plus: 5s)
+        fails: 3  # HAProxy's fall default (NGINX Plus: 1)
+        passes: 2  # HAProxy's rise default (NGINX Plus: 1)
   routes:
     - path: /
       action:
@@ -4004,16 +4040,36 @@ data:
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: client-mtls-policy
+  name: my-app-ingress-mtls
 spec:
   ingressMTLS:
     clientCertSecret: ca-secret  # client-ca — CA under key "ca.crt"
     verifyClient: "on"
     verifyDepth: 1
-
-# Attach via VirtualServer spec.policies, or on Ingress via:
-#   annotations:
-#     nginx.org/policies: "client-mtls-policy"</code></pre></div>
+---
+# Attached at spec.policies of the host's VirtualServer, or on an Ingress
+# through nginx.org/policies
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  tls:
+    secret: app-tls  # ingressMTLS needs the host to terminate TLS
+    redirect:  # ssl-redirect, on by default with TLS in HAProxy
+      enable: true
+      code: 302
+  policies:
+    - name: my-app-ingress-mtls
+  upstreams:
+    - name: backend-svc
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend-svc</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> HAProxy <code>client-ca</code> Secrets carry the CA under <code>tls.crt</code>; NGINX Ingress Controller reads the bundle from <code>ca.crt</code> (optional CRL under <code>ca.crl</code>). Add that key; since v5.7.0 the Secret can stay <code>Opaque</code>. Requires TLS termination on the host: on a host without TLS, NGINX Ingress Controller rejects the Policy and the whole host answers <code>500</code>. Verification failures return <strong>HTTP 400</strong> (not 500). On mergeable Ingress it must sit on the master. Ingress-attachable since v5.5.0.</div>
                         
@@ -4031,18 +4087,43 @@ metadata:
   name: haproxy-kubernetes-ingress
   namespace: haproxy-controller
 data:
+  client-ca: "default/ca-secret"  # without it, HAProxy asks for no certificate
   client-crt-optional: "true"  # request but do not enforce</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: Policy
 metadata:
-  name: client-mtls-policy
+  name: my-app-ingress-mtls
 spec:
   ingressMTLS:
-    clientCertSecret: ca-secret
+    clientCertSecret: ca-secret  # client-ca
     verifyClient: "optional"  # client-crt-optional: true
-    verifyDepth: 1            # false → verifyClient: "on" (enforced)</code></pre></div>
+    verifyDepth: 1            # false → verifyClient: "on" (enforced)
+---
+# Attached at spec.policies of the host's VirtualServer, or on an Ingress
+# through nginx.org/policies
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  tls:
+    secret: app-tls  # ingressMTLS needs the host to terminate TLS
+    redirect:  # ssl-redirect, on by default with TLS in HAProxy
+      enable: true
+      code: 302
+  policies:
+    - name: my-app-ingress-mtls
+  upstreams:
+    - name: backend-svc
+      service: backend-svc
+      port: 80
+  routes:
+    - path: /
+      action:
+        pass: backend-svc</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Polarity — HAProxy defaults to enforced (<code>false</code>). Map <code>false</code> → <code>verifyClient: "on"</code>, <code>true</code> → <code>verifyClient: "optional"</code>. Do <strong>not</strong> use <code>optional_no_ca</code> (it skips CA verification; HAProxy still verifies against <code>client-ca</code> when optional). <code>verifyDepth</code> defaults to 1 on both sides.</div>
+                            <div class="info-box note"><strong>Note:</strong> Polarity — HAProxy defaults to enforced (<code>false</code>). Map <code>false</code> → <code>verifyClient: "on"</code>, <code>true</code> → <code>verifyClient: "optional"</code>. Do <strong>not</strong> use <code>optional_no_ca</code> (it skips CA verification; HAProxy still verifies against <code>client-ca</code> when optional). <code>verifyDepth</code> defaults to 1 on both sides. <code>client-crt-optional</code> applies only beside <code>client-ca</code>: without a CA, HAProxy asks for no certificate at all.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>client-strict-sni</code></td>
@@ -4377,9 +4458,10 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  log-format: |  # TODO: log-format, in NGINX variables
-    $remote_addr - $remote_user [$time_local] "$request"
-    $status $body_bytes_sent "$http_referer" "$http_user_agent"</code></pre></div>
+  # %ci %cp %tr %ST %B have NGINX variables (%B is every byte sent, as
+  # $bytes_sent); %ft, %b and %s are HAProxy names with none: TODO
+  log-format: |
+    $remote_addr:$remote_port [$time_local] %ft %b/%s $status $bytes_sent</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>Hand-translation required:</strong> HAProxy <code>%</code>-tokens are a different DSL from NGINX <code>$</code>-variables (<code>%ci</code> → <code>$remote_addr</code>, <code>%ST</code> → <code>$status</code>, <code>%Tr</code> → <code>$upstream_response_time</code>) — never copy them verbatim. Several HAProxy timers (<code>%Tw</code>/<code>%Tc</code>/<code>%Ta</code>) have no NGINX variable. <code>log-format</code> is <strong>global</strong> (one HTTP format).</div>
                         </div></td></tr>
@@ -4935,6 +5017,7 @@ spec:
       sessionCookie:
         enable: true
         name: SERVERID  # cookie
+        path: /
       max-conns: 100  # default_server.maxconn
   routes:
     - path: /
@@ -5006,11 +5089,10 @@ spec:
         enable: true
         name: SERVERID   # cookie.name
         path: /
-        httpOnly: true
-        # type/indirect/nocache have no
-        # NGINX Ingress Controller fields; the
-        # upstream gets a "sticky cookie" that
-        # NGINX inserts itself
+        # httponly, secure and domain carry over
+        # when set; type/indirect/nocache have no
+        # NGINX Ingress Controller fields: NGINX
+        # inserts its own "sticky cookie"
   routes:
     - path: /
       action:
@@ -5096,13 +5178,14 @@ spec:
       service: app-svc
       port: 80
       next-upstream-tries: 4  # retries 3 + the first attempt
-      next-upstream: "error timeout http_502 http_503 http_504"  # retry_on
+      next-upstream: "http_502 http_503 http_504"  # retry_on replaces HAProxy's
+                                                # default conn-failure, so no "error"
   routes:
     - path: /
       action:
         pass: backend</code></pre></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>retries</code> → <code>next-upstream-tries</code> plus one: HAProxy counts the retries after the first attempt, NGINX every attempt (verified on nginx 1.31.7); <code>redispatch</code>/<code>retry_on</code> → <code>next-upstream</code> (NGINX default <code>"error timeout"</code>). HAProxy retry conditions are bare status codes; NGINX names them <code>http_5xx</code>-style, and only from its fixed vocabulary.</div>
+                            <div class="info-box note"><strong>Note:</strong> <code>retries</code> → <code>next-upstream-tries</code> plus one: HAProxy counts the retries after the first attempt, NGINX every attempt (verified on nginx 1.31.7); <code>retry_on</code> → <code>next-upstream</code>: <code>conn-failure</code> and <code>empty-response</code> are <code>error</code>, <code>response-timeout</code> is <code>timeout</code>, <code>junk-response</code> is <code>invalid_header</code>, and status codes are <code>http_403</code>, <code>http_404</code>, <code>http_429</code> and <code>http_5xx</code>; 401, 408, 421, 425, 501 and <code>0rtt-rejected</code> have no NGINX condition. <code>retry_on</code> replaces HAProxy's default <code>conn-failure</code> rather than adding to it, and NGINX's default is <code>"error timeout"</code>. <code>redispatch</code> is what <code>next-upstream</code> always does: the retry goes to another server.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>acl_list</code> / <code>http_request_rule_list</code> / <code>server_switching_rule_list</code> / <code>stick_table</code></td>
@@ -5236,7 +5319,7 @@ metadata:
 data:
   # Client side only; NGINX Ingress Controller
   # defaults to 75s
-  keepalive-timeout: "60s"
+  keepalive-timeout: "1m"
   # upstream keep-alive is the separate "keepalive" key (a count)</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Client keep-alive idle timeout (NGINX Ingress Controller default 75s). Does not govern upstream keep-alive.</div>
@@ -5259,10 +5342,10 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
+  # %ci %cp %tr %ST %B have NGINX variables (%B is every byte sent, as
+  # $bytes_sent); %ft, %b and %s are HAProxy names with none: TODO
   log-format: |
-    $remote_addr:$remote_port [$time_local] "$request"
-    $status $body_bytes_sent
-    # TODO: hand-translate the remaining HAProxy %-tokens</code></pre></div>
+    $remote_addr:$remote_port [$time_local] %ft %b/%s $status $bytes_sent</code></pre></div>
                             </div>
                             <div class="info-box warning"><strong>Hand-translation required:</strong> HAProxy <code>%</code>-tokens must be rewritten as NGINX <code>$</code>-variables — see the <a href="#logging">Logging</a> row. <code>tcplog</code> maps to <code>stream-log-format</code> the same way.</div>
                         </div></td></tr>
@@ -5290,7 +5373,7 @@ data:
   proxy-read-timeout: "50s"    # server_timeout (ms → s) — NGINX splits read/send
   proxy-send-timeout: "50s"    # one HAProxy timeout covers both directions
   proxy-connect-timeout: "5s"  # connect_timeout
-  keepalive-timeout: "60s"     # http_keep_alive_timeout
+  keepalive-timeout: "1m"     # http_keep_alive_timeout
   lb-method: "least_conn"      # balance: leastconn</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> One HAProxy timeout governs both directions — set <strong>both</strong> <code>proxy-read-timeout</code> and <code>proxy-send-timeout</code>, or the unset one silently stays at NGINX's 60s default.</div>
@@ -5466,12 +5549,12 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: nginx-ingress
 data:
   proxy-read-timeout: 1h  # tunnel_timeout (every upstream, not only tunnels)
   proxy-send-timeout: 1h  # tunnel_timeout
   http-snippets: |
     gzip on;               # compression.algorithms
+    gzip_proxied any;      # HAProxy compressed what the servers sent
     gzip_types text/html;  # compression.types
 # error_files becomes per-route VirtualServer errorPages — see the
 # --configmap-errorfiles row under Controller flag mappings.</code></pre></div>
@@ -5831,8 +5914,8 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
-  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info main"
-  error-log-level: "info"  # level — verbosity only, still stderr</code></pre></div>
+  # level info lets HAProxy's access logs (sent at info) through
+  access-log: "syslog:server=10.0.0.1:514,facility=local0,severity=info main"</code></pre></div>
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Log targets become the <code>access-log</code> key (<code>syslog:</code> destination only); NGINX error-log verbosity is set by <code>error-log-level</code>. There is no error-log-to-syslog key. One destination only — NGINX Ingress Controller ignores any <code>access-log</code> value that does not start with <code>syslog:</code>.</div>
                         </div></td></tr>

@@ -48,7 +48,8 @@ SOURCE = 'assets/js/migration-ingress-nginx.js'
 TOOLS = [
     {'page': MIGRATION, 'module': SOURCE, 'inputs': r'^kind: Ingress\b'},
     {'page': 'haproxy-migration.html', 'module': 'assets/js/migration-haproxy.js',
-     'inputs': r'^kind: (Ingress|Service|ConfigMap|Global|Defaults|Backend|Frontend|TCP)\b'},
+     'inputs': r'^kind: (Ingress|Service|ConfigMap|Global|Defaults|Backend|Frontend|TCP)\b',
+     'complete': lambda old, new, strategy: complete_haproxy(old, new, strategy)},
 ]
 TOOLS = [t for t in TOOLS if os.path.exists(os.path.join(ROOT, t['page']))]
 
@@ -809,6 +810,66 @@ def with_spec(ingress_yaml):
     return ingress_yaml.rstrip('\n') + '\n' + ROW_SPEC
 
 
+# A row whose paste the analyzer cannot route on its own makes it emit nothing,
+# and a match would compare nothing: 52 of the HAProxy page's 138 comparisons
+# did. Each tool's completer adds what the NGINX side implies the reader also
+# had, so the example is held to real output. A row that answers with no
+# resource at all (a Frontend CR) is listed in ALTERNATIVE_TABS instead.
+def scaffold_name(new, kind, default):
+    m = re.search(r'^kind: %s\s*\nmetadata:\s*\n(?:\s+[\w-]+:.*\n)*?\s+name:\s*(\S+)' % kind, new + '\n', re.M)
+    return m.group(1) if m else default
+
+
+def backend_service(new):
+    """The Service the NGINX side routes to: its upstream or backend."""
+    m = re.search(r'^\s+service:\s*([a-z0-9][-a-z0-9]*)\s*(?:#.*)?$', new, re.M) or \
+        re.search(r'^\s+service:\s*\n\s+name:\s*([a-z0-9][-a-z0-9]*)', new, re.M)
+    return m.group(1) if m else 'backend-svc'
+
+
+def haproxy_ingress(service, annotations='', tls=False):
+    return ('apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: my-app\n'
+            + ('  annotations:\n' + annotations if annotations else '')
+            + 'spec:\n'
+            + ('  tls:\n    - hosts:\n        - app.example.com\n      secretName: app-tls\n' if tls else '')
+            + '  rules:\n    - host: app.example.com\n      http:\n        paths:\n'
+              '          - path: /\n            pathType: Prefix\n            backend:\n'
+              '              service:\n                name: %s\n                port:\n'
+              '                  number: 80\n' % service)
+
+
+def complete_haproxy(old, new, strategy):
+    """An Ingress for a paste without one: HAProxy applied a Service's
+    annotations, a cr-backend Backend and the ConfigMap's per-backend keys to
+    the Ingresses routing to them. Global and Defaults CRs also need the
+    controller ConfigMap's cr-global / cr-defaults pointer."""
+    if re.search(r'^kind: Ingress\b', old, re.M):
+        return with_spec(old)
+    kinds = re.findall(r'^kind: (\w+)', old, re.M)
+    extra = []
+    svc = backend_service(new)
+    svcs = re.findall(r'^kind: Service\s*\nmetadata:\s*\n(?:\s+[\w-]+:.*\n)*?\s+name:\s*(\S+)', old + '\n', re.M)
+    if svcs:
+        svc = svcs[0]
+    ann = ''
+    for kind in ('Global', 'Defaults'):
+        if kind in kinds and 'ConfigMap' not in kinds:
+            name = scaffold_name(old, kind, kind.lower())
+            ns = re.search(r'^kind: %s\s*\nmetadata:\s*\n(?:\s+[\w-]+:.*\n)*?\s+namespace:\s*(\S+)' % kind, old + '\n', re.M)
+            extra.append('apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: haproxy-kubernetes-ingress\ndata:\n'
+                         '  cr-%s: "%s"\n' % (kind.lower(), (ns.group(1) + '/' if ns else '') + name))
+    if 'Backend' in kinds:
+        name = scaffold_name(old, 'Backend', 'backend')
+        ns = re.search(r'^kind: Backend\s*\nmetadata:\s*\n(?:\s+[\w-]+:.*\n)*?\s+namespace:\s*(\S+)', old + '\n', re.M)
+        ann = '    haproxy.org/cr-backend: "%s"\n' % ((ns.group(1) + '/' if ns else '') + name)
+    # Client certificates are asked for on HTTPS only (HAProxy's client-ca
+    # binds to the https frontend): give the Ingress TLS when the row is one.
+    tls = bool(re.search(r'^\s+(client-ca|client-crt-optional):', old, re.M))
+    if set(kinds) & {'Service', 'Backend', 'ConfigMap'} or extra:
+        extra.append(haproxy_ingress(svc, ann, tls))
+    return old.rstrip('\n') + ''.join('\n---\n' + e for e in extra) if extra else old
+
+
 def normalise(text, ingress_name='my-app'):
     """The comparable content of a manifest: no comments, no blank lines, no
     step headers, and scaffold values (host, service, names) made generic so a
@@ -830,6 +891,14 @@ def normalise(text, ingress_name='my-app'):
         # `"/$2"` and `/$2` are the same scalar, as a value or a list item.
         line = re.sub(r'''^(\s*(?:-\s+)?[\w./-]+:\s+)(["'])(.*)\2$''', r'\1\3', line)
         line = re.sub(r'''^(\s*-\s+)(["'])(.*)\2$''', r'\1\3', line)
+        # `key: [a, b]` is the block list `key:` / `- a` / `- b`.
+        flow = re.match(r'^(\s*)((?:-\s+)?[\w./-]+):\s+\[([^\[\]{}]*)\]$', line)
+        if flow:
+            pad = flow.group(1) + ('  ' if flow.group(2).startswith('-') else '')
+            lines.append(flow.group(1) + flow.group(2) + ':')
+            lines.extend('%s  - %s' % (pad, re.sub(r'''^(["'])(.*)\1$''', r'\2', v.strip()))
+                         for v in flow.group(3).split(',') if v.strip())
+            continue
         lines.append(line)
     if lines and lines[0] == 'annotations:':
         lines = ['apiVersion: networking.k8s.io/v1', 'kind: Ingress', 'metadata:',
@@ -926,7 +995,8 @@ def diff_rows(rows, page_rel=MIGRATION):
 
             strategy = TAB_STRATEGY.get(tab, 'crd')
             plan.append((row, tab or '(single)', strategy, new))
-            cases.append((with_spec(old) if 'kind: Ingress' in old else old, strategy))
+            cases.append((tool['complete'](old, new, strategy) if tool.get('complete') else
+                          (with_spec(old) if 'kind: Ingress' in old else old), strategy))
     if not cases:
         return [], ''
     results, err = run_analyzer(cases, tool['module'])
@@ -937,9 +1007,16 @@ def diff_rows(rows, page_rel=MIGRATION):
         if res['error']:
             out.append((page_rel, row, tab, strategy, ['+ERROR: ' + res['error']], [], res['warnings']))
             continue
+        if not re.search(r'^kind:', res['text'], re.M):
+            EMPTY_OUTPUT.add((page_rel, row['start'], tab))
         delta, extra = compare_documents(normalise(new), normalise(res['text']), tab, strategy)
         out.append((page_rel, row, tab, strategy, delta, extra, res['warnings']))
     return out, ''
+
+
+# (page, row start, tab) of every compared tab whose analyzer output held no
+# resource, filled by diff_rows: such a tab compares nothing, and passes.
+EMPTY_OUTPUT = set()
 
 
 def documents(lines):
@@ -1458,12 +1535,29 @@ ALTERNATIVE_TABS = {
     # choose for the reader.
     ('haproxy-migration.html', 'configuration-snippets', 'configmap'): 'the global location-snippets key, which '
                              'applies to every location; the analyzer keeps a backend-config-snippet on its own Ingress',
+    ('haproxy-migration.html', 'crd-backend', '(single)#acl_list'): 'Backend CR rules re-expressed by hand as a '
+                             'VirtualServer route; ACLs and switching rules do not carry over as data, and the analyzer says so',
+    ('haproxy-migration.html', 'controller-flags', '(single)#--configmap-errorfiles'): 'the errorfiles ConfigMap '
+                             'translated by hand: the flag that names it is a Deployment argument, which no paste carries',
+    ('haproxy-migration.html', 'request-queueing', '(single)'): 'the NGINX Plus upstreams[].queue, which needs a '
+                             'size HAProxy never set (its queue is unbounded); the analyzer notes it under pod-maxconn',
     ('haproxy-migration.html', 'rate-limiting', '(single)'): 'rate-limit-whitelist as a hand-written geo/map key '
                              'beside the rate-limit Policy; NGINX Ingress Controller has no exemption field',
 } | {('haproxy-migration.html', 'enterprise', '(single)#' + k): 'HAProxy Enterprise ' + k + ' arrives as raw configuration '
                              'in a snippet key; the tab shows the NGINX Plus product that replaces it, which the analyzer '
                              'cannot read from the snippet (it converts the snippet key itself, with a TODO per line)'
      for k in ['Global Profiling Engine', 'Global Rate Limiting', 'Intelligent WAF', 'UDP']}
+
+
+# A tab whose analyzer output holds no resource compares nothing, so it passes
+# whatever the page shows; that is drift the sweep could not see (52 HAProxy
+# tabs did, before each tool's completer). One listed here answers, correctly,
+# with no resource: flags and notes only. Keyed as ALTERNATIVE_TABS; an entry
+# whose tab starts producing output fails, so the list cannot outlive its reason.
+NO_RESOURCE_TABS = {('haproxy-migration.html', 'crd-frontend', t): 'a Frontend CR becomes listener flags, '
+                    'GlobalConfiguration listeners and ConfigMap keys the reader sets, which the analyzer names in notes'
+                    for t in ['crd#binds', 'annotation#binds', '(single)#ssl', '(single)#accept_proxy', '(single)#httplog',
+                              '(single)#http_request_rule_list', '(single)#binds']}
 
 
 def mapping_keys():
@@ -1509,7 +1603,7 @@ def reference_row_failures():
         if err:
             return failures + ['the reference rows of %s did not run through the analyzer: %s' % (t['page'], err)]
         results += res
-    differing = set()
+    differing, empty = set(), set()
     for page_rel, row, tab, strategy, delta, extra, warnings in results:
         key = (row['heading'] or row['section'], tab) if page_rel == MIGRATION else (page_rel, row['heading'] or row['section'], tab)
         if key not in ALTERNATIVE_TABS and row['left']:
@@ -1517,6 +1611,13 @@ def reference_row_failures():
             if named in ALTERNATIVE_TABS:
                 key = named
         where = '%s:%d #%s tab %s' % (page_rel, row['start'] + 1, row['heading'] or row['section'], tab)
+        if (page_rel, row['start'], tab) in EMPTY_OUTPUT:
+            nkey = (page_rel, row['heading'] or row['section'], tab + ('#' + row['left'][0] if row['left'] else ''))
+            empty.add(nkey)
+            if nkey not in NO_RESOURCE_TABS:
+                failures.append('%s: the analyzer emits no resource for this tab, so it compares nothing; complete '
+                                'its paste (the tool\'s completer) or list it in NO_RESOURCE_TABS with the reason' % where)
+            continue
         for w in warnings:
             failures.append('%s: the analyzer warned: %s' % (where, w[:160]))
         if not delta:
@@ -1526,6 +1627,10 @@ def reference_row_failures():
             failures.append('%s differs from the analyzer (%s); first line: %s'
                             % (where, 'where.py --diff ' + row['left'][0] if row['left']
                                else 'its left cell names no annotation: see the row', delta[0].strip()))
+    for key, why in sorted(NO_RESOURCE_TABS.items()):
+        if key not in empty:
+            failures.append('NO_RESOURCE_TABS lists %s, which emits a resource now or names no tab: remove the entry (%s)'
+                            % (' '.join(key), why))
     for key, why in sorted(ALTERNATIVE_TABS.items()):
         if key not in differing:
             failures.append('ALTERNATIVE_TABS lists %s, which now matches the '

@@ -335,8 +335,11 @@ for (const p of PAGES) {
     // the order was a rule. A mapping marked preferAnnotation is the deliberate
     // exception, and the analyzer keeps it as an annotation under CRD-first too:
     // its row must lead with the annotation, and must exist.
+    // ingress-nginx names the annotation in community:, on the line before;
+    // other modules name the row's left cell in source:, on the same line.
     const ANNOTATION_FIRST = [...mod.matchAll(/\{ community: \["([\w-]+)"[^\n]*\n\s*preferAnnotation:/g)]
-        .map((m) => `nginx.ingress.kubernetes.io/${m[1]}`);
+        .map((m) => `nginx.ingress.kubernetes.io/${m[1]}`)
+        .concat([...mod.matchAll(/\{ keys: [^\n]*?source: '([^']+)'[^\n]*?preferAnnotation:/g)].map((m) => m[1]));
     test(`${p.name}: rows with a CRD and an annotation approach lead with the CRD`, () => {
         const CRD_BADGE = /badge-(?:virtualserver|virtualserverroute|policy|transportserver|globalconfiguration)\b/;
         const strip = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();

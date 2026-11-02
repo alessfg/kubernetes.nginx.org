@@ -13,13 +13,8 @@ const { ROOT, loadAnalyzer, idsQueriedBy } = require('./lib/load.js');
 /* One entry per migration tool the branch ships. Branches that add a second
    source module add a row here; nothing else in this file is source-specific. */
 const PAGES = [
-    { name: 'ingress-nginx', page: 'ingress-nginx-migration.html', module: 'assets/js/migration-ingress-nginx.js',
-      // Predates the alphabetical-categories rule: four headings in #mappings sit
-      // beside their topic rather than at their letter, and #configmap-mappings is
-      // grouped by what a reader migrates first. Reordering it is its own change.
-      alphabeticalCategories: false },
-    { name: 'haproxy', page: 'haproxy-migration.html', module: 'assets/js/migration-haproxy.js',
-      alphabeticalCategories: true },
+    { name: 'ingress-nginx', page: 'ingress-nginx-migration.html', module: 'assets/js/migration-ingress-nginx.js' },
+    { name: 'haproxy', page: 'haproxy-migration.html', module: 'assets/js/migration-haproxy.js' },
 ];
 
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -135,7 +130,7 @@ for (const p of PAGES) {
     // Categories are alphabetical within their section, so the order a reader
     // scrolls past matches the order the category filter offers. Appending a new
     // category to the end is the easy mistake and is invisible on a long page.
-    test(`${p.name}: category headings are alphabetical within each section`, { skip: p.alphabeticalCategories ? false : 'predates the rule — see PAGES' }, () => {
+    test(`${p.name}: category headings are alphabetical within each section`, () => {
         const sections = [...page.matchAll(/<section id="([\w-]+)"([\s\S]*?)(?=<section id="|$)/g)];
         let checked = 0;
         for (const [, id, body] of sections) {

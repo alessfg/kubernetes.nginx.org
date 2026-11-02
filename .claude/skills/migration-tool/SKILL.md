@@ -70,7 +70,7 @@ shape below is illustrative:
 | `community` | source annotation names, alphabetical, without the prefix |
 | `nic` | the display string shown in the right-hand column |
 | `type` | `annotation`, `policy`, `virtualserver`, `transportserver`, `configmap`, `unsupported` — drives which plan step it lands in |
-| `category` | **must equal the `<h3>` text verbatim**, sentence case — asserted by `check-classes.py` |
+| `category` | **must equal the `<h3>` text verbatim**, sentence case — asserted by `check-classes.py` (against the heading its `anchor` names) and by the wiring suite (some heading on the page carries it) |
 | `anchor` | the `<h3 id>` this row lives under |
 | `section` | `oss` or `plus` — where the analyzer's "See Reference Guide" link points (`plus-mappings` or `mappings`) |
 | `dualApproach` | the row offers both an annotation and a CRD; the chosen strategy picks which one the analyzer emits |
@@ -79,7 +79,7 @@ shape below is illustrative:
 | `templateFn` | the translator in `TRANSLATORS` that turns this mapping's annotations into fragments; it must exist, and every translator must be named (asserted) |
 | `nicMapping.crdKind` | the kind of resource the mapping's CRD form produces, for the reference row and the mapping index |
 | `vsField` | on an annotation entry, the VirtualServer upstream field it sets under CRD-first (`generateUpstreamSettingsVS`, every upstream), converted with the entry's own `transform`; under annotation-first the entry's `key` is written instead |
-| `preferAnnotation` | on a `dualApproach` mapping, a reason string: the annotation form is the better answer. CRD-first still emits the CRD form (there is no Ingress to carry the annotation) and shows the reason as a warning recommending annotation-first (only `custom-http-errors`) |
+| `preferAnnotation` | on a `dualApproach` mapping, a reason string: the annotation has no CRD form. CRD-first keeps that Ingress an Ingress (`ingressOnly`: also an `nginx.org/*` annotation `buildCrd` has no snippet for, or a rule with no host), as annotation-first builds it, and gives the reason as a warning; the row leads with the annotation. `nic-migrate convert --target virtualserver` passes `keepIngress: false` and gets the CRD form with a note of what it loses (only `custom-http-errors`) |
 
 `transform` is nested inside each annotation entry, not a top-level field — a
 misspelling there falls through `translateValue`'s `default: return value` and
@@ -205,7 +205,7 @@ The wiring suite asserts placement from the rendered rows (`every mapping row si
 
 - **Badge the resource, always.** A cell that names a field says which resource it sits on, and it says it with a badge — never bare text. Use `badge-ingress` when the field is on the Ingress the reader already has (`spec.ingressClassName`, `spec.defaultBackend`, `spec.rules[].host`): every other badge means "author this", that one means "edit what you have". A cell with no badge at all is an annotation, which names its own resource.
 - **An alternative offered in a cell is shown in the panel.** `— or —` (and a slash between two named targets) promises the reader two ways of doing it, so the panel carries both as approach tabs — never one form with the other mentioned in a comment or a note. If only one form can be shown, the cell names one target and the second belongs in the note. Both pages are asserted by the wiring suite; a signpost row whose panel only points at another table must not use `— or —` either.
-- **Category `<h3>` headings** within a mapping `<section>` are in case-insensitive alphabetical order by heading text, so scrolling and filtering land a reader in the same place. A new category is inserted at its letter, never appended. The wiring suite asserts it per page; `ingress-nginx-migration.html` is exempt and carries its reason in the `PAGES` table.
+- **Category `<h3>` headings** within a mapping `<section>` are in case-insensitive alphabetical order by heading text, so scrolling and filtering land a reader in the same place. A new category is inserted at its letter, never appended. The wiring suite asserts it per page.
 - **Annotation mapping rows** within each category table are sorted alphabetically by the community annotation name (left column).
 - **Within a single row**, when multiple annotations are listed on either side, they are in alphabetical order.
 - **"No direct equivalent" rows** (NIC-only annotations) go at the end of their category table, after all community-to-NIC mappings.

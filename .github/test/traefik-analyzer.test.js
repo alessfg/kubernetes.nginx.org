@@ -342,3 +342,83 @@ test('what a reader sees names each product in full', () => {
     text.split('\n').forEach((l, i) => walk(l, 'traefik-migration.html text line ' + (i + 1)));
     assert.deepEqual([...found], []);
 });
+
+/* ------------------------------------------- one host, one owning resource
+
+   NGINX Ingress Controller gives a host to one resource. Under CRD-first the
+   Traefik module already built one VirtualServer per host from every
+   IngressRoute and Ingress that routes it (buildHost); the Ingress forms did
+   not. A two-host Traefik Ingress stayed one Ingress, two Traefik Ingresses on
+   one host stayed two, and a Traefik Ingress beside an IngressRoute on its host
+   gave an Ingress and a VirtualServer. Traefik built a router per Ingress rule
+   with that Ingress's middlewares (kubernetes.go, v3.7.17), so its settings
+   applied to its own paths. */
+
+const trIngress = (name, hosts, ann, tls) => doc({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name, namespace: 'prod', annotations: ann || {} },
+    spec: Object.assign(tls ? { tls: [{ hosts: [hosts[0][0]], secretName: tls }] } : {}, { ingressClassName: 'traefik',
+        rules: hosts.map(([h, p, svc]) => ({ host: h, http: { paths: [{ path: p, pathType: 'Prefix', backend: { service: { name: svc || 'web', port: { number: 80 } } } }] } })) }) });
+const trRoute = (name, match, svc) => doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'IngressRoute', metadata: { name, namespace: 'prod' }, spec: { entryPoints: ['web'], routes: [{ match, kind: 'Rule', services: [{ name: svc, port: 80 }] }] } });
+const hostsOf = (d) => d.kind === 'Ingress' ? d.spec.rules.map((r) => r.host) : [d.spec.host];
+const claims = (r) => {
+    const by = {};
+    // A TCP TransportServer owns a GlobalConfiguration listener, not a host.
+    for (const d of r.docs) if (['VirtualServer', 'TransportServer', 'Ingress'].includes(d.kind)) for (const h of hostsOf(d)) if (h) (by[h] = by[h] || []).push(d.kind + '/' + d.metadata.name);
+    return by;
+};
+
+test('for any Traefik input, no VirtualServer, Ingress or TransportServer has two hosts, and no host has two of them', () => {
+    /* Every preset, and a Traefik Ingress alone, with a second host, beside a
+       second Traefik Ingress on its host, and beside an IngressRoute on its
+       host; both strategies. An Ingress that must stay one (the errors
+       middleware, a hostless rule) beside an IngressRoute's VirtualServer
+       cannot be merged, and passes only if it warns. */
+    const bad = [];
+    const check = (label, text, strategy) => {
+        const r = run(text, strategy);
+        for (const d of r.docs) if (['VirtualServer', 'TransportServer', 'Ingress'].includes(d.kind) && hostsOf(d).filter(Boolean).length > 1) bad.push(label + ' ' + strategy + ': ' + d.kind + '/' + d.metadata.name + ' has ' + hostsOf(d).join(', '));
+        const warned = r.plan.infoNotes.filter((n) => n.severity === 'warning').map((n) => n.message).join('\n');
+        for (const [h, list] of Object.entries(claims(r))) {
+            if (list.length > 1 && !/also routed by an IngressRoute, which can only be a VirtualServer, and this Ingress must stay an Ingress|passes .* through as TLS/.test(warned)) bad.push(label + ' ' + strategy + ': ' + h + ' is claimed by ' + list.join(', '));
+        }
+    };
+    const ann = { 'traefik.ingress.kubernetes.io/router.entrypoints': 'web' };
+    for (const strategy of ['crd', 'annotation']) {
+        for (const p of Object.keys(source.analyzer.samplePresets)) check('preset ' + p, source.analyzer.samplePresets[p], strategy);
+        check('alone', trIngress('app', [['a.example.com', '/']], ann, 'a-tls'), strategy);
+        check('two hosts', trIngress('app', [['a.example.com', '/'], ['b.example.com', '/b']], ann, 'a-tls'), strategy);
+        check('two Ingresses', paste(trIngress('app', [['a.example.com', '/']], ann, 'a-tls'), trIngress('other', [['a.example.com', '/other', 'other']])), strategy);
+        check('Ingress + IngressRoute', paste(trIngress('app', [['a.example.com', '/']], ann), trRoute('api', 'Host(`a.example.com`) && PathPrefix(`/api`)', 'api')), strategy);
+    }
+    assert.deepEqual(bad, []);
+});
+
+test('Traefik Ingresses on one host merge into one NGINX Ingress Controller Ingress (annotation-first)', () => {
+    const r = run(paste(
+        trIngress('shop', [['a.example.com', '/', 'web']], {}, 'a-tls'),
+        trIngress('api', [['a.example.com', '/api', 'api']], { 'traefik.ingress.kubernetes.io/service.serversscheme': 'https' })
+    ), 'annotation');
+    const ings = kinds(r, 'Ingress');
+    assert.equal(ings.length, 1);
+    assert.deepEqual(ings[0].spec.rules[0].http.paths.map((p) => p.backend.service.name), ['web', 'api']);
+    assert.equal(ings[0].spec.tls[0].secretName, 'a-tls');
+    assert.ok(said(r, /shop, api share a\.example\.com, so they are merged into one Ingress.*NGINX Gateway Fabric/));
+});
+
+test('a Traefik Ingress beside an IngressRoute on its host joins the IngressRoute\'s VirtualServer (annotation-first)', () => {
+    /* An IngressRoute has no Ingress form, so its host is a VirtualServer
+       under either strategy; one host, one resource. */
+    const r = run(paste(trIngress('shop', [['a.example.com', '/', 'web']]), trRoute('api', 'Host(`a.example.com`) && PathPrefix(`/api`)', 'api')), 'annotation');
+    assert.deepEqual(claims(r), { 'a.example.com': ['VirtualServer/a'] });
+    const vs = kinds(r, 'VirtualServer')[0];
+    assert.deepEqual(vs.spec.routes.map((x) => x.path).sort(), ['/', '/api']);
+    assert.ok(said(r, /also routed by an IngressRoute, which can only be a VirtualServer, so this Ingress's paths join that VirtualServer/));
+});
+
+test('a Traefik Ingress with several hosts becomes one VirtualServer or Ingress per host, with one note', () => {
+    for (const strategy of ['crd', 'annotation']) {
+        const r = run(trIngress('shop', [['a.example.com', '/', 'web'], ['b.example.com', '/', 'web2']], {}, 'ab-tls'), strategy);
+        const routing = r.docs.filter((d) => d.kind === 'VirtualServer' || d.kind === 'Ingress');
+        assert.deepEqual(routing.map((d) => hostsOf(d)), [['a.example.com'], ['b.example.com']], strategy);
+        assert.equal(r.plan.infoNotes.filter((n) => /was split into one per host/.test(n.message)).length, 1, strategy + ': said once');
+    }
+});

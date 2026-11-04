@@ -2930,6 +2930,168 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> See <a href="#session-affinity">Session affinity</a> for the full field-by-field map, including <code>.maxage</code> (seconds) → <code>expires</code> (nginx time) and the lowercase <code>samesite</code> values.</div>
                         </div></td></tr>
                         <tr class="expandable">
+                            <td>Several Ingresses on one host</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> One VirtualServer with every path<span class="or-text">— or —</span>One Ingress with every path</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="info-box note"><strong>One host, one resource:</strong> Traefik makes a router of every Ingress rule and applies each router's middlewares to its own paths only. NGINX Ingress Controller gives a host to one resource and rejects a second that claims it, so the analyzer merges the Ingresses of a host into one; IngressRoutes on one host, and an Ingress sharing a host with one, become one VirtualServer the same way. An Ingress that routes several hosts is split into one per host first.</div>
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">One VirtualServer</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">One Ingress</button>
+                            </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: default-api-buffer@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-buffer
+  namespace: default
+spec:
+  buffering:
+    maxRequestBodyBytes: 10485760</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># One VirtualServer for the host, with every path
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: web
+      service: web
+      port: 80
+    - name: api
+      service: api
+      port: 8080
+      client-max-body-size: "10m"  # Middleware api-buffer (buffering) maxRequestBodyBytes
+  routes:
+    - path: /  # Host(`app.example.com`) &amp;&amp; PathPrefix(`/`)
+      action:
+        pass: web
+    - path: /api  # Host(`app.example.com`) &amp;&amp; PathPrefix(`/api`)
+      action:
+        pass: api</code></pre></div>
+                                </div>
+                                <div class="info-box note"><strong>Note:</strong> Each Ingress keeps its own upstreams, so the body-size limit above stays with <code>api</code>, as its middleware did in Traefik, and its Policies go on its own routes. Traefik tries the longest rule first by default, so <code>/api</code> beats <code>/</code> there as NGINX's longest prefix does here.</div>
+                            </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Traefik Proxy</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: default-api-buffer@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-buffer
+  namespace: default
+spec:
+  buffering:
+    maxRequestBodyBytes: 10485760</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># One Ingress for the host, with every path
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-example-com
+  annotations:
+    nginx.org/client-max-body-size: "10m"  # Middleware api-buffer (buffering)
+spec:
+  rules:
+    - host: app.example.com  # served by web, api, merged
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080</code></pre></div>
+                                </div>
+                                <div class="info-box warning"><strong>Settings become host-wide:</strong> In one Ingress, only the per-Service annotations (<code>nginx.org/ssl-services</code>, <code>nginx.org/grpc-services</code>, <code>nginx.org/websocket-services</code>, <code>nginx.org/rewrites</code>, <code>nginx.org/sticky-cookie-services</code>) stay with the Service they name. Every other setting covers every path, so the body-size limit above, set only on <code>api</code>, applies to <code>web</code> too, where Traefik kept it to <code>api</code>'s paths. The analyzer names each setting that changes scope. To keep them per Ingress, use the VirtualServer approach, where each Ingress keeps its own upstreams.</div>
+                            </div>
+                            <div class="info-box tip"><strong>A resource per team:</strong> NGINX Ingress Controller can also delegate a host's paths to VirtualServerRoutes, or to mergeable minion Ingresses under a master, and NGINX Gateway Fabric attaches several HTTPRoutes to one Gateway listener. Each gives a team a resource of its own, and each needs setting up with the result in mind. The analyzer does not emit them.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
                             <td><code>traefik.ingress.kubernetes.io/router.priority</code></td>
                             <td>No direct equivalent</td>
                         </tr>

@@ -1354,7 +1354,10 @@
             let docs = [], comments = [];
             let c = {};
             let names = []; entries.forEach(function(e) { if (names.indexOf(e.source.name) === -1) names.push(e.source.name); });
-            if (names.length > 1) ctx.note('Host ' + host, 'IngressRoutes ' + names.join(', ') + ' all route this host; NGINX Ingress Controller gives a host to one resource, so they are one VirtualServer.');
+            // Each by its own kind: an Ingress's routes reach here as well.
+            let kinds = {}; entries.forEach(function(e) { (kinds[e.source.kind] = kinds[e.source.kind] || []).indexOf(e.source.name) === -1 && kinds[e.source.kind].push(e.source.name); });
+            let who = Object.keys(kinds).map(function(k) { return k + (kinds[k].length > 1 ? (/s$/.test(k) ? 'es ' : 's ') : ' ') + kinds[k].join(', '); }).join(' and ');
+            if (names.length > 1) ctx.note('Host ' + host, who + ' all route this host; NGINX Ingress Controller gives a host to one resource, so they are one VirtualServer. For a resource per team instead, NGINX Ingress Controller can delegate a host\'s paths to VirtualServerRoutes or to mergeable minion Ingresses, and NGINX Gateway Fabric attaches several HTTPRoutes to one listener. Each needs setting up by hand with the result in mind, which is why this tool does not emit them.');
             let spec = {};
             let cls = targetClass(entries.map(function(e) { return e.ingressClassName; }).find(Boolean), options);
             if (cls) spec.ingressClassName = cls;

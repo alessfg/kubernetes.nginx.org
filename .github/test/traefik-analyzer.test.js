@@ -422,3 +422,35 @@ test('a Traefik Ingress with several hosts becomes one VirtualServer or Ingress 
         assert.equal(r.plan.infoNotes.filter((n) => /was split into one per host/.test(n.message)).length, 1, strategy + ': said once');
     }
 });
+
+test('Traefik Ingresses on one host merge into one VirtualServer that calls them Ingresses (CRD-first)', () => {
+    /* buildHost serves Ingress routes as well as IngressRoute ones, and its
+       note called every source an IngressRoute. It names each by its kind,
+       and points to the per-team resources as the annotation-first note does. */
+    const r = run(paste(trIngress('web', [['a.example.com', '/', 'web']]), trIngress('api', [['a.example.com', '/api', 'api']])), 'crd');
+    assert.deepEqual(r.docs.filter((d) => d.kind === 'VirtualServer').map((d) => d.spec.host), ['a.example.com']);
+    const note = r.plan.infoNotes.find((n) => /all route this host/.test(n.message));
+    assert.ok(note, 'no merge note');
+    assert.match(note.message, /^Ingresses web, api all route this host/);
+    assert.match(note.message, /VirtualServerRoutes or to mergeable minion Ingresses, and NGINX Gateway Fabric/);
+});
+
+test('the reference row for Traefik Ingresses on one host matches what the analyzer emits', () => {
+    /* The row names no annotation of its own, so where.py --diff cannot reach
+       it. Its source block runs under each tab's strategy and is compared,
+       comments included. */
+    const fs = require('node:fs');
+    const page = fs.readFileSync(require('node:path').join(__dirname, '..', '..', 'traefik-migration.html'), 'utf8');
+    const at = page.indexOf('<td>Several Ingresses on one host</td>');
+    assert.ok(at > 0, 'the row is on the page');
+    const row = page.slice(at, page.indexOf('</div></td></tr>', at));
+    const unescape = (t) => t.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    for (const strategy of ['crd', 'annotation']) {
+        const tab = row.slice(row.indexOf('class="approach-content' + (strategy === 'crd' ? ' active' : '') + '" data-approach="' + strategy + '">'));
+        const [, src] = /comparison-block old"><h4>[^<]*<\/h4><pre><code>([\s\S]*?)<\/code>/.exec(tab);
+        const [, want] = /comparison-block new"><h4>[^<]*<\/h4><pre><code>([\s\S]*?)<\/code>/.exec(tab);
+        const shown = unescape(want).split('\n---\n').map((d) => d.replace(/^# .*\n/, ''));
+        const got = run(unescape(src), strategy).text.split('\n---\n').map((d) => d.replace(/^# .*\n/, ''));
+        assert.deepEqual(shown, got, strategy);
+    }
+});

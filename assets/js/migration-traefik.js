@@ -336,6 +336,31 @@
             };
         }
 
+        // NGINX Ingress Controller gives a host to one resource. An Ingress with
+        // several hosts becomes one model per host, each with every annotation
+        // and that host's TLS. Under CRD-first, buildHost already makes one
+        // VirtualServer per host; this matters for the Ingress forms.
+        function splitByHost(model) {
+            if (model.hosts.length <= 1) return [model];
+            let used = {}, pieces = [];
+            return model.hosts.map(function(h, i) {
+                let label = h.host.replace(/^\*\./, 'wildcard.').split('.')[0];
+                let name = dnsName((model.name || 'app') + (label === model.name ? '' : '-' + label));
+                for (let n = 2; used[name]; n++) name = dnsName((model.name || 'app') + '-' + label + '-' + n);
+                used[name] = true;
+                pieces.push(name + ' (' + h.host + ')');
+                let d = JSON.parse(JSON.stringify(model.doc));
+                d.metadata = Object.assign({}, d.metadata, { name: name });
+                let sp = isMap(d.spec) ? d.spec : {};
+                if (Array.isArray(sp.rules)) sp.rules = sp.rules.filter(function(r) { return isMap(r) && (r.host ? str(r.host) === h.host : i === 0); });
+                if (Array.isArray(sp.tls)) { sp.tls = sp.tls.map(function(t) { return Object.assign({}, t, { hosts: list(t.hosts).filter(function(x) { return str(x) === h.host; }) }); }).filter(function(t) { return t.hosts.length; }); if (!sp.tls.length) delete sp.tls; }
+                if (i) { delete sp.defaultBackend; delete sp.backend; }
+                return Object.assign({}, model, { name: name, doc: d, hosts: [h], hostless: i ? [] : model.hostless, defaultBackend: i ? null : model.defaultBackend,
+                    tls: model.tls.filter(function(t) { return list(t.hosts).map(str).indexOf(h.host) !== -1; }),
+                    splitFrom: { name: model.name, hosts: model.hosts.map(function(x) { return x.host; }), pieces: pieces } });
+            });
+        }
+
         // A middleware reference as the CRD provider resolves it (makeMiddlewareKeys):
         // a name, in the route's namespace unless the reference names another.
         // "name@provider" points outside the CRD provider (a file-provider middleware).
@@ -402,7 +427,7 @@
         function addToRun(run, doc, docIndex) {
             if (!isMap(doc) || !doc.kind) return;
             let kind = str(doc.kind);
-            if (kind === 'Ingress') { run.ingresses.push(ingressModel(doc)); return; }
+            if (kind === 'Ingress') { run.ingresses.push.apply(run.ingresses, splitByHost(ingressModel(doc))); return; }
             if (kind === 'Service') {
                 let md = isMap(doc.metadata) ? doc.metadata : {};
                 run.services.push({ name: str(md.name), namespace: md.namespace ? str(md.namespace) : null, traefik: traefikAnnotations(md),
@@ -2309,10 +2334,23 @@
             let entries = collectRoutes(run, ctx, cache);
             let results = [];
             let allFrags = [];
+            // Hosts an IngressRoute routes: a VirtualServer owns them under
+            // either strategy (an IngressRoute has no Ingress form).
+            let routeHosts = {};
+            entries.forEach(function(e) { routeHosts[(e.namespace || '') + '\u0000' + e.host] = true; });
+            let onRouteHost = function(m) { return m.hosts.some(function(h) { return routeHosts[(m.namespace || '') + '\u0000' + h.host]; }); };
             run.ingresses.forEach(function(m) {
+                if (m.splitFrom && m === run.ingresses.find(function(x) { return x.splitFrom && x.splitFrom.name === m.splitFrom.name && x.namespace === m.namespace; }))
+                    ctx.note('Ingress ' + (m.splitFrom.name || ''), 'Ingress ' + (m.splitFrom.name || '') + ' routes ' + m.splitFrom.hosts.length + ' hosts. NGINX Ingress Controller gives a host to one resource, so it was split into one per host, each with every annotation of the original: ' + m.splitFrom.pieces.join(', ') + '.', 'warning');
                 let res = ingressEntries(m, run, ctx, cache);
                 let why = needsIngress(m, res);
                 if (res.down) return;
+                if (why.length && onRouteHost(m)) ctx.note('Ingress ' + (m.name || ''), 'Host ' + m.hosts.map(function(h) { return h.host; }).join(', ') + ' is also routed by an IngressRoute, which can only be a VirtualServer, and this Ingress must stay an Ingress (' + why.join('; ') + '). NGINX Ingress Controller gives the host to one of them: route the host from one resource.', 'warning');
+                if (strategy === 'annotation' && !why.length && onRouteHost(m)) {
+                    ctx.note('Ingress ' + (m.name || ''), 'Host ' + m.hosts.map(function(h) { return h.host; }).join(', ') + ' is also routed by an IngressRoute, which can only be a VirtualServer, so this Ingress\'s paths join that VirtualServer: NGINX Ingress Controller gives a host to one resource.');
+                    entries = entries.concat(res.entries);
+                    return;
+                }
                 if (strategy === 'annotation' || why.length) {
                     if (strategy !== 'annotation' && why.length) ctx.note('Ingress ' + (m.name || ''), 'Kept as an Ingress under CRD-first: ' + why.join('; ') + '. A VirtualServer would lose ' + (why.length > 1 ? 'them' : 'it') + '.', 'warning');
                     let out = buildIngressDoc(m, res, run, ctx, options);
@@ -2353,7 +2391,103 @@
                     if (!referenced) ctx.note('Middleware ' + mw.name + ' (' + (mw.type || 'empty') + ')', 'No route in the paste uses it, so it applied to nothing here. Paste the IngressRoute or Ingress that names it to migrate it in place.');
                 }
             });
+            mergeIngressHosts(results, ctx);
             return { results: results, tcp: tcp, controller: g, ctx: ctx, cache: cache };
+        }
+
+        // Annotation-first (and Ingresses kept under CRD-first): the Ingresses
+        // of one host become one Ingress for it, since NGINX Ingress Controller
+        // gives a host to one. Traefik built a router per Ingress rule with that
+        // Ingress's middlewares (kubernetes.go loadConfigurationFromIngresses),
+        // so each setting applied to its own Ingress's paths; in one Ingress
+        // only the per-Service nginx.org lists stay scoped, and every other
+        // setting is said where it now covers the host. TLS: Traefik served
+        // each Ingress's Secret by SNI (getCertificates); one Ingress takes
+        // one, the first by namespace and name.
+        let PER_SERVICE = { 'nginx.org/ssl-services': ',', 'nginx.org/grpc-services': ',', 'nginx.org/websocket-services': ',', 'nginx.org/rewrites': ';', 'nginx.org/sticky-cookie-services': ';' };
+        function mergeIngressHosts(results, ctx) {
+            let byHost = {};
+            results.forEach(function(r, ri) {
+                if (!r.model) return;
+                r.docs.forEach(function(d, i) {
+                    if (d.kind !== 'Ingress' || !isMap(d.spec) || !Array.isArray(d.spec.rules) || d.spec.rules.length !== 1 || !d.spec.rules[0].host) return;
+                    let key = (d.metadata.namespace || '') + '\u0000' + d.spec.rules[0].host;
+                    (byHost[key] = byHost[key] || []).push({ r: r, i: i, doc: d });
+                });
+            });
+            Object.keys(byHost).forEach(function(key) {
+                let listed = byHost[key];
+                if (listed.length < 2) return;
+                let group = listed.slice().sort(function(a, b) { let x = (a.doc.metadata.namespace || '') + '/' + a.r.model.name, y = (b.doc.metadata.namespace || '') + '/' + b.r.model.name; return x < y ? -1 : x > y ? 1 : 0; });
+                let host = key.split('\u0000')[1], ns = group[0].doc.metadata.namespace;
+                let names = listed.map(function(g) { return g.r.model.name; });
+                let say = function(message, severity) { ctx.note('Host ' + host, message, severity || 'note'); };
+                let merged = { apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: md(dnsName(host.replace(/^\*\./, 'wildcard.').replace(/\./g, '-')), ns) };
+                let ann = {}, c = {}, from = {};
+                let serviceOf = function(k, entry) { return PER_SERVICE[k] === ',' ? entry.trim() : (/serviceName=(\S+)/.exec(entry) || [])[1] || entry.trim(); };
+                group.forEach(function(g) {
+                    let a = g.doc.metadata.annotations || {}, gc = g.r.comments[g.i] || {};
+                    Object.keys(a).forEach(function(k) {
+                        let v = a[k], ck = 'metadata.annotations.' + k;
+                        if (k === 'nginx.org/policies') {
+                            let have = ann[k] ? ann[k].split(',') : [];
+                            v.split(',').map(function(x) { return x.trim(); }).filter(Boolean).forEach(function(x) { if (have.indexOf(x) === -1) have.push(x); });
+                            ann[k] = have.join(','); if (gc[ck]) c[ck] = gc[ck];
+                            return;
+                        }
+                        if (PER_SERVICE[k]) {
+                            let sep = PER_SERVICE[k], have = ann[k] ? ann[k].split(sep) : [];
+                            v.split(sep).filter(function(x) { return x.trim(); }).forEach(function(entry) {
+                                let svc = serviceOf(k, entry), prior = have.find(function(x) { return serviceOf(k, x) === svc; });
+                                if (!prior) have.push(entry.trim());
+                                else if (prior.trim() !== entry.trim()) say('Service ' + svc + ' is in ' + k + ' of ' + from[k + '|' + svc] + ' and ' + g.r.model.name + ' with different values; the one Ingress for the host keeps ' + from[k + '|' + svc] + '\'s, the first by namespace and name.', 'warning');
+                                from[k + '|' + svc] = from[k + '|' + svc] || g.r.model.name;
+                            });
+                            ann[k] = have.join(sep); if (gc[ck]) c[ck] = gc[ck];
+                            return;
+                        }
+                        if (ann[k] === undefined) { ann[k] = v; from[k] = g.r.model.name; if (gc[ck]) c[ck] = gc[ck]; return; }
+                        if (ann[k] !== v) say(from[k] + ' and ' + g.r.model.name + ' set ' + k + ' differently (' + ann[k] + ', ' + v + '). One Ingress has one value for every path, so it keeps ' + from[k] + '\'s, the first by namespace and name, where Traefik kept each to its own paths. CRD-first keeps both: in one VirtualServer each Ingress keeps its own upstreams.', 'warning');
+                    });
+                });
+                Object.keys(ann).forEach(function(k) {
+                    if (PER_SERVICE[k] || k === 'nginx.org/policies') return;
+                    let without = group.filter(function(g) { return !(g.doc.metadata.annotations || {})[k]; });
+                    if (without.length) say('Only ' + from[k] + ' sets ' + k + '; on the one Ingress for ' + host + ' it applies to the paths of ' + without.map(function(g) { return g.r.model.name; }).join(', ') + ' too, where Traefik applied it to ' + from[k] + '\'s own paths. CRD-first keeps it scoped: in one VirtualServer each Ingress keeps its own upstreams.', /rewrite|path-regex/.test(k) ? 'warning' : 'note');
+                });
+                let claimed = {}, paths = [];
+                listed.forEach(function(g) {
+                    (g.doc.spec.rules[0].http && g.doc.spec.rules[0].http.paths || []).forEach(function(pp) {
+                        if (claimed[pp.path]) { say('Path ' + pp.path + ' is routed by ' + claimed[pp.path] + ' and ' + g.r.model.name + '. One Ingress cannot route a path twice, so it keeps ' + claimed[pp.path] + '\'s.', 'warning'); return; }
+                        claimed[pp.path] = g.r.model.name; paths.push(pp);
+                    });
+                });
+                let spec = {};
+                if (group[0].doc.spec.ingressClassName) spec.ingressClassName = group[0].doc.spec.ingressClassName;
+                let hasTls = function(g) { return Array.isArray(g.doc.spec.tls) && g.doc.spec.tls.length; };
+                let tlsFrom = group.find(hasTls);
+                if (tlsFrom) {
+                    spec.tls = tlsFrom.doc.spec.tls;
+                    if (group.filter(hasTls).some(function(g) { return JSON.stringify(g.doc.spec.tls) !== JSON.stringify(spec.tls); })) say('Ingresses on ' + host + ' set TLS differently (' + group.filter(hasTls).map(function(g) { return g.r.model.name; }).join(', ') + '). Traefik served each by SNI; one Ingress takes one, ' + tlsFrom.r.model.name + '\'s, the first by namespace and name. Check that it suits every path.', 'warning');
+                }
+                let dflt = group.find(function(g) { return g.doc.spec.defaultBackend; });
+                if (dflt) spec.defaultBackend = dflt.doc.spec.defaultBackend;
+                spec.rules = [{ host: host, http: { paths: paths } }];
+                if (Object.keys(ann).length) merged.metadata.annotations = ann;
+                merged.spec = spec;
+                c['spec.rules.0.host'] = 'served by ' + names.join(', ') + ', merged';
+                say(names.join(', ') + ' share ' + host + ', so they are merged into one Ingress, as NGINX Ingress Controller gives a host to one resource. For a resource per team instead, NGINX Ingress Controller can delegate a host\'s paths to VirtualServerRoutes or to mergeable minion Ingresses, and NGINX Gateway Fabric attaches several HTTPRoutes to one listener. Each needs setting up by hand with the result in mind, which is why this tool does not emit them.');
+                // The merged Ingress replaces the first-listed's own; the others
+                // keep their Policies and the like.
+                let first = listed[0];
+                listed.slice(1).forEach(function(g) {
+                    g.r.docs.splice(g.i, 1); g.r.comments.splice(g.i, 1);
+                    listed.forEach(function(o) { if (o !== g && o.r === g.r && o.i > g.i) o.i--; });
+                });
+                first.r.docs[first.i] = merged;
+                first.r.comments[first.i] = c;
+                first.r.models = listed.map(function(g) { return g.r.model; });
+            });
         }
 
         // What NGINX Ingress Controller admits on NGINX Plus only: the jwt,
@@ -2461,6 +2595,7 @@
             return hit ? rawYaml(hit.doc) : '# (written by the Traefik resources above)';
         }
         function oldFor(d, r, run) {
+            if (r.models && d.kind === 'Ingress') return r.models.map(function(m) { return rawYaml(m.doc); }).join('\n---\n');
             if (r.model) return rawYaml(r.model.doc);
             if (d.kind === 'VirtualServer' && r.entries) {
                 let docs = [], seen = {};
@@ -2574,7 +2709,9 @@
             let mergeNote = units.map(function() { return null; });
             let indexOf = function(kind, name) { return units.findIndex(function(u) { return u.kind === kind && u.name === name; }); };
             all.results.forEach(function(r) {
-                let owners = r.model ? [indexOf('Ingress', r.model.name)] : (r.entries || []).map(function(e) { return indexOf(e.source.kind, e.source.name); }).filter(function(i, k, a) { return i !== -1 && a.indexOf(i) === k; });
+                let src = function(m) { return (m.splitFrom && m.splitFrom.name) || m.name; };
+                let owners = r.models ? r.models.map(function(m) { return indexOf('Ingress', src(m)); }).filter(function(i, k, a) { return i !== -1 && a.indexOf(i) === k; })
+                    : r.model ? [indexOf('Ingress', src(r.model))] : (r.entries || []).map(function(e) { return indexOf(e.source.kind, e.source.name); }).filter(function(i, k, a) { return i !== -1 && a.indexOf(i) === k; });
                 if (!owners.length || owners[0] === -1) return;
                 r.docs.forEach(function(d, i) { outFor[owners[0]].docs.push(d); outFor[owners[0]].comments.push(r.comments[i]); });
                 owners.slice(1).forEach(function(o) {

@@ -454,3 +454,18 @@ test('the reference row for Traefik Ingresses on one host matches what the analy
         assert.deepEqual(shown, got, strategy);
     }
 });
+
+test('a Traefik stripPrefix or stripPrefixRegex with nothing to strip migrates to nothing, not a crash', () => {
+    /* Traefik builds either with an empty list and strips nothing (stripprefix
+       and stripprefixregex New, v3.7.17). The regex form read regexes[0] and
+       threw, failing the whole analysis. */
+    for (const [type, opts] of [['stripPrefix', {}], ['stripPrefix', { prefixes: [] }], ['stripPrefixRegex', {}], ['stripPrefixRegex', { regex: [] }]]) {
+        for (const strategy of ['crd', 'annotation']) {
+            const r = run(paste(route(['m']), mw('m', type, opts)), strategy);
+            const vs = kinds(r, 'VirtualServer')[0];
+            assert.ok(vs, type + ' ' + strategy);
+            assert.ok(!vs.spec.routes.some((x) => x.action && x.action.proxy && x.action.proxy.rewritePath), type + ' ' + strategy + ': no rewrite');
+            assert.ok(said(r, /stripped nothing/) || (r.plan.unchanged || []).some((n) => /stripped nothing/.test(n.message)), type + ' ' + strategy);
+        }
+    }
+});

@@ -935,12 +935,16 @@
                 if (o.maxRequestBodyBytes !== undefined) ctx.note(mw.label, 'maxRequestBodyBytes has no per-retry form.');
             },
 
+            // With no prefix or regex, Traefik strips nothing (stripprefix,
+            // stripprefixregex New): the request passes as it came.
             stripPrefix: function(o, f, ctx, mw) {
+                if (!list(o.prefixes).length) { ctx.note(mw.label, 'No prefixes, so Traefik stripped nothing; nothing is migrated.', 'unchanged'); return; }
                 f.rewrite = { kind: 'stripPrefix', prefixes: list(o.prefixes).map(str), source: mw.label };
                 ctx.note(mw.label, 'Traefik also sent the stripped prefix in X-Forwarded-Prefix; rewritePath does not. Set it with requestHeaders if the backend builds URLs from it.');
             },
 
             stripPrefixRegex: function(o, f, ctx, mw) {
+                if (!list(o.regex).length) { ctx.note(mw.label, 'No regex, so Traefik stripped nothing; nothing is migrated.', 'unchanged'); return; }
                 f.rewrite = { kind: 'stripPrefixRegex', regexes: list(o.regex).map(str), source: mw.label };
                 ctx.note(mw.label, 'Traefik also sent the stripped prefix in X-Forwarded-Prefix, and its regex is RE2 (NGINX: PCRE); check the pattern.');
             },

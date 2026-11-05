@@ -3525,10 +3525,10 @@
             let run = parsed.run || { ingresses: [], services: [], configMaps: [], crs: [] };
             let warnings = [];
             if (Object.keys(parsed.skipped || {}).length) warnings.push({ title: 'Documents skipped', message: Object.keys(parsed.skipped).map(function(k) { return parsed.skipped[k] + ' ' + k; }).join(', ') + ' — the analyzer reads Ingresses, the Services they route to, the HAProxy ConfigMap and ingress.v3.haproxy.org custom resources.' });
-            let infoNotes = [];
+            // Where each note shows: the core places them (MigrationTool.notes).
+            let sorter = MigrationTool.notes();
             let resources = [];
             let cmAll = { data: {}, comments: {} };
-            let unsupportedCards = [];
             let unrecognised = [];
             let paths = {};
             let noteOf = function(prefix, n, model) {
@@ -3537,20 +3537,20 @@
                 if (hit) code = hit.key + ': ' + hit.value;
                 else if (!model) { let cm = controllerOptions(run); if (cm[n.name]) code = n.name + ': ' + cm[n.name].value + ' (ConfigMap)'; }
                 if (model && model.splitFrom && n.name === 'host' && /was split into one per host/.test(n.message)) code = model.splitFrom.hosts.join(', ');
-                if (model && model.splitFrom && infoNotes.some(function(x) { return x.code === prefix + code && x.message === n.message; })) return;
-                infoNotes.push({ code: prefix + code, message: n.message, severity: n.severity });
+                if (model && model.splitFrom && sorter.has({ code: prefix + code, message: n.message })) return;
+                sorter.add({ code: prefix + code, message: n.message, severity: n.severity });
             };
             results.forEach(function(r) {
                 // A split Ingress speaks as the Ingress the reader pasted.
                 let who = (r.model.splitFrom && r.model.splitFrom.name) || r.model.name;
                 let label = (run.ingresses.length > 1 || results.length > 1) && who ? who + ': ' : '';
                 r.out.notes.forEach(function(n) { noteOf(label, n, r.model); });
-                r.out.todos.forEach(function(t) { infoNotes.push({ code: label + 'TODO ' + t.path, message: 'Fill in: ' + t.message + '.', severity: 'warning' }); });
+                r.out.todos.forEach(function(t) { sorter.add({ code: label + 'TODO ' + t.path, message: 'Fill in: ' + t.message + '.', severity: 'warning' }); });
                 if (r.out.configMap) Object.keys(r.out.configMap.data).forEach(function(k) {
-                    if (cmAll.data[k] !== undefined && cmAll.data[k] !== r.out.configMap.data[k]) infoNotes.push({ code: 'ConfigMap ' + k, message: 'Ingresses disagree (' + cmAll.data[k] + ' vs ' + r.out.configMap.data[k] + '); the ConfigMap is global, so the first value is kept.', severity: 'warning' });
+                    if (cmAll.data[k] !== undefined && cmAll.data[k] !== r.out.configMap.data[k]) sorter.add({ code: 'ConfigMap ' + k, message: 'Ingresses disagree (' + cmAll.data[k] + ' vs ' + r.out.configMap.data[k] + '); the ConfigMap is global, so the first value is kept.', severity: 'warning' });
                     else { cmAll.data[k] = r.out.configMap.data[k]; cmAll.comments[k] = r.out.configMap.comments[k]; }
                 });
-                r.out.unsupported.forEach(function(e) { unsupportedCards.push({ title: e.mapping.source, code: e.names.join(', '), desc: e.mapping.nic, anchor: e.mapping.anchor || null, sidebarSection: sectionIdFor(e.mapping) }); });
+                r.out.unsupported.forEach(function(e) { sorter.unsupportedCard({ title: e.mapping.source, code: e.names.join(', '), desc: e.mapping.nic, anchor: e.mapping.anchor || null, sidebarSection: sectionIdFor(e.mapping) }); });
                 r.out.unrecognized.forEach(function(k) { if (!unrecognised.some(function(u) { return u.name === k; })) unrecognised.push({ name: k, value: r.model.haproxy[k] ? r.model.haproxy[k].value : '', key: r.model.haproxy[k] ? r.model.haproxy[k].key : 'haproxy.org/' + k, where: 'Ingress' }); });
                 r.out.matched.forEach(function(e) { paths[e.mapping.source] = e.mapping; });
                 if (!r.mergedInto) r.out.docs.forEach(function(d, i) {
@@ -3560,12 +3560,12 @@
             });
             // The controller pass.
             g.notes.forEach(function(n) { noteOf('', n); });
-            g.todos.forEach(function(t) { infoNotes.push({ code: 'TODO ' + t.path, message: 'Fill in: ' + t.message + '.', severity: 'warning' }); });
+            g.todos.forEach(function(t) { sorter.add({ code: 'TODO ' + t.path, message: 'Fill in: ' + t.message + '.', severity: 'warning' }); });
             Object.keys(g.cmData).forEach(function(k) {
-                if (cmAll.data[k] !== undefined && cmAll.data[k] !== g.cmData[k]) infoNotes.push({ code: 'ConfigMap ' + k, message: 'Two settings write it (' + cmAll.data[k] + ' vs ' + g.cmData[k] + '); the first value is kept.', severity: 'warning' });
+                if (cmAll.data[k] !== undefined && cmAll.data[k] !== g.cmData[k]) sorter.add({ code: 'ConfigMap ' + k, message: 'Two settings write it (' + cmAll.data[k] + ' vs ' + g.cmData[k] + '); the first value is kept.', severity: 'warning' });
                 else if (cmAll.data[k] === undefined) { cmAll.data[k] = g.cmData[k]; cmAll.comments[k] = g.cmComments[k]; }
             });
-            g.unsupported.forEach(function(e) { unsupportedCards.push({ title: e.mapping.source, code: e.names.join(', '), desc: e.mapping.nic, anchor: e.mapping.anchor || null, sidebarSection: sectionIdFor(e.mapping) }); });
+            g.unsupported.forEach(function(e) { sorter.unsupportedCard({ title: e.mapping.source, code: e.names.join(', '), desc: e.mapping.nic, anchor: e.mapping.anchor || null, sidebarSection: sectionIdFor(e.mapping) }); });
             (g.unrecognised || []).forEach(function(u) { unrecognised.push(u); });
             g.entries.forEach(function(e) { if (e) paths[e.source] = e; });
             g.docs.forEach(function(d, i) {
@@ -3576,14 +3576,31 @@
                 resources.push({ doc: d, comments: g.comments[i], old: old || '# ' + src, model: null });
             });
 
-            let classNote = 'Set the class NGINX Ingress Controller owns (Helm default "nginx"; to run both controllers side by side, install with --set controller.ingressClass.name=nginx-nic and pass --class to nic-migrate). A class naming HAProxy is left off the migrated resources: NGINX Ingress Controller ignores a resource whose class it does not own, without an error, and claims one with none.';
-            if (run.ingresses.length) infoNotes.unshift({ code: 'spec.ingressClassName', message: classNote, severity: 'note' });
             let usesSnippets = resources.some(function(r) {
                 let s = r.doc.spec || {};
                 let ann = (r.doc.metadata && r.doc.metadata.annotations) || {};
                 return s['server-snippets'] || (s.routes || []).some(function(rt) { return rt['location-snippets']; }) || ann['nginx.org/location-snippets'] || ann['nginx.org/server-snippets'];
             });
-            if (usesSnippets) infoNotes.unshift({ code: 'snippets', message: 'This output uses snippets, which NGINX Ingress Controller rejects unless NGINX Ingress Controller runs with -enable-snippets (Helm: controller.enableSnippets=true). HAProxy directives are not NGINX directives: every line marked TODO must be rewritten, or the reload fails.', severity: 'warning' });
+            // HAProxy directives are not NGINX ones: each snippet line is a TODO,
+            // and the reload fails until every one is rewritten.
+            if (usesSnippets) sorter.add({ before: true, code: 'snippets', message: 'HAProxy directives are not NGINX directives: rewrite every snippet line marked TODO before you apply, or the reload fails.', severity: 'warning' });
+            // Step 0: install NGINX Ingress Controller beside HAProxy with the
+            // flags this output needs, then the changes before applying it.
+            let passthrough = resources.some(function(r) { return r.doc.kind === 'TransportServer' && r.doc.spec && r.doc.spec.listener && r.doc.spec.listener.protocol === 'TLS_PASSTHROUGH'; });
+            let flags = [];
+            if (run.ingresses.length) flags.push({ flag: 'controller.ingressClass.name=nginx-nic', why: 'The migrated resources name the class nginx-nic, so NGINX Ingress Controller serves them beside HAProxy; pass --class to nic-migrate for another. A class naming HAProxy is left off them: NGINX Ingress Controller ignores a resource whose class it does not own, without an error, and claims one with none.' });
+            if (Object.keys(cmAll.data).length) flags.push({ flag: 'controller.config.name=nginx-config', why: 'The ConfigMap changes below go into nginx-config; the chart otherwise names it after the release, and NGINX Ingress Controller reads only its own.' });
+            if (usesSnippets) flags.push({ flag: 'controller.enableSnippets=true', why: 'This output uses snippets, which NGINX Ingress Controller rejects unless snippets are on (-enable-snippets).' });
+            if (passthrough) flags.push({ flag: 'controller.enableTLSPassthrough=true', why: 'TLS passthrough is off by default (-enable-tls-passthrough). The built-in tls-passthrough listener needs no GlobalConfiguration.' });
+            let prerequisites = flags.length || sorter.before().length ? {
+                title: 'Before you apply',
+                desc: 'Install NGINX Ingress Controller beside HAProxy with the flags this output needs, and make these changes first.',
+                command: flags.length ? 'helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress \\\n' + flags.map(function(x) { return '  --set ' + x.flag; }).join(' \\\n') : null,
+                flags: flags,
+                anchor: null,
+                items: sorter.before().filter(function(n) { return n.severity === 'warning'; }).concat(sorter.before().filter(function(n) { return n.severity !== 'warning'; }))
+            } : null;
+            let sections = sorter.sections('HAProxy', { title: 'Unsupported features', desc: 'These HAProxy settings are recognized but have no NGINX Ingress Controller equivalent. Review each one and take the recommended action.' });
 
             let steps = [];
             let ingressDocs = resources.filter(function(r) { return r.doc.kind === 'Ingress'; });
@@ -3641,14 +3658,14 @@
             pills.push({ cls: 'found', text: total + ' HAProxy item' + (total !== 1 ? 's' : '') + ' found', scrollTo: null });
             pills.push({ cls: 'paths', text: pathCount + ' migration path' + (pathCount !== 1 ? 's' : ''), scrollTo: steps.length ? steps[0].id : null });
             if (crd.length) pills.push({ cls: 'crds', text: crd.length + ' require CRDs', scrollTo: 'analyzer-step-3' });
-            let flagged = infoNotes.filter(function(n) { return n.severity === 'warning'; }).length;
+            let flagged = sections.flagged;
             if (flagged) pills.push({ cls: 'unrecognized', text: flagged + ' need attention', scrollTo: 'analyzer-info-notes' });
             if (unrecognised.length) pills.push({ cls: 'unrecognized', text: unrecognised.length + ' unrecognized', scrollTo: 'analyzer-unrecognized' });
             let ingressCount = run.ingresses.length;
             let banner = {
                 strongText: total ? total + ' HAProxy item' + (total !== 1 ? 's' : '') + ' analyzed' : ingressCount + ' Ingress' + (ingressCount !== 1 ? 'es' : '') + ' with no HAProxy settings',
                 restText: (total ? ', ' + pathCount + ' migration path' + (pathCount !== 1 ? 's' : '') + ' across ' + steps.length + ' step' + (steps.length !== 1 ? 's' : '') : ' — the resources below still need the NGINX Ingress Controller class') + (flagged ? ' — ' + flagged + ' need' + (flagged === 1 ? 's' : '') + ' attention before you apply.' : '.'),
-                complexity: flagged > 2 || unsupportedCards.length ? 'advanced' : (flagged || cmDoc || Object.keys(paths).some(function(k) { let t = paths[k].type; return t === 'policy' || t === 'virtualserver' || t === 'transportserver'; })) ? 'moderate' : 'simple'
+                complexity: flagged > 2 || sections.unsupported ? 'advanced' : (flagged || cmDoc || Object.keys(paths).some(function(k) { let t = paths[k].type; return t === 'policy' || t === 'virtualserver' || t === 'transportserver'; })) ? 'moderate' : 'simple'
             };
 
             let parts = [];
@@ -3669,12 +3686,11 @@
                 banner: banner,
                 warnings: warnings,
                 steps: steps,
-                infoNotes: infoNotes,
-                unsupported: unsupportedCards.length ? {
-                    title: 'Unsupported features', countText: unsupportedCards.length + ' finding' + (unsupportedCards.length !== 1 ? 's' : ''),
-                    desc: 'These HAProxy settings are recognized but have no NGINX Ingress Controller equivalent. Review each one and take the recommended action.',
-                    cards: unsupportedCards
-                } : null,
+                prerequisites: prerequisites,
+                infoNotes: sections.infoNotes,
+                unchanged: sections.unchanged,
+                invalid: sections.invalid,
+                unsupported: sections.unsupported,
                 unrecognized: unrecognised.length ? {
                     title: 'Unrecognized HAProxy configuration',
                     desc: 'These settings were not found in the migration database. They may be custom annotations (ValidationRules), HAProxy Enterprise only, or not yet mapped.',

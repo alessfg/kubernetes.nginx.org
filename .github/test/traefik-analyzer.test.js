@@ -19,7 +19,11 @@ const run = (yaml, strategy) => {
     return Object.assign(r, { docs: JSON.parse(JSON.stringify(Y.parseAll(r.text))).filter(Boolean) });
 };
 const kinds = (r, k) => r.docs.filter((d) => d.kind === k);
-const said = (r, re) => r.plan.infoNotes.some((n) => re.test(n.message));
+// Every note a reader sees, wherever the plan puts it.
+const allNotes = (plan) => (plan.prerequisites ? plan.prerequisites.items : []).concat(plan.infoNotes, plan.unchanged || [],
+    plan.invalid ? plan.invalid.items.map((x) => Object.assign({ severity: 'invalid' }, x)) : [],
+    plan.unsupported ? plan.unsupported.cards.map((c) => ({ code: c.code, message: c.desc, severity: 'unsupported' })) : []);
+const said = (r, re) => allNotes(r.plan).some((n) => re.test(n.message));
 const doc = (o) => Y.stringify(o);
 // One IngressRoute on a.example.com, /api through the named middlewares, / plain.
 const route = (mws, extra) => doc({ apiVersion: 'traefik.io/v1alpha1', kind: 'IngressRoute', metadata: { name: 'app' }, spec: Object.assign({ routes: [
@@ -71,7 +75,7 @@ test('every value of every middleware option migrates to something NGINX Ingress
                     const vs = kinds(r, 'VirtualServer')[0];
                     const ups = vs ? (vs.spec.upstreams || []).filter((u) => Object.keys(u).some((k) => !['name', 'service', 'port'].includes(k))) : [];
                     const plain = api && api.action && api.action.pass && !api.policies && !api['location-snippets'] && !ups.length;
-                    const noted = r.plan.infoNotes.some((n) => /Middleware m\b/.test(n.code + ' ' + n.message));
+                    const noted = allNotes(r.plan).some((n) => /Middleware m\b/.test(n.code + ' ' + n.message));
                     const global = r.plan.configMap || kinds(r, 'Policy').length;
                     if (plain && !noted && !global) broken.push(type + '.' + opt + '=' + JSON.stringify(v) + ' / ' + strategy + ': did not say why');
                 }
@@ -376,7 +380,7 @@ test('for any Traefik input, no VirtualServer, Ingress or TransportServer has tw
     const check = (label, text, strategy) => {
         const r = run(text, strategy);
         for (const d of r.docs) if (['VirtualServer', 'TransportServer', 'Ingress'].includes(d.kind) && hostsOf(d).filter(Boolean).length > 1) bad.push(label + ' ' + strategy + ': ' + d.kind + '/' + d.metadata.name + ' has ' + hostsOf(d).join(', '));
-        const warned = r.plan.infoNotes.filter((n) => n.severity === 'warning').map((n) => n.message).join('\n');
+        const warned = allNotes(r.plan).filter((n) => n.severity === 'warning').map((n) => n.message).join('\n');
         for (const [h, list] of Object.entries(claims(r))) {
             if (list.length > 1 && !/also routed by an IngressRoute, which can only be a VirtualServer, and this Ingress must stay an Ingress|passes .* through as TLS/.test(warned)) bad.push(label + ' ' + strategy + ': ' + h + ' is claimed by ' + list.join(', '));
         }
@@ -419,7 +423,7 @@ test('a Traefik Ingress with several hosts becomes one VirtualServer or Ingress 
         const r = run(trIngress('shop', [['a.example.com', '/', 'web'], ['b.example.com', '/', 'web2']], {}, 'ab-tls'), strategy);
         const routing = r.docs.filter((d) => d.kind === 'VirtualServer' || d.kind === 'Ingress');
         assert.deepEqual(routing.map((d) => hostsOf(d)), [['a.example.com'], ['b.example.com']], strategy);
-        assert.equal(r.plan.infoNotes.filter((n) => /was split into one per host/.test(n.message)).length, 1, strategy + ': said once');
+        assert.equal(allNotes(r.plan).filter((n) => /was split into one per host/.test(n.message)).length, 1, strategy + ': said once');
     }
 });
 
@@ -429,7 +433,7 @@ test('Traefik Ingresses on one host merge into one VirtualServer that calls them
        and points to the per-team resources as the annotation-first note does. */
     const r = run(paste(trIngress('web', [['a.example.com', '/', 'web']]), trIngress('api', [['a.example.com', '/api', 'api']])), 'crd');
     assert.deepEqual(r.docs.filter((d) => d.kind === 'VirtualServer').map((d) => d.spec.host), ['a.example.com']);
-    const note = r.plan.infoNotes.find((n) => /all route this host/.test(n.message));
+    const note = allNotes(r.plan).find((n) => /all route this host/.test(n.message));
     assert.ok(note, 'no merge note');
     assert.match(note.message, /^Ingresses web, api all route this host/);
     assert.match(note.message, /VirtualServerRoutes or to mergeable minion Ingresses, and NGINX Gateway Fabric/);

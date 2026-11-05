@@ -59,4 +59,5 @@ If you have not yet agreed to the F5 CLA terms and submit a PR to this repositor
   - **How it was verified.** For a check, that means the fault you planted and what it reported. "Fixed the check" is worth much less later than "planted a misspelled transform; the run reported it and exited 1".
 
 - **Keep it proportionate.** A body over ~15 lines is almost always padding. Record the fault you planted and the decision you rejected, not a narrative of the work.
+- **Write it plainly.** No dash joining two clauses, no "not X but Y" where nobody claimed X, no closing line that restates the paragraph. The full list, with examples and the patterns this repo keeps on purpose, is in [`.claude/skills/writing-style/SKILL.md`](.claude/skills/writing-style/SKILL.md); it applies to people and agents alike.
 - Reference issues and pull requests liberally after the subject line.

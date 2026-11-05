@@ -100,6 +100,8 @@ The site follows the **F5 Design System (F5DS)**. Never blend it with the F5 **m
 
 Commit bodies are the record of what was tried and rejected: run `git log --grep='Considered and rejected'` or `git log -S'<name>'` before re-proposing or deleting anything. Write yours the same way (`CONTRIBUTING.md`), and keep commits and reports proportionate: a body of ~15 lines, a report of a few, no tables or headings for a small result.
 
+**Every commit message gets a plain-writing pass before you commit**, subject and body, and so does any edit to the docs, the skills or page prose: no dash joining two clauses, no "not X but Y" where nobody claimed X, no one-line closer restating the paragraph, no triad for rhythm, no inflated or stock AI words. Facts, names, numbers and the "Considered and rejected" record stay as they are. How, with examples and the deliberate exceptions, is in `writing-style`.
+
 - **A finding is verified only as far as you checked it.** A quote can be right and its premise wrong: read the section it is about and who it addresses before calling it confirmed, say which part you checked, and keep "re-verified" apart from "as reported".
 - **During a mockup review, a stated preference changes the mockups, not the repo**, until the maintainer says to implement it.
 - **British** in agent-facing prose and comments (`colour`), including `tokens.css` comments; **American** in page copy; `color` in CSS regardless. Normalising this is out of scope.
@@ -108,6 +110,6 @@ Commit bodies are the record of what was tried and rejected: run `git log --grep
 
 ## Deeper references
 
-`.claude/skills/*/SKILL.md`, plain markdown that any agent can read: **f5ds-design** (design values and every deviation), **migration-tool** (mappings, generators, the test harness, the accuracy check, research sources), **repo-checks** (what each check asserts, when to run them, how to add one), **release-update** (version bumps, patch and minor), **verify-visually** (rendering, measuring, the CDP helper). Two commands in `.claude/commands/` run only when the maintainer types them: `/checks` and `/site-audit` (the multi-perspective audit).
+`.claude/skills/*/SKILL.md`, plain markdown that any agent can read: **f5ds-design** (design values and every deviation), **migration-tool** (mappings, generators, the test harness, the accuracy check, research sources), **repo-checks** (what each check asserts, when to run them, how to add one), **release-update** (version bumps, patch and minor), **verify-visually** (rendering, measuring, the CDP helper), **writing-style** (the plain-writing pass and its exceptions). Two commands in `.claude/commands/` run only when the maintainer types them: `/checks` and `/site-audit` (the multi-perspective audit).
 
 **A rule the maintainer gives you goes here or in a skill, committed**, never only in an agent's private memory: other agents and sessions do not see that, and it is lost with the agent. A rule that must apply before anything is read goes in this file; the how goes in the skill it belongs to.

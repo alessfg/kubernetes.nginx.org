@@ -2515,17 +2515,22 @@
             all.results.forEach(function(r) { r.docs.forEach(function(d, i) { resources.push({ doc: d, comments: r.comments[i], old: oldFor(d, r, run), model: r.model }); }); });
             all.tcp.docs.forEach(function(d, i) { resources.push({ doc: d, comments: all.tcp.comments[i], old: rawTraefik(run, ['ingressRoutesTCP', 'ingressRoutesUDP'], d.metadata.name), model: null }); });
             all.controller.docs.forEach(function(d, i) { resources.push({ doc: d, comments: all.controller.comments[i], old: d.kind === 'GlobalConfiguration' ? '# entryPoints (Traefik static configuration)' : rawTraefik(run, ['tlsOptions', 'serversTransports'], d.metadata.name.replace(/-(mtls|egress-mtls)$/, '')), model: null }); });
-            let infoNotes = ctx.notes.map(function(n) { return { code: n.code, message: n.message, severity: n.severity }; });
-            ctx.todos.forEach(function(t) { infoNotes.push({ code: 'TODO ' + t.path, message: 'Fill in: ' + t.message + '.', severity: 'warning' }); });
-            let classNote = 'Set the class NGINX Ingress Controller owns (Helm default "nginx"; to run both controllers side by side, install with --set controller.ingressClass.name=nginx-nic and pass --class to nic-migrate). A class naming Traefik is left off the migrated resources: NGINX Ingress Controller ignores a resource whose class it does not own, without an error, and claims one with none.';
-            if (resources.some(function(r) { return r.doc.kind === 'Ingress' || r.doc.kind === 'VirtualServer' || r.doc.kind === 'TransportServer'; })) infoNotes.unshift({ code: 'ingressClassName', message: classNote, severity: 'note' });
+            // Where each note shows: the core places them (MigrationTool.notes).
+            let sorter = MigrationTool.notes();
+            ctx.notes.forEach(function(n) { sorter.add({ code: n.code, message: n.message, severity: n.severity }); });
+            ctx.todos.forEach(function(t) { sorter.add({ code: 'TODO ' + t.path, message: 'Fill in: ' + t.message + '.', severity: 'warning' }); });
+            // Step 0: install NGINX Ingress Controller beside Traefik with the
+            // flags this output needs.
             let usesSnippets = resources.some(function(r) {
                 let s = r.doc.spec || {};
                 let ann = (r.doc.metadata && r.doc.metadata.annotations) || {};
                 return s.serverSnippets || s['server-snippets'] || (s.routes || []).some(function(rt) { return rt['location-snippets']; }) || ann['nginx.org/location-snippets'] || ann['nginx.org/server-snippets'];
             });
-            if (usesSnippets) infoNotes.unshift({ code: 'snippets', message: 'This output uses snippets, which NGINX Ingress Controller rejects unless it runs with -enable-snippets (Helm: controller.enableSnippets=true).', severity: 'warning' });
-            if (resources.some(function(r) { return r.doc.kind === 'TransportServer' && r.doc.spec.listener && r.doc.spec.listener.name === 'tls-passthrough'; })) infoNotes.unshift({ code: 'tls-passthrough', message: 'TLS passthrough is off by default in NGINX Ingress Controller: install with controller.enableTLSPassthrough=true (Helm) or -enable-tls-passthrough.', severity: 'warning' });
+            let flags = [];
+            if (resources.some(function(r) { return r.doc.kind === 'Ingress' || r.doc.kind === 'VirtualServer' || r.doc.kind === 'TransportServer'; })) flags.push({ flag: 'controller.ingressClass.name=nginx-nic', why: 'The migrated resources name the class nginx-nic, so NGINX Ingress Controller serves them beside Traefik; pass --class to nic-migrate for another. A class naming Traefik is left off them: NGINX Ingress Controller ignores a resource whose class it does not own, without an error, and claims one with none.' });
+            if (Object.keys(all.controller.cm || {}).length) flags.push({ flag: 'controller.config.name=nginx-config', why: 'The ConfigMap changes below go into nginx-config; the chart otherwise names it after the release, and NGINX Ingress Controller reads only its own.' });
+            if (usesSnippets) flags.push({ flag: 'controller.enableSnippets=true', why: 'This output uses snippets, which NGINX Ingress Controller rejects unless snippets are on (-enable-snippets).' });
+            if (resources.some(function(r) { return r.doc.kind === 'TransportServer' && r.doc.spec.listener && r.doc.spec.listener.name === 'tls-passthrough'; })) flags.push({ flag: 'controller.enableTLSPassthrough=true', why: 'TLS passthrough is off by default (-enable-tls-passthrough). The built-in tls-passthrough listener needs no GlobalConfiguration.' });
             // Unsupported and unrecognized, from the findings.
             let unsupportedCards = [], unrecognised = [], paths = {};
             parsed.findings.forEach(function(f) {
@@ -2539,6 +2544,17 @@
                     else unsupportedCards.push({ title: mp.source, code: f.label, desc: mp.nic, anchor: mp.anchor || null, sidebarSection: sectionIdFor(mp) });
                 }
             });
+            // Merged per mapping above, so handed over finished.
+            unsupportedCards.forEach(function(c) { sorter.unsupportedCard(c); });
+            let prerequisites = flags.length || sorter.before().length ? {
+                title: 'Before you apply',
+                desc: 'Install NGINX Ingress Controller beside Traefik with the flags this output needs, and make these changes first.',
+                command: flags.length ? 'helm install nginx-ingress oci://ghcr.io/nginx/charts/nginx-ingress \\\n' + flags.map(function(x) { return '  --set ' + x.flag; }).join(' \\\n') : null,
+                flags: flags,
+                anchor: null,
+                items: sorter.before().filter(function(n) { return n.severity === 'warning'; }).concat(sorter.before().filter(function(n) { return n.severity !== 'warning'; }))
+            } : null;
+            let sections = sorter.sections('Traefik', { title: 'Unsupported features', desc: 'These Traefik settings are recognized but have no NGINX Ingress Controller equivalent. Review each one and take the recommended action.' });
             let steps = [];
             let ingressDocs = resources.filter(function(r) { return r.doc.kind === 'Ingress'; });
             if (ingressDocs.length) steps.push({ id: 'analyzer-step-1', title: 'Migrated Ingress', countText: ingressDocs.length + ' Ingress' + (ingressDocs.length !== 1 ? 'es' : ''), countCls: '',
@@ -2566,7 +2582,7 @@
             }
             let total = parsed.foundCount;
             let pathCount = Object.keys(paths).length;
-            let flagged = infoNotes.filter(function(n) { return n.severity === 'warning'; }).length;
+            let flagged = sections.flagged;
             let pills = [{ cls: 'found', text: total + ' Traefik item' + (total !== 1 ? 's' : '') + ' found', scrollTo: null },
                 { cls: 'paths', text: pathCount + ' migration path' + (pathCount !== 1 ? 's' : ''), scrollTo: steps.length ? steps[0].id : null }];
             if (crd.length) pills.push({ cls: 'crds', text: crd.length + ' require CRDs', scrollTo: 'analyzer-step-3' });
@@ -2575,7 +2591,7 @@
             let banner = {
                 strongText: total ? total + ' Traefik item' + (total !== 1 ? 's' : '') + ' analyzed' : run.ingresses.length + ' Ingress' + (run.ingresses.length !== 1 ? 'es' : '') + ' with no Traefik settings',
                 restText: (total ? ', ' + pathCount + ' migration path' + (pathCount !== 1 ? 's' : '') + ' across ' + steps.length + ' step' + (steps.length !== 1 ? 's' : '') : ' — the resources below still need the NGINX Ingress Controller class') + (flagged ? ' — ' + flagged + ' need' + (flagged === 1 ? 's' : '') + ' attention before you apply.' : '.'),
-                complexity: flagged > 2 || unsupportedCards.length ? 'advanced' : (flagged || cmDoc || crd.length) ? 'moderate' : 'simple'
+                complexity: flagged > 2 || sections.unsupported ? 'advanced' : (flagged || cmDoc || crd.length) ? 'moderate' : 'simple'
             };
             let parts = [];
             ingressDocs.forEach(function(r) { parts.push('# Migrated Ingress\n' + docYaml(r.doc, r.comments)); });
@@ -2585,8 +2601,8 @@
             if (crd.length) nextItems.push({ text: 'Install the required CRDs', anchor: '#installation' });
             nextItems.push({ text: 'Check the NGINX Ingress Controller docs', href: 'https://docs.nginx.com/nginx-ingress-controller/', external: true });
             return {
-                pills: pills, liveText: pills.map(function(p) { return p.text; }).join(', '), banner: banner, warnings: warnings, steps: steps, infoNotes: infoNotes,
-                unsupported: unsupportedCards.length ? { title: 'Unsupported features', countText: unsupportedCards.length + ' finding' + (unsupportedCards.length !== 1 ? 's' : ''), desc: 'These Traefik settings are recognized but have no NGINX Ingress Controller equivalent. Review each one and take the recommended action.', cards: unsupportedCards } : null,
+                pills: pills, liveText: pills.map(function(p) { return p.text; }).join(', '), banner: banner, warnings: warnings, steps: steps, prerequisites: prerequisites,
+                infoNotes: sections.infoNotes, unchanged: sections.unchanged, invalid: sections.invalid, unsupported: sections.unsupported,
                 unrecognized: unrecognised.length ? { title: 'Unrecognized Traefik configuration', desc: 'These settings were not found in the migration database. They may be plugins, Traefik Hub features, or not yet mapped.',
                     items: unrecognised.map(function(f) { return { yaml: f.key.indexOf('annotation:') === 0 ? MigrationTool.yaml.stringify({ annotations: { [f.label]: f.value } }, null, { quote: function() { return true; } }).replace(/\n$/, '') : '# ' + f.label }; }) } : null,
                 export: parts.length ? { parts: parts } : null,

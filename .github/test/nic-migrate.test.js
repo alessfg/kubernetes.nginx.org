@@ -202,7 +202,7 @@ test('the gap detectors still catch a broken result', () => {
     }
 });
 
-test('every host, path and backend of the Ingress is in the output', () => {
+test('every host, path and backend of the community Ingress is in the output', () => {
     const a = analyze(ing(['rewrite-target: /$1'], [
         '  rules:',
         '  - host: a.example.com',
@@ -591,7 +591,9 @@ test('custom-http-errors under CRD-first keeps the Ingress, which alone serves t
     const result = engine.analyze(Y.stringify(ERRORS()), 'crd');
     assert.match(result.yaml, /nginx\.org\/custom-http-errors/);
     assert.ok(!/errorPages:/.test(result.yaml) && !/kind: VirtualServer/.test(result.yaml), result.yaml);
-    assert.ok(result.plan.infoNotes.some((n) => /Kept as an Ingress under CRD-first/.test(n.message) && n.severity === 'warning'),
+    // On the kept Ingress's card, as a warning.
+    const cards = result.plan.steps.flatMap((st) => st.blocks.flatMap((b) => (b.items || [b]).flatMap((it) => it.notes || [])));
+    assert.ok(cards.some((n) => /Kept as an Ingress under CRD-first/.test(n.message) && n.severity === 'warning'),
         'the reason must be a warning');
 });
 
@@ -620,12 +622,13 @@ test('the ingress target turns default-backend into spec.defaultBackend', () => 
     assert.deepEqual(ing.spec.defaultBackend, { service: { name: 'error-svc', port: { number: 8080 } } });
     assert.deepEqual(asked, ['prod/error-svc']);
 
-    // A value that is not a Service name never reaches the resolver (kubectl argv).
+    // A value that is not a Service name never reaches the resolver (kubectl
+    // argv): the community controller refuses that Ingress, so nothing does.
     asked.length = 0;
     ({ out } = runConvert(ERRORS({ 'nginx.ingress.kubernetes.io/default-backend': '--kubeconfig=/tmp/x' }),
         { target: 'ingress', strategy: 'annotation', resolveServicePort }));
     assert.deepEqual(asked, []);
-    assert.equal(out.docs.find((d) => d.kind === 'Ingress').spec.defaultBackend, undefined);
+    assert.deepEqual(out.docs, []);
 
     // Without custom-http-errors, default-backend is the no-endpoints fallback,
     // which spec.defaultBackend is not.
@@ -693,51 +696,50 @@ const fs = require('node:fs');
 const E2E = path.join(ROOT, 'tools', 'nic-migrate', 'e2e', 'manifests');
 const readE2E = (f) => fs.readFileSync(path.join(E2E, f), 'utf8');
 
-test('every backend the e2e Ingress routes to exists in the e2e workload', () => {
+test('every backend the e2e community Ingresses route to exists in the e2e workload', () => {
     const workload = Y.parseAll(readE2E('workload.yaml'));
-    const ingress = Y.parse(readE2E('source-ingress.yaml'));
-
     const services = new Map(workload.filter((d) => d.kind === 'Service')
         .map((s) => [s.metadata.name, s.spec.ports.map((p) => p.port)]));
     const namespaces = new Set(workload.filter((d) => d.metadata && d.metadata.namespace)
         .map((d) => d.metadata.namespace));
-
-    assert.ok(namespaces.has(ingress.metadata.namespace),
-        'the Ingress namespace must be one the workload creates');
-
-    for (const rule of ingress.spec.rules) {
-        for (const p of rule.http.paths) {
-            const svc = p.backend.service;
-            assert.ok(services.has(svc.name), 'no Service named ' + svc.name + ' in workload.yaml');
-            assert.ok(services.get(svc.name).includes(svc.port.number),
-                svc.name + ' does not listen on port ' + svc.port.number);
+    for (const ingress of Y.parseAll(readE2E('source-ingress.yaml'))) {
+        assert.ok(namespaces.has(ingress.metadata.namespace), ingress.metadata.name + ': the Ingress namespace must be one the workload creates');
+        for (const rule of ingress.spec.rules) {
+            for (const p of rule.http.paths) {
+                const svc = p.backend.service;
+                assert.ok(services.has(svc.name), 'no Service named ' + svc.name + ' in workload.yaml');
+                assert.ok(services.get(svc.name).includes(svc.port.number), svc.name + ' does not listen on port ' + svc.port.number);
+            }
         }
     }
 });
 
-test('the e2e Ingress converts cleanly and covers every host and path', () => {
-    const ingress = Y.parse(readE2E('source-ingress.yaml'));
-    const model = toModel(ingress);
-    const result = engine.analyze(Y.stringify(ingress), 'crd');
-    assert.deepEqual(result.warnings, [], 'a generator failed on the e2e fixture');
-
-    const out = convert(model, engine, { target: 'virtualserver', ingressClass: 'nginx-nic' });
-    const vs = out.docs.filter((d) => d.kind === 'VirtualServer');
-    assert.equal(vs.length, ingress.spec.rules.length, 'one VirtualServer per host');
-
-    const names = vs.map((v) => v.metadata.name);
-    assert.equal(new Set(names).size, names.length, 'VirtualServer names must be unique: ' + names.join(', '));
-
-    const totalPaths = ingress.spec.rules.reduce((n, r) => n + r.http.paths.length, 0);
-    const totalRoutes = vs.reduce((n, v) => n + v.spec.routes.length, 0);
-    assert.equal(totalRoutes, totalPaths, 'every path must become a route');
-
-    // The TLS secret the pipeline creates must be the one the output references.
-    const withTls = vs.find((v) => v.spec.tls);
-    assert.equal(withTls.spec.tls.secret, ingress.spec.tls[0].secretName);
-    // ssl-redirect is "false" in the fixture, so the converter must NOT add one:
-    // the pipeline asserts plain HTTP is served, and a redirect would break it.
-    assert.equal(withTls.spec.tls.redirect, undefined);
+test('the e2e community Ingresses convert to one VirtualServer or Ingress per host with every path routed', () => {
+    /* The fixture holds shop (two hosts, so it is split) and admin (/admin on
+       shop's host, so the host is merged). convert runs them together, as
+       the runner does. */
+    const { convertAll } = require(path.join(TOOL, 'lib', 'convert.js'));
+    const ingresses = Y.parseAll(readE2E('source-ingress.yaml'));
+    assert.deepEqual(ingresses.map((i) => i.metadata.name), ['shop', 'admin']);
+    for (const target of ['virtualserver', 'ingress']) {
+        const out = convertAll(ingresses.map(toModel), engine, { target, ingressClass: 'nginx-nic' });
+        assert.deepEqual(out.flatMap((o) => o.warnings), [], target + ': a generator failed on the e2e fixture');
+        const docs = out.flatMap((o) => o.docs);
+        const routing = docs.filter((d) => d.kind === (target === 'virtualserver' ? 'VirtualServer' : 'Ingress'));
+        const hosts = routing.map((d) => (d.spec.host ? [d.spec.host] : d.spec.rules.map((r) => r.host)));
+        assert.ok(hosts.every((h) => h.length === 1), target + ': one host per resource');
+        assert.deepEqual(hosts.map((h) => h[0]).sort(), ['b.example.com', 'shop.example.com'], target + ': one resource per host');
+        const sourcePaths = ingresses.reduce((n, i) => n + i.spec.rules.reduce((m, r) => m + r.http.paths.length, 0), 0);
+        const routed = routing.reduce((n, d) => n + (d.spec.routes ? d.spec.routes.length : d.spec.rules[0].http.paths.length), 0);
+        assert.equal(routed, sourcePaths, target + ': every path is routed');
+        // The TLS secret the pipeline creates is the one referenced, and with
+        // ssl-redirect "false" on both, no redirect: the runner asserts plain HTTP.
+        const shop = routing.find((d) => (d.spec.host || d.spec.rules[0].host) === 'shop.example.com');
+        if (target === 'virtualserver') {
+            assert.equal(shop.spec.tls.secret, 'shop-tls');
+            assert.equal(shop.spec.tls.redirect, undefined);
+        } else assert.equal(shop.spec.tls[0].secretName, 'shop-tls');
+    }
 });
 
 test('the e2e workload and runner agree on names', () => {
@@ -956,4 +958,123 @@ test('the e2e runner passes its own self-test, which needs no cluster', () => {
     assert.equal(r.error, undefined, 'could not run ' + python + ': ' + (r.error && r.error.message));
     assert.equal(r.status, 0, (r.stdout + r.stderr).split('\n').filter((l) => /FAIL|got/.test(l)).join('\n') || r.stdout + r.stderr);
     assert.match(r.stdout, /(\d+) of \1 self-tests passed/);
+});
+
+test('convert writes files that parse, whatever a note quotes', () => {
+    /* A note quoting a multi-line annotation value (configuration-snippet)
+       was written as one "# NOTE:" line with the value's newlines in it, so
+       every line after the first was YAML: `more_set_headers ...` became a
+       scalar, the file did not parse, and kubectl apply -f rejected it. Every
+       line of a header is a comment now, the files and stdout alike. */
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const { spawnSync } = require('node:child_process');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nic-migrate-'));
+    const src = path.join(dir, 'in.yaml');
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = {
+        'nginx.ingress.kubernetes.io/configuration-snippet': 'more_set_headers "X-A: b";\nadd_header X-B c;\n',
+        'nginx.ingress.kubernetes.io/limit-connections': '5'
+    };
+    fs.writeFileSync(src, Y.stringify(doc));
+    const cli = path.join(TOOL, 'nic-migrate.js');
+    for (const args of [['convert', '-f', src], ['convert', '-f', src, '--out', path.join(dir, 'out')]]) {
+        const r = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
+        assert.equal(r.status, 0, r.stderr);
+        const texts = args.includes('--out')
+            ? fs.readdirSync(path.join(dir, 'out')).map((f) => fs.readFileSync(path.join(dir, 'out', f), 'utf8'))
+            : [r.stdout];
+        for (const text of texts) {
+            for (const part of text.split(/^---$/m)) {
+                const head = part.split('\n').filter((l) => l.trim() && !/^\s*#/.test(l))[0] || '';
+                assert.match(head, /^(apiVersion|kind):/, 'a header line escaped its comment:\n' + part.slice(0, 400));
+            }
+            assert.ok(Y.parseAll(text).every((d) => d && d.kind), 'every document parses to a resource');
+        }
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('convert: community Ingresses on one host or with several hosts give one VirtualServer or Ingress per host, and one result per input file', () => {
+    /* convert runs every Ingress of a run together (migrateMany). A shared
+       host's VirtualServer is written with the first Ingress listed; a
+       multi-host Ingress is split and comes back as one result. */
+    const { convertAll } = require(path.join(TOOL, 'lib', 'convert.js'));
+    const two = (name, host, p, svc) => ({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name, namespace: 'prod' },
+        spec: { rules: [{ host, http: { paths: [{ path: p, pathType: 'Prefix', backend: { service: { name: svc, port: { number: 80 } } } }] } }] } });
+    const multi = two('multi', 'b.example.com', '/', 'b');
+    multi.spec.rules.push({ host: 'c.example.com', http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: 'c', port: { number: 80 } } } }] } });
+    const docs = [two('shop', 'a.example.com', '/', 'web'), two('api', 'a.example.com', '/api', 'api'), multi];
+    const out = convertAll(docs.map(toModel), engine, { target: 'virtualserver' });
+    assert.equal(out.length, 3, 'one result per input Ingress');
+    const all = out.flatMap((o) => o.docs);
+    const owner = {};
+    for (const d of all.filter((x) => x.kind === 'VirtualServer')) (owner[d.spec.host] = owner[d.spec.host] || []).push(d.metadata.name);
+    assert.deepEqual(owner, { 'a.example.com': ['a-example-com'], 'b.example.com': ['multi-b'], 'c.example.com': ['multi-c'] });
+    assert.deepEqual(out[0].docs.map((d) => d.kind), ['VirtualServer'], 'the merged VirtualServer goes with the first Ingress listed');
+    assert.deepEqual(out[1].docs.map((d) => d.kind), [], 'api is in it');
+    assert.deepEqual(all.filter((d) => d.kind === 'VirtualServerRoute'), [], 'no VirtualServerRoute');
+    assert.equal(out[2].notes.filter((n) => /was split into one per host/.test(n)).length, 1);
+});
+
+test('report flags a host that several community Ingresses route, but not a canary pair', () => {
+    /* report analyzes each Ingress on its own, so two Ingresses on one host
+       each looked complete: 0 blocking, 0 review. */
+    const { sharedHosts } = require(path.join(TOOL, 'lib', 'gaps.js'));
+    const item = (name, h, canary) => ({ desc: describeIngress(Y.stringify({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress',
+        metadata: { name, namespace: 'prod', annotations: canary ? { 'nginx.ingress.kubernetes.io/canary': 'true' } : {} },
+        spec: { rules: [{ host: h, http: { paths: [{ path: '/', pathType: 'Prefix', backend: { service: { name: name, port: { number: 80 } } } }] } }] } })), gaps: [] });
+    const items = [item('shop', 'a.example.com'), item('api', 'a.example.com'), item('shop-canary', 'a.example.com', true), item('solo', 'b.example.com')];
+    sharedHosts(items);
+    assert.deepEqual(items.map((i) => i.gaps.map((g) => g.id)), [['shared-host'], ['shared-host'], [], []]);
+    assert.match(items[0].gaps[0].message, /routed by shop, api\. .*merges them into one VirtualServer/);
+});
+
+test('convert and report say what the page says about a community Ingress the community controller refused', () => {
+    /* The page shows an error and migrates nothing for it. convert writes the
+       others, prints that error to stderr and exits 1 (--json lists it under
+       refused); report gives it blocking gaps. One engine function builds the
+       text for all three, so they cannot disagree. */
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const { spawnSync } = require('node:child_process');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nic-migrate-'));
+    const src = path.join(dir, 'in.yaml');
+    const good = JSON.parse(JSON.stringify(INGRESS));
+    good.metadata.annotations = { 'nginx.ingress.kubernetes.io/proxy-body-size': '8m' };
+    const bad = JSON.parse(JSON.stringify(INGRESS));
+    bad.metadata.name = 'bad';
+    bad.spec.rules = [{ host: 'bad.example.com', http: bad.spec.rules[0].http }];
+    bad.spec.tls = [];
+    bad.metadata.annotations = { 'nginx.ingress.kubernetes.io/limit-rps': 'ten' };
+    fs.writeFileSync(src, Y.stringifyAll([good, bad]));
+    const cli = path.join(TOOL, 'nic-migrate.js');
+    const run = (...args) => spawnSync(process.execPath, [cli, ...args, '--no-color'], { encoding: 'utf8' });
+
+    let r = run('convert', '-f', src);
+    assert.equal(r.status, 1, r.stderr);
+    assert.match(r.stderr, /✗ Ingress \S*bad not migrated — The community controller \(v1\.15\.1\) refuses it by default/);
+    assert.match(r.stderr, /limit-rps: ten — expects a whole number\./);
+    assert.ok(Y.parseAll(r.stdout).every((d) => d && d.metadata.name !== 'bad'), 'nothing written for the refused Ingress');
+    assert.ok(Y.parseAll(r.stdout).some((d) => d && d.kind === 'VirtualServer'), 'the other Ingress still migrates');
+
+    r = run('convert', '-f', src, '--json');
+    assert.equal(r.status, 1);
+    const json = JSON.parse(r.stdout);
+    assert.deepEqual(json.refused.map((x) => x.name), ['bad']);
+    assert.equal(json.refused[0].error.items[0].code, 'nginx.ingress.kubernetes.io/limit-rps: ten');
+
+    r = run('report', '-f', src, '--json');
+    const item = JSON.parse(r.stdout).ingresses.find((x) => x.name === 'bad');
+    assert.deepEqual(item.gaps.map((g) => g.severity + ' ' + g.id), ['blocking refused', 'blocking refused-value']);
+    fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('convert prints the command that gives a basic-auth Secret its htpasswd key, as the page does', () => {
+    const doc = JSON.parse(JSON.stringify(INGRESS));
+    doc.metadata.annotations = { 'nginx.ingress.kubernetes.io/auth-type': 'basic', 'nginx.ingress.kubernetes.io/auth-secret': 'basic-auth' };
+    const { out } = runConvert(doc);
+    const note = out.notes.find((n) => /key named htpasswd/.test(n));
+    assert.ok(note, out.notes.join(' | '));
+    assert.match(note, /\n\nkubectl (-n \S+ )?patch secret basic-auth --type merge/);
 });

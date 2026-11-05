@@ -85,7 +85,7 @@ e2e-shop/shop  (shop.example.com, b.example.com)
     VirtualServer/shop  host shop.example.com
     VirtualServer/shop-b  host b.example.com
   note: spec.ingressClassName — Set spec.ingressClassName to the NGINX Ingress Controller class ...
-  note: cors-allow-headers — Dropped DNT, Keep-Alive from allowHeaders — browsers send these ...
+  note: cors-allow-headers — Dropped DNT, Keep-Alive from allowHeaders: browsers send these ...
 
 ────────────────────────────────────────────────────────────
 1 Ingress · 1 with community annotations · 0 blocking · 0 review · 0 note
@@ -123,6 +123,21 @@ captured warning, not a thrown exception, and both commands exit non-zero on it.
 Every path becomes a route, every distinct backend an upstream, Policies are
 referenced from `spec.policies`, and TLS, namespace, and `ingressClassName` are
 carried over.
+
+NGINX Ingress Controller gives a host to one resource, so every host in the
+output has exactly one. An Ingress that routes several hosts is split into one
+per host, with a note. A host that several Ingresses of a run share becomes one
+VirtualServer with every Ingress's routes: each keeps its own upstreams, and
+its Policies go on its own routes (with `--target ingress`: one Ingress with
+every path, which makes each Ingress's settings apply to the whole host, and
+the notes name each one). Routes are ordered as the community controller tried
+them, which matters once an Ingress on the host uses `rewrite-target` or
+`use-regex`. The merged resource is written into the file of the Ingress listed
+first. The tool never emits VirtualServerRoutes or mergeable minion Ingresses:
+they give each team its own resource, but need setting up by hand. Where the Ingresses set a
+host-wide value differently, the oldest Ingress's is kept, as the community
+controller kept it, and a note says so. `report` analyzes each Ingress alone
+and flags the shared host as a `shared-host` gap.
 
 `--target ingress` keeps the Ingress resource and rewrites its annotations to
 `nginx.org/*`, adding `nginx.org/policies` for anything that needs a Policy.
@@ -165,7 +180,7 @@ source's name. Applying it replaces the Ingress you are migrating. Pass
   path) and the two become one VirtualServer; alone, the stable side is a
   reported placeholder.
 - **Snippets.** Carried across as written and never validated. Directives from
-  modules the community image included — `more_set_headers`, Lua — do not exist
+  modules the community image included (`more_set_headers`, Lua) do not exist
   in NGINX Ingress Controller and fail the reload; the analyzer names them.
 - **NGINX Plus features** (JWT, OIDC, WAF) have no community equivalent to
   convert from. They are additions, not migrations.

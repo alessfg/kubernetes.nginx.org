@@ -624,9 +624,35 @@
         // Emit `value` at `indent`. `comments` maps a dotted path ('spec.host',
         // 'spec.routes.0.path') to a trailing comment, which is how each
         // generated line names the community annotation it came from.
+        // A comment holding "TODO: …" is split: the instruction goes on a
+        // comment line of its own above the key, where it is read without
+        // scrolling a narrow pane sideways, and the line keeps its source
+        // with a short "# … — TODO" marker.
         function yamlEmitNode(value, indent, lines, path, comments, opts) {
             let pad = ' '.repeat(indent);
-            let note = function(p) { return comments && comments[p] ? '  # ' + comments[p] : ''; };
+            let todoOf = function(p) { return comments && /(^|— )TODO: /.test(comments[p] || '') ? comments[p].replace(/^(.*? — )?TODO: /, '') : null; };
+            let note = function(p) {
+                if (!comments || !comments[p]) return '';
+                let todo = todoOf(p);
+                if (todo === null) return '  # ' + comments[p];
+                let src = /^(.*?) — TODO: /.exec(comments[p]);
+                return '  # ' + (src ? src[1] + ' — ' : '') + 'TODO';
+            };
+            // Wrapped to 48 columns, indent included: an analyzer pane is
+            // ~50 monospace columns wide at a 1400px window (measured), and a
+            // sentence that runs past it is one nobody scrolls to read. A deep
+            // field keeps at least 30 columns of text per line.
+            let above = function(p, at) {
+                let todo = todoOf(p);
+                if (todo === null) return;
+                let width = Math.max(30, 46 - at.length);
+                let words = ('TODO: ' + todo).split(' '), line = '';
+                words.forEach(function(w) {
+                    if (line && (line + ' ' + w).length > width) { lines.push(at + '# ' + line); line = '      ' + w; }
+                    else line = line ? line + ' ' + w : w;
+                });
+                lines.push(at + '# ' + line);
+            };
             if (Array.isArray(value)) {
                 value.forEach(function(item, i) {
                     let p = path + '.' + i;
@@ -656,6 +682,7 @@
                     let v = value[key];
                     let p = path ? path + '.' + key : key;
                     let k = yamlNeedsQuotes(key) ? yamlQuote(key) : key;
+                    above(p, pad);
                     if (yamlIsMap(v) || Array.isArray(v)) {
                         let empty = Array.isArray(v) ? v.length === 0 : Object.keys(v).length === 0;
                         if (empty) { lines.push(pad + k + ': ' + (Array.isArray(v) ? '[]' : '{}') + note(p)); return; }
@@ -709,9 +736,77 @@
             splitStream: yamlSplitStream
         };
 
+        // Where each note shows, for every source. A source module resolves a
+        // note's code (the annotation and its value) and reference (title,
+        // anchor, sidebarSection), then adds it; the sorter places it:
+        //   card      { card: 'namespace/host' }  on that resource's card
+        //   step 0    before: true                 with its command, if any
+        //   severity  'unsupported'                an "Unsupported annotations" card
+        //             'invalid'                    the box under the errors
+        //             'unchanged'                  the collapsed "no change" list
+        //             'warning' | 'note'           "Behavior differences"
+        // Notes arrive in paste order and keep it within a section; each
+        // section drops a repeat of a note it already holds.
+        function noteSorter() {
+            let s = { before: [], differences: [], cards: {}, unsupported: [] };
+            let same = function(a, b) { return a.code === b.code && a.message === b.message; };
+            return {
+                add: function(n) {
+                    if (n.card && !n.before) {
+                        let list = s.cards[n.card] = s.cards[n.card] || [];
+                        if (!list.some(function(x) { return x.message === n.message; })) list.push({ code: n.code, message: n.message, severity: n.severity === 'warning' ? 'warning' : 'note' });
+                        return;
+                    }
+                    if (n.severity === 'unsupported') {
+                        if (!s.unsupported.some(function(c) { return c.code === n.code && c.desc === n.message; }))
+                            s.unsupported.push({ title: n.title || n.code, code: n.code, desc: n.message, anchor: n.anchor || null, sidebarSection: n.sidebarSection || 'mappings' });
+                        return;
+                    }
+                    (n.before ? s.before : s.differences).push({ code: n.code, message: n.message, severity: n.severity, command: n.command || null, title: n.title || null, anchor: n.anchor || null, sidebarSection: n.sidebarSection || null });
+                },
+                // A card the source builds itself (an annotation with no mapping path).
+                unsupportedCard: function(card) { s.unsupported.push(card); },
+                has: function(n) { return s.differences.concat(s.before).some(function(x) { return same(x, n); }); },
+                before: function() { return s.before; },
+                differences: function() { return s.differences; },
+                cardsFor: function(key) {
+                    let list = s.cards[key] || [];
+                    return list.filter(function(n) { return n.severity === 'warning'; }).concat(list.filter(function(n) { return n.severity !== 'warning'; }));
+                },
+                // The plan's note sections, in the shape renderPlan reads.
+                // `controller` names the source controller in the invalid box;
+                // `unsupported` ({ title, desc }) words that section for the source.
+                sections: function(controller, unsupported) {
+                    unsupported = unsupported || {};
+                    let d = s.differences;
+                    let by = function(sev) { return d.filter(function(n) { return n.severity === sev; }); };
+                    let invalid = by('invalid');
+                    return {
+                        // Warnings first: they are the notes that change what to do.
+                        infoNotes: by('warning').concat(by('note')).map(function(n) { return { code: n.code, message: n.message, severity: n.severity, title: n.title || null, anchor: n.anchor || null, sidebarSection: n.sidebarSection || null }; }),
+                        unchanged: by('unchanged').map(function(n) { return { code: n.code, message: n.message }; }),
+                        invalid: invalid.length ? {
+                            title: 'Values ' + controller + ' ignored',
+                            message: 'It could not read these values and used its default instead; the migration does the same. Fix any you meant to take effect.',
+                            items: invalid.map(function(n) { return { code: n.code, message: n.message }; })
+                        } : null,
+                        unsupported: s.unsupported.length ? {
+                            title: unsupported.title || 'Unsupported annotations',
+                            countText: s.unsupported.length + ' finding' + (s.unsupported.length !== 1 ? 's' : ''),
+                            desc: unsupported.desc || 'These annotations are recognized but have no NGINX Ingress Controller equivalent. Review each one and take the recommended action.',
+                            cards: s.unsupported
+                        } : null,
+                        // Attention: warnings in step 0 and in the notes, and the ignored values.
+                        flagged: s.before.filter(function(n) { return n.severity === 'warning'; }).length + by('warning').length + invalid.length
+                    };
+                }
+            };
+        }
+
         // Shared utilities the SOURCE modules call (call-time only — they load first).
         window.MigrationTool = {
             NIC: NIC,
+            notes: noteSorter,
             util: {
                 splitDocuments: splitDocuments,
                 stripInlineComment: stripInlineComment,
@@ -952,7 +1047,9 @@
         function highlightBlock(block) {
             if (block.dataset.highlighted) return;
             try {
-                let frag = highlightYaml(block.textContent);
+                // A command block is shell; everything else on this page is YAML.
+                let shell = block.getAttribute('data-lang') === 'shell' || SHELL_START.test(block.textContent.replace(/^(\s*#.*\n)+/, '').trimStart());
+                let frag = shell ? highlightShell(block.textContent) : highlightYaml(block.textContent);
                 block.textContent = '';
                 block.appendChild(frag);
                 block.dataset.highlighted = '1';
@@ -1253,9 +1350,8 @@
         });
 
         // Respect the user's reduced-motion preference for programmatic scrolling.
-        function scrollBehavior() {
-            return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth';
-        }
+        function reducedMotion() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+        function scrollBehavior() { return reducedMotion() ? 'auto' : 'smooth'; }
 
         // Current fixed header height (banner + top bar) read from the rendered layout,
         // so scroll math shares a single source of truth with the CSS --fixed-top-h var.
@@ -1348,6 +1444,42 @@
             });
         }
 
+        // What made a resource look as it does (merged, split, built as the
+        // other kind), above its YAML, where the reader sees it.
+        function appendCardNotes(container, notes) {
+            (notes || []).forEach(function(n) {
+                container.appendChild(buildNoteCard(n.severity === 'warning' ? 'warning' : 'note', { text: n.message }));
+            });
+        }
+
+        // A resource the source controller refused, so nothing below comes
+        // from it: { title, message, items: [{ code, message }] }. `variant`
+        // 'warning' is the same shape for values it ignored, which still migrate.
+        function renderPlanErrors(container, errors, variant) {
+            errors.forEach(function(e) {
+                let card = document.createElement('div');
+                card.className = 'info-box ' + (variant || 'error');
+                let strong = document.createElement('strong');
+                strong.textContent = e.title + ': ';
+                card.appendChild(strong);
+                card.appendChild(document.createTextNode(e.message));
+                if (e.items && e.items.length) {
+                    let list = document.createElement('ul');
+                    list.className = 'analyzer-flag-list';
+                    e.items.forEach(function(x) {
+                        let li = document.createElement('li');
+                        let code = document.createElement('code');
+                        code.textContent = x.code;
+                        li.appendChild(code);
+                        li.appendChild(document.createTextNode(' — ' + x.message));
+                        list.appendChild(li);
+                    });
+                    card.appendChild(list);
+                }
+                container.appendChild(card);
+            });
+        }
+
         function showAnalyzerLoading(container) {
             container.textContent = '';
             let wrap = document.createElement('div');
@@ -1397,12 +1529,24 @@
                 return;
             }
             let plan = SOURCE.analyzer.buildPlan(parsed, _migrationStrategy);
+            // Every resource refused by the source controller: the errors are
+            // the whole result, with no plan for nothing beneath them.
+            if (plan.errors && plan.errors.length && !plan.export) {
+                resultsDiv.textContent = '';
+                renderPlanErrors(resultsDiv, plan.errors);
+                renderParserWarnings(resultsDiv, warnings.concat(plan.warnings || []));
+                let liveStatus = document.getElementById('analyzerLiveStatus');
+                if (liveStatus) liveStatus.textContent = plan.errors.map(function(e) { return e.title; }).join('. ');
+                return;
+            }
             renderPlan(resultsDiv, plan);
             // Prepend any parser/plan warnings inside the renderer's now-populated container.
             let allWarnings = warnings.concat(plan.warnings || []);
-            if (allWarnings.length > 0) {
+            if (allWarnings.length > 0 || (plan.errors && plan.errors.length) || plan.invalid) {
                 let firstChild = resultsDiv.firstChild;
                 let warningHolder = document.createDocumentFragment();
+                renderPlanErrors(warningHolder, plan.errors || []);
+                if (plan.invalid) renderPlanErrors(warningHolder, [plan.invalid], 'warning');
                 renderParserWarnings(warningHolder, allWarnings);
                 resultsDiv.insertBefore(warningHolder, firstChild);
             }
@@ -1436,9 +1580,17 @@
             if (liveStatus) liveStatus.textContent = title + ' ' + message;
         }
 
+        // A comment holding a placeholder ("# TODO: …", "# source — TODO: …")
+        // reads as one: weight and an upright face mark it, never a status
+        // hue (which is never text here). Width is unchanged, so the input
+        // editor's overlay stays aligned with the textarea under it.
+        // A marker ("# TODO", "# source — TODO") or an instruction line and its
+        // wrapped continuation ("#       …" right after a "# TODO: …").
+        function commentClass(text, continues) { return /^#(\s*|.* — )TODO(:|$)/.test(text) || (continues && /^# {7}\S/.test(text)) ? 'yaml-comment yaml-todo' : 'yaml-comment'; }
         function highlightYaml(text) {
             let frag = document.createDocumentFragment();
             let lines = text.split('\n');
+            let inTodo = false;
             lines.forEach(function(line, i) {
                 if (i > 0) frag.appendChild(document.createTextNode('\n'));
                 // Comment lines
@@ -1447,11 +1599,13 @@
                     let indent = document.createTextNode(line.substring(0, line.length - trimmed.length));
                     frag.appendChild(indent);
                     let commentSpan = document.createElement('span');
-                    commentSpan.className = 'yaml-comment';
+                    commentSpan.className = commentClass(trimmed, inTodo);
+                    inTodo = /yaml-todo/.test(commentSpan.className);
                     commentSpan.textContent = trimmed;
                     frag.appendChild(commentSpan);
                     return;
                 }
+                inTodo = false;
                 // Document separator
                 if (trimmed === '---') {
                     let sepSpan = document.createElement('span');
@@ -1490,7 +1644,7 @@
                         } else if (/^["']?\d+(\.\d+)?[smhkMG]?["']?$/.test(valTrimmed)) {
                             valSpan.className = 'yaml-number';
                         } else if (valTrimmed.startsWith('#')) {
-                            valSpan.className = 'yaml-comment';
+                            valSpan.className = commentClass(valTrimmed);
                         } else {
                             valSpan.className = 'yaml-value';
                         }
@@ -1498,7 +1652,7 @@
                         frag.appendChild(valSpan);
                         if (inlineComment) {
                             let cmSpan = document.createElement('span');
-                            cmSpan.className = 'yaml-comment';
+                            cmSpan.className = commentClass(inlineComment.trim());
                             cmSpan.textContent = inlineComment;
                             frag.appendChild(cmSpan);
                         }
@@ -1524,11 +1678,56 @@
                 if (fbComment >= 0) {
                     frag.appendChild(document.createTextNode(line.substring(0, fbComment)));
                     let fbCmSpan = document.createElement('span');
-                    fbCmSpan.className = 'yaml-comment';
+                    fbCmSpan.className = commentClass(line.substring(fbComment).trim());
                     fbCmSpan.textContent = line.substring(fbComment);
                     frag.appendChild(fbCmSpan);
                 } else {
                     frag.appendChild(document.createTextNode(line));
+                }
+            });
+            return frag;
+        }
+
+        // Shell commands get the landing page's four roles (index.html's
+        // .code-block: .cmd, .flag, .str, .comment), on the same code palette
+        // as YAML. A command word opens the line and follows |, &&, || and ;;
+        // a flag is -x or --name, and on `--set k=v` the key reads as a flag
+        // and the value as a string. Quotes, $VAR and ${…} are strings; a
+        // trailing \ is punctuation. Only colour changes, never width.
+        let SHELL_START = /^(helm|kubectl|curl|docker|git|node|python3?|nic-migrate|ingress2gateway|export|cd|echo|cat|go|brew)\b/;
+        // Values after "=" take YAML's colours: true/false a keyword, a number a number.
+        function shellValueClass(v) { return /^(true|false)$/.test(v) ? 'sh-cmd' : /^\d+(\.\d+)*$/.test(v) ? 'sh-num' : 'sh-str'; }
+        function highlightShell(text) {
+            let frag = document.createDocumentFragment();
+            // Each call names its class as a literal, which check-classes.py reads.
+            let span = function(cls, t) { let e = document.createElement('span'); e.className = cls; e.textContent = t; frag.appendChild(e); };
+            let plain = function(t) { if (t) frag.appendChild(document.createTextNode(t)); };
+            text.split('\n').forEach(function(line, i) {
+                if (i > 0) plain('\n');
+                let re = /(\s+)|(#.*$)|("(?:[^"\\]|\\.)*"|'[^']*')|(\$\{[^}]*\}|\$[A-Za-z_]\w*)|(\|\||&&|[|;])|(\\$)|([^\s"'|;&]+)/g;
+                let m, expectCmd = !/^\s/.test(line) || i === 0, afterSet = false;
+                while ((m = re.exec(line))) {
+                    if (m[1]) plain(m[1]);
+                    else if (m[2]) span('sh-comment', m[2]);
+                    else if (m[3] || m[4]) span('sh-str', m[0]);
+                    else if (m[5]) { span('sh-punct', m[5]); expectCmd = true; }
+                    else if (m[6]) span('sh-punct', m[6]);
+                    else {
+                        let w = m[7];
+                        if (expectCmd) { span('sh-cmd', w); expectCmd = false; }
+                        else if (/^--?[A-Za-z]/.test(w)) {
+                            let eq = w.indexOf('=');
+                            if (eq > 0) { span('sh-flag', w.slice(0, eq)); span('sh-punct', '='); span(shellValueClass(w.slice(eq + 1)), w.slice(eq + 1)); }
+                            else span('sh-flag', w);
+                            afterSet = /^--set(-string|-file|-json)?$/.test(w);
+                            continue;
+                        } else if (afterSet && w.indexOf('=') > 0) {
+                            let eq = w.indexOf('=');
+                            span('sh-key', w.slice(0, eq)); span('sh-punct', '='); span(shellValueClass(w.slice(eq + 1)), w.slice(eq + 1));
+                        } else if (/^\d+(\.\d+)*$/.test(w)) span('sh-num', w);
+                        else plain(w);
+                        afterSet = false;
+                    }
                 }
             });
             return frag;
@@ -1555,7 +1754,7 @@
         // used to have the same accessible name, "Copy", so a screen reader
         // listing buttons heard a column of identical entries.
         let _yamlBlockSeq = 0;
-        function buildYamlBlock(text, collapsible, label) {
+        function buildYamlBlock(text, collapsible, label, lang) {
             let pre = document.createElement('div');
             pre.className = 'analyzer-yaml-output';
             pre.id = 'analyzer-yaml-' + (++_yamlBlockSeq);
@@ -1563,13 +1762,13 @@
             copyBtn.type = 'button';
             copyBtn.className = 'analyzer-copy-btn';
             copyBtn.textContent = 'Copy';
-            if (label) copyBtn.setAttribute('aria-label', 'Copy YAML: ' + label);
+            if (label) copyBtn.setAttribute('aria-label', (lang === 'shell' ? 'Copy command: ' : 'Copy YAML: ') + label);
             copyBtn.addEventListener('click', function() { copyAnalyzerBlock(copyBtn); });
             pre.appendChild(copyBtn);
-            pre.appendChild(highlightYaml(text));
+            pre.appendChild(lang === 'shell' ? highlightShell(text) : highlightYaml(text));
             pre.setAttribute('data-raw', text);
             let lineCount = text.split('\n').length;
-            if (collapsible && lineCount > 12) {
+            if (collapsible && lineCount > 12 && !/#[^\n]*TODO:/.test(text)) {
                 pre.classList.add('collapsed');
                 let wrapper = document.createDocumentFragment();
                 wrapper.appendChild(pre);
@@ -1674,6 +1873,7 @@
                 }
                 if (item.dualSuffix) catLabel.appendChild(document.createTextNode(item.dualSuffix));
                 groupDiv.appendChild(catLabel);
+                appendCardNotes(groupDiv, item.notes);
                 groupDiv.appendChild(renderComparisonBlock({ old: item.old, new: item.new }, item.category + ' ' + block.kind));
             });
             return groupDiv;
@@ -1715,6 +1915,28 @@
         // Spacing comes from .analyzer-note-card / .analyzer-note-body in
         // migration.css — these used to carry inline `margin: 10px 0` and
         // `margin-top: 6px`, neither of which is on the 4px grid.
+        // A finding about one annotation: its category, the annotation, what
+        // it means, and its reference row. Unsupported annotations and
+        // behaviour differences share it, in their own colour.
+        function buildReferenceCard(variant, opts) {
+            let card = buildNoteCard(variant, { title: opts.title, code: opts.code, text: opts.text });
+            if (opts.anchor) {
+                let link = document.createElement('a');
+                link.href = '#' + opts.anchor;
+                link.className = 'analyzer-note-link';
+                link.textContent = 'See reference guide →';
+                // One of these per card, so the visible text alone does
+                // not say where each goes.
+                if (opts.title) link.setAttribute('aria-label', 'See reference guide: ' + opts.title);
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    goToAnchor(opts.anchor, opts.sidebarSection);
+                });
+                card.appendChild(link);
+            }
+            return card;
+        }
+
         function buildNoteCard(variant, opts) {
             let card = document.createElement('div');
             card.className = 'info-box ' + variant + ' analyzer-note-card';
@@ -1724,9 +1946,11 @@
                 card.appendChild(strong);
                 card.appendChild(document.createTextNode(' — '));
             }
-            let code = document.createElement('code');
-            code.textContent = opts.code;
-            card.appendChild(code);
+            if (opts.code) {
+                let code = document.createElement('code');
+                code.textContent = opts.code;
+                card.appendChild(code);
+            }
             let body = document.createElement('div');
             body.className = 'analyzer-note-body';
             body.textContent = opts.text;
@@ -1765,10 +1989,17 @@
 
             // Announce results to screen readers
             let liveStatus = document.getElementById('analyzerLiveStatus');
-            if (liveStatus) liveStatus.textContent = plan.liveText;
+            // A refused resource is said first: it is what the reader must act on.
+            if (liveStatus) liveStatus.textContent = (plan.errors || []).map(function(e) { return e.title + '. '; }).join('') + plan.liveText;
 
             let animDelay = 0;
+            // Under reduced motion there is no fade, so there is no stagger
+            // either: shared.css shortens the animation to 0.01ms, but an
+            // inline delay still held each step at opacity 0 for up to a
+            // second, with the results announced and nothing on screen.
+            let still = reducedMotion();
             function applyFadeIn(el) {
+                if (still) return;
                 el.classList.add('analyzer-fade-in');
                 el.style.animationDelay = animDelay + 'ms';
                 animDelay += 100;
@@ -1813,6 +2044,54 @@
             applyFadeIn(banner);
             container.appendChild(banner);
 
+            // Step 0: install the controller with the flags this output needs,
+            // and anything that must change before the YAML below will apply.
+            // It used to be two informational notes after the YAML.
+            if (plan.prerequisites) {
+                let pre = plan.prerequisites;
+                let step0 = buildStep({
+                    id: 'analyzer-before',
+                    marker: '0',
+                    markerCls: pre.items.some(function(n) { return n.severity === 'warning'; }) ? 'warning' : '',
+                    title: pre.title,
+                    countText: [pre.flags.length ? pre.flags.length + ' install flag' + (pre.flags.length !== 1 ? 's' : '') : null, pre.items.length ? pre.items.length + ' change' + (pre.items.length !== 1 ? 's' : '') : null].filter(Boolean).join(', '),
+                    desc: pre.desc
+                });
+                pre.items.forEach(function(n) {
+                    step0.appendChild(buildNoteCard(n.severity === 'warning' ? 'warning' : 'note', { code: n.code, text: n.message }));
+                    // A change the reader can run: the command right under its note.
+                    if (n.command) step0.appendChild(buildYamlBlock(n.command, false, 'Command', 'shell'));
+                });
+                // A source with nothing to install has no command and no flags.
+                if (pre.command) step0.appendChild(buildYamlBlock(pre.command, false, 'Helm install command', 'shell'));
+                if (pre.flags && pre.flags.length) {
+                    let why = document.createElement('ul');
+                    why.className = 'analyzer-flag-list';
+                    pre.flags.forEach(function(x) {
+                        let li = document.createElement('li');
+                        let code = document.createElement('code');
+                        code.textContent = x.flag;
+                        li.appendChild(code);
+                        li.appendChild(document.createTextNode(' — ' + x.why));
+                        why.appendChild(li);
+                    });
+                    step0.appendChild(why);
+                }
+                if (pre.anchor) {
+                    let link = document.createElement('a');
+                    link.href = '#' + pre.anchor;
+                    link.className = 'analyzer-note-link';
+                    link.textContent = 'Running both controllers side by side →';
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        goToAnchor(pre.anchor);
+                    });
+                    step0.appendChild(link);
+                }
+                applyFadeIn(step0);
+                container.appendChild(step0);
+            }
+
             // Numbered steps — the id is fixed per step type (pills scroll to it),
             // the displayed number is sequential in render order.
             let stepNum = 0;
@@ -1829,6 +2108,7 @@
 
                 stepData.blocks.forEach(function(block) {
                     if (block.type === 'comparison') {
+                        appendCardNotes(step, block.notes);
                         step.appendChild(renderComparisonBlock(block, stepData.title));
                     } else if (block.type === 'dual-note') {
                         let dualNote = document.createElement('div');
@@ -1848,19 +2128,59 @@
                 container.appendChild(step);
             });
 
-            // Informational notes (recognized values that don't need a swap or have no equivalent)
+            // What changes in behaviour, and what has no equivalent. A warning
+            // renders as one: these all used to wear the note style.
             if (plan.infoNotes && plan.infoNotes.length > 0) {
+                let warned = plan.infoNotes.filter(function(n) { return n.severity === 'warning'; }).length;
                 let stepInfo = buildStep({
                     id: 'analyzer-info-notes',
                     marker: 'i',
-                    title: 'Informational notes',
-                    countText: plan.infoNotes.length + ' note' + (plan.infoNotes.length !== 1 ? 's' : '')
+                    markerCls: warned ? 'warning' : '',
+                    title: 'Behavior differences',
+                    countText: plan.infoNotes.length + ' note' + (plan.infoNotes.length !== 1 ? 's' : '') + (warned ? ', ' + warned + ' to review' : ''),
+                    desc: 'These annotations migrate, but NGINX Ingress Controller applies them differently. Check each one against how you rely on it.'
                 });
                 plan.infoNotes.forEach(function(note) {
-                    stepInfo.appendChild(buildNoteCard('note', { code: note.code, text: note.message }));
+                    stepInfo.appendChild(buildReferenceCard(note.severity === 'warning' ? 'warning' : 'note', { title: note.title, code: note.code, text: note.message, anchor: note.anchor, sidebarSection: note.sidebarSection }));
                 });
                 applyFadeIn(stepInfo);
                 container.appendChild(stepInfo);
+            }
+
+            // Settings the source controller ignored or defaulted, which migrate
+            // to the same thing: worth a look if the value was meant to do
+            // something, nothing to act on otherwise. Collapsed, last.
+            if (plan.unchanged && plan.unchanged.length > 0) {
+                let n = plan.unchanged.length;
+                let stepSame = buildStep({
+                    id: 'analyzer-unchanged',
+                    marker: '=',
+                    markerCls: '',
+                    title: 'Not migrated, no change',
+                    countText: n + ' setting' + (n !== 1 ? 's' : ''),
+                    desc: 'The community controller ignored ' + (n !== 1 ? 'these settings' : 'this setting') + ' or used its default, so the migration does the same. Check any value you meant to take effect.'
+                });
+                let list = document.createElement('div');
+                list.id = 'analyzer-unchanged-list';
+                list.hidden = true;
+                plan.unchanged.forEach(function(note) {
+                    list.appendChild(buildNoteCard('note', { code: note.code, text: note.message }));
+                });
+                let toggle = document.createElement('button');
+                toggle.type = 'button';
+                toggle.className = 'analyzer-yaml-expand';
+                toggle.setAttribute('aria-controls', list.id);
+                let setOpen = function(open) {
+                    list.hidden = !open;
+                    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    toggle.textContent = open ? 'Hide' : 'Show ' + n + ' Setting' + (n !== 1 ? 's' : '');
+                };
+                setOpen(false);
+                toggle.addEventListener('click', function() { setOpen(list.hidden); });
+                stepSame.appendChild(toggle);
+                stepSame.appendChild(list);
+                applyFadeIn(stepSame);
+                container.appendChild(stepSame);
             }
 
             // Unsupported findings (recognized but no migration path)
@@ -1876,26 +2196,7 @@
                 });
 
                 plan.unsupported.cards.forEach(function(cardData) {
-                    let card = buildNoteCard('warning', {
-                        title: cardData.title,
-                        code: cardData.code,
-                        text: cardData.desc
-                    });
-                    if (cardData.anchor) {
-                        let link = document.createElement('a');
-                        link.href = '#' + cardData.anchor;
-                        link.className = 'analyzer-note-link';
-                        link.textContent = 'See reference guide →';
-                        // One of these per card, so the visible text alone does
-                        // not say where each goes.
-                        if (cardData.title) link.setAttribute('aria-label', 'See reference guide: ' + cardData.title);
-                        link.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            goToAnchor(cardData.anchor, cardData.sidebarSection);
-                        });
-                        card.appendChild(link);
-                    }
-                    step4.appendChild(card);
+                    step4.appendChild(buildReferenceCard('warning', { title: cardData.title, code: cardData.code, text: cardData.desc, anchor: cardData.anchor, sidebarSection: cardData.sidebarSection }));
                 });
 
                 applyFadeIn(step4);

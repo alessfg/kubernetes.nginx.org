@@ -79,7 +79,10 @@ function describe(doc, prefixes) {
         services,
         hasTls: tls.length > 0,
         tlsSecrets: tls.map((t) => t && t.secretName).filter(Boolean).map(String),
-        annotations
+        annotations,
+        // A canary Ingress shares its stable one's host by design. Only the
+        // community controller has canary annotations.
+        canary: /^true$/i.test(String(ann[COMMUNITY_PREFIX + 'canary'] || '').trim())
     };
 }
 

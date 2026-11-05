@@ -376,3 +376,65 @@ for (const p of PAGES) {
         assert.deepEqual(lower, [], 'lead-ins with a lowercase letter after the em dash');
     });
 }
+
+test('shell commands are highlighted without losing a character', () => {
+    /* highlightShell() rebuilds a command as spans, so a regex gap drops text
+       from what a reader sees, though Copy still reads the raw text. Run it
+       over every command block on the page and a few that exercise pipes,
+       quotes and variables: the text must survive whole, and each role land
+       where index.html's hand-highlighted commands put it. */
+    const start = core.indexOf('        let SHELL_START');
+    const end = core.indexOf('        // Build an inline SVG icon');
+    assert.ok(start > 0 && end > start, 'highlightShell() is where this test expects it');
+    const doc = {
+        createDocumentFragment: () => ({ kids: [], appendChild(n) { this.kids.push(n); } }),
+        createElement: () => ({ className: '', textContent: '' }),
+        createTextNode: (t) => ({ className: '', textContent: t })
+    };
+    const { highlightShell, SHELL_START } = new Function('document', core.slice(start, end) + '; return { highlightShell, SHELL_START };')(doc);
+    const run = (t) => highlightShell(t).kids;
+    const page = read('ingress-nginx-migration.html');
+    const blocks = [...page.matchAll(/<pre[^>]*><code[^>]*>([^<]*)<\/code><\/pre>/g)].map((m) => m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'))
+        .filter((t) => SHELL_START.test(t.trimStart()));
+    assert.ok(blocks.length >= 3, 'the page still has command blocks: ' + blocks.length);
+    const extra = ['kubectl get svc -o jsonpath="{.spec.ports[0].port}" | grep 80 && echo "ok $HOME ${X}"', '# comment\nhelm upgrade --install x y --version 2.8.0 --namespace=nginx'];
+    for (const t of blocks.concat(extra)) assert.equal(run(t).map((k) => k.textContent).join(''), t);
+    const roles = (t) => run(t).filter((k) => k.className).map((k) => k.className.replace('sh-', '') + ':' + k.textContent);
+    assert.deepEqual(roles('helm install x \\\n  --set a.b=nginx-nic \\\n  --set c=true --version 2.8.0'),
+        ['cmd:helm', 'punct:\\', 'flag:--set', 'key:a.b', 'punct:=', 'str:nginx-nic', 'punct:\\', 'flag:--set', 'key:c', 'punct:=', 'cmd:true', 'flag:--version', 'num:2.8.0']);
+    assert.deepEqual(roles('a | b && c'), ['cmd:a', 'punct:|', 'cmd:b', 'punct:&&', 'cmd:c']);
+});
+
+test('the core places every source\'s notes: card, step 0, unsupported, ignored values, no change, differences', () => {
+    /* MigrationTool.notes() is the one place a note's section is decided, for
+       every source module; each module only says what a note is. Its
+       contract: a card note stays on its card, deduped by message; step 0
+       keeps its command; an unsupported note is a card with its reason;
+       invalid notes are the box naming the module's controller; unchanged
+       notes are the collapsed list; warnings lead the differences; and the
+       attention count is step-0 warnings, differences warnings and invalid. */
+    const { tool } = loadAnalyzer('assets/js/migration-ingress-nginx.js');
+    const s = tool.notes();
+    const n = (o) => Object.assign({ code: 'x', message: 'm', severity: 'note' }, o);
+    s.add(n({ message: 'merged', card: 'prod/a.example.com' }));
+    s.add(n({ message: 'merged', card: 'prod/a.example.com' }));
+    s.add(n({ message: 'split', card: 'prod/a.example.com', severity: 'warning' }));
+    s.add(n({ code: 'k', message: 'run this', before: true, severity: 'warning', command: 'kubectl get x' }));
+    s.add(n({ code: 'u', message: 'gone', severity: 'unsupported', title: 'Load balancing', anchor: 'lb' }));
+    s.add(n({ code: 'u', message: 'gone', severity: 'unsupported', title: 'Load balancing', anchor: 'lb' }));
+    s.add(n({ code: 'i', message: 'unread', severity: 'invalid' }));
+    s.add(n({ code: 'c', message: 'did nothing', severity: 'unchanged' }));
+    s.add(n({ code: 'd1', message: 'differs', severity: 'note' }));
+    s.add(n({ code: 'd2', message: 'differs badly', severity: 'warning' }));
+    const out = s.sections('the community controller');
+    assert.deepEqual(Array.from(s.cardsFor('prod/a.example.com'), (x) => x.message), ['split', 'merged'], 'warnings first, a repeat dropped');
+    assert.deepEqual(Array.from(s.cardsFor('prod/b.example.com')), []);
+    assert.equal(s.before()[0].command, 'kubectl get x');
+    assert.deepEqual(Array.from(out.unsupported.cards, (c) => c.title + '|' + c.desc + '|' + c.anchor), ['Load balancing|gone|lb']);
+    assert.equal(out.invalid.title, 'Values the community controller ignored');
+    assert.deepEqual(Array.from(out.invalid.items, (x) => x.code), ['i']);
+    assert.deepEqual(Array.from(out.unchanged, (x) => x.code), ['c']);
+    assert.deepEqual(Array.from(out.infoNotes, (x) => x.code), ['d2', 'd1'], 'warnings lead');
+    assert.equal(out.flagged, 1 + 1 + 1, 'step-0 warning, a differences warning, an ignored value');
+    assert.ok(s.has({ code: 'd1', message: 'differs' }) && !s.has({ code: 'd1', message: 'other' }));
+});

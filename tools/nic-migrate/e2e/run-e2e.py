@@ -244,6 +244,8 @@ def self_test():
         check(source + ': every case has a host', all(c.get('host') for c in prof['cases']), True)
         check(source + ': every case has a path', all(c.get('path') for c in prof['cases']), True)
         check(source + ': fixture exists', os.path.exists(os.path.join(MANIFESTS, prof['fixture'])), True)
+        # A known difference must name a target the runner can run.
+        check(source + ': known differences name a target', all(set(c.get('known_difference') or {}) <= {'virtualserver', 'ingress'} for c in prof['cases']), True)
     # The HAProxy fixture's ConfigMap is what nic-migrate reads; the chart sets
     # the controller's from HAPROXY_CONFIG. They must say the same.
     fixture = open(os.path.join(MANIFESTS, SOURCES['haproxy']['fixture'])).read()
@@ -251,6 +253,22 @@ def self_test():
     declared = dict((k.strip(), v.strip().strip('"')) for k, v in
                     (l.split(':', 1) for l in data.splitlines() if ':' in l and l.startswith('  ')))
     check('haproxy: chart config matches the fixture ConfigMap', declared, HAPROXY_CONFIG)
+    check('converted Ingresses listed one per line', converted_ingress_names('shop-example-com\nshop-b-nic\n\n'), ['shop-example-com', 'shop-b-nic'])
+    check('VirtualServer states keep the reason',
+          virtualserver_states('shop\tValid\tok\nshop-b\tWarning\thost taken\n\t\t\n'),
+          {'shop': ('Valid', 'ok'), 'shop-b': ('Warning', 'host taken')})
+    check('a VirtualServer NIC has not processed has no state',
+          virtualserver_states('shop\t\t\n'), {'shop': ('', '')})
+    check('leftover NIC config is the namespace\'s own',
+          leftover_configs('_default-server.conf\nvs_e2e-shop_shop-b.conf\ne2e-shop-shop-nic.conf\n'
+                           'ts_e2e-shop_db.conf\nvs_other_x.conf\n', 'e2e-shop'),
+          ['vs_e2e-shop_shop-b.conf', 'e2e-shop-shop-nic.conf', 'ts_e2e-shop_db.conf'])
+    # header_absent: a header that must not be there.
+    with_cors = dict(status=200, headers={'access-control-allow-origin': '*'}, app='web2', uri='/admin')
+    without = dict(status=200, headers={}, app='web2', uri='/admin')
+    absent = dict(header_absent='access-control-allow-origin')
+    check('header_absent flags a present header', absolute_problems(absent, with_cors), ['access-control-allow-origin header present'])
+    check('header_absent passes an absent one', absolute_problems(absent, without), [])
 
     cmd = curl_argv('svc.ns.svc', dict(host='h', path='/x', scheme='https', headers={'Origin': 'o'}))
     check('https adds -k', '-k' in cmd, True)
@@ -534,15 +552,60 @@ def clear_previous():
     """Remove anything a previous run converted. Matters when reusing a cluster
     (--skip-cluster, or --keep then re-run): a VirtualServer left over from a
     --target virtualserver run would still be serving during a --target ingress
-    run, and the comparison would silently be against the wrong resource."""
+    run, and the comparison would silently be against the wrong resource.
+
+    Every Ingress of NIC_CLASS goes, not one by name: a multi-host Ingress is
+    split per host and Ingresses sharing a host are merged, so one run converts
+    to several Ingresses, and a leftover one keeps its host from the next
+    run's VirtualServer, which then never turns Valid. The source Ingresses
+    are COMMUNITY_CLASS and stay."""
     kubectl('delete', 'virtualserver,policy,transportserver', '--all', '-n', NS,
             '--ignore-not-found', check=False, quiet=True)
-    kubectl('delete', 'ingress', model_ingress_name(), '-n', NS,
-            '--ignore-not-found', check=False, quiet=True)
+    names = kubectl('get', 'ingress', '-n', NS, '-o',
+                    'jsonpath={range .items[?(@.spec.ingressClassName=="%s")]}{.metadata.name}{"\\n"}{end}' % NIC_CLASS,
+                    check=False, quiet=True)
+    for name in converted_ingress_names(getattr(names, 'stdout', '') or ''):
+        kubectl('delete', 'ingress', name, '-n', NS, '--ignore-not-found', check=False, quiet=True)
+
+    # The delete must be processed before the apply. NIC queues a resource's
+    # delete and re-add as one task (keyed by kind and name, handlers.go), and
+    # by the time it runs the lister holds the new object; IsEqual compares
+    # only namespace, name and generation (configuration.go), and a re-created
+    # resource is generation 1 again. So a VirtualServer re-applied too soon
+    # is "unchanged": no reload, no status, and NGINX keeps serving the old
+    # object's config. Found when a reused cluster's shop-b never got a state.
+    def cleared():
+        out = kubectl('exec', '-n', NIC_NS, 'deploy/nic-nginx-ingress-controller', '--',
+                      'ls', '/etc/nginx/conf.d', check=False, quiet=True)
+        if out.returncode != 0:
+            raise Fail('cannot list conf.d: %s' % out.stderr.strip())
+        left = leftover_configs(out.stdout, NS)
+        if left:
+            raise Fail('still configured: ' + ' '.join(left))
+        return 'cleared'
+    wait_for('NGINX Ingress Controller to drop the previous run', cleared, timeout=60, interval=1)
 
 
-def model_ingress_name():
-    return 'shop' + NAME_SUFFIX
+def leftover_configs(listing, ns):
+    """The conf.d files NIC wrote for namespace ns: vs_<ns>_<name>.conf,
+    ts_<ns>_<name>.conf, and <ns>-<name>.conf for an Ingress (configurator.go
+    getFileNameFor*, objectMetaToFileName). Pure, so --self-test can cover it."""
+    names = listing.split()
+    return [n for n in names
+            if n.startswith(('vs_%s_' % ns, 'ts_%s_' % ns, '%s-' % ns)) and n.endswith('.conf')]
+
+
+def converted_ingress_names(listing):
+    """The Ingress names `kubectl get ... -o jsonpath` printed, one per line.
+    Pure, so --self-test can cover it."""
+    return [line.strip() for line in listing.splitlines() if line.strip()]
+
+
+def virtualserver_states(listing):
+    """{name: (state, message)} from the tab-separated lines the Valid wait
+    lists; a line with no name is dropped. Pure, so --self-test can cover it."""
+    rows = (line.split('\t') + ['', ''] for line in listing.splitlines())
+    return {r[0]: (r[1], r[2].strip()) for r in rows if r[0]}
 
 
 def apply_converted(args, path):
@@ -558,16 +621,21 @@ def apply_converted(args, path):
             # a trailing bare "=", which parses into an empty-named resource
             # whose state is "" — so `all(state == Valid)` is false forever and
             # the wait times out against two perfectly Valid VirtualServers.
-            # Cost an entire e2e run to find. The empty-key filter below is the
-            # belt to that braces.
+            # Cost an entire e2e run to find. virtualserver_states dropping a
+            # nameless line is the belt to those braces.
             out = kubectl('get', 'virtualserver', '-n', NS,
-                          '-o', 'jsonpath={range .items[*]}{.metadata.name}={.status.state} {end}',
-                          check=False).stdout.strip()
-            states = {k: v for k, v in
-                      (p.split('=', 1) for p in out.split() if '=' in p) if k}
-            if states and all(v == 'Valid' for v in states.values()):
-                return ' '.join('%s=%s' % kv for kv in sorted(states.items()))
-            return None
+                          '-o', 'jsonpath={range .items[*]}{.metadata.name}{"\\t"}{.status.state}'
+                                '{"\\t"}{.status.message}{"\\n"}{end}',
+                          check=False).stdout
+            states = virtualserver_states(out)
+            if states and all(s == 'Valid' for s, _ in states.values()):
+                return ' '.join('%s=Valid' % name for name in sorted(states))
+            # Raised, not returned: wait_for keeps a Fail's text as `last`, so a
+            # timeout names each VirtualServer's state and NIC's reason for it.
+            # Returning None reported "last: None" and threw both away.
+            raise Fail('; '.join('%s=%s %s' % (name, s or '(no state)', m)
+                                 for name, (s, m) in sorted(states.items()))
+                       or 'no VirtualServer listed')
         say('  ' + wait_for('every VirtualServer to reach state Valid', valid, timeout=180))
     else:
         say('  applied the converted Ingress on class %s' % NIC_CLASS)
@@ -610,6 +678,20 @@ CASES = [
          expect_status=200, expect_app='web'),
     dict(name='plain-http-not-redirected', host='shop.example.com', path='/',
          compare=('status',), expect_status=200),
+    # admin shares shop.example.com. shop's rewrite-target made the community
+    # controller match every path of the host as a regex, longest first, so
+    # /admin reached admin's backend (web2) ahead of shop's catch-all "/".
+    dict(name='shared-host-path-routes-to-its-ingress', host='shop.example.com', path='/admin/users',
+         compare=('status', 'app'), expect_status=200, expect_app='web2'),
+    # Each Ingress's settings stay its own: shop's CORS Policy and rewrite are
+    # not admin's. One merged Ingress (--target ingress) cannot keep that.
+    dict(name='shared-host-keeps-other-ingress-cors-off', host='shop.example.com', path='/admin',
+         headers={'Origin': 'https://shop.example.com'},
+         compare=('status',), expect_status=200, header_absent='access-control-allow-origin',
+         known_difference={'ingress': 'one Ingress per host: shop\'s CORS Policy covers every path of the merged Ingress, /admin included'}),
+    dict(name='shared-host-keeps-other-ingress-uri', host='shop.example.com', path='/admin/users',
+         compare=('status', 'app', 'uri'), expect_status=200, expect_app='web2', expect_uri='/admin/users',
+         known_difference={'ingress': 'one Ingress per host: shop\'s rewrite-target /$2 applies to /admin too'}),
 ]
 
 
@@ -780,6 +862,9 @@ def absolute_problems(case, r):
     needed = case.get('header_present')
     if needed and needed not in r['headers']:
         problems.append('no %s header' % needed)
+    unwanted = case.get('header_absent')
+    if unwanted and unwanted in r['headers']:
+        problems.append('%s header present' % unwanted)
     return problems
 
 
@@ -834,16 +919,17 @@ def probe_against(args, target, baseline, label):
         fields = case.get('compare', ('status', 'app', 'uri'))
         problems = ['%s: %r -> %r' % (f, before.get(f), after.get(f))
                     for f in fields if before.get(f) != after.get(f)]
-        needed = case.get('header_present')
-        if needed and (needed in before['headers']) != (needed in after['headers']):
-            problems.append('%s header %s' % (needed, 'lost' if needed in before['headers'] else 'appeared'))
+        for needed in (case.get('header_present'), case.get('header_absent')):
+            if needed and (needed in before['headers']) != (needed in after['headers']):
+                problems.append('%s header %s' % (needed, 'lost' if needed in before['headers'] else 'appeared'))
 
         # A difference already investigated and written down is not a failure —
         # but a documented difference that has QUIETLY GONE AWAY is, because the
         # note explaining it is now wrong and someone will read it. Both
         # directions have to be checked or the declaration rots.
         #
-        # Currently unused — no case declares one. Kept as the mechanism for
+        # Used by the shared-host cases on --target ingress: one merged Ingress
+        # cannot keep each source Ingress's settings to its own paths. Kept for
         # divergences that are real and understood, as opposed to cases that
         # simply do not apply to a target (skip_targets, above).
         known = (case.get('known_difference') or {}).get(args.target)

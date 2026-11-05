@@ -46,6 +46,14 @@ function detect(desc, result, source) {
     const resources = generatedResources(parts);
     const routable = resources.filter((r) => r.kind === 'VirtualServer' || r.kind === 'TransportServer' || r.kind === 'Ingress');
 
+    /* 0. The source controller refused this Ingress: nothing is migrated. */
+    const refused = result.plan && result.plan.errors && result.plan.errors[0];
+    if (refused) {
+        add('refused', 'blocking', refused.message);
+        for (const x of refused.items) add('refused-value', 'blocking', x.code + ' — ' + x.message);
+        return gaps;
+    }
+
     /* 1. A translator that threw was swallowed and its fragment is missing. */
     for (const w of result.warnings || []) {
         add('generator-warning', 'blocking', 'A translator failed and part of the output is missing: ' + w);
@@ -98,12 +106,15 @@ function detect(desc, result, source) {
 
     /* 7. Placeholders and warnings the engine raised. */
     const plan = result.plan || {};
-    const todos = (plan.infoNotes || []).filter((n) => /TODO/.test(n.code)).length + countMatches(yaml, /#\s*TODO:/g);
+    // Each placeholder has a "# TODO: <what to fill in>" line above it.
+    const todos = countMatches(yaml, /#\s*TODO:/g);
     if (todos > 0) {
         add('todo-placeholders', 'review', todos + ' placeholder' + (todos !== 1 ? 's' : '') + ' to fill in — the analyzer could not infer these values.');
     }
-    for (const n of plan.infoNotes || []) {
-        if (n.severity === 'warning' && !/TODO|^snippets$/.test(n.code)) add('needs-attention', 'review', n.code + ' — ' + n.message);
+    // Step 0's changes (a directive to rewrite, a flag to set) and the
+    // notes' warnings. The snippet flag has a gap of its own (9).
+    for (const n of ((plan.prerequisites || {}).items || []).concat(plan.infoNotes || [])) {
+        if (n.severity === 'warning') add('needs-attention', 'review', n.code + ' — ' + n.message);
     }
 
     /* 8. Recognised with no migration path, and never-seen annotations. */
@@ -132,10 +143,38 @@ function detect(desc, result, source) {
     return gaps;
 }
 
+/* Across a run: a host more than one Ingress routes. report analyzes each
+   Ingress on its own, so only here can it see that NGINX Ingress Controller
+   gives the host to one resource. convert groups them. Canary pairs are the
+   community controller's own sharing, and convert merges them, so they are
+   left out. Adds a gap to each Ingress involved. */
+function sharedHosts(items) {
+    const byHost = new Map();
+    for (const item of items) {
+        if (item.desc.canary) continue;
+        for (const h of item.desc.hosts) {
+            const key = (item.desc.namespace || '') + '/' + h;
+            if (!byHost.has(key)) byHost.set(key, []);
+            byHost.get(key).push(item);
+        }
+    }
+    for (const [key, list] of byHost) {
+        if (list.length < 2) continue;
+        const host = key.split('/').slice(1).join('/');
+        const names = list.map((i) => i.desc.name);
+        for (const item of list) {
+            item.gaps.push({ id: 'shared-host', severity: 'review', message: 'Host ' + host + ' is routed by ' + names.join(', ') +
+                '. NGINX Ingress Controller gives a host to one resource: `convert` merges them into one VirtualServer ' +
+                '(--target ingress: one Ingress with every path). ' +
+                'The resources listed above are this Ingress on its own.' });
+        }
+    }
+}
+
 const RANK = { blocking: 0, review: 1, note: 2 };
 
 function sortGaps(gaps) {
     return gaps.slice().sort((a, b) => (RANK[a.severity] - RANK[b.severity]) || a.id.localeCompare(b.id));
 }
 
-module.exports = { detect, sortGaps, generatedResources, RANK };
+module.exports = { detect, sortGaps, sharedHosts, generatedResources, RANK };

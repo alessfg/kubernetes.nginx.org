@@ -3030,34 +3030,47 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> Leading-label wildcards (<code>*.example.com</code>) port unchanged. NGINX Ingress Controller, like HAProxy, does not support mid-label or bare-suffix wildcards, and <code>spec.host</code> must be single and unique across Ingress and VirtualServer resources.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td>No direct equivalent</td>
-                            <td><code>nginx.org/mergeable-ingress-type</code> (<code>master</code> / <code>minion</code>)</td>
+                            <td>Several Ingresses on one host</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> One VirtualServer with every path<span class="or-text">— or —</span>One Ingress with every path</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># HAProxy merges Ingresses by Service+port into a shared backend —
-# a different axis, with no explicit master/minion annotation.</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># master defines the host + TLS + server-level policies
-apiVersion: networking.k8s.io/v1
+                            <div class="info-box note"><strong>One host, one resource:</strong> HAProxy serves every Ingress from one frontend, routing by host and path maps, and applies each Ingress's settings to its own paths only. NGINX Ingress Controller gives a host to one resource and rejects a second that claims it, so the analyzer merges the Ingresses of a host into one. A path two Ingresses route goes, as in HAProxy, to the backend whose name sorts first. An Ingress that routes several hosts is split into one per host first.</div>
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">One VirtualServer</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">One Ingress</button>
+                            </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: app-master
-  annotations:
-    nginx.org/mergeable-ingress-type: master
+  name: web
 spec:
-  ingressClassName: nginx
+  ingressClassName: haproxy
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
   rules:
     - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
 ---
-# minions add paths under the master's host
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: app-minion-api
+  name: api
   annotations:
-    nginx.org/mergeable-ingress-type: minion
+    haproxy.org/timeout-server: "120s"
 spec:
-  ingressClassName: nginx
+  ingressClassName: haproxy
   rules:
     - host: app.example.com
       http:
@@ -3066,11 +3079,119 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: api-svc
+                name: api
                 port:
-                  number: 80</code></pre></div>
+                  number: 8080</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># One VirtualServer for the host, with every path
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: app-example-com
+spec:
+  host: app.example.com  # served by web, api, merged
+  tls:  # spec.tls
+    secret: app-tls
+    redirect:  # ssl-redirect (HAProxy default with TLS)
+      enable: true
+      code: 302  # the HAProxy default 302
+  upstreams:
+    - name: web
+      service: web
+      port: 80
+    - name: api
+      service: api
+      port: 8080
+      read-timeout: "2m"  # timeout-server
+      send-timeout: "2m"  # timeout-server
+  routes:
+    - path: /
+      action:
+        pass: web
+    - path: /api
+      action:
+        pass: api</code></pre></div>
+                                </div>
+                                <div class="info-box note"><strong>Note:</strong> Each Ingress keeps its own upstreams, so the <code>timeout-server</code> above stays with <code>api</code>, as in HAProxy, and its Policies go on its own routes. HAProxy matches exact paths first, then the longest prefix, which NGINX does whatever order the routes are in. HAProxy redirected HTTP to HTTPS only for <code>web</code>, the Ingress with TLS; the VirtualServer redirects every path.</div>
                             </div>
-                            <div class="info-box note"><strong>NGINX Ingress Controller-only capability:</strong> mergeable Ingress types share host-scoped config across Ingresses (the master owns the host/TLS/server policies; minions add paths) — a different merge axis from HAProxy's per-Service auto-merge, so they are not interchangeable. Minion duplicate paths are a config error, not a silent overwrite.</div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+spec:
+  ingressClassName: haproxy
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  annotations:
+    haproxy.org/timeout-server: "120s"
+spec:
+  ingressClassName: haproxy
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># One Ingress for the host, with every path
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-example-com
+  annotations:
+    nginx.org/proxy-read-timeout: "2m"  # timeout-server
+    nginx.org/proxy-send-timeout: "2m"  # timeout-server
+    nginx.org/http-redirect-code: "302"  # the HAProxy default 302
+spec:
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: app-tls
+  rules:
+    - host: app.example.com  # served by web, api, merged
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080</code></pre></div>
+                                </div>
+                                <div class="info-box warning"><strong>Settings become host-wide:</strong> In one Ingress, only the per-Service annotations (<code>nginx.org/ssl-services</code>, <code>nginx.org/grpc-services</code>, <code>nginx.org/websocket-services</code>, <code>nginx.org/rewrites</code>, <code>nginx.org/sticky-cookie-services</code>) stay with the Service they name. Every other setting covers every path, so the <code>timeout-server</code> above, set only on <code>api</code>, applies to <code>web</code> too, where HAProxy kept it to <code>api</code>'s paths. The analyzer names each setting that changes scope. To keep them per Ingress, use the VirtualServer approach, where each Ingress keeps its own upstreams.</div>
+                            </div>
+                            <div class="info-box tip"><strong>A resource per team:</strong> NGINX Ingress Controller can also delegate a host's paths to VirtualServerRoutes, or to mergeable minion Ingresses under a master, and NGINX Gateway Fabric attaches several HTTPRoutes to one Gateway listener. Each gives a team a resource of its own, and each needs setting up with the result in mind. The analyzer does not emit them.</div>
                         </div></td></tr>
                     </tbody>
                 </table>

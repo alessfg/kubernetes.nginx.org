@@ -75,6 +75,34 @@ test('every recognised setting is named in the output, under both strategies', (
     assert.deepEqual(broken, []);
 });
 
+test('a migrated Ingress never claims a setting it does not carry was folded in', () => {
+    /* "Also applied, folded into the fields above" is a promise the YAML holds
+       it. Annotation-first wrote check-interval and timeout-check into CRD
+       fragments a migrated Ingress cannot carry, and said exactly that. Every
+       single key, every grouped mapping together, and the samples. */
+    const groups = [...mod.matchAll(/keys: \[([^\]]+)\]/g)].map((m) => [...m[1].matchAll(/'annotation:([\w.-]+)'/g)].map((x) => x[1])).filter((g) => g.length > 1);
+    const inputs = CASES.concat(groups.map((g) => ({ label: g.join(' + '), yaml: ingress(Object.fromEntries(g.map((k) => ['haproxy.org/' + k, value(k)]))) })));
+    const broken = [];
+    for (const c of inputs) for (const strategy of ['crd', 'annotation']) {
+        const r = run(c.yaml, strategy);
+        r.plan.infoNotes.filter((n) => /folded into the fields above/.test(n.message)).forEach((n) => broken.push(c.label + ' / ' + strategy + ': ' + n.message));
+    }
+    assert.deepEqual(broken, []);
+});
+
+test('a migrated Ingress names the health-check settings no annotation carries', () => {
+    /* NGINX Ingress Controller v5.7.0 takes an Ingress health check's path,
+       interval and timeout from the Pods' readiness probe and nothing else
+       (controller.go findProbeForPods), so each one set is named, with the
+       probe field that replaces it. */
+    const r = run(ingress({ 'haproxy.org/check-http': '/healthz', 'haproxy.org/check-interval': '5s', 'haproxy.org/timeout-check': '2s' }), 'annotation');
+    const note = r.plan.infoNotes.find((n) => /readiness probe/.test(n.message));
+    assert.ok(note, 'no health-check note');
+    assert.match(note.message, /check-http, check-interval, timeout-check are not carried over/);
+    assert.match(note.message, /the path, periodSeconds, timeoutSeconds on the readiness probe/);
+    assert.doesNotMatch(note.message, /probe "\/"/, 'NGINX Ingress Controller adds no probe without a readiness probe');
+});
+
 test('the analyzer view keeps its promises for every setting and sample', () => {
     /* The rules analyzer.test.js holds ingress-nginx to: both sides on every
        card; a Policy card shows one mapping's settings; the export holds
@@ -481,4 +509,134 @@ test('the controller settings HAProxy read become NGINX settings that load', () 
     assert.match(b['http-snippets'], /ssl_session_tickets off;/);
     assert.equal(cm(run(g({ nbthread: 4, cpu_maps: [{ process: '1/1-4', cpu_set: '0-3' }] })))['worker-cpu-affinity'], '0001 0010 0100 1000');
     assert.equal(cm(run(g({ log_target_list: [{ address: '10.0.0.1:514', facility: 'local0', level: 'info' }] })))['access-log'], 'syslog:server=10.0.0.1:514,facility=local0,severity=info main');
+});
+
+/* ------------------------------------------- one host, one owning resource
+
+   NGINX Ingress Controller gives a host to one resource. The HAProxy module
+   emitted a VirtualServer (or Ingress) per HAProxy Ingress, so two HAProxy
+   Ingresses on one host became two owners, the second rejected, and a
+   two-host HAProxy Ingress stayed one Ingress under annotation-first. HAProxy
+   itself serves every Ingress from one frontend, routing by its host and path
+   maps (route.go MapRows; controller.go: exact, then prefix-exact, then the
+   longest prefix) and scoping each Ingress's frontend rules to its own map
+   rows (ingress.go resolveFrontendRules). v3.2.19. */
+
+const hapIngress = (name, hosts, ann, tls) => ({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name, namespace: 'prod', annotations: ann || {} },
+    spec: Object.assign(tls ? { tls: [{ hosts: [hosts[0][0]], secretName: tls }] } : {}, { ingressClassName: 'haproxy',
+        rules: hosts.map(([h, p, svc]) => ({ host: h, http: { paths: [{ path: p, pathType: 'Prefix', backend: { service: { name: svc || 'web', port: { number: 80 } } } }] } })) }) });
+const paste = (...docs) => docs.map((d) => Y.stringify(d)).join('---\n');
+const hostsOf = (d) => d.kind === 'Ingress' ? d.spec.rules.map((r) => r.host) : [d.spec.host];
+const claims = (r) => {
+    const by = {};
+    // A TCP TransportServer owns a GlobalConfiguration listener, not a host.
+    for (const d of r.docs) if (['VirtualServer', 'TransportServer', 'Ingress'].includes(d.kind)) for (const h of hostsOf(d)) if (h) (by[h] = by[h] || []).push(d.kind + '/' + d.metadata.name);
+    return by;
+};
+const noteText = (r) => r.plan.infoNotes.map((n) => n.code + ' — ' + n.message).join('\n');
+
+test('for any HAProxy input, no VirtualServer, Ingress or TransportServer has two hosts, and no host has two of them', () => {
+    /* Every mapped HAProxy key, alone, on an HAProxy Ingress that routes a
+       second host, and beside a second HAProxy Ingress on its host; both
+       strategies. A TLS-passthrough host shared with HTTP routing cannot be
+       merged and passes only if it warns. */
+    const keys = [...new Set(source.analyzer.mappings.flatMap((m) => m.keys || []).filter((k) => /^annotation:/.test(k)).map((k) => k.slice(11)))];
+    const bad = [];
+    const check = (label, text, strategy) => {
+        const r = run(text, strategy);
+        for (const d of r.docs) if (['VirtualServer', 'TransportServer', 'Ingress'].includes(d.kind) && hostsOf(d).length > 1) bad.push(label + ' ' + strategy + ': ' + d.kind + '/' + d.metadata.name + ' has ' + hostsOf(d).join(', '));
+        const warned = r.plan.infoNotes.filter((n) => n.severity === 'warning').map((n) => n.message).join('\n');
+        for (const [h, list] of Object.entries(claims(r))) {
+            if (list.length > 1 && !(list.some((x) => /^TransportServer\//.test(x)) && /passes .* through as TLS/.test(warned))) bad.push(label + ' ' + strategy + ': ' + h + ' is claimed by ' + list.join(', '));
+        }
+    };
+    for (const strategy of ['crd', 'annotation']) {
+        for (const p of Object.keys(source.analyzer.samplePresets)) check('preset ' + p, source.analyzer.samplePresets[p], strategy);
+        for (const k of keys) {
+            const ann = { ['haproxy.org/' + k]: VALUES[k] !== undefined ? VALUES[k] : 'true' };
+            check(k, paste(hapIngress('app', [['a.example.com', '/']], ann, 'a-tls')), strategy);
+            check(k + ' (two hosts)', paste(hapIngress('app', [['a.example.com', '/'], ['b.example.com', '/b']], ann, 'a-tls')), strategy);
+            check(k + ' (shared host)', paste(hapIngress('app', [['a.example.com', '/']], ann, 'a-tls'), hapIngress('other', [['a.example.com', '/other', 'other']])), strategy);
+        }
+    }
+    assert.deepEqual(bad, []);
+});
+
+test('HAProxy Ingresses on one host merge into one VirtualServer, each keeping its own settings (CRD-first)', () => {
+    /* HAProxy scoped each Ingress's rules to its own routes; one VirtualServer
+       keeps that where NGINX Ingress Controller can: upstream settings on each
+       Ingress's upstreams, its Policies on its own routes. */
+    const r = run(paste(
+        hapIngress('shop', [['a.example.com', '/', 'web']], {}, 'a-tls'),
+        hapIngress('api', [['a.example.com', '/api', 'api']], { 'haproxy.org/timeout-server': '30s', 'haproxy.org/allow-list': '10.0.0.0/8' })
+    ));
+    assert.deepEqual(claims(r), { 'a.example.com': ['VirtualServer/a-example-com'] });
+    assert.equal(r.docs.filter((d) => d.kind === 'VirtualServerRoute').length, 0);
+    const vs = r.docs.find((d) => d.kind === 'VirtualServer');
+    assert.equal(vs.spec.tls.secret, 'a-tls');
+    const up = (svc) => vs.spec.upstreams.find((u) => u.service === svc);
+    assert.equal(up('api')['read-timeout'], '30s');
+    assert.equal(up('web')['read-timeout'], undefined, 'api\'s timeout stays on api\'s upstream');
+    const route = (p) => vs.spec.routes.find((x) => x.path === p);
+    assert.ok(route('/api').policies && route('/api').policies.length, 'api\'s access control on its own route');
+    assert.equal(route('/').policies, undefined, 'and not on shop\'s');
+    // HAProxy redirected only the Ingress with TLS; one resource redirects every path.
+    assert.match(noteText(r), /HAProxy redirected HTTP to HTTPS on the paths of shop only; .*api's included/);
+    assert.match(noteText(r), /shop, api share a\.example\.com, so they are merged into one VirtualServer.*NGINX Gateway Fabric/);
+});
+
+test('HAProxy Ingresses on one host merge into one NGINX Ingress Controller Ingress (annotation-first)', () => {
+    const r = run(paste(
+        hapIngress('shop', [['a.example.com', '/', 'web']], { 'haproxy.org/server-ssl': 'true' }, 'a-tls'),
+        hapIngress('api', [['a.example.com', '/api', 'api']], { 'haproxy.org/timeout-server': '30s' })
+    ), 'annotation');
+    const ings = r.docs.filter((d) => d.kind === 'Ingress');
+    assert.equal(ings.length, 1);
+    assert.deepEqual(ings[0].spec.rules[0].http.paths.map((p) => p.backend.service.name), ['web', 'api']);
+    // A per-Service list keeps its Service; an Ingress-wide setting covers every
+    // path, where HAProxy applied it to api's own paths.
+    assert.equal(ings[0].metadata.annotations['nginx.org/ssl-services'], 'web');
+    assert.match(noteText(r), /Only api sets nginx\.org\/proxy-read-timeout; .* applies to the paths of shop too, where HAProxy applied it to api's own paths/);
+});
+
+test('a path two HAProxy Ingresses route goes to the backend HAProxy kept, the one that sorts first', () => {
+    /* routecollision.go: HAProxy keeps the map row whose value sorts first,
+       the backend name (<namespace>_svc_<service>_<port>), whichever Ingress
+       declared it first. */
+    for (const strategy of ['crd', 'annotation']) {
+        const r = run(paste(hapIngress('one', [['a.example.com', '/', 'zebra']]), hapIngress('two', [['a.example.com', '/', 'alpha']])), strategy);
+        const d = r.docs.find((x) => x.kind === (strategy === 'crd' ? 'VirtualServer' : 'Ingress'));
+        const svc = strategy === 'crd' ? d.spec.upstreams.find((u) => u.name === d.spec.routes[0].action.pass).service : d.spec.rules[0].http.paths[0].backend.service.name;
+        assert.equal(svc, 'alpha', strategy);
+        assert.match(noteText(r), /HAProxy kept one map row, the backend that sorts first; .*keeping two's/, strategy);
+    }
+});
+
+test('an HAProxy Ingress with several hosts becomes one VirtualServer or Ingress per host, with one note', () => {
+    const doc = hapIngress('shop', [['a.example.com', '/', 'web'], ['b.example.com', '/', 'web2']], { 'haproxy.org/timeout-server': '30s' }, 'ab-tls');
+    for (const strategy of ['crd', 'annotation']) {
+        const r = run(paste(doc), strategy);
+        const routing = r.docs.filter((d) => d.kind === 'VirtualServer' || d.kind === 'Ingress');
+        assert.deepEqual(routing.map((d) => hostsOf(d)), [['a.example.com'], ['b.example.com']], strategy);
+        assert.equal(r.plan.infoNotes.filter((n) => /was split into one per host/.test(n.message)).length, 1, strategy + ': said once');
+    }
+});
+
+test('the reference row for HAProxy Ingresses on one host matches what the analyzer emits', () => {
+    /* The row has no HAProxy annotation, so where.py --diff cannot reach it.
+       Its source block is run under each tab's strategy and compared,
+       comments included; the ConfigMap the run also emits is not shown. */
+    const page = fs.readFileSync(path.join(ROOT, 'haproxy-migration.html'), 'utf8');
+    const at = page.indexOf('<td>Several Ingresses on one host</td>');
+    const row = page.slice(at, page.indexOf('</div></td></tr>', at));
+    assert.ok(at > 0, 'the row is on the page');
+    const unescape = (t) => t.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    for (const strategy of ['crd', 'annotation']) {
+        const tab = row.slice(row.indexOf('class="approach-content' + (strategy === 'crd' ? ' active' : '') + '" data-approach="' + strategy + '">'));
+        const [, src] = /comparison-block old"><h4>[^<]*<\/h4><pre><code>([\s\S]*?)<\/code>/.exec(tab);
+        const [, want] = /comparison-block new"><h4>[^<]*<\/h4><pre><code>([\s\S]*?)<\/code>/.exec(tab);
+        const shown = unescape(want).split('\n---\n').map((d) => d.replace(/^# .*\n/, ''));
+        const got = run(unescape(src), strategy).text.split('\n---\n').filter((d) => !/kind: ConfigMap/.test(d)).map((d) => d.replace(/^# .*\n/, ''));
+        assert.deepEqual(shown, got, strategy);
+    }
 });

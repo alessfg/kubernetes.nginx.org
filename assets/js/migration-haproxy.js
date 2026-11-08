@@ -547,7 +547,7 @@
             if (run.crs.some(function(c) { return c.isV1; })) {
                 warnings.push({
                     title: 'ingress.v1.haproxy.org apiVersion detected',
-                    message: 'Resources using the legacy `ingress.v1.haproxy.org/v1` group were parsed (fields read from `spec.config`), but this tool documents the current `ingress.v3.haproxy.org/v3` shapes — verify field names against your CRD version before migrating.'
+                    message: 'Resources using the legacy `ingress.v1.haproxy.org/v1` group were parsed (fields read from `spec.config`), but this tool documents the current `ingress.v3.haproxy.org/v3` shapes: verify field names against your CRD version before migrating.'
                 });
             }
 
@@ -679,7 +679,7 @@
                     if (draws <= 1) return { value: 'random' };
                     return { value: 'random two', note: draws > 2 ? 'random(' + draws + ') becomes two draws, the most NGINX takes' : null };
                 }
-                case 'first': return { none: 'No NGINX Ingress Controller equivalent for balance first (fill servers in order) — choose round_robin or least_conn instead.' };
+                case 'first': return { none: 'No NGINX Ingress Controller equivalent for balance first (fill servers in order); choose round_robin or least_conn instead.' };
                 case 'rdp-cookie': return { none: 'No NGINX Ingress Controller equivalent for rdp-cookie balancing.' };
                 case 'hash': return { none: 'balance hash takes an HAProxy sample expression; rewrite it as an NGINX hash key (lb-method "hash <key> consistent") by hand.' };
             }
@@ -1067,7 +1067,7 @@
                 if (a['rate-limit-whitelist']) {
                     let bad = splitCommaList(a['rate-limit-whitelist'].value).filter(function(s) { return !isPatternFileRef(s) && !isAddress(s); });
                     if (bad.length) ctx.note('rate-limit-whitelist', 'rate-limit-whitelist holds "' + bad.join('", "') + '", which is not an IP address or CIDR, so HAProxy logged an error and exempted nobody.', 'warning');
-                    else ctx.note('rate-limit-whitelist', 'NGINX Ingress Controller has no rate-limit exemption list. To keep ' + a['rate-limit-whitelist'].value + ' unlimited, key the limit on a geo map (ConfigMap http-snippets) that yields an empty key for them — NGINX does not count an empty key.', 'warning');
+                    else ctx.note('rate-limit-whitelist', 'NGINX Ingress Controller has no rate-limit exemption list. To keep ' + a['rate-limit-whitelist'].value + ' unlimited, key the limit on a geo map (ConfigMap http-snippets) that yields an empty key for them, because NGINX does not count an empty key.', 'warning');
                 }
                 if (a['rate-limit-size']) ctx.note('rate-limit-size', 'rate-limit-size counts tracked clients; NGINX Ingress Controller sizes the zone in memory (about 16,000 clients per megabyte), so 10M holds roughly 160,000.');
                 ctx.note('rate-limit-requests', 'HAProxy counts requests over a sliding period; NGINX limit_req refills at a steady rate, so a client is admitted at the same average but spaced differently near the limit. Each NGINX Ingress Controller pod counts on its own (HAProxy counted per controller too).');

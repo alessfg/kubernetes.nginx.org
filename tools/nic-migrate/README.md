@@ -1,6 +1,6 @@
 # nic-migrate
 
-Run the migration tool's analyzer over real Ingress manifests, from a terminal —
+Run the migration tool's analyzer over real Ingress manifests, from a terminal:
 ingress-nginx by default, or HAProxy with `--source haproxy`.
 
 > **Beta.** Review the output before you apply anything to a cluster. Command
@@ -56,7 +56,7 @@ what the matching page reports.
 The kinds column is the substantive difference. ingress-nginx keeps every
 setting on the Ingress, so an Ingress-only scan sees all of it. HAProxy spreads
 the same job across annotated Ingress **and Service** objects, its controller
-ConfigMap and five CRs — a scan that only looked at Ingresses would report
+ConfigMap and five CRs, so a scan that only looked at Ingresses would report
 "nothing found" on a real HAProxy deployment.
 
 Both commands migrate one Ingress at a time, and for HAProxy resolve it the

@@ -360,6 +360,48 @@ for (const p of PAGES) {
         assert.deepEqual(misplaced, [], 'rows in the wrong reference section');
     });
 
+    // "Not needed" says the reader drops a setting and keeps its behavior,
+    // and it takes one of two forms: NGINX Ingress Controller already does it,
+    // or a construct the reader migrates to covers it. Five cells had grown
+    // five phrasings ("Not needed, sent automatically", "Not needed: the
+    // Policy CRD cors answers preflights itself"); the reason is in the panel.
+    test(`${p.name}: every "Not needed" cell uses one of the two forms`, () => {
+        const bad = [];
+        for (const m of page.matchAll(/<tr class="expandable"[^>]*>\s*<td>[\s\S]*?<\/td>\s*<td>(Not needed[\s\S]*?)<\/td>/g)) {
+            if (!/^Not needed \((?:default behavior|built into <code>[^<]+<\/code>[^)<]*)\)$/.test(m[1])) bad.push(m[1].slice(0, 60));
+        }
+        assert.deepEqual(bad, []);
+    });
+
+    // A row with no configuration to show answers in the NGINX Ingress
+    // Controller column itself: the note sits there, in place of a code block.
+    // 32 rows held a block of comments with a note below repeating it, and the
+    // Copy button copied the comments.
+    test(`${p.name}: no NGINX Ingress Controller example is comments only`, () => {
+        const only = [];
+        for (const m of page.matchAll(/<div class="comparison-block new"><h4>[\s\S]*?<\/h4><pre><code>([\s\S]*?)<\/code><\/pre><\/div>/g)) {
+            const lines = m[1].split('\n').filter((l) => l.trim());
+            if (lines.length && lines.every((l) => l.trim().startsWith('#'))) {
+                only.push(page.slice(0, m.index).split('\n').length + ': ' + lines[0].trim().slice(0, 40));
+            }
+        }
+        assert.deepEqual(only, []);
+    });
+
+    // In the NGINX Ingress Controller column the verdict is in the collapsed
+    // cell straight above, so a note there starts with its content. A bold
+    // lead-in stays only when it says what the cell does not ("Different
+    // mechanism:", "Partial:").
+    test(`${p.name}: a note in the NGINX Ingress Controller column does not repeat the cell's verdict`, () => {
+        const repeats = [];
+        for (const m of page.matchAll(/<div class="comparison-block new answer-only">[\s\S]*?(?=<\/div>\s*<\/div>\s*(?:<div class="info-box|<\/div>))/g)) {
+            for (const b of m[0].matchAll(/<div class="info-box[^"]*"><strong>([^<]*)<\/strong>/g)) {
+                if (/^(Note|Not applicable|Not needed|Not supported|No direct equivalent|No NGINX Open Source equivalent):?$/.test(b[1])) repeats.push(b[1]);
+            }
+        }
+        assert.deepEqual(repeats, []);
+    });
+
     test(`${p.name}: page loads the three scripts in source-before-core order`, () => {
         const scripts = [...page.matchAll(/<script[^>]+src="(assets\/js\/[\w.-]+\.js)"/g)].map((m) => m[1]);
         assert.deepEqual(scripts, ['assets/js/shared.js', p.module, 'assets/js/migration-core.js']);

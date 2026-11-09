@@ -237,7 +237,7 @@
             { keys: ['configmap:dontlognull', 'configmap:logasap'], source: 'dontlognull / logasap', nic: 'No direct equivalent (generally moot — see notes)', type: 'configmap', category: 'Logging', anchor: 'logging', section: 'configmap', grouped: true, generator: 'controller' },
 
             // Health checks
-            { keys: ['annotation:check'], source: 'check', nic: 'nginx.org/max-fails + nginx.org/fail-timeout (passive, NGINX Open Source) — active probes are NGINX Plus', type: 'annotation', category: 'Health checks', anchor: 'health-checks', section: 'oss', grouped: true, generator: 'check' },
+            { keys: ['annotation:check'], source: 'check', nic: 'VirtualServer upstreams[].max-fails — or — nginx.org/max-fails (passive, NGINX Open Source) — active probes are NGINX Plus', type: 'annotation', category: 'Health checks', anchor: 'health-checks', section: 'oss', grouped: true, generator: 'check' },
             { keys: ['annotation:check-http', 'annotation:check-interval', 'annotation:timeout-check'], source: 'check-http / check-interval / timeout-check', nic: 'VirtualServer upstreams[].healthCheck (NGINX Plus)', type: 'virtualserver', category: 'Active health checks', anchor: 'active-health-checks', section: 'plus', grouped: true, plusRequired: true, generator: 'activeHealthCheck' },
 
             // Load balancing
@@ -246,7 +246,8 @@
             { keys: ['annotation:standalone-backend'], source: 'standalone-backend', nic: 'Not applicable — NGINX Ingress Controller already generates one upstream per Ingress/VirtualServer', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'notApplicable', verified: { haproxy: 'v3.2.19', nic: 'v5.7.0' } },
 
             // Miscellaneous (not applicable on NIC)
-            { keys: ['annotation:abortonclose', 'configmap:clean-certs'], source: 'abortonclose / clean-certs', nic: 'Not applicable — NGINX Ingress Controller architecture makes these unnecessary (see notes)', type: 'annotation', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss', grouped: true, generator: 'notApplicable' },
+            { keys: ['annotation:abortonclose'], source: 'abortonclose', nic: 'Not needed — NGINX already aborts the upstream request when the client closes', type: 'annotation', category: 'Miscellaneous', anchor: 'miscellaneous', section: 'oss', grouped: true, generator: 'notApplicable' },
+            { keys: ['configmap:clean-certs'], source: 'clean-certs', nic: 'Not applicable — NGINX Ingress Controller loads certificates from Secrets and manages its own storage', type: 'configmap', category: 'Global & lifecycle', anchor: 'global-lifecycle', section: 'configmap', grouped: true, generator: 'notApplicable' },
 
             // Rewrites & redirects
             { keys: ['annotation:path-rewrite'], source: 'path-rewrite', nic: 'VirtualServer regex path + rewritePath — or — nginx.org/rewrite-target (+ nginx.org/path-regex)', type: 'annotation', category: 'Rewrites', anchor: 'rewrites', section: 'oss', grouped: true, generator: 'pathRewrite' },

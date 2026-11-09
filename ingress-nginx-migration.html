@@ -1133,12 +1133,8 @@ metadata:
   name: my-app
   annotations:
     nginx.ingress.kubernetes.io/enable-global-auth: "false"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># NGINX Ingress Controller does not have a global external
-# auth feature. Authentication is configured per-resource
-# via Policy CRDs or annotations.
-# No migration action needed for this annotation.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">The community controller supports global external authentication via ConfigMap keys (<code>global-auth-url</code>, etc.), and <code>enable-global-auth: "false"</code> opts an Ingress out of it. NGINX Ingress Controller has no global external auth: authentication is always configured per resource, through the <code>externalAuth</code>, <code>oidc</code> or <code>jwt</code> Policy CRDs or <code>location-snippets</code>. Remove the annotation; it needs no replacement.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller supports global external authentication via ConfigMap keys (<code>global-auth-url</code>, etc.). The <code>enable-global-auth: "false"</code> annotation opts an Ingress out of this global setting. NGINX Ingress Controller does not have global external auth: authentication is always configured per-resource (via the <code>externalAuth</code>/<code>oidc</code>/<code>jwt</code> Policy CRDs or <code>location-snippets</code>). This annotation can be safely removed during migration.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2005,11 +2001,8 @@ metadata:
   name: my-app
   annotations:
     nginx.ingress.kubernetes.io/http2-push-preload: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not supported — HTTP/2 Server Push was deprecated
-# by major browsers and removed from NGINX 1.25.1.
-# No migration action needed.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">HTTP/2 Server Push (<code>http2_push_preload</code>) was removed from NGINX in version 1.25.1 after major browsers deprecated it. Remove the annotation; it needs no replacement.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HTTP/2 Server Push (<code>http2_push_preload</code>) was removed from NGINX in version 1.25.1 after major browsers deprecated the feature. This annotation can be safely removed during migration.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2871,12 +2864,8 @@ metadata:
       SecRuleEngine On
       SecRule ARGS "@contains &lt;script&gt;" "id:1,deny,status:403"
     nginx.ingress.kubernetes.io/modsecurity-transaction-id: "$request_id"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct NGINX Open Source replacement
-# For WAF capabilities, see the Plus WAF section
-# which uses the F5 WAF for NGINX (App Protect)</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller does not include ModSecurity or any built-in WAF module. For WAF capabilities, <a href="#waf">F5 WAF for NGINX</a> (formerly App Protect) is available with NGINX Plus; see the <a href="#waf">WAF section</a> in NGINX Plus mappings for migration examples.</div><div class="info-box note">The community controller's ModSecurity support relies on a third-party module compiled into the controller image; it is not a native Kubernetes-integrated WAF solution. Neither controller provides an open-source WAF alternative.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No NGINX Open Source equivalent:</strong> NGINX Ingress Controller does not include ModSecurity or any built-in WAF module. For WAF capabilities, <a href="#waf">F5 WAF for NGINX</a> is available with NGINX Plus; see the <a href="#waf">WAF section</a> in NGINX Plus mappings for migration examples.</div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller's ModSecurity support relies on a third-party module compiled into the controller image; it is not a native Kubernetes-integrated WAF solution. Neither controller provides an open-source WAF alternative.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4352,7 +4341,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/preserve-trailing-slash</code></td>
-                            <td>Not needed, trailing slash preserved by default</td>
+                            <td>Not needed (default behavior)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -4362,10 +4351,8 @@ metadata:
   name: my-app
   annotations:
     nginx.ingress.kubernetes.io/preserve-trailing-slash: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No annotation needed — NGINX Ingress
-# Controller preserves trailing slashes by default.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">NGINX Ingress Controller preserves trailing slashes by default, so the community <code>preserve-trailing-slash</code> annotation has no equivalent to migrate to. Remove it.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> The community <code>preserve-trailing-slash</code> annotation has no NGINX Ingress Controller equivalent because trailing slashes are preserved by default. You can safely drop it during migration.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>nginx.ingress.kubernetes.io/ssl-ciphers</code></td>

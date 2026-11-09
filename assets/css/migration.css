@@ -342,6 +342,9 @@ pre code { background: none; border: 0; padding: 0; color: inherit; }
 .comparison-block.old h4 { background: var(--pomegranate-tint); color: var(--text); }
 .comparison-block.new h4 { background: var(--green-tint); color: var(--text); }
 .comparison-block pre { margin: 0; border: 0; border-radius: 0; }
+/* A side with no configuration to show holds the answer itself: the note sits
+   inside the block, under its header, with no code and so no Copy button. */
+.comparison-block.answer-only .info-box { margin: 0; border-radius: 0; border-left-width: 0; }
 /* Copy-button geometry and the copied state are shared with the landing page
    and live in shared.css; what is here is placement and rest colours.
 

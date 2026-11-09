@@ -732,7 +732,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/forwarded-for</code></td>
-                            <td>Not needed: sent automatically (<code>"false"</code>: <span class="badge badge-configmap">ConfigMap</span> <code>disable-forwarded-headers</code> <span class="badge badge-new">New v5.6.0</span>)</td>
+                            <td>Not needed (default behavior)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -861,7 +861,7 @@ metadata:
                             </div>
                             <div class="info-box note"><strong>Note:</strong> HAProxy replaces every space in the realm with a dash, so <code>Restricted Area</code> reached browsers as <code>Restricted-Area</code>, and an unset realm as <code>Protected-Content</code>. NGINX Ingress Controller keeps the realm as written, and with none it turns basic auth off (<code>auth_basic ""</code>), so always set it. See the <code>auth-secret</code> row for the full setup.</div>
                         </div></td></tr>
-                        <tr class="expandable">
+                        <tr class="expandable" id="auth-secret">
                             <td><code>haproxy.org/auth-secret</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <code>basicAuth.secret</code><span class="or-text">— or —</span><code>nginx.org/basic-auth-secret</code></td>
                         </tr>
@@ -972,7 +972,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/auth-type</code></td>
-                            <td>No direct equivalent (use <code>basicAuth</code>)</td>
+                            <td>No direct equivalent (use <a href="#auth-secret"><code>basicAuth</code></a>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -982,12 +982,8 @@ metadata:
   name: my-app
   annotations:
     haproxy.org/auth-type: basic-auth  # the only supported value</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No standalone equivalent — enabling basic auth IS the switch.
-# Drop auth-type and reference the Secret instead:
-#   VirtualServer: a basicAuth Policy in spec.policies
-#   Ingress:       nginx.org/basic-auth-secret + nginx.org/basic-auth-realm</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note"><code>basic-auth</code> is the only value HAProxy accepts here, and there is no global basic-auth ConfigMap key in NGINX Ingress Controller. Drop <code>auth-type</code>: the Secret reference is what enables basic auth, through a <code>basicAuth</code> Policy in a VirtualServer's <code>spec.policies</code>, or <code>nginx.org/basic-auth-secret</code> and <code>nginx.org/basic-auth-realm</code> on an Ingress.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>basic-auth</code> is the only value HAProxy accepts here, and there is no global basic-auth ConfigMap key in NGINX Ingress Controller: basic auth is turned on per Ingress (annotations) or per VirtualServer (a <code>basicAuth</code> Policy). Drop <code>auth-type</code>; the presence of the Secret reference is what enables authentication.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -1630,7 +1626,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/cors-respond-to-options</code></td>
-                            <td>Not needed: the <span class="badge badge-policy">Policy CRD</span> <code>cors</code> answers preflights itself</td>
+                            <td>Not needed (built into <code>cors</code> Policy)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -1641,12 +1637,8 @@ metadata:
   name: my-app
   annotations:
     haproxy.org/cors-respond-to-options: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Nothing to set. Wherever a cors Policy applies,
-# NGINX Ingress Controller answers every OPTIONS
-# request with 204 and the CORS headers, which is
-# what this annotation turned on in HAProxy.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">HAProxy answers the preflight with <code>204</code> only when this annotation is <code>"true"</code>; without it the <code>OPTIONS</code> request reaches the backend. Wherever a <code>cors</code> Policy applies, NGINX Ingress Controller answers every <code>OPTIONS</code> request at the edge with <code>204</code> and the CORS headers, with no way to pass preflights on. Drop the annotation, and let a backend that answered them itself stop doing so.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> HAProxy answers the preflight with <code>204</code> only when this annotation is <code>"true"</code>; without it the <code>OPTIONS</code> request reaches the backend. The NGINX Ingress Controller <code>cors</code> Policy always answers it at the edge, with no way to pass preflights on, so drop the annotation and let a backend that answered them itself stop doing so.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2008,25 +2000,55 @@ spec:
                     <tbody>
                         <tr class="expandable">
                             <td><code>haproxy.org/check</code></td>
-                            <td><code>nginx.org/fail-timeout</code> + <code>nginx.org/max-fails</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].max-fails</code><span class="or-text">— or —</span><code>nginx.org/max-fails</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-  annotations:
-    haproxy.org/check: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-  annotations:
-    # check: "true" — passive health on NGINX Open Source (eject after N failed client requests)
-    nginx.org/max-fails: "1"      # eject after N failed client requests
-    nginx.org/fail-timeout: "10s" # window + ejection time for passive failures</code></pre></div>
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="crd">CRD Approach</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="annotation">Annotation Approach</button>
                             </div>
+                            <div class="approach-content" data-approach="annotation">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/check: "false"</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    nginx.org/max-fails: "0"  # check "false"</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content active" data-approach="crd">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/check: "false"</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: backend
+      service: backend-svc
+      port: 80
+      max-fails: 0  # check "false"
+  routes:
+    - path: /
+      action:
+        pass: backend</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="info-box note"><strong>Checks off:</strong> with <code>check: "false"</code> HAProxy never marks a server down. NGINX Ingress Controller marks one failed after <code>max-fails</code> errors (default 1 in 10s) even with no probes, so set <code>max-fails</code> to <code>0</code> to match. <code>check: "true"</code>, the default, needs nothing: NGINX's passive checks are already on.</div>
                             <div class="info-box note"><strong>Passive vs active:</strong> HAProxy <code>check</code> runs active TCP probes; the NGINX Ingress Controller equivalent on NGINX Open Source is <em>passive</em>: a server is ejected only after real client requests fail (idle backends are never probed). For a true active probe, use the NGINX Plus <code>upstreams[].healthCheck</code> in <a href="#active-health-checks">Active health checks</a>.</div>
                         </div></td></tr>
                     </tbody>
@@ -2102,13 +2124,8 @@ metadata:
   name: my-app
   annotations:
     haproxy.org/scale-server-slots: "42"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not applicable — NGINX Ingress Controller has
-# no pre-allocated server slots. It re-resolves
-# endpoints on change (NGINX Open Source reloads; NGINX Plus updates
-# dynamically via the API), so there is nothing
-# to configure. Remove.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">HAProxy pre-provisions server slots for reload-free scaling. NGINX Ingress Controller re-renders and reloads (NGINX Open Source) or updates upstreams dynamically (NGINX Plus), so this knob has no counterpart; remove it.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Not applicable:</strong> HAProxy pre-provisions server slots for reload-free scaling. NGINX Ingress Controller re-renders and reloads (NGINX Open Source) or updates upstreams dynamically (NGINX Plus), so this knob has no counterpart; remove it.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/standalone-backend</code></td>
@@ -2122,13 +2139,8 @@ metadata:
   name: my-app
   annotations:
     haproxy.org/standalone-backend: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not needed — NGINX Ingress Controller already
-# generates a separate upstream per
-# Ingress/VirtualServer, so the shared backend
-# this annotation opts out of does not exist.
-# Remove.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">HAProxy builds one backend per Service and port, owned by the first Ingress to route to it (oldest, then by name). A later Ingress loses its own backend annotations to it, or gets no route at all when its <code>ssl-passthrough</code> differs; <code>standalone-backend</code> gives it a backend of its own. NGINX Ingress Controller already generates a separate upstream per Ingress or VirtualServer, so each one keeps its settings; remove the annotation. The analyzer applies the ownership rule to what it migrates, and names any setting HAProxy dropped.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Not applicable:</strong> HAProxy builds one backend per Service and port, owned by the first Ingress to route to it (oldest, then by name). A later Ingress loses its own backend annotations to it, or gets no route at all when its <code>ssl-passthrough</code> differs; <code>standalone-backend</code> gives it a backend of its own. NGINX Ingress Controller isolates upstreams per resource, so each Ingress keeps its settings without it. The analyzer applies the ownership rule to what it migrates, and names any setting HAProxy dropped.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2139,36 +2151,20 @@ metadata:
                 <table class="mapping-table" aria-labelledby="miscellaneous"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>haproxy.org/abortonclose</code><br><code>clean-certs</code> ConfigMap key</td>
-                            <td>Not applicable</td>
+                            <td><code>haproxy.org/abortonclose</code></td>
+                            <td>Not needed (default behavior)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code># abortonclose is a code-only / undocumented HAProxy annotation
+apiVersion: networking.k8s.io/v1
 kind: Ingress
-# abortonclose is a code-only / undocumented HAProxy annotation
 metadata:
   name: my-app
   annotations:
-    haproxy.org/abortonclose: "true"
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-kubernetes-ingress
-  namespace: haproxy-controller
-data:
-  clean-certs: "true"  # ConfigMap-scoped only</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not applicable — remove both;
-# NGINX Ingress Controller architecture makes
-# them unnecessary:
-#   abortonclose → NGINX already aborts the upstream request on
-#                  client close (proxy_ignore_client_abort off by default)
-#   clean-certs  → NGINX Ingress Controller loads
-#                  certificates from Secrets and
-#                  manages its own storage</code></pre></div>
+    haproxy.org/abortonclose: "true"</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">NGINX already aborts the upstream request when the client closes (<code>proxy_ignore_client_abort</code> is off by default), as <code>abortonclose</code> did. Remove the annotation. Two not-applicable knobs, <code>haproxy.org/scale-server-slots</code> and <code>haproxy.org/standalone-backend</code>, are documented under <a href="#load-balancing">Load balancing</a>.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> Both constructs translate to nothing on NGINX Ingress Controller: the behaviors they configure are either the NGINX default or handled by NGINX Ingress Controller's architecture. Remove them during migration. <code>clean-certs</code> is ConfigMap-only: there is no Ingress or Service tier for it. Two more not-applicable knobs, <code>haproxy.org/scale-server-slots</code> and <code>haproxy.org/standalone-backend</code>, are documented under <a href="#load-balancing">Load balancing</a>.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -2228,11 +2224,8 @@ metadata:
   annotations:
     haproxy.org/rate-limit-requests: "10"
     haproxy.org/rate-limit-period: "1s"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No standalone period field — it folds into the rate denominator:
-#   period 1s → rate: 10r/s
-#   period 1m → rate: 10r/m</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">NGINX has no separate rate-limit period: only <code>r/s</code> and <code>r/m</code> exist, so the period folds into the <code>rate</code> denominator. With <code>rate-limit-requests: "10"</code>, a period of <code>1s</code> becomes <code>rate: 10r/s</code> and <code>1m</code> becomes <code>rate: 10r/m</code> (see the <code>rate-limit-requests</code> row). Arbitrary periods are normalized to a per-second rate and are inexact.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> NGINX has no separate rate-limit period: only <code>r/s</code> and <code>r/m</code> exist, so the period folds into the <code>rate</code> denominator (see the <code>rate-limit-requests</code> row). Arbitrary periods are normalized to a per-second rate and are inexact.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>haproxy.org/rate-limit-requests</code></td>
@@ -2751,26 +2744,8 @@ metadata:
   name: my-app
   annotations:
     haproxy.org/ssl-redirect-port: "8443"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent. An Ingress redirects to its first
-# nginx.org/listen-ports-ssl port (default 443), and moving it
-# moves the listener too; a VirtualServer tls.redirect sends no
-# port. For a client-facing port alone, redirect plain HTTP in
-# a VirtualServer route yourself — a route redirect fires for
-# HTTPS too, so match the scheme or it loops:
-#   routes:
-#     - path: /
-#       matches:
-#         - conditions:
-#             - variable: $scheme
-#               value: http
-#           action:
-#             redirect:
-#               url: https://${host}:8443${request_uri}
-#               code: 302
-#       action:
-#         pass: backend</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">HAProxy redirects to <code>ssl-redirect-port</code> (default <code>8443</code>, the port as the client sees it) without moving its listener. An Ingress redirects to the first port in <code>nginx.org/listen-ports-ssl</code> (default 443), and setting that also moves the listener; a VirtualServer <code>tls.redirect</code> sends no port at all. For a client-facing port alone, redirect plain HTTP in a VirtualServer route: match <code>$scheme</code> equal to <code>http</code>, set <code>action.redirect</code> to <code>https://${host}:8443${request_uri}</code> with code <code>302</code>, and <code>pass</code> everything else to the backend. Without the <code>$scheme</code> match, the redirect also fires for HTTPS and loops.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> HAProxy redirects to <code>ssl-redirect-port</code> (default <code>8443</code>, the port as the client sees it) without moving its listener. An Ingress redirects to the first port in <code>nginx.org/listen-ports-ssl</code> (default 443), and setting that also moves the listener; a VirtualServer <code>tls.redirect</code> sends no port at all. For a client-facing port alone, redirect plain HTTP in a route, as above: a route's <code>action.redirect</code> fires for HTTPS requests too, so match <code>$scheme</code> or it loops.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -3795,16 +3770,8 @@ data:
     filter botmgmt profile my-bots
     http-request botmgmt-evaluate profile my-bots
     http-request deny deny_status 403 if { &lt;bot verdict ACL&gt; }</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># F5 DoS for NGINX (NGINX Plus) — behavioral DDoS
-# / automated-traffic protection. Enable per
-# Ingress with:
-#   appprotectdos.f5.com/app-protect-dos-resource:
-#     "default/my-app-dos"
-# backed by a DosProtectedResource CRD (author its spec
-# to match your protected object).</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning"><strong>Different mechanism:</strong> HAProxy Enterprise Bot Management has no Ingress annotation, ConfigMap key or CRD field, so it arrives as raw configuration: the profile section through the mounted <code>haproxy-aux.cfg</code>, the per-frontend lines through <code>frontend-config-snippet</code>. Mount the aux ConfigMap with <code>subPath: haproxy-aux.cfg</code> so it lands as a file rather than a directory. The <code>botmgmt-profile</code> section and <code>botmgmt-evaluate</code> are named in HAProxy Enterprise's release notes; the profile's own fields are portal-documented, so treat the body on the left as a placeholder. F5 DoS for NGINX provides <em>behavioral</em> DDoS and automated-traffic protection, not fingerprint-based bot scoring, and its interactive-challenge (CAPTCHA) counterpart has <strong>no NGINX equivalent</strong> (see the CAPTCHA and Fingerprint rows). F5 WAF for NGINX bot signatures cover a further slice.</div><div class="info-box note">F5 DoS for NGINX is enabled per Ingress with the <code>appprotectdos.f5.com/app-protect-dos-resource</code> annotation (for example <code>"default/my-app-dos"</code>), backed by a <code>DosProtectedResource</code> CRD whose spec you author to match the protected object. It requires <strong>NGINX Plus</strong>.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>Different mechanism:</strong> HAProxy Enterprise Bot Management has no Ingress annotation, ConfigMap key or CRD field, so it arrives as raw configuration: the profile section through the mounted <code>haproxy-aux.cfg</code>, the per-frontend lines through <code>frontend-config-snippet</code>. Mount the aux ConfigMap with <code>subPath: haproxy-aux.cfg</code> so it lands as a file rather than a directory. The <code>botmgmt-profile</code> section and <code>botmgmt-evaluate</code> are named in HAProxy Enterprise's release notes; the profile's own fields are portal-documented, so treat the body above as a placeholder. F5 DoS for NGINX provides <em>behavioral</em> DDoS and automated-traffic protection, not fingerprint-based bot scoring, and its interactive-challenge (CAPTCHA) counterpart has <strong>no NGINX equivalent</strong> (see the CAPTCHA and Fingerprint rows). F5 WAF for NGINX bot signatures cover a further slice.</div>
-                            <div class="info-box note"><strong>Note:</strong> F5 DoS for NGINX is enabled with the <code>appprotectdos.f5.com/app-protect-dos-resource</code> annotation plus a <code>DosProtectedResource</code> CRD, and requires <strong>NGINX Plus</strong>.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Global Profiling Engine</code> (HAProxy Enterprise)</td>
@@ -4058,12 +4025,8 @@ data:
     # keys are documented on the HAProxy customer portal
     captcha my-challenge
       # provider credentials and challenge settings</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX has no CAPTCHA /
-# interactive challenge construct. F5 WAF for
-# NGINX can block or rate-limit automated
-# traffic, but does not serve challenges.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller has no CAPTCHA or JavaScript-challenge construct. F5 WAF for NGINX and F5 DoS for NGINX can detect and block or rate-limit automated traffic, but cannot serve an interactive challenge. On the HAProxy side there is no annotation, ConfigMap key or CRD field either: the <code>captcha</code> section is declared in the mounted <code>haproxy-aux.cfg</code>, and its section name comes from a third-party parser of Enterprise configuration rather than the (portal-only) module reference, so treat the keys as a placeholder.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller has no CAPTCHA or JavaScript-challenge construct. F5 WAF for NGINX and F5 DoS for NGINX can detect and block or rate-limit automated traffic, but cannot serve an interactive challenge. On the HAProxy side there is no annotation, ConfigMap key or CRD field either: the <code>captcha</code> section is declared in the mounted <code>haproxy-aux.cfg</code>, and its section name comes from a third-party parser of Enterprise configuration rather than the (portal-only) module reference, so treat the keys as a placeholder.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>Fingerprint</code> module (HAProxy Enterprise)</td>
@@ -4076,11 +4039,8 @@ data:
 # its section lives in the mounted haproxy-aux.cfg and its per-frontend
 # lines in frontend-config-snippet, exactly like Bot Management above.
 # Directive names are documented on the HAProxy customer portal.</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX Ingress Controller
-# exposes no Ingress-level TLS/JA3 client
-# fingerprinting.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller has no Ingress-level TLS/JA3 client fingerprinting. The HAProxy side has no Ingress construct either (the module's section is declared in the mounted <code>haproxy-aux.cfg</code> and its per-frontend lines arrive through <code>frontend-config-snippet</code>), so there is no annotation, ConfigMap key or CRD field to carry across.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller has no Ingress-level TLS/JA3 client fingerprinting. The HAProxy side has no Ingress construct either (the module's section is declared in the mounted <code>haproxy-aux.cfg</code> and its per-frontend lines arrive through <code>frontend-config-snippet</code>), so there is no annotation, ConfigMap key or CRD field to carry across.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4269,15 +4229,8 @@ metadata:
   name: haproxy-kubernetes-ingress
 data:
   client-strict-sni: "true"  # reject connections with an unknown SNI</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No per-resource toggle — strict SNI is a side effect of NOT deploying a
-# default server certificate. Leave the controller flag unset:
-#   (omit) -default-server-tls-secret=&lt;ns&gt;/&lt;secret&gt;
-# NGINX then answers unknown SNI with ssl_reject_handshake.
-#
-# To serve a fallback certificate instead (client-strict-sni: false), set
-# -default-server-tls-secret to a Secret of type kubernetes.io/tls.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">There is no user-facing strict-SNI toggle in NGINX Ingress Controller: rejecting unknown SNI follows from the <em>absence</em> of a default server certificate, and it is controller-global, not per Ingress. Leave the <code>-default-server-tls-secret</code> controller flag unset, and NGINX answers an unknown SNI with <code>ssl_reject_handshake</code>. To serve a fallback certificate instead (<code>client-strict-sni: false</code>), set <code>-default-server-tls-secret</code> to a Secret of type <code>kubernetes.io/tls</code>.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> There is no user-facing strict-SNI toggle in NGINX Ingress Controller: rejecting unknown SNI follows from the <em>absence</em> of a default server certificate, and it is controller-global (not per-Ingress).</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>proxy-protocol</code></td>
@@ -4382,14 +4335,8 @@ data:
   stats-config-snippet: |
     stats auth admin:password
     stats uri /haproxy-stats</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX Ingress Controller
-# on NGINX Open Source has no stats frontend to
-# inject config into. Scrape Prometheus /metrics
-# instead:
-#   -enable-prometheus-metrics (port 9113) → Grafana
-# The live activity dashboard is an NGINX Plus feature.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller on NGINX Open Source has no stats frontend to inject configuration into, and the HAProxy stats page has no equivalent. Scrape Prometheus <code>/metrics</code> instead (<code>-enable-prometheus-metrics</code>, port 9113) into Grafana; the live activity dashboard is NGINX Plus only. <code>stats auth ...</code> has no equivalent.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller has no stats-frontend snippet context and the HAProxy stats page has no equivalent. Use Prometheus <code>/metrics</code> + Grafana; the live dashboard is NGINX Plus only. <code>stats auth ...</code> has no equivalent.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4540,6 +4487,22 @@ data:
                 <table class="mapping-table" aria-labelledby="global-lifecycle"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
+                            <td><code>clean-certs</code></td>
+                            <td>Not applicable</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-kubernetes-ingress
+  namespace: haproxy-controller
+data:
+  clean-certs: "true"  # ConfigMap-scoped only</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">NGINX Ingress Controller loads certificates from Secrets and manages its own storage, so there are no certificate files to clean up. Remove the key.</div></div>
+                            </div>
+                        </div></td></tr>
+                        <tr class="expandable">
                             <td><code>hard-stop-after</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <code>worker-shutdown-timeout</code></td>
                         </tr>
@@ -4686,11 +4649,8 @@ metadata:
   namespace: haproxy-controller
 data:
   dontlognull: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — generally a no-op. The NGINX HTTP
-# access log records completed requests only, so connection
-# probes without a request are not logged anyway. Remove.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">There is no <code>option dontlognull</code> analogue, but it is generally moot: the NGINX HTTP access log records completed requests only, so connection probes without a request are not logged anyway. Remove the annotation.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> there is no <code>option dontlognull</code> analogue, but it is generally moot: NGINX logs completed requests only. Remove the annotation.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>logasap</code></td>
@@ -4705,11 +4665,8 @@ metadata:
   namespace: haproxy-controller
 data:
   logasap: "true"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX writes the access-log entry
-# when the request completes (long transfers log late).
-# There is no early-log (option logasap) toggle. Remove.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX has no early-log (<code>option logasap</code>) toggle: it writes the access-log entry when the request completes, so a long download appears in the log only once it finishes. Remove the annotation.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX has no early-log (<code>option logasap</code>) toggle: long downloads log at completion. Remove the annotation.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4907,10 +4864,8 @@ metadata:
   namespace: haproxy-controller
 data:
   timeout-client-fin: "10s"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX has no half-closed
-# (FIN_WAIT) client-side connection timeout knob. Remove.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX has no half-closed (FIN_WAIT) client-side connection timeout. Remove the annotation.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX has no half-closed (FIN_WAIT) client-side connection timeout. Remove the annotation.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>timeout-server-fin</code></td>
@@ -4925,10 +4880,8 @@ metadata:
   namespace: haproxy-controller
 data:
   timeout-server-fin: "10s"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX has no half-closed
-# (FIN_WAIT) server-side connection timeout knob. Remove.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX has no half-closed (FIN_WAIT) server-side connection timeout. Remove the annotation.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX has no half-closed (FIN_WAIT) server-side connection timeout. Remove the annotation.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4952,13 +4905,8 @@ metadata:
   name: haproxy-kubernetes-ingress
 data:
   generate-certificates-signer: default/my-ca   # namespace/name; ConfigMap-only</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX Ingress Controller
-# has no on-the-fly per-connection certificate
-# signing. Pre-issue certificates instead
-# (cert-manager provisions real Secrets):
-#   VirtualServer spec.tls.cert-manager.cluster-issuer: &lt;issuer&gt;</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">HAProxy's on-the-fly per-connection certificate signing (new in HAProxy 3.2) has no NGINX Ingress Controller analogue. Pre-issue certificates instead with cert-manager, which provisions real Secrets; name the issuer in a VirtualServer's <code>spec.tls.cert-manager.cluster-issuer</code>.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> HAProxy's on-the-fly per-connection certificate signing has no NGINX Ingress Controller analogue: cert-manager provisions <em>pre-issued</em> Secrets, not a per-connection signer. (New in HAProxy 3.2.)</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>quic-alt-svc-max-age</code></td>
@@ -4972,11 +4920,8 @@ metadata:
   name: haproxy-kubernetes-ingress
 data:
   quic-alt-svc-max-age: "86400"   # ConfigMap-only</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX Ingress Controller
-# has no QUIC / HTTP-3 support. Remove this
-# annotation.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller has no QUIC or HTTP/3 support, so drop the annotation.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> NGINX Ingress Controller has no QUIC or HTTP/3 support, so drop the annotation.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>ssl-certificate</code></td>
@@ -5561,7 +5506,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>forwardfor</code></td>
-                            <td>Not needed, sent automatically</td>
+                            <td>Not needed (default behavior)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -5598,14 +5543,8 @@ metadata:
   name: haproxy-defaults
 spec:                    # v1 wraps under spec.config
   mode: http             # or tcp</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Structural — there is no mode key. The resource kind decides:
-#
-#   mode: http →  Ingress or VirtualServer
-#   mode: tcp  →  TransportServer + a GlobalConfiguration listener
-#
-# See the TCP services rows for the L4 pair.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">There is no <code>mode</code> key: the resource kind decides. <code>mode: http</code> is an Ingress or a VirtualServer; <code>mode: tcp</code> is a TransportServer and a GlobalConfiguration listener (see the <a href="#tcp-services">TCP services</a> rows).</div></div>
                             </div>
-                            <div class="info-box note"><strong>Note:</strong> <code>mode</code> is structural on NGINX Ingress Controller: HTTP traffic uses Ingress/VirtualServer, TCP uses TransportServer. There is no <code>mode</code> key.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>redispatch</code></td>
@@ -6254,19 +6193,8 @@ spec:
   user: haproxy
   group: haproxy
   chroot: /var/empty</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not applicable — nothing to migrate. The
-# NGINX Ingress Controller image already runs
-# NGINX in master/worker mode as an unprivileged
-# user, and neither the ConfigMap nor any flag
-# exposes daemon, pidfile, chroot, user/group,
-# uid/gid, localpeer or default_path.
-#
-# Process identity is a pod concern instead:
-# Deployment spec.template.spec.containers[].securityContext
-#   runAsUser: 101      # nginx
-#   runAsNonRoot: true</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box note">Nothing to migrate: the NGINX Ingress Controller image already runs NGINX in master/worker mode as an unprivileged user, and no ConfigMap key or flag exposes these fields, or <code>uid</code>, <code>gid</code>, <code>localpeer</code> and <code>default_path</code>. Process identity is a pod concern instead, set in the Deployment's <code>spec.template.spec.containers[].securityContext</code> (<code>runAsUser: 101</code>, the <code>nginx</code> user, and <code>runAsNonRoot: true</code>).</div></div>
                             </div>
-                            <div class="info-box note"><strong>Not applicable:</strong> these process-management fields are controller-managed on NGINX Ingress Controller (nothing to migrate), as are <code>uid</code>, <code>gid</code>, <code>localpeer</code>, and <code>default_path</code>.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -6359,15 +6287,8 @@ spec:
       template: "timeout server {{.}}"
       type: duration
       rule: "value > duration('42s') && value <= duration('42m')"</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — NGINX Ingress Controller
-# has a fixed annotation vocabulary and no
-# CEL/template custom-annotation framework.
-# Re-express the intent with native constructs
-# (Policies, VirtualServer fields) or
-# hand-written snippets; the
-# validation/templating layer is lost.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">The <code>ValidationRules</code> CRD (and its <code>--custom-validation-rules</code> / <code>--enable-custom-annotations-on-ingress</code> flags) has no analog: NGINX Ingress Controller has a fixed annotation vocabulary and no CEL or template custom-annotation framework. Re-express the intent with native constructs (Policies, VirtualServer fields) or hand-written snippets; the closest escape hatch is <code>-enable-snippets</code>. The validation and templating layer is lost.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> the <code>ValidationRules</code> CRD (and its <code>--custom-validation-rules</code> / <code>--enable-custom-annotations-on-ingress</code> flags) has no analog; the closest escape hatch is <code>-enable-snippets</code>, not a new annotation vocabulary.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -6599,7 +6520,7 @@ spec:
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Keep <code>warning</code>. The levels NGINX Ingress Controller sets are <code>trace</code>/<code>debug</code>/<code>info</code>/<code>warning</code>/<code>error</code>/<code>fatal</code>: <code>-log-level=warn</code> matches none of them and runs at <code>info</code>. At startup it also prints "Invalid log level: warning … Falling back to default: info", which is wrong: the level stays <code>warning</code>. Controls the controller log, not the data plane; NGINX's own verbosity is the <code>error-log-level</code> ConfigMap key.</div>
                         </div></td></tr>
-                        <tr class="expandable">
+                        <tr class="expandable" id="namespace-whitelist">
                             <td><code>--namespace-whitelist</code></td>
                             <td><span class="badge badge-flag">Controller flag</span> <code>-watch-namespace &lt;a,b&gt;</code><span class="or-text">— or —</span><span class="badge badge-flag">Controller flag</span> <code>-watch-namespace-label</code></td>
                         </tr>
@@ -6666,7 +6587,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--disable-service-external-name</code></td>
-                            <td>Not needed, already the NGINX Open Source default</td>
+                            <td>Not needed (default behavior)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -6729,7 +6650,7 @@ metadata:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--namespace-blacklist</code></td>
-                            <td>No direct equivalent (use <span class="badge badge-flag">Controller flag</span> <code>-watch-namespace</code>)</td>
+                            <td>No direct equivalent (use <span class="badge badge-flag">Controller flag</span> <a href="#namespace-whitelist"><code>-watch-namespace</code></a>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -6752,10 +6673,8 @@ args:
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --cache-resync-period=10m  # HAProxy default</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent — the shared informer resync period is not
-# exposed as a flag. Drop it; there is nothing to carry over.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">The shared informer resync period is not exposed as a flag in NGINX Ingress Controller. Drop it; there is nothing to carry over.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> the informer re-sync period is not tunable in NGINX Ingress Controller.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--channel-size</code></td>
@@ -6765,14 +6684,8 @@ args:
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --channel-size=10000  # bigger buffers for large clusters</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent —
-# NGINX Ingress Controller's internal event
-# buffers are not configurable. Scale with
-# -watch-namespace / -watch-namespace-label to
-# reduce how many objects the controller tracks
-# instead.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller's internal event buffers are not configurable. To reduce how many objects the controller tracks, scope it with <code>-watch-namespace</code> or <code>-watch-namespace-label</code> instead.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> the internal event-buffer size is not exposed.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--configmap-patternfiles</code></td>
@@ -6932,13 +6845,8 @@ spec:
   - --disable-quic
   - --quic-bind-port=8443
   - --quic-announce-port=443</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not applicable — NGINX Ingress Controller
-# has no QUIC or HTTP/3 support, so there
-# is nothing to bind, announce or turn off. Drop
-# all three, and drop any UDP/443 port they
-# needed on the Service.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller has no QUIC or HTTP/3 support, so there is nothing to bind, announce or turn off. Drop all three, and any UDP/443 port they needed on the Service.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>Not applicable:</strong> NGINX Ingress Controller has no QUIC or HTTP/3 support, so there is nothing to enable or disable.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--disable-writing-only-if-reload</code></td>
@@ -6969,18 +6877,12 @@ args:
   - --program=/usr/sbin/haproxy
   - --config-dir=/etc/haproxy
   - --runtime-dir=/var/run/haproxy</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not applicable — NGINX Ingress Controller
-# always runs in-cluster with NGINX in the same
-# pod, so there is no external mode and no binary
-# or path flags. Drop all four. (-proxy runs the
-# controller against a kubectl proxy for local
-# testing only, not in production.)</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller always runs in-cluster, with NGINX in the same pod, so there is no external mode and no binary or path flags; drop all four. <code>-proxy</code> runs the controller against a <code>kubectl proxy</code> for local testing only, not in production.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>Not applicable:</strong> NGINX Ingress Controller runs in-cluster only (NGINX in-pod); there is no external/standalone mode. <code>-proxy</code> (kubectl proxy) is test-only.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--gateway-controller-name</code></td>
-                            <td>No direct equivalent (see NGINX Gateway Fabric)</td>
+                            <td>No direct equivalent (see <a href="index.html#nginx-gateway-fabric">NGINX Gateway Fabric</a>)</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -7008,13 +6910,8 @@ spec:
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --input-file=/tmp/backend-v1.yaml
   - --output-file=/tmp/backend-v3.yaml</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># Not applicable — this pair runs HAProxy's
-# v1-to-v3 CRD converter as a one-shot utility.
-# NGINX Ingress Controller has no conversion
-# tool: the CRD field tables above are the
-# conversion. Drop both flags.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">This pair runs HAProxy's v1-to-v3 CRD converter as a one-shot utility. NGINX Ingress Controller has no conversion tool: the <a href="#crd-mappings">CRD mappings</a> tables are the conversion. Drop both flags.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>Not applicable:</strong> these drive HAProxy's v1→v3 CRD converter utility; there is no equivalent in NGINX Ingress Controller.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--ipv4-bind-address</code> / <code>--ipv6-bind-address</code></td>
@@ -7025,15 +6922,8 @@ spec:
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --ipv4-bind-address=10.0.0.5
   - --ipv6-bind-address=::</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No direct equivalent —
-# NGINX Ingress Controller's listeners always
-# bind every address. Constrain reachability
-# outside the controller instead: a Service
-# (type/ipFamilies/loadBalancerIP), or
-# hostNetwork with a nodeSelector. -disable-ipv6
-# drops the IPv6 side entirely.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">The default HTTP and HTTPS listeners, and every Ingress, bind all addresses (<code>0.0.0.0</code> and IPv6). Constrain reachability outside the controller instead: a Service (<code>type</code>, <code>ipFamilies</code>, <code>loadBalancerIP</code>), or <code>hostNetwork</code> with a <code>nodeSelector</code>. <code>-disable-ipv6</code> drops IPv6 entirely. A GlobalConfiguration listener does take an <code>ipv4</code> and <code>ipv6</code> address, for the VirtualServers and TransportServers that name it.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> the default HTTP and HTTPS listeners, and every Ingress, bind all addresses (<code>0.0.0.0</code> and IPv6); restrict at the Service/host-network level. <code>-disable-ipv6</code> drops IPv6 entirely. A GlobalConfiguration listener does take an <code>ipv4</code> and <code>ipv6</code> address, for the VirtualServers and TransportServers that name it.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--job-check-crd</code></td>
@@ -7043,14 +6933,8 @@ spec:
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --job-check-crd  # adds/updates CRDs, then exits</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># No run-and-exit mode. CRDs are installed before the controller
-# starts, as manifests or by the Helm chart:
-#
-#   kubectl apply -f deploy/crds.yaml
-#
-# See "Installing CRDs" above for the version-pinned command.</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">There is no run-and-exit check mode: CRDs are installed before the controller starts, as manifests (<code>kubectl apply -f deploy/crds.yaml</code>) or by the Helm chart. See <a href="#installation">Installing CRDs</a> for the version-pinned command.</div></div>
                             </div>
-                            <div class="info-box warning"><strong>No direct equivalent:</strong> CRDs are installed via manifests/Helm; there is no run-and-exit check mode.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--pprof</code></td>

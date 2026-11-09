@@ -2432,9 +2432,8 @@ metadata:
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="ingress-configuration"><thead><tr><th scope="col">Ingress-NGINX</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
-                        <tr class="expandable"><td>Several Ingresses on one host</td><td><span class="badge badge-virtualserver">VirtualServer CRD</span> One VirtualServer with every path<span class="or-text">— or —</span>One Ingress with every path</td></tr>
+                        <tr class="expandable" id="several-ingresses-one-host"><td>Several Ingresses on one host</td><td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.routes[]</code><span class="or-text">— or —</span><span class="badge badge-ingress">Ingress</span> <code>spec.rules[].http.paths[]</code></td></tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>One host, one resource:</strong> The community controller served every Ingress that names a host from one server block. NGINX Ingress Controller gives a host to one resource and rejects a second that claims it, so the analyzer merges the Ingresses of a host into one resource. What applies to the whole host (TLS, HTTP/2, server snippets, an <code>ingressMTLS</code> Policy) comes from one Ingress: where two set it differently, the community controller kept the oldest Ingress's, and so does the analyzer. An Ingress that routes several hosts is split into one per host first.</div>
                             <div class="approach-tabs">
                                 <button class="approach-tab active" data-action="switchApproach" data-approach="crd">One VirtualServer</button>
                                 <button class="approach-tab" data-action="switchApproach" data-approach="annotation">One Ingress</button>
@@ -2585,6 +2584,7 @@ spec:
                                 </div>
                                 <div class="info-box warning"><strong>Settings become host-wide:</strong> In one Ingress, only the per-Service annotations (<code>nginx.org/ssl-services</code>, <code>nginx.org/grpc-services</code>, <code>nginx.org/websocket-services</code>, <code>nginx.org/rewrites</code>, <code>nginx.org/sticky-cookie-services</code>) stay with the Service they name. Every other setting covers every path, so the <code>proxy-read-timeout</code> above, set only on <code>api</code>, applies to <code>web</code> too; the community controller scoped it to <code>api</code>'s paths. A <code>rewrite-target</code> or <code>use-regex</code> on one Ingress rewrites or matches the other's paths as well. The analyzer names each setting that changes scope. To keep them per Ingress, use the VirtualServer approach, where each Ingress keeps its own upstreams.</div>
                             </div>
+                            <div class="info-box note"><strong>One host, one resource:</strong> The community controller served every Ingress that names a host from one server block. NGINX Ingress Controller gives a host to one resource and rejects a second that claims it, so the analyzer merges the Ingresses of a host into one resource. What applies to the whole host (TLS, HTTP/2, server snippets, an <code>ingressMTLS</code> Policy) comes from one Ingress: where two set it differently, the community controller kept the oldest Ingress's, and so does the analyzer. An Ingress that routes several hosts is split into one per host first.</div>
                             <div class="info-box tip"><strong>A resource per team:</strong> NGINX Ingress Controller can also delegate a host's paths to VirtualServerRoutes, or to mergeable minion Ingresses under a master, and NGINX Gateway Fabric attaches several HTTPRoutes to one Gateway listener. Each gives a team a resource of its own, and each needs setting up with the result in mind: regex paths in different VirtualServerRoutes, for one, are not tried longest first. The analyzer does not emit them.</div>
                         </div></td></tr>
                     </tbody>
@@ -4085,8 +4085,6 @@ spec:
                             <td><span class="badge badge-virtualserverroute">VirtualServerRoute CRD</span> <code>routes[].route</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box tip"><strong>Tip:</strong> This feature requires CRDs. See <a href="#installation">Installing CRDs</a> for Helm and manifest installation instructions.</div>
-                            <div class="info-box note"><strong>Note:</strong> The community controller has no equivalent for cross-namespace route delegation. VirtualServerRoute allows different teams to manage their own routing rules while a central VirtualServer controls the domain. The analyzer migrates several Ingresses on one host into one VirtualServer instead, which keeps the community routing order; see <a href="#ingress-configuration">Ingress configuration</a>. Since v5.7.0, a VirtualServerRoute may omit <code>spec.host</code> and be referenced by any number of VirtualServers, so paths that several hosts share, migrated from Ingresses that repeated them per host, can be defined once.</div>
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>Ingress-NGINX</h4><pre><code># No equivalent across namespaces: several
 # Ingresses can share a host, but the
@@ -4122,6 +4120,8 @@ spec:
       action:
         pass: api-v1</code></pre></div>
                             </div>
+                            <div class="info-box tip"><strong>Tip:</strong> This feature requires CRDs. See <a href="#installation">Installing CRDs</a> for Helm and manifest installation instructions.</div>
+                            <div class="info-box note"><strong>Note:</strong> The community controller has no equivalent for cross-namespace route delegation. VirtualServerRoute allows different teams to manage their own routing rules while a central VirtualServer controls the domain. The analyzer migrates several Ingresses on one host into one VirtualServer instead, which keeps the community routing order; see <a href="#ingress-configuration">Ingress configuration</a>. Since v5.7.0, a VirtualServerRoute may omit <code>spec.host</code> and be referenced by any number of VirtualServers, so paths that several hosts share, migrated from Ingresses that repeated them per host, can be defined once.</div>
                         </div></td></tr>
                     </tbody>
                 </table>

@@ -271,7 +271,7 @@
 
             // Routing
             { keys: ['annotation:ingress.class'], source: 'ingress.class (deprecated annotation)', nic: 'Ingress spec.ingressClassName (exact match to -ingress-class; the IngressClass must exist)', type: 'annotation', category: 'Routing', anchor: 'routing', section: 'oss', grouped: true, generator: 'ingressClass' },
-            { keys: ['kind:Ingress'], source: 'Ingress spec (pathType / wildcard hosts / defaultBackend)', nic: 'Ingress ports as-is — pathType Prefix boundary and class matching need review (see notes)', type: 'annotation', category: 'Routing', anchor: 'routing', section: 'oss', grouped: true, generator: 'ingressSpec' },
+            { keys: ['kind:Ingress'], source: 'Ingress spec (pathType / wildcard hosts / defaultBackend)', nic: 'Ingress ports as-is — a Prefix path becomes two, the exact path and the path below it; class matching needs review (see notes)', type: 'annotation', category: 'Routing', anchor: 'routing', section: 'oss', grouped: true, generator: 'ingressSpec' },
 
             // Traffic splitting / canary
             { keys: ['annotation:route-acl'], source: 'route-acl (canary / ACL routing)', nic: 'VirtualServer routes[].splits (rand percentages) / matches[].conditions (cookie, header, argument, method)', type: 'virtualserver', category: 'Traffic splitting', anchor: 'traffic-splitting', section: 'oss', grouped: true, generator: 'routeAcl' },
@@ -287,13 +287,13 @@
             { keys: ['configmap:hard-stop-after'], source: 'hard-stop-after', nic: 'ConfigMap worker-shutdown-timeout', type: 'configmap', category: 'Global & lifecycle', anchor: 'global-lifecycle', section: 'configmap', grouped: true, generator: 'controller' },
 
             // HAProxy CRDs
-            { keys: ['annotation:cr-backend'], source: 'cr-backend (CR pointer)', nic: 'Not applicable — NGINX Ingress Controller has no CR indirection; migrate the referenced Backend CR\'s content', type: 'annotation', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', grouped: true, generator: 'crBackendRef' },
-            { keys: ['kind:Global'], source: 'Global CRD', nic: 'NGINX Ingress Controller ConfigMap global keys (worker-*, ssl-*)', type: 'configmap', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', generator: 'controller' },
-            { keys: ['kind:Defaults'], source: 'Defaults CRD', nic: 'NGINX Ingress Controller ConfigMap proxy/keepalive/log keys', type: 'configmap', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', generator: 'controller' },
-            { keys: ['kind:Backend'], source: 'Backend CRD', nic: 'VirtualServer upstreams[] fields / nginx.org/* annotations', type: 'virtualserver', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', generator: 'controller' },
-            { keys: ['kind:Frontend'], source: 'Frontend CRD (v3-only)', nic: 'Split: listener flags/GlobalConfiguration + ConfigMap keys + server-snippets', type: 'globalconfiguration', category: 'CRD overview', anchor: 'crd-overview', section: 'crd', generator: 'controller' },
+            { keys: ['annotation:cr-backend'], source: 'cr-backend', nic: 'VirtualServer upstreams[] fields — the Backend\'s, on each upstream it served', type: 'annotation', category: 'Load balancing', anchor: 'load-balancing', section: 'oss', grouped: true, generator: 'crBackendRef' },
+            { keys: ['kind:Global'], source: 'Global CRD', nic: 'NGINX Ingress Controller ConfigMap global keys (worker-*, ssl-*)', type: 'configmap', category: 'HAProxy Global CRD', anchor: 'crd-global', section: 'crd', generator: 'controller' },
+            { keys: ['kind:Defaults'], source: 'Defaults CRD', nic: 'NGINX Ingress Controller ConfigMap proxy/keepalive/log keys', type: 'configmap', category: 'HAProxy Defaults CRD', anchor: 'crd-defaults', section: 'crd', generator: 'controller' },
+            { keys: ['kind:Backend'], source: 'Backend CRD', nic: 'VirtualServer upstreams[] fields / nginx.org/* annotations', type: 'virtualserver', category: 'HAProxy Backend CRD', anchor: 'crd-backend', section: 'crd', generator: 'controller' },
+            { keys: ['kind:Frontend'], source: 'Frontend CRD (v3-only)', nic: 'Split: listener flags/GlobalConfiguration + ConfigMap keys + server-snippets', type: 'globalconfiguration', category: 'HAProxy Frontend CRD (v3-only)', anchor: 'crd-frontend', section: 'crd', generator: 'controller' },
             { keys: ['kind:TCP'], source: 'TCP CRD', nic: 'GlobalConfiguration TCP listener + TransportServer per entry', type: 'transportserver', category: 'HAProxy TCP CRD', anchor: 'crd-tcp', section: 'crd', generator: 'controller' },
-            { keys: ['configmap:tcp-services'], source: 'tcp-services ConfigMap', nic: 'GlobalConfiguration TCP listener + TransportServer per entry', type: 'transportserver', category: 'TCP services', anchor: 'tcp-services', section: 'oss', generator: 'controller' },
+            { keys: ['configmap:tcp-services'], source: 'tcp-services ConfigMap', nic: 'GlobalConfiguration TCP listener + TransportServer per entry', type: 'transportserver', category: 'TCP services', anchor: 'static-tcp-services', section: 'configmap', generator: 'controller' },
 
             // Enterprise → Plus
             { keys: ['annotation:modsecurity'], source: 'modsecurity (Enterprise WAF)', nic: 'Policy CRD waf (NGINX Plus + F5 WAF for NGINX, via nginx.com/policies)', type: 'policy', category: 'Enterprise features', anchor: 'enterprise', section: 'plus', plusRequired: true, grouped: true, generator: 'modsecurity' }
@@ -2137,12 +2137,46 @@
                 ctx.note('path-rewrite', 'The path-rewrite regex "' + r.re + '" cannot be placed in a VirtualServer route as it is; rewrite it by hand.', 'warning');
                 return null;
             }
-            return [
-                { path: '~ ^' + guard + '.*?' + r.re, rewritePath: r.to, rewritten: true },
-                { path: p.pathType === 'Exact' ? '=' + p.path : p.path, rewritten: false }
-            ];
+            return [{ path: '~ ^' + guard + '.*?' + r.re, rewritePath: r.to, rewritten: true }]
+                .concat(nginxPaths(p).map(function(np) { return { path: (np.exact ? '=' : '') + np.path, rewritten: false, pathComment: np.comment }; }));
         }
         function escapeRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+        const PREFIX_PAIR = 'pathType Prefix';
+        // The NGINX prefixes an Ingress path becomes, as HAProxy matches it
+        // (route.go, v3.2.19): Exact is its exact map; Prefix is /foo exactly
+        // plus /foo/ as a prefix, so /foobar is not matched; ImplementationSpecific
+        // is /foo exactly plus /foo as a prefix, which matches /foobar too. Both
+        // drop a trailing slash first, and "/" is a prefix of everything. NGINX
+        // renders a plain prefix for both Prefix and ImplementationSpecific, on
+        // a VirtualServer route and on an Ingress (generateIngressPath, v5.7.0),
+        // so a Prefix path other than "/" becomes two: =/foo and /foo/.
+        function nginxPaths(p) {
+            if (p.pathType === 'Exact') return [{ path: p.path, exact: true, comment: 'pathType Exact' }];
+            let trimmed = p.path.replace(/\/+$/, '');
+            if (!trimmed) return [{ path: '/', exact: false }];
+            if (p.pathType === 'Prefix') return [{ path: trimmed, exact: true, comment: PREFIX_PAIR }, { path: trimmed + '/', exact: false, comment: PREFIX_PAIR }];
+            return [{ path: trimmed, exact: false }];
+        }
+        // Two Ingress paths can become one NGINX location (Exact /foo beside
+        // Prefix /foo, or Prefix /foo beside /foo/), and both controllers
+        // reject a duplicate. HAProxy answers from its exact map first, then
+        // from the row whose backend sorts first (maps.Compare): keep that one.
+        function onePerLocation(items, keyOf, pathOf, ctx, host, what) {
+            let rank = function(p) { return (p.pathType === 'Exact' ? '0' : '1') + (p.backend ? p.backend.service + ':' + p.backend.port : ''); };
+            let winner = {};
+            items.forEach(function(item) {
+                let k = keyOf(item);
+                if (k && (!winner[k] || rank(pathOf(item)) < rank(pathOf(winner[k])))) winner[k] = item;
+            });
+            return items.filter(function(item) {
+                let k = keyOf(item);
+                if (!k || winner[k] === item) return true;
+                let lost = pathOf(item), kept = pathOf(winner[k]);
+                ctx.note('host', 'The ' + lost.pathType + ' path ' + lost.path + ' and the ' + kept.pathType + ' path ' + kept.path + ' on ' + host + ' both become the NGINX location ' + k + '. HAProxy answered it from the ' + kept.pathType + ' path' + (kept.backend ? ' (Service ' + kept.backend.service + ')' : '') + ', and so does the ' + what + '.', 'warning');
+                return false;
+            });
+        }
 
         // CRD-first: one VirtualServer per host.
         function buildCrd(model, resolved, f, ctx, options) {
@@ -2215,9 +2249,10 @@
                 let rewritten = [];
                 paths.forEach(function(p) {
                     let rws = f.rewrite ? routeRewrite(p, f.rewrite, ctx, paths) : null;
-                    if (!rws) { rewritten.push({ p: p, rw: null }); return; }
-                    rws.forEach(function(rw) { rewritten.push({ p: p, rw: rw.rewritten ? rw : null, plain: rw.rewritten ? null : rw.path }); });
+                    if (!rws) { nginxPaths(p).forEach(function(np) { rewritten.push({ p: p, rw: null, plain: (np.exact ? '=' : '') + np.path, pathComment: np.comment }); }); return; }
+                    rws.forEach(function(rw) { rewritten.push({ p: p, rw: rw.rewritten ? rw : null, plain: rw.rewritten ? null : rw.path, pathComment: rw.pathComment }); });
                 });
+                rewritten = onePerLocation(rewritten, function(item) { return item.plain; }, function(item) { return item.p; }, ctx, h.host, 'route');
                 // NGINX tries regex locations in order and takes the first match,
                 // ahead of any prefix: longest Ingress path first, so "/" does
                 // not take /api's requests.
@@ -2236,8 +2271,9 @@
                     let p = item.p;
                     if (!p.canaryOnly && (!p.backend || p.backend.resource)) { ctx.note('backend', 'Path ' + p.path + ' on ' + h.host + ' has a resource backend, which a VirtualServer cannot route to; it is skipped.', 'warning'); return; }
                     let up = p.canaryOnly ? null : addUpstream(p.backend.service, p.backend.port, 'spec.upstreams.' + upstreams.length + '.port');
-                    let route = { path: item.rw ? item.rw.path : item.plain || (p.pathType === 'Exact' ? '=' + p.path : p.path) };
+                    let route = { path: item.rw ? item.rw.path : item.plain };
                     let ri = routes.length;
+                    if (item.pathComment && !item.rw) c['spec.routes.' + ri + '.path'] = item.pathComment;
                     let action;
                     if (f.redirect) {
                         action = { redirect: { url: f.redirect.url, code: f.redirect.code } };
@@ -2565,6 +2601,7 @@
             // would claim the path a second time, and NGINX refuses a duplicate
             // location. An Ingress cannot split, so the canary leg is dropped.
             let dropped = 0;
+            let pairPaths = [];
             (Array.isArray(spec.rules) ? spec.rules : []).forEach(function(r) {
                 if (!isMap(r) || !isMap(r.http) || !Array.isArray(r.http.paths)) return;
                 r.http.paths = r.http.paths.filter(function(p) {
@@ -2572,7 +2609,21 @@
                     if (b && canaryServices.indexOf(b.service) !== -1) { dropped++; return false; }
                     return true;
                 });
-                r.http.paths.forEach(function(p) { if (isMap(p)) { p.backend = v1Backend(p.backend); if (!p.pathType) p.pathType = 'ImplementationSpecific'; } });
+                let items = [];
+                r.http.paths.forEach(function(p) {
+                    if (!isMap(p)) { items.push({ out: p }); return; }
+                    p.backend = v1Backend(p.backend);
+                    if (!p.pathType) p.pathType = 'ImplementationSpecific';
+                    let src = { path: p.path ? str(p.path) : '/', pathType: str(p.pathType), backend: backendOf(p.backend) };
+                    nginxPaths(src).forEach(function(np) {
+                        let out = np.path === src.path && np.exact === (src.pathType === 'Exact') ? p
+                            : Object.assign({}, p, { path: np.path, pathType: np.exact ? 'Exact' : src.pathType, backend: JSON.parse(JSON.stringify(p.backend)) });
+                        items.push({ out: out, src: src, pair: np.comment === PREFIX_PAIR, key: (out.pathType === 'Exact' ? '=' : '') + out.path });
+                    });
+                });
+                items = onePerLocation(items, function(item) { return item.key; }, function(item) { return item.src; }, ctx, r.host ? str(r.host) : 'the rule with no host', 'migrated Ingress');
+                r.http.paths = items.map(function(item) { return item.out; });
+                items.forEach(function(item, pi) { if (item.pair) pairPaths.push('spec.rules.' + spec.rules.indexOf(r) + '.http.paths.' + pi + '.path'); });
             });
             if (dropped) ctx.note('route-acl', 'The rule for the canary Service ' + canaryServices.join(', ') + ' is left off the migrated Ingress: HAProxy used it only for the route-acl, and an Ingress cannot split traffic, so every request goes to the main backend. CRD-first keeps the split.', 'warning');
             let cls = targetClass(model, options);
@@ -2585,6 +2636,7 @@
             if (Object.keys(spec).length) ing.spec = spec;
             let c = {};
             Object.keys(annComments).forEach(function(k) { if (annComments[k]) c['metadata.annotations.' + k] = annComments[k]; });
+            pairPaths.forEach(function(k) { c[k] = PREFIX_PAIR; });
             docs.push(ing);
             comments.push(c);
             return { docs: docs, comments: comments };
@@ -3452,16 +3504,19 @@
             });
             let claimed = {}, paths = [];
             group.listed.forEach(function(g) {
-                (g.doc.spec.rules[0].http && g.doc.spec.rules[0].http.paths || []).forEach(function(pp) {
-                    let entry = { g: g, p: pp, name: (ns || '') + '_svc_' + (pp.backend && pp.backend.service ? pp.backend.service.name : '') };
-                    let prior = claimed[pp.path];
+                let gc = g.r.out.comments[g.i] || {};
+                (g.doc.spec.rules[0].http && g.doc.spec.rules[0].http.paths || []).forEach(function(pp, pi) {
+                    let entry = { g: g, p: pp, name: (ns || '') + '_svc_' + (pp.backend && pp.backend.service ? pp.backend.service.name : ''), comment: gc['spec.rules.0.http.paths.' + pi + '.path'] };
+                    // NGINX keys a location on its modifier too: = /foo and /foo differ.
+                    let key = (pp.pathType === 'Exact' ? '=' : '') + pp.path;
+                    let prior = claimed[key];
                     if (prior) {
                         let win = hapWinner(prior, entry);
                         note(entry.g, 'Path ' + pp.path + ' on ' + host + ' is routed by ' + prior.g.r.model.name + ' and ' + g.r.model.name + '. HAProxy kept one map row, the backend that sorts first; so does the merged Ingress, keeping ' + win.g.r.model.name + '\'s.');
-                        if (win === entry) { paths[paths.indexOf(prior)] = entry; claimed[pp.path] = entry; }
+                        if (win === entry) { paths[paths.indexOf(prior)] = entry; claimed[key] = entry; }
                         return;
                     }
-                    claimed[pp.path] = entry;
+                    claimed[key] = entry;
                     paths.push(entry);
                 });
             });
@@ -3476,6 +3531,7 @@
             let dflt = group.find(function(g) { return g.doc.spec.defaultBackend; });
             if (dflt) spec.defaultBackend = dflt.doc.spec.defaultBackend;
             spec.rules = [{ host: host, http: { paths: paths.map(function(e) { return e.p; }) } }];
+            paths.forEach(function(e, pi) { if (e.comment) c['spec.rules.0.http.paths.' + pi + '.path'] = e.comment; });
             if (Object.keys(ann).length) merged.metadata.annotations = ann;
             merged.spec = spec;
             c['spec.rules.0.host'] = 'served by ' + group.listed.map(function(g) { return g.r.model.name; }).join(', ') + ', merged';

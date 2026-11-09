@@ -578,7 +578,7 @@ test('HAProxy Ingresses on one host merge into one VirtualServer, each keeping i
     assert.equal(up('api')['read-timeout'], '30s');
     assert.equal(up('web')['read-timeout'], undefined, 'api\'s timeout stays on api\'s upstream');
     const route = (p) => vs.spec.routes.find((x) => x.path === p);
-    assert.ok(route('/api').policies && route('/api').policies.length, 'api\'s access control on its own route');
+    assert.ok(['=/api', '/api/'].every((x) => route(x).policies && route(x).policies.length), 'api\'s access control on its own routes');
     assert.equal(route('/').policies, undefined, 'and not on shop\'s');
     // HAProxy redirected only the Ingress with TLS; one resource redirects every path.
     assert.match(noteText(r), /HAProxy redirected HTTP to HTTPS on the paths of shop only; .*api's included/);
@@ -592,7 +592,9 @@ test('HAProxy Ingresses on one host merge into one NGINX Ingress Controller Ingr
     ), 'annotation');
     const ings = r.docs.filter((d) => d.kind === 'Ingress');
     assert.equal(ings.length, 1);
-    assert.deepEqual(ings[0].spec.rules[0].http.paths.map((p) => p.backend.service.name), ['web', 'api']);
+    // pathType Prefix /api becomes /api exactly and /api/ as a prefix, as HAProxy matches it.
+    assert.deepEqual(ings[0].spec.rules[0].http.paths.map((p) => [p.path, p.pathType, p.backend.service.name]),
+        [['/', 'Prefix', 'web'], ['/api', 'Exact', 'api'], ['/api/', 'Prefix', 'api']]);
     // A per-Service list keeps its Service; an Ingress-wide setting covers every
     // path, where HAProxy applied it to api's own paths.
     assert.equal(ings[0].metadata.annotations['nginx.org/ssl-services'], 'web');
@@ -620,6 +622,24 @@ test('an HAProxy Ingress with several hosts becomes one VirtualServer or Ingress
         assert.deepEqual(routing.map((d) => hostsOf(d)), [['a.example.com'], ['b.example.com']], strategy);
         assert.equal(r.plan.infoNotes.filter((n) => /was split into one per host/.test(n.message)).length, 1, strategy + ': said once');
     }
+});
+
+test('each pathType tab of the reference row matches what the analyzer emits', () => {
+    /* where.py --diff treats a route path as scaffolding, so it passed a Prefix
+       tab whose regex the analyzer never emitted, and an analyzer whose plain
+       /foo also matched /foobar, which HAProxy's Prefix never did (route.go). */
+    const page = fs.readFileSync(path.join(ROOT, 'haproxy-migration.html'), 'utf8');
+    const at = page.indexOf('<td><code>pathType</code>');
+    const row = page.slice(at, page.indexOf('</div></td></tr>', at));
+    const unescape = (t) => t.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    const tabs = [...row.matchAll(/data-approach="([\w-]+)">\s*<div class="comparison">\s*<div class="comparison-block old"><h4>[^<]*<\/h4><pre><code>([\s\S]*?)<\/code>[\s\S]*?comparison-block new"><h4>[^<]*<\/h4><pre><code>([\s\S]*?)<\/code>/g)];
+    assert.deepEqual(tabs.map((t) => t[1]), ['exact', 'prefix', 'implementation-specific']);
+    for (const [, tab, src, want] of tabs) {
+        assert.equal(unescape(want), run(unescape(src), 'crd').text.replace(/^# .*\n/, ''), tab);
+    }
+    // And what each route matches, as HAProxy did: Prefix stops at a segment.
+    const prefix = run(unescape(tabs[1][2]), 'crd').docs.find((d) => d.kind === 'VirtualServer').spec.routes.map((r) => r.path);
+    assert.deepEqual(prefix, ['=/foo', '/foo/']);
 });
 
 test('the reference row for HAProxy Ingresses on one host matches what the analyzer emits', () => {

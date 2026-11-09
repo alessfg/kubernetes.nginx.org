@@ -390,7 +390,7 @@
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-snippets"><span>Re-author <code>*-config-snippet</code> content as NGINX directives (main/http/server/location context) and set <code>-enable-snippets</code> for resource snippets</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="relocate-service-annotations"><span>Relocate Service-scoped annotations to per-Ingress annotations or the ConfigMap (NGINX Ingress Controller has no Service tier)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-timeout-server"><span>Split <code>timeout-server</code> into <strong>both</strong> <code>nginx.org/proxy-read-timeout</code> and <code>nginx.org/proxy-send-timeout</code></span></li>
-                <li role="checkbox" aria-checked="false" tabindex="0" data-id="review-pathtype"><span>Review <code>pathType: Prefix</code> boundary semantics: plain Ingress renders Prefix as a raw prefix (use a VirtualServer regex route to preserve path-segment boundaries)</span></li>
+                <li role="checkbox" aria-checked="false" tabindex="0" data-id="review-pathtype"><span>Check each hand-written <code>pathType: Prefix</code> path: NGINX matches a plain <code>/foo</code> against <code>/foobar</code>, so write it as <code>=/foo</code> plus <code>/foo/</code>, as the analyzer does</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-log-format"><span>Hand-translate <code>log-format</code>/<code>log-format-tcp</code>: HAProxy <code>%</code>-tokens become NGINX <code>$</code>-variables (never copy verbatim)</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="convert-modsecurity"><span>Re-author ModSecurity/CRS rules as an F5 WAF for NGINX <code>waf</code> Policy (NGINX Plus): HAProxy Enterprise WAF rules are not portable</span></li>
                 <li role="checkbox" aria-checked="false" tabindex="0" data-id="rebuild-dashboards"><span>Rebuild Prometheus/Grafana dashboards: NGINX Ingress Controller metric names (<code>nginx_ingress_*</code>) differ from HAProxy's on a dedicated <code>:9113</code> port</span></li>
@@ -2061,6 +2061,57 @@ spec:
                 <table class="mapping-table" aria-labelledby="load-balancing"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
+                            <td><code>haproxy.org/cr-backend</code></td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code> fields</td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="comparison">
+                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    haproxy.org/cr-backend: my-backend
+    haproxy.org/load-balance: roundrobin  # ignored
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-service
+                port:
+                  number: 80
+---
+apiVersion: ingress.v3.haproxy.org/v3
+kind: Backend
+metadata:
+  name: my-backend
+spec:
+  balance:
+    algorithm: leastconn</code></pre></div>
+                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: my-service
+      service: my-service
+      port: 80
+      lb-method: least_conn  # Backend my-backend balance
+  routes:
+    - path: /
+      action:
+        pass: my-service</code></pre></div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> NGINX Ingress Controller has no resource for a pointer to name, so the Backend's fields go on the upstream of each Service it served, and the pointer is dropped. HAProxy ignored every backend annotation where a Backend applied, so <code>load-balance</code> above is left out, and the analyzer says so. A <code>cr-backend</code> in the ConfigMap applied to every backend, so its fields go on every upstream.</div>
+                        </div></td></tr>
+                        <tr class="expandable">
                             <td><code>haproxy.org/load-balance</code></td>
                             <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[].lb-method</code><span class="or-text">— or —</span><code>nginx.org/lb-method</code></td>
                         </tr>
@@ -2849,51 +2900,125 @@ spec:
                             <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].path</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="comparison">
-                                <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="exact">Exact</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="prefix">Prefix</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="implementation-specific">ImplementationSpecific</button>
+                            </div>
+                            <div class="approach-content active" data-approach="exact">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-app
 spec:
+  ingressClassName: haproxy
   rules:
     - host: app.example.com
       http:
         paths:
           - path: /foo
-            pathType: Prefix  # K8s: matches /foo and /foo/* only
+            pathType: Exact  # /foo only
             backend:
               service:
                 name: foo-svc
                 port:
                   number: 80</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code># On a plain Ingress, NGINX Ingress Controller
-# renders Prefix AND ImplementationSpecific as a
-# raw NGINX prefix — /foo also matches /foobar
-# (no segment boundary). To preserve strict
-# Prefix semantics, use a VirtualServer regex
-# route:
-apiVersion: k8s.nginx.org/v1
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: VirtualServer
 metadata:
   name: my-app
 spec:
   host: app.example.com
   upstreams:
-    - name: foo
+    - name: foo-svc
       service: foo-svc
       port: 80
   routes:
-    - path: ~^/foo(/.*)?$  # boundary-preserving regex (Prefix semantics)
+    - path: =/foo  # pathType Exact
       action:
-        pass: foo
-    # Exact → path: =/foo   ImplementationSpecific → path: /foo</code></pre></div>
+        pass: foo-svc</code></pre></div>
+                                </div>
                             </div>
-                            <div class="info-box warning"><strong>Prefix boundary trap:</strong> on a plain Ingress, NGINX Ingress Controller renders <code>Prefix</code> and <code>ImplementationSpecific</code> both as a raw NGINX prefix location <strong>without</strong> the Kubernetes path-segment boundary (<code>/foo</code> also matches <code>/foobar</code>). The boundary-preserving form <code>~^/foo(/.*)?$</code> is available on a VirtualServer route, or on an Ingress with <code>nginx.org/path-regex: case_sensitive</code> and the path <code>/foo(/.*)?$</code> (the annotation applies to every path of that Ingress, so give such paths their own Ingress). <code>Exact</code> renders as <code>=/foo</code> and ports 1:1.</div>
-                            <div class="info-box note"><strong>Note:</strong> NGINX Ingress Controller's regex engine is PCRE while HAProxy's <code>-m reg</code> differs on anchoring/lookaround; verify complex patterns after migrating.</div>
+                            <div class="approach-content" data-approach="prefix">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  ingressClassName: haproxy
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /foo
+            pathType: Prefix  # /foo and below /foo/, not /foobar
+            backend:
+              service:
+                name: foo-svc
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: foo-svc
+      service: foo-svc
+      port: 80
+  routes:
+    - path: =/foo  # pathType Prefix
+      action:
+        pass: foo-svc
+    - path: /foo/  # pathType Prefix
+      action:
+        pass: foo-svc</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="implementation-specific">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  ingressClassName: haproxy
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /foo
+            pathType: ImplementationSpecific  # /foo and /foobar alike
+            backend:
+              service:
+                name: foo-svc
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  host: app.example.com
+  upstreams:
+    - name: foo-svc
+      service: foo-svc
+      port: 80
+  routes:
+    - path: /foo
+      action:
+        pass: foo-svc</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> NGINX matches a plain <code>/foo</code> prefix against <code>/foobar</code>, and HAProxy's <code>Prefix</code> did not, so <code>Prefix</code> becomes two routes, <code>=/foo</code> and <code>/foo/</code>. <code>Exact</code> becomes <code>=/foo</code>, and <code>ImplementationSpecific</code> stays a plain <code>/foo</code> prefix, which HAProxy also matched against <code>/foobar</code>. A trailing slash is dropped first, as HAProxy does. A migrated Ingress gets the same split, an <code>Exact</code> path <code>/foo</code> and a <code>Prefix</code> path <code>/foo/</code>, because NGINX Ingress Controller renders <code>Prefix</code> as a plain prefix too.</div>
+                            <div class="info-box note"><strong>Regex paths:</strong> NGINX Ingress Controller's regex engine is PCRE, and HAProxy's <code>-m reg</code> differs on anchoring and lookaround; verify complex patterns after migrating.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>spec.defaultBackend</code></td>
-                            <td><span class="badge badge-ingress">Ingress</span> <code>spec.defaultBackend</code> (its own hosts only)</td>
+                            <td><span class="badge badge-ingress">Ingress</span> <code>spec.defaultBackend</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -3015,12 +3140,11 @@ spec:
                             </div>
                             <div class="info-box note"><strong>Note:</strong> Leading-label wildcards (<code>*.example.com</code>) port unchanged. NGINX Ingress Controller, like HAProxy, does not support mid-label or bare-suffix wildcards, and <code>spec.host</code> must be single and unique across Ingress and VirtualServer resources.</div>
                         </div></td></tr>
-                        <tr class="expandable">
+                        <tr class="expandable" id="several-ingresses-one-host">
                             <td>Several Ingresses on one host</td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> One VirtualServer with every path<span class="or-text">— or —</span>One Ingress with every path</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>spec.routes[]</code><span class="or-text">— or —</span><span class="badge badge-ingress">Ingress</span> <code>spec.rules[].http.paths[]</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>One host, one resource:</strong> HAProxy serves every Ingress from one frontend, routing by host and path maps, and applies each Ingress's settings to its own paths only. NGINX Ingress Controller gives a host to one resource and rejects a second that claims it, so the analyzer merges the Ingresses of a host into one. A path two Ingresses route goes, as in HAProxy, to the backend whose name sorts first. An Ingress that routes several hosts is split into one per host first.</div>
                             <div class="approach-tabs">
                                 <button class="approach-tab active" data-action="switchApproach" data-approach="crd">One VirtualServer</button>
                                 <button class="approach-tab" data-action="switchApproach" data-approach="annotation">One Ingress</button>
@@ -3093,7 +3217,10 @@ spec:
     - path: /
       action:
         pass: web
-    - path: /api
+    - path: =/api  # pathType Prefix
+      action:
+        pass: api
+    - path: /api/  # pathType Prefix
       action:
         pass: api</code></pre></div>
                                 </div>
@@ -3167,7 +3294,14 @@ spec:
                 name: web
                 port:
                   number: 80
-          - path: /api
+          - path: /api  # pathType Prefix
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080
+          - path: /api/  # pathType Prefix
             pathType: Prefix
             backend:
               service:
@@ -3177,6 +3311,7 @@ spec:
                                 </div>
                                 <div class="info-box warning"><strong>Settings become host-wide:</strong> In one Ingress, only the per-Service annotations (<code>nginx.org/ssl-services</code>, <code>nginx.org/grpc-services</code>, <code>nginx.org/websocket-services</code>, <code>nginx.org/rewrites</code>, <code>nginx.org/sticky-cookie-services</code>) stay with the Service they name. Every other setting covers every path, so the <code>timeout-server</code> above, set only on <code>api</code>, applies to <code>web</code> too, where HAProxy kept it to <code>api</code>'s paths. The analyzer names each setting that changes scope. To keep them per Ingress, use the VirtualServer approach, where each Ingress keeps its own upstreams.</div>
                             </div>
+                            <div class="info-box note"><strong>One host, one resource:</strong> HAProxy serves every Ingress from one frontend, routing by host and path maps, and applies each Ingress's settings to its own paths only. NGINX Ingress Controller gives a host to one resource and rejects a second that claims it, so the analyzer merges the Ingresses of a host into one. A path two Ingresses route goes, as in HAProxy, to the backend whose name sorts first. An Ingress that routes several hosts is split into one per host first.</div>
                             <div class="info-box tip"><strong>A resource per team:</strong> NGINX Ingress Controller can also delegate a host's paths to VirtualServerRoutes, or to mergeable minion Ingresses under a master, and NGINX Gateway Fabric attaches several HTTPRoutes to one Gateway listener. Each gives a team a resource of its own, and each needs setting up with the result in mind. The analyzer does not emit them.</div>
                         </div></td></tr>
                     </tbody>
@@ -3741,7 +3876,7 @@ spec:
                 <table class="mapping-table" aria-labelledby="enterprise"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td><code>Bot Management</code> (HAProxy Enterprise)</td>
+                            <td><code>Bot Management</code></td>
                             <td><span class="badge badge-plus">NGINX Plus</span> F5 DoS for NGINX <code>app-protect-dos-resource</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3774,7 +3909,7 @@ data:
                             </div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>Global Profiling Engine</code> (HAProxy Enterprise)</td>
+                            <td><code>Global Profiling Engine</code></td>
                             <td><span class="badge badge-configmap">ConfigMap</span> <span class="badge badge-plus">NGINX Plus</span> <code>zone-sync</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3816,7 +3951,7 @@ data:
                             <div class="info-box note"><strong>Closest analogue:</strong> NGINX Plus <strong>zone synchronization</strong> (the <code>zone-sync</code> ConfigMap keys) shares the rate-limit and key-value zones NGINX Ingress Controller generates across controller pods (built into the Plus data plane with no extra component). It has <strong>no</strong> equivalent for GPE's threat-scoring or bot-metrics collection (a scope mismatch). TLS-protected zone sync is only possible via the <code>stream-snippets</code> ConfigMap key.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>Global Rate Limiting</code> (HAProxy Enterprise, via GPE)</td>
+                            <td><code>Global Rate Limiting</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>rateLimit</code> + <span class="badge badge-configmap">ConfigMap</span> <code>zone-sync</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3863,7 +3998,7 @@ data:
                             <div class="info-box note"><strong>Note:</strong> Cross-replica aggregation requires the <strong>NGINX Plus</strong> <code>zone-sync</code> ConfigMap keys (<code>zone-sync</code>, <code>zone-sync-port</code> default <code>12345</code>, <code>zone-sync-resolver-addresses</code>, <code>zone-sync-resolver-valid</code>, <code>zone-sync-resolver-ipv6</code>): <strong>keys, not CLI flags</strong>. On NGINX Open Source each pod limits independently, as HAProxy's pods did; the Policy's <code>scale: true</code> or <code>nginx.org/limit-req-scale: "true"</code> divides the rate by the replica count to approximate one cluster-wide limit. The <code>rateLimit</code> Policy is not Ingress-attachable; on plain Ingress use <code>nginx.org/limit-req-*</code>. The <code>key</code> accepts <code>${binary_remote_addr}</code>, <code>${request_uri}</code>, <code>${uri}</code>, <code>${args}</code>, <code>${request_method}</code> and <code>arg_</code> / <code>cookie_</code> / <code>http_</code> / <code>jwt_claim_</code> / <code>apikey_</code>-prefixed variables; <code>${host}</code> is not allowed. See <a href="#rate-limiting">Rate limiting</a> for the single-pod mapping. The <code>mypeers/request_rates</code> tables the HAProxy rules read are declared in the aux config file (see the <a href="#enterprise">Global Profiling Engine</a> row above).</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>Intelligent WAF</code> (HAProxy Enterprise)</td>
+                            <td><code>Intelligent WAF</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>waf</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3904,7 +4039,7 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> There is no configuration to import: it is a different engine, so re-author and re-tune the policy against F5 WAF for NGINX (see the <code>modsecurity</code> row). No dedicated HAProxy Ingress annotation was located, so this collapses into the same <code>waf</code> Policy mapping. Requires <strong>NGINX Plus</strong>.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>haproxy.org/modsecurity</code><br><code>modsecurity</code> ConfigMap key (HAProxy Enterprise)</td>
+                            <td><code>haproxy.org/modsecurity</code><br><span class="badge badge-configmap">ConfigMap</span> <code>modsecurity</code></td>
                             <td><span class="badge badge-policy">Policy CRD</span> <span class="badge badge-plus">NGINX Plus</span> <code>waf</code> via <code>nginx.com/policies</code> <span class="badge badge-new">New v5.5.0</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -3942,7 +4077,7 @@ spec:
                             <div class="info-box note"><strong>Note:</strong> Attach the <code>waf</code> Policy via <code>nginx.com/policies</code> on an Ingress, or from VirtualServer / VirtualServerRoute <code>spec.policies</code>; it is <strong>rejected</strong> on <code>nginx.org/policies</code>. <code>apPolicy</code>, <code>apBundle</code> and <code>apBundleSource</code> <span class="badge badge-new">New v5.6.0</span> are mutually exclusive (set at most one); <code>apLogConf</code> pairs only with <code>apPolicy</code>, and <code>apLogBundle</code> or <code>apLogBundleSource</code> only with a bundle. There is <strong>no <code>securityLogBundle</code> field</strong>. NGINX Ingress Controller has no cluster-wide <code>modsecurity</code> toggle; attach the Policy per Ingress or VirtualServer. You can also enable F5 WAF for NGINX directly with the <code>appprotect.f5.com/</code> annotations (<code>app-protect-enable</code>, <code>app-protect-policy</code>, <code>app-protect-security-log-enable</code>, <code>app-protect-security-log</code>, <code>app-protect-security-log-destination</code>).</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>UDP</code> module (HAProxy Enterprise)</td>
+                            <td><code>UDP</code> module</td>
                             <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>protocol: UDP</code> + <span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4008,7 +4143,7 @@ spec:
                             <div class="info-box note"><strong>No NGINX Plus needed:</strong> UDP load balancing is the one enterprise-labeled HAProxy module NGINX Ingress Controller covers on <strong>NGINX Open Source</strong>. Neither side uses a host. Requires the controller to run with <code>-global-configuration</code> and custom resources enabled. Active UDP health checks are NGINX Plus; passive checks work on NGINX Open Source.</div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>CAPTCHA</code> module (HAProxy Enterprise)</td>
+                            <td><code>CAPTCHA</code> module</td>
                             <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4029,7 +4164,7 @@ data:
                             </div>
                         </div></td></tr>
                         <tr class="expandable">
-                            <td><code>Fingerprint</code> module (HAProxy Enterprise)</td>
+                            <td><code>Fingerprint</code> module</td>
                             <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4680,7 +4815,7 @@ data:
                 <table class="mapping-table" aria-labelledby="static-tcp-services"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
                     <tbody>
                         <tr class="expandable">
-                            <td>TCP bind SSL offloading (<code>:ssl</code> / <code>ssl_certificate</code>)</td>
+                            <td><code>tcp-services</code> entry with <code>:ssl</code></td>
                             <td><span class="badge badge-transportserver">TransportServer CRD</span> <code>spec.tls.secret</code></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
@@ -4691,7 +4826,7 @@ metadata:
   name: tcp-services
   namespace: haproxy-controller
 data:
-  "6379": default/redis:6379:ssl  # hostless SSL offload</code></pre></div>
+  "6379": default/redis:6379:ssl  # TLS ends at the controller</code></pre></div>
                                 <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
 kind: GlobalConfiguration
 metadata:
@@ -4721,7 +4856,7 @@ spec:
   action:
     pass: backend</code></pre></div>
                             </div>
-                            <div class="info-box warning"><strong>Partial:</strong> NGINX Ingress Controller terminates TLS over TCP from <code>spec.tls.secret</code> alone: <code>spec.host</code> is <strong>not</strong> required, so HAProxy's hostless SSL offload <em>is</em> reproducible (add an SNI <code>spec.host</code> only to differentiate multiple TransportServers on one listener). Filesystem-path certificates have no equivalent (Secrets only). This is termination, not passthrough (see <code>ssl-passthrough</code>).</div>
+                            <div class="info-box note"><strong>Note:</strong> HAProxy ended TLS on the port with the certificates it already loaded for its HTTPS frontend. A TransportServer ends it with the <code>kubernetes.io/tls</code> Secret in <code>spec.tls.secret</code>, in its own namespace, and needs no <code>spec.host</code>; add one only to tell apart several TransportServers on one listener. This ends TLS at the controller; to pass it through to the backend, see <code>ssl-passthrough</code>.</div>
                         </div></td></tr>
                     </tbody>
                 </table>
@@ -4977,7 +5112,15 @@ data:
 
         <section id="crd-mappings">
             <h2>CRD mappings</h2>
-            <p>HAProxy's Global, Defaults, Backend and Frontend CRD fields map to NGINX Ingress Controller <code>nginx-config</code> ConfigMap keys, the GlobalConfiguration CRD, or per-application VirtualServer fields.</p>
+            <p>NGINX Ingress Controller has no resource for a <code>cr-*</code> pointer to name, so drop the pointer and migrate the CR it names. Current CRs use <code>ingress.v3.haproxy.org/v3</code>; the older <code>ingress.v1.haproxy.org/v1</code> group is superseded, and v3.2.19 still serves it and the analyzer still reads it, but write no new ones. Each CR lands in a different place, and the tables below map its fields one by one:</p>
+            <ul class="doc-list">
+                <li><a href="#crd-backend">Backend</a>: VirtualServer <code>upstreams[]</code> fields, or the matching <code>nginx.org/*</code> annotations. A TCP-mode Backend becomes a TransportServer upstream.</li>
+                <li><a href="#crd-defaults">Defaults</a>: <code>nginx-config</code> ConfigMap keys for timeouts, logging and connections.</li>
+                <li><a href="#crd-frontend">Frontend</a> (v3 only): GlobalConfiguration listeners and controller flags for its binds, ConfigMap keys for protocol and TLS defaults, and <code>server-snippets</code> for raw directives.</li>
+                <li><a href="#crd-global">Global</a>: <code>nginx-config</code> ConfigMap keys for the process and TLS (<code>worker-processes</code>, <code>ssl-protocols</code>).</li>
+                <li><a href="#crd-tcp">TCP</a>: a GlobalConfiguration listener per port and a TransportServer per entry.</li>
+                <li><a href="#crd-validationrules">ValidationRules</a>: no direct equivalent, since NGINX Ingress Controller cannot define new annotations.</li>
+            </ul>
 
             <div class="controls">
                 <input type="search" id="searchInputCrd" placeholder="Search CRD fields..." data-filter-source="crd" aria-label="Search CRD fields">
@@ -4989,69 +5132,10 @@ data:
                 <button class="btn btn-secondary" data-action="collapseAllExamples">Collapse All</button>
             </div>
 
-            <!-- CRD overview -->
-            <h3 id="crd-overview">CRD overview</h3>
-            <div class="info-box note"><strong>Write v3:</strong> current CRs use <code>ingress.v3.haproxy.org/v3</code> (Global, Defaults, Backend, TCP, plus Frontend and ValidationRules). The older <code>ingress.v1.haproxy.org/v1</code> group is superseded: v3.2.19 still serves it and this tool still reads it, but write no new ones. Both fold into NGINX Ingress Controller's global <code>nginx-config</code> ConfigMap, per-app VirtualServer fields, or the GlobalConfiguration CRD. Each row below names where that CR lands; the per-field tables that follow give every field, and the analyzer emits complete YAML for a pasted CR.</div>
-            <div class="table-wrapper">
-                <table class="mapping-table" aria-labelledby="crd-overview"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
-                    <tbody>
-                        <tr class="expandable">
-                            <td><code>Backend</code></td>
-                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>upstreams[]</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> Per-backend settings (load balancing, timeouts, health checks, cookie persistence, backend TLS) become VirtualServer <code>upstreams[]</code> fields or the matching <code>nginx.org/*</code> annotations. TCP-mode Backends convert to a TransportServer instead. See the <a href="#crd-backend">HAProxy Backend CRD</a> field-mapping table for the full breakdown.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>cr-backend</code> (CR pointer)</td>
-                            <td>Not applicable (migrate the CR's content)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> NGINX Ingress Controller has no CR-reference indirection; drop the <code>cr-backend</code> annotation (and the <code>cr-global</code>/<code>cr-defaults</code>/<code>cr-frontend-*</code> ConfigMap pointer keys) and migrate the referenced CR's <em>content</em> instead. If the pointer was ConfigMap-scoped, replicate the settings per application.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>Defaults</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> proxy / keepalive / log keys</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> Cluster-wide defaults (timeouts, logging, connection handling) fold into the global <code>nginx-config</code> ConfigMap. See the <a href="#crd-defaults">HAProxy Defaults CRD</a> field-mapping table.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>Frontend</code><br>(v3-only)</td>
-                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> listeners + <span class="badge badge-configmap">ConfigMap</span> keys + <code>server-snippets</code></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> There is no single NGINX Ingress Controller analogue: listener binds map to GlobalConfiguration listeners and controller flags, protocol/TLS defaults to ConfigMap keys, and any raw directives to <code>server-snippets</code>. See the <a href="#crd-frontend">HAProxy Frontend CRD</a> field-mapping table.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>Global</code></td>
-                            <td><span class="badge badge-configmap">ConfigMap</span> global keys (<code>worker-*</code>, <code>ssl-*</code>)</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> Process- and TLS-level settings become global <code>nginx-config</code> ConfigMap keys (<code>worker-processes</code>, <code>worker-connections</code>, <code>ssl-protocols</code>, and related). See the <a href="#crd-global">HAProxy Global CRD</a> field-mapping table.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>TCP</code></td>
-                            <td><span class="badge badge-globalconfiguration">GlobalConfiguration CRD</span> listener + <span class="badge badge-transportserver">TransportServer CRD</span></td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> One GlobalConfiguration listener per port plus one TransportServer per entry. L4 ACLs and content switching do not port. See the <a href="#crd-tcp">HAProxy TCP CRD</a> field-mapping table.</div>
-                        </div></td></tr>
-                        <tr class="expandable">
-                            <td><code>ValidationRules</code></td>
-                            <td>No direct equivalent</td>
-                        </tr>
-                        <tr class="example-row"><td colspan="2"><div class="example-content">
-                            <div class="info-box note"><strong>Note:</strong> Custom annotation vocabularies have no NGINX Ingress Controller analogue; re-express the intent natively or fall back to snippets. See the <a href="#crd-validationrules">HAProxy ValidationRules CRD</a> field-mapping table.</div>
-                        </div></td></tr>
-                    </tbody>
-                </table>
-            </div>
-
                         <!-- HAProxy Backend CRD -->
             <h3 id="crd-backend">HAProxy Backend CRD</h3>
-            <div class="info-box warning"><strong>CR xor annotations:</strong> mirror HAProxy's no-mixing rule: a migrated backend uses VirtualServer <code>upstreams[]</code> fields <strong>or</strong> <code>nginx.org/*</code> annotations, not both. Drop the <code>cr-backend</code> annotation/pointer; if it was ConfigMap-scoped, replicate the settings per application.</div>
             <div class="info-box note"><strong>Field paths below are v3:</strong> v3 inlines under <code>spec</code>; on the superseded v1 group they sit under <code>spec.config</code>, with <code>spec.acls</code> and <code>spec.http-requests</code> alongside. TCP-mode Backends migrate to a TransportServer (see <a href="#tcp-services">TCP services</a>).</div>
+            <div class="info-box note"><strong>Elsewhere:</strong> the <code>haproxy.org/cr-backend</code> annotation that names a Backend is mapped under <a href="#load-balancing">Load balancing</a>.</div>
             <div class="info-box note"><strong>Elsewhere:</strong> <code>adv_check</code>, <code>httpchk_params</code> and <code>default_server.check</code>/<code>inter</code>/<code>rise</code>/<code>fall</code> are mapped under <a href="#active-health-checks">Active health checks</a>: active probes require NGINX Plus.</div>
             <div class="table-wrapper">
                 <table class="mapping-table" aria-labelledby="crd-backend"><thead><tr><th scope="col">HAProxy Kubernetes Ingress Controller</th><th scope="col">NGINX Ingress Controller</th></tr></thead>
@@ -5533,7 +5617,7 @@ data:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>mode</code></td>
-                            <td>Structural, no ConfigMap key</td>
+                            <td><code>http</code>: <span class="badge badge-virtualserver">VirtualServer CRD</span><br><code>tcp</code>: <span class="badge badge-transportserver">TransportServer CRD</span></td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -6287,7 +6371,7 @@ spec:
       template: "timeout server {{.}}"
       type: duration
       rule: "value > duration('42s') && value <= duration('42m')"</code></pre></div>
-                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">The <code>ValidationRules</code> CRD (and its <code>--custom-validation-rules</code> / <code>--enable-custom-annotations-on-ingress</code> flags) has no analog: NGINX Ingress Controller has a fixed annotation vocabulary and no CEL or template custom-annotation framework. Re-express the intent with native constructs (Policies, VirtualServer fields) or hand-written snippets; the closest escape hatch is <code>-enable-snippets</code>. The validation and templating layer is lost.</div></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">The <code>ValidationRules</code> CRD (and its <code>--custom-validation-rules</code> / <code>--enable-custom-annotations-on-ingress</code> flags) has no analog: NGINX Ingress Controller has a fixed annotation vocabulary and no CEL or template custom-annotation framework. Migrate what each custom annotation set to the annotation, VirtualServer field or Policy that covers it. The validation and templating layer is lost.</div></div>
                             </div>
                         </div></td></tr>
                     </tbody>
@@ -6626,27 +6710,14 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--enable-custom-annotations-on-ingress</code></td>
-                            <td><span class="badge badge-flag">Controller flag</span> <code>-enable-snippets</code> (closest)</td>
+                            <td>No direct equivalent</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
                                 <div class="comparison-block old"><h4>HAProxy Kubernetes Ingress Controller</h4><pre><code>args:
   - --enable-custom-annotations-on-ingress</code></pre></div>
-                                <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>args:
-  # The closest thing NGINX Ingress Controller
-  # has
-  - -enable-snippets
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: my-app
-  annotations:
-    # a fixed key that takes raw nginx — not a custom annotation
-    nginx.org/location-snippets: |
-      add_header X-Env prod;</code></pre></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">The flag turns on the custom annotations a <a href="#crd-validationrules">ValidationRules</a> CR defines, which render into HAProxy configuration. NGINX Ingress Controller reads a fixed set of annotations and has no way to define new ones, so drop the flag and migrate what each custom annotation set: most settings have an annotation, a VirtualServer field or a Policy of their own in the tables above.</div></div>
                             </div>
-                            <div class="info-box note"><strong>Partial:</strong> not like-for-like. NGINX Ingress Controller has a fixed annotation vocabulary and no custom-annotation framework. Snippets (fixed keys) are the escape hatch; resource snippets are gated, ConfigMap snippets always on.</div>
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--namespace-blacklist</code></td>
@@ -6837,7 +6908,7 @@ spec:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--disable-quic</code> / <code>--quic-announce-port</code> / <code>--quic-bind-port</code></td>
-                            <td>Not applicable</td>
+                            <td>Not supported</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -6868,7 +6939,7 @@ args:
                         </div></td></tr>
                         <tr class="expandable">
                             <td><code>--external</code> / <code>--program</code> / <code>--config-dir</code> / <code>--runtime-dir</code></td>
-                            <td>Not applicable</td>
+                            <td>Not supported</td>
                         </tr>
                         <tr class="example-row"><td colspan="2"><div class="example-content">
                             <div class="comparison">
@@ -6877,7 +6948,7 @@ args:
   - --program=/usr/sbin/haproxy
   - --config-dir=/etc/haproxy
   - --runtime-dir=/var/run/haproxy</code></pre></div>
-                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller always runs in-cluster, with NGINX in the same pod, so there is no external mode and no binary or path flags; drop all four. <code>-proxy</code> runs the controller against a <code>kubectl proxy</code> for local testing only, not in production.</div></div>
+                                <div class="comparison-block new answer-only"><h4>NGINX Ingress Controller</h4><div class="info-box warning">NGINX Ingress Controller always runs in-cluster, with NGINX in the same pod, and has no external mode. <code>--program</code>, <code>--config-dir</code> and <code>--runtime-dir</code> work only in that mode, so drop all four. <code>-proxy</code> runs the controller against a <code>kubectl proxy</code> for local testing only, not in production.</div></div>
                             </div>
                         </div></td></tr>
                         <tr class="expandable">

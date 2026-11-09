@@ -151,7 +151,7 @@ for (const p of PAGES) {
     // tabs. Naming an alternative and then showing one form is the drift this
     // catches: ingress-nginx has 42 such cells and 42 tabbed panels.
     test(`${p.name}: every alternative offered in a cell has an example`, () => {
-        const rows = [...page.matchAll(/<tr class="expandable">\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)];
+        const rows = [...page.matchAll(/<tr class="expandable"(?: id="[\w-]+")?>\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)];
         const unbacked = [];
         for (const [, head, panel] of rows) {
             const cells = [...head.matchAll(/<td>([\s\S]*?)<\/td>/g)].map((m) => m[1]);
@@ -277,7 +277,7 @@ for (const p of PAGES) {
         const LINE = /^\s*(?:-\s*)?([\w.\-/]+):(\s*)(\S.*?)(?:\s\s#\s*(.*))?$/;
         const drift = [];
         const rows = page.matchAll(
-            /<tr class="expandable">\s*[\s\S]*?\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g);
+            /<tr class="expandable"(?: id="[\w-]+")?>\s*[\s\S]*?\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g);
         for (const row of rows) {
             const blocks = [...row[1].matchAll(
                 /<div class="comparison-block new"><h4>[\s\S]*?<\/h4><pre><code>([\s\S]*?)<\/code><\/pre><\/div>/g)];
@@ -314,7 +314,7 @@ for (const p of PAGES) {
     // reader an Ingress annotation exists where only a ConfigMap key does.
     test(`${p.name}: every mapping row sits in the section its surface implies`, () => {
         const rows = [...page.matchAll(
-            /<section id="([\w-]+)"|<tr class="expandable">\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)];
+            /<section id="([\w-]+)"|<tr class="expandable"(?: id="[\w-]+")?>\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)];
         const strip = (s) => s.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
         const REFERENCE = new Set(['mappings', 'plus-mappings', 'configmap-mappings',
             'crd-mappings', 'flag-mappings']);
@@ -402,6 +402,17 @@ for (const p of PAGES) {
         assert.deepEqual(repeats, []);
     });
 
+    // A panel opens on its code: tabs or the comparison first, then the notes.
+    // Ten panels opened on a paragraph, eight of them in a CRD overview table
+    // that had no code at all; a reader expanding a row expects the example.
+    test(`${p.name}: every expanded panel opens on its code`, () => {
+        const prose = [];
+        for (const m of page.matchAll(/<div class="example-content">\s*<div class="info-box/g)) {
+            prose.push(page.slice(0, m.index).split('\n').length);
+        }
+        assert.deepEqual(prose, [], 'lines where a panel opens on a note');
+    });
+
     test(`${p.name}: page loads the three scripts in source-before-core order`, () => {
         const scripts = [...page.matchAll(/<script[^>]+src="(assets\/js\/[\w.-]+\.js)"/g)].map((m) => m[1]);
         assert.deepEqual(scripts, ['assets/js/shared.js', p.module, 'assets/js/migration-core.js']);
@@ -425,7 +436,7 @@ for (const p of PAGES) {
         const wrong = [];
         const seen = new Set();
         for (const m of page.matchAll(
-                /<tr class="expandable">\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)) {
+                /<tr class="expandable"(?: id="[\w-]+")?>\s*([\s\S]*?)\s*<\/tr>\s*<tr class="example-row">([\s\S]*?)<\/tr>/g)) {
             const tabs = [...m[2].matchAll(
                 /class="approach-tab( active)?" data-action="switchApproach" data-approach="([\w-]+)"/g)];
             const kinds = tabs.map((t) => t[2]);

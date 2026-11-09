@@ -63,6 +63,23 @@ test('no view is revealed by find-in-page: no hidden="until-found", no beforemat
     assert.deepEqual(found, []);
 });
 
+// NGINX is a name, so it is written in capitals wherever a reader meets it as
+// a word (AGENTS.md). Lowercase nginx is right only as code: a directive, a
+// path, `ingressClassName: nginx`. Seven "verified on nginx 1.31.7" and
+// "nginx has no ..." sentences sat on the pages until a reader spotted one.
+test('page prose writes NGINX in capitals; lowercase nginx is only code', () => {
+    const found = [];
+    for (const f of allPages) {
+        const prose = read(f)
+            .replace(/<!--[\s\S]*?-->|<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<pre\b[\s\S]*?<\/pre>|<code>[\s\S]*?<\/code>/g, ' ')
+            .replace(/<[^>]+>/g, ' ');
+        for (const m of prose.matchAll(/(?<![\w./`'"-])nginx(?![\w./`'"-])/g)) {
+            found.push(f + ': ' + prose.slice(Math.max(0, m.index - 40), m.index + 30).replace(/\s+/g, ' ').trim());
+        }
+    }
+    assert.deepEqual(found, []);
+});
+
 // data-action values the engine dispatches.
 const actionsBlock = core.match(/let ACTIONS = \{([\s\S]*?)\n {12}\};/);
 const engineActions = new Set([...actionsBlock[1].matchAll(/(\w+):\s*function/g)].map((m) => m[1]));

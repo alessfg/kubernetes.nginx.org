@@ -159,7 +159,26 @@ test('haproxy: hard no-equivalents surface as unsupported cards, not silently dr
     ].join('\n');
     const { plan } = analyze(source, yaml, 'crd');
     assert.ok(plan.unsupported, 'expected unsupported section');
-    assert.equal(plan.unsupported.cards.length, 3);
+    assert.equal(plan.unsupported.cards.length, 2);
+});
+
+test('haproxy: rate-limit-whitelist reaches the rate-limit translator, which says how to exempt the addresses', () => {
+    /* It had a mapping of its own, typed unsupported, so the rateLimit
+       translator never saw it: its notes (the geo map workaround, an
+       invalid address, no rate-limit-requests to exempt from) could not
+       fire, and a reader got only the generic card. */
+    const { source } = loadAnalyzer('assets/js/migration-haproxy.js');
+    const ing = (ann) => ['apiVersion: networking.k8s.io/v1', 'kind: Ingress', 'metadata:', '  name: rl', '  annotations:',
+        ...ann.map((a) => '    ' + a), 'spec:', '  rules:', '    - host: rl.example.com'].join('\n');
+    for (const strategy of ['crd', 'annotation']) {
+        const text = (y) => JSON.stringify(analyze(source, y, strategy).plan);
+        assert.match(text(ing(['haproxy.org/rate-limit-requests: "10"', 'haproxy.org/rate-limit-whitelist: "10.0.0.0/8"'])),
+            /no rate-limit exemption list\. To keep 10\.0\.0\.0\/8 unlimited, key the limit on a geo map/, strategy);
+        assert.match(text(ing(['haproxy.org/rate-limit-requests: "10"', 'haproxy.org/rate-limit-whitelist: "office"'])),
+            /rate-limit-whitelist holds \\"office\\", which is not an IP address or CIDR/, strategy);
+        assert.match(text(ing(['haproxy.org/rate-limit-whitelist: "10.0.0.0/8"'])),
+            /so rate-limit-whitelist was inactive/, strategy);
+    }
 });
 
 test('haproxy: what a reader sees names each product in full', () => {

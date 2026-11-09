@@ -221,8 +221,7 @@
             { keys: ['annotation:cookie-persistence', 'annotation:cookie-persistence-no-dynamic'], source: 'cookie-persistence / cookie-persistence-no-dynamic', nic: 'VirtualServer upstreams[].sessionCookie — or — nginx.org/sticky-cookie-services', type: 'virtualserver', dualApproach: true, category: 'Session persistence', anchor: 'session-persistence', section: 'oss', grouped: true, generator: 'cookiePersistence' },
 
             // Rate limiting
-            { keys: ['annotation:rate-limit-requests', 'annotation:rate-limit-period', 'annotation:rate-limit-size', 'annotation:rate-limit-status-code'], source: 'rate-limit-*', nic: 'Policy CRD rateLimit — or — nginx.org/limit-req-* annotations (Ingress)', type: 'policy', category: 'Rate limiting', anchor: 'rate-limiting', section: 'oss', grouped: true, dualApproach: true, generator: 'rateLimit' },
-            { keys: ['annotation:rate-limit-whitelist'], source: 'rate-limit-whitelist', nic: 'No direct equivalent — rateLimit Policy and nginx.org/limit-req-* have no exclusion field; last-resort geo/map snippet blanking the limit key', type: 'unsupported', category: 'Rate limiting', anchor: 'rate-limiting', section: 'oss', grouped: true },
+            { keys: ['annotation:rate-limit-requests', 'annotation:rate-limit-period', 'annotation:rate-limit-size', 'annotation:rate-limit-status-code', 'annotation:rate-limit-whitelist'], source: 'rate-limit-*', nic: 'Policy CRD rateLimit — or — nginx.org/limit-req-* annotations (Ingress)', type: 'policy', category: 'Rate limiting', anchor: 'rate-limiting', section: 'oss', grouped: true, dualApproach: true, generator: 'rateLimit' },
 
             // CORS
             { keys: ['annotation:cors-enable', 'annotation:cors-allow-origin', 'annotation:cors-allow-methods', 'annotation:cors-allow-headers', 'annotation:cors-allow-credentials', 'annotation:cors-max-age', 'annotation:cors-respond-to-options'], source: 'cors-*', nic: 'Policy CRD cors (+ nginx.org/policies on Ingress)', type: 'policy', category: 'CORS', anchor: 'cors', section: 'oss', grouped: true, generator: 'cors' },
@@ -3066,7 +3065,7 @@
                 let d = line.split(/\s/)[0];
                 let at = http.findIndex(function(h) { return h.line.split(/\s/)[0] === d; });
                 if (at === -1) http.push({ line: line, source: source });
-                else if (http[at].line !== line) g.note(source, 'Sets ' + d + ', which ' + http[at].source + ' already set (' + http[at].line + '); nginx takes a directive once, so the first is kept.', 'warning');
+                else if (http[at].line !== line) g.note(source, 'Sets ' + d + ', which ' + http[at].source + ' already set (' + http[at].line + '); NGINX takes a directive once, so the first is kept.', 'warning');
             };
             g.listeners = [];
             let cm = controllerOptions(run);

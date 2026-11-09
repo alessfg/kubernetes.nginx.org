@@ -1725,10 +1725,18 @@
                 entryPoints: str(get('router.entrypoints')).split(',').map(function(s) { return s.trim(); }).filter(Boolean)
             };
         }
+        const STRICT_PREFIX_NOTE = 'pathType Prefix becomes a prefix route, which matches /foobar under /foo, as Traefik does by default. If Traefik runs with providers.kubernetesIngress.strictPrefixMatching: true, it matched /foo and /foo/ only: write each Prefix path as =/foo plus /foo/ (see the strictPrefixMatching row under Static config mappings).';
         const CHAIN_NOTE = 'A chain is its middlewares in order; NGINX Ingress Controller has no chain, so each one is applied to the route directly.';
         function ingressPathFacts(p, cfg, ctx, label) {
             if (p.pathType === 'Exact') return { type: 'exact', value: p.path };
-            if (p.pathType === 'Prefix') return { type: 'prefix', value: p.path };
+            if (p.pathType === 'Prefix') {
+                // providers.kubernetesIngress.strictPrefixMatching (static
+                // configuration, off by default) makes Prefix element-wise:
+                // Path(/foo) || PathPrefix(/foo/) (buildStrictPrefixMatchingRule).
+                // No paste carries static configuration, so say what changes.
+                if (p.path.replace(/\/+$/, '')) ctx.note(label, STRICT_PREFIX_NOTE);
+                return { type: 'prefix', value: p.path };
+            }
             let pm = cfg.pathMatcher;
             if (pm === undefined || pm === '') return { type: 'prefix', value: p.path };
             if (pm === 'Path') return { type: 'exact', value: p.path };

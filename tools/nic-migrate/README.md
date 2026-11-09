@@ -65,24 +65,13 @@ Traefik's static configuration is deliberately not in that list: it is CLI flags
 or a `traefik.yml`, not a Kubernetes object, so there is no kind to gate on. The
 page documents it; the CLI cannot read it.
 
-### `--whole-input`, and when you need it
+### `--whole-input`
 
-By default each document is analyzed on its own. That is right for
-ingress-nginx, where an Ingress is self-contained, and it keeps the report
-per-object.
-
-It is wrong for a Traefik `IngressRoute`, which references `Middleware` objects
-that are separate documents by design. Analyzed alone, every one of those
-references is reported as unresolved and the migration is understated — the
-middlewares contribute nothing. `--whole-input` analyzes everything as one unit,
-the way the web tool treats a paste, and the references resolve: a rate-limit
-Middleware becomes a `rateLimit` Policy, a headers Middleware becomes the HSTS
-annotations.
-
-The cost is the engine's single-context model — one host, one service, one path
-across the whole input — so the gaps then report the rest as dropped. That is
-the honest trade, and it is why the flag is opt-in rather than the default. The
-same applies to a HAProxy Ingress that points at a `Backend` CR.
+By default `report` gives one entry per resource. Each is analyzed with the rest
+of the run as context, so a Traefik `IngressRoute` resolves the `Middleware`
+documents it references, and a HAProxy Ingress reads its Services, ConfigMap and
+CRs. `--whole-input` analyzes everything as one unit instead, the way the web
+tool treats a paste, and reports it as one entry. `convert` ignores it.
 
 Both commands migrate one Ingress at a time, and for HAProxy resolve it the
 way the controller does: a backend setting from the Service the path routes

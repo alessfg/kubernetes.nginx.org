@@ -473,3 +473,21 @@ test('a Traefik stripPrefix or stripPrefixRegex with nothing to strip migrates t
         }
     }
 });
+
+test('a Prefix path stays a prefix route, and the note gives the routes strictPrefixMatching needs', () => {
+    /* Traefik's PathPrefix is character-wise unless the static option
+       providers.kubernetesIngress.strictPrefixMatching is on (kubernetes.go
+       buildStrictPrefixMatchingRule, v3.7.17), and no paste carries static
+       configuration: the route matches Traefik's default, and the note says
+       what strict matching needs. The reference row shows those routes. */
+    const ing = doc({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app' }, spec: { rules: [{ host: 'a.example.com', http: { paths: [
+        { path: '/foo', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }] } });
+    const r = run(ing);
+    assert.deepEqual(kinds(r, 'VirtualServer')[0].spec.routes.map((x) => x.path), ['/foo']);
+    assert.ok(said(r, /strictPrefixMatching: true, it matched \/foo and \/foo\/ only/));
+    const page = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'traefik-migration.html'), 'utf8');
+    const at = page.indexOf('<td><code>providers.kubernetesIngress.strictPrefixMatching</code></td>');
+    assert.ok(at > 0, 'the row is on the page');
+    const block = /comparison-block new"><h4>[^<]*<\/h4><pre><code>([\s\S]*?)<\/code>/.exec(page.slice(at))[1];
+    assert.deepEqual([...block.matchAll(/^\s*- path: (\S+)/gm)].map((m) => m[1]), ['=/foo', '/foo/']);
+});

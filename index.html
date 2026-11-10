@@ -801,7 +801,7 @@
                     </div>
 
                     <div class="info-box note">
-                        <strong>Where the NGINX emitter lives:</strong> the emitter is in the <a href="https://github.com/nginx/ingress2gateway" target="_blank" rel="noopener">nginx/ingress2gateway</a> fork while we work on getting it merged upstream in <a href="https://github.com/kubernetes-sigs/ingress2gateway/pull/422" target="_blank" rel="noopener">pull request 422 in kubernetes-sigs/ingress2gateway</a>. Until then, the released ingress2gateway below has the NGINX provider but not the emitter: build the fork to use <code>--emitter=nginx</code>.
+                        <strong>Where the NGINX emitter lives:</strong> the emitter is in the <a href="https://github.com/nginx/ingress2gateway" target="_blank" rel="noopener">nginx/ingress2gateway</a> fork while we work on getting it merged upstream in <a href="https://github.com/kubernetes-sigs/ingress2gateway/pull/422" target="_blank" rel="noopener">pull request 422 in kubernetes-sigs/ingress2gateway</a>. Until then, build it from source as shown below.
                     </div>
 
                     <div class="info-box warning">
@@ -814,11 +814,7 @@
 
                     <h2 class="section-heading">Installation</h2>
                     <div class="code-section code-section-flush">
-                        <div class="code-block"><button class="copy-btn" aria-label="Copy Go install command">Copy</button><code><span class="comment"># Install with Go</span>
-<span class="cmd">go</span> install github.com/kubernetes-sigs/ingress2gateway<span data-version="i2g.release" data-version-format="atv">@v1.2.0</span></code></div>
-                        <div class="code-block"><button class="copy-btn" aria-label="Copy Homebrew install command">Copy</button><code><span class="comment"># Or install with Homebrew (macOS / Linux)</span>
-<span class="cmd">brew</span> install ingress2gateway</code></div>
-                        <div class="code-block"><button class="copy-btn" aria-label="Copy build-from-fork commands">Copy</button><code><span class="comment"># With the NGINX emitter: build the nginx/ingress2gateway fork</span>
+                        <div class="code-block"><button class="copy-btn" aria-label="Copy build-from-source commands">Copy</button><code><span class="comment"># Build from source</span>
 <span class="cmd">git</span> clone https://github.com/nginx/ingress2gateway.git &amp;&amp; <span class="cmd">cd</span> ingress2gateway
 <span class="cmd">make</span> build
 <span class="cmd">go</span> install .</code></div>
@@ -837,7 +833,7 @@
 <span class="cmd">ingress2gateway</span> print \
   <span class="flag">--providers</span>=nginx \
   <span class="flag">--input-file</span>=<span class="str">my-ingress.yaml</span> &gt; gateway-resources.yaml</code></div>
-                        <div class="code-block"><button class="copy-btn" aria-label="Copy NGINX emitter command">Copy</button><code><span class="comment"># Add NGINX Gateway Fabric policies (fork build)</span>
+                        <div class="code-block"><button class="copy-btn" aria-label="Copy NGINX emitter command">Copy</button><code><span class="comment"># Add NGINX Gateway Fabric policies</span>
 <span class="cmd">ingress2gateway</span> print \
   <span class="flag">--providers</span>=nginx \
   <span class="flag">--emitter</span>=nginx \

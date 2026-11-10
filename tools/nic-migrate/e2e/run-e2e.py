@@ -692,6 +692,12 @@ CASES = [
     dict(name='shared-host-keeps-other-ingress-uri', host='shop.example.com', path='/admin/users',
          compare=('status', 'app', 'uri'), expect_status=200, expect_app='web2', expect_uri='/admin/users',
          known_difference={'ingress': 'one Ingress per host: shop\'s rewrite-target /$2 applies to /admin too'}),
+    # docs: a plain Prefix /api, split by the community controller into /api/
+    # and = /api, so /apix is "/"'s (web) and /api itself is api's.
+    dict(name='prefix-stops-at-segment', host='c.example.com', path='/apix',
+         compare=('status', 'app'), expect_status=200, expect_app='web'),
+    dict(name='prefix-matches-its-own-path', host='c.example.com', path='/api',
+         compare=('status', 'app'), expect_status=200, expect_app='api'),
 ]
 
 
@@ -713,6 +719,10 @@ HAPROXY_CASES = [
          skip_targets=('ingress',), skip_reason='a two-field path-rewrite keeps captures from its own regex, which nginx.org/rewrite-target cannot; the analyzer says to use CRD-first'),
     dict(name='api-bare-prefix-not-rewritten', host='shop.example.com', path='/api',
          compare=('status', 'uri', 'app'), expect_status=200, expect_app='api', expect_uri='/api'),
+    # pathType Prefix stops at a path segment (route.go: /api exactly, /api/
+    # as a prefix), so /apix is web's. A plain /api location took it to api.
+    dict(name='prefix-stops-at-segment', host='shop.example.com', path='/apix',
+         compare=('status', 'app'), expect_status=200, expect_app='web'),
     # The regex is unanchored: under "/" it still matches, on web's path.
     dict(name='unanchored-rewrite-on-root', host='shop.example.com', path='/x/api/y',
          compare=('status', 'uri', 'app'), expect_status=200, expect_app='web', expect_uri='/y',

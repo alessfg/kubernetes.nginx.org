@@ -715,12 +715,13 @@ test('every backend the e2e community Ingresses route to exists in the e2e workl
 });
 
 test('the e2e community Ingresses convert to one VirtualServer or Ingress per host with every path routed', () => {
-    /* The fixture holds shop (two hosts, so it is split) and admin (/admin on
-       shop's host, so the host is merged). convert runs them together, as
-       the runner does. */
+    /* The fixture holds shop (two hosts, so it is split), admin (/admin on
+       shop's host, so the host is merged) and docs (a plain Prefix /api on a
+       host of its own, so it is split into /api/ and = /api). convert runs
+       them together, as the runner does. */
     const { convertAll } = require(path.join(TOOL, 'lib', 'convert.js'));
     const ingresses = Y.parseAll(readE2E('source-ingress.yaml'));
-    assert.deepEqual(ingresses.map((i) => i.metadata.name), ['shop', 'admin']);
+    assert.deepEqual(ingresses.map((i) => i.metadata.name), ['shop', 'admin', 'docs']);
     for (const target of ['virtualserver', 'ingress']) {
         const out = convertAll(ingresses.map(toModel), engine, { target, ingressClass: 'nginx-nic' });
         assert.deepEqual(out.flatMap((o) => o.warnings), [], target + ': a generator failed on the e2e fixture');
@@ -728,10 +729,16 @@ test('the e2e community Ingresses convert to one VirtualServer or Ingress per ho
         const routing = docs.filter((d) => d.kind === (target === 'virtualserver' ? 'VirtualServer' : 'Ingress'));
         const hosts = routing.map((d) => (d.spec.host ? [d.spec.host] : d.spec.rules.map((r) => r.host)));
         assert.ok(hosts.every((h) => h.length === 1), target + ': one host per resource');
-        assert.deepEqual(hosts.map((h) => h[0]).sort(), ['b.example.com', 'shop.example.com'], target + ': one resource per host');
+        assert.deepEqual(hosts.map((h) => h[0]).sort(), ['b.example.com', 'c.example.com', 'shop.example.com'], target + ': one resource per host');
+        // Every source path is routed. shop's rewrite-target puts its hosts in
+        // regex mode, where no Prefix path is split; docs's /api is split in
+        // two, and "/" never is: one route per source path, plus one.
         const sourcePaths = ingresses.reduce((n, i) => n + i.spec.rules.reduce((m, r) => m + r.http.paths.length, 0), 0);
         const routed = routing.reduce((n, d) => n + (d.spec.routes ? d.spec.routes.length : d.spec.rules[0].http.paths.length), 0);
-        assert.equal(routed, sourcePaths, target + ': every path is routed');
+        assert.equal(routed, sourcePaths + 1, target + ': every path is routed');
+        const docsHost = routing.find((d) => (d.spec.host || d.spec.rules[0].host) === 'c.example.com');
+        const docsPaths = docsHost.spec.routes ? docsHost.spec.routes.map((x) => x.path) : docsHost.spec.rules[0].http.paths.map((x) => x.pathType[0] + ':' + x.path);
+        assert.deepEqual(docsPaths, target === 'virtualserver' ? ['/api/', '=/api', '/'] : ['P:/api/', 'E:/api', 'P:/'], target + ': docs\'s Prefix /api split as the community controller split it');
         // The TLS secret the pipeline creates is the one referenced, and with
         // ssl-redirect "false" on both, no redirect: the runner asserts plain HTTP.
         const shop = routing.find((d) => (d.spec.host || d.spec.rules[0].host) === 'shop.example.com');

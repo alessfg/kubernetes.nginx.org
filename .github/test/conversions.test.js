@@ -339,7 +339,8 @@ test('path-rewrite replaces the whole path where its regex matches, and leaves t
        Ingress Controller renders: /app/a/b → /new/a/b, /app unchanged. */
     const two = Y.stringify({ apiVersion: 'networking.k8s.io/v1', kind: 'Ingress', metadata: { name: 'app', annotations: { 'haproxy.org/path-rewrite': '/app/(.*) /new/\\1' } }, spec: { rules: [{ host: 'a.example.com', http: { paths: [{ path: '/app', pathType: 'Prefix', backend: { service: { name: 'web', port: { number: 80 } } } }] } }] } });
     const routes = kinds(run(two), 'VirtualServer')[0].spec.routes;
-    assert.deepEqual(routes.map((rt) => rt.path), ['~ ^(?=/app(?:/|$)).*?/app/(.*)', '/app']);
+    // pathType Prefix keeps the segment boundary: /app exactly, and /app/ as a prefix.
+    assert.deepEqual(routes.map((rt) => rt.path), ['~ ^(?=/app(?:/|$)).*?/app/(.*)', '=/app', '/app/']);
     assert.equal(routes[0].action.proxy.rewritePath, '/new/$1');
     // The one-field form on an Ingress: rewrite-target with no path-regex
     // replaces the whole path (rewrite "<path>" <target> break).
@@ -398,7 +399,7 @@ test('a canary leg applies under its own path only', () => {
         { path: '/beta', pathType: 'Prefix', backend: { service: { name: 'canary', port: { number: 80 } } } },
         { path: '/', pathType: 'Prefix', backend: { service: { name: 'main', port: { number: 80 } } } }] } }] } });
     const routes = kinds(run(stream(ing, service('canary', { 'haproxy.org/route-acl': 'hdr(X-Canary) -m str yes' }))), 'VirtualServer')[0].spec.routes;
-    assert.ok(routes.find((r) => r.path === '/beta').matches, '/beta carries the canary');
+    assert.ok(routes.find((r) => r.path === '=/beta').matches && routes.find((r) => r.path === '/beta/').matches, '/beta carries the canary');
     assert.equal(routes.find((r) => r.path === '/').matches, undefined, '/ does not');
 });
 

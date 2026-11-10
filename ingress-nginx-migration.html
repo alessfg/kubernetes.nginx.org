@@ -2503,7 +2503,10 @@ spec:
     - path: /
       action:
         pass: web
-    - path: /api
+    - path: /api/  # pathType Prefix
+      action:
+        pass: api
+    - path: =/api  # pathType Prefix
       action:
         pass: api</code></pre></div>
                                 </div>
@@ -2574,8 +2577,15 @@ spec:
                 name: web
                 port:
                   number: 80
-          - path: /api
+          - path: /api/  # pathType Prefix
             pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080
+          - path: /api  # pathType Prefix
+            pathType: Exact
             backend:
               service:
                 name: api
@@ -2586,6 +2596,130 @@ spec:
                             </div>
                             <div class="info-box note"><strong>One host, one resource:</strong> The community controller served every Ingress that names a host from one server block. NGINX Ingress Controller gives a host to one resource and rejects a second that claims it, so the analyzer merges the Ingresses of a host into one resource. What applies to the whole host (TLS, HTTP/2, server snippets, an <code>ingressMTLS</code> Policy) comes from one Ingress: where two set it differently, the community controller kept the oldest Ingress's, and so does the analyzer. An Ingress that routes several hosts is split into one per host first.</div>
                             <div class="info-box tip"><strong>A resource per team:</strong> NGINX Ingress Controller can also delegate a host's paths to VirtualServerRoutes, or to mergeable minion Ingresses under a master, and NGINX Gateway Fabric attaches several HTTPRoutes to one Gateway listener. Each gives a team a resource of its own, and each needs setting up with the result in mind: regex paths in different VirtualServerRoutes, for one, are not tried longest first. The analyzer does not emit them.</div>
+                        </div></td></tr>
+                        <tr class="expandable" id="path-type">
+                            <td><code>pathType</code><br>(Exact / Prefix / ImplementationSpecific)</td>
+                            <td><span class="badge badge-virtualserver">VirtualServer CRD</span> <code>routes[].path</code></td>
+                        </tr>
+                        <tr class="example-row"><td colspan="2"><div class="example-content">
+                            <div class="approach-tabs">
+                                <button class="approach-tab active" data-action="switchApproach" data-approach="exact">Exact</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="prefix">Prefix</button>
+                                <button class="approach-tab" data-action="switchApproach" data-approach="implementation-specific">ImplementationSpecific</button>
+                            </div>
+                            <div class="approach-content active" data-approach="exact">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Ingress-NGINX</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /foo
+            pathType: Exact  # /foo only
+            backend:
+              service:
+                name: foo-svc
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  ingressClassName: nginx
+  host: app.example.com
+  upstreams:
+    - name: foo-svc
+      service: foo-svc
+      port: 80
+  routes:
+    - path: =/foo  # pathType Exact
+      action:
+        pass: foo-svc</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="prefix">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Ingress-NGINX</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /foo
+            pathType: Prefix  # not /foobar
+            backend:
+              service:
+                name: foo-svc
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  ingressClassName: nginx
+  host: app.example.com
+  upstreams:
+    - name: foo-svc
+      service: foo-svc
+      port: 80
+  routes:
+    - path: /foo/  # pathType Prefix
+      action:
+        pass: foo-svc
+    - path: =/foo  # pathType Prefix
+      action:
+        pass: foo-svc</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="approach-content" data-approach="implementation-specific">
+                                <div class="comparison">
+                                    <div class="comparison-block old"><h4>Ingress-NGINX</h4><pre><code>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /foo
+            pathType: ImplementationSpecific  # /foo and /foobar alike
+            backend:
+              service:
+                name: foo-svc
+                port:
+                  number: 80</code></pre></div>
+                                    <div class="comparison-block new"><h4>NGINX Ingress Controller</h4><pre><code>apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: my-app
+spec:
+  ingressClassName: nginx
+  host: app.example.com
+  upstreams:
+    - name: foo-svc
+      service: foo-svc
+      port: 80
+  routes:
+    - path: /foo
+      action:
+        pass: foo-svc</code></pre></div>
+                                </div>
+                            </div>
+                            <div class="info-box note"><strong>Note:</strong> NGINX matches a plain <code>/foo</code> prefix against <code>/foobar</code>, and the community controller's <code>Prefix</code> did not: it wrote <code>/foo/</code> as a prefix and <code>= /foo</code> beside it, so <code>Prefix</code> becomes those two routes. A path written <code>/foo/</code> keeps its slash in both, and <code>/</code> is not split. <code>Exact</code> becomes <code>=/foo</code>, and <code>ImplementationSpecific</code> stays a plain <code>/foo</code> prefix, which the community controller also matched against <code>/foobar</code>. A migrated Ingress gets the same split, a <code>Prefix</code> path <code>/foo/</code> and an <code>Exact</code> path <code>/foo</code>, because NGINX Ingress Controller renders <code>Prefix</code> as a plain prefix too.</div>
+                            <div class="info-box note"><strong>Regex hosts:</strong> once any Ingress on a host sets <code>use-regex</code> or <code>rewrite-target</code>, the community controller made every location on that host a case-insensitive regex, <code>/foobar</code> included for <code>/foo</code>, and split no <code>Prefix</code> path. The analyzer follows it (see <a href="#several-ingresses-one-host">Several Ingresses on one host</a>).</div>
                         </div></td></tr>
                     </tbody>
                 </table>

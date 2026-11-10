@@ -692,6 +692,12 @@ CASES = [
     dict(name='shared-host-keeps-other-ingress-uri', host='shop.example.com', path='/admin/users',
          compare=('status', 'app', 'uri'), expect_status=200, expect_app='web2', expect_uri='/admin/users',
          known_difference={'ingress': 'one Ingress per host: shop\'s rewrite-target /$2 applies to /admin too'}),
+    # docs: a plain Prefix /api, split by the community controller into /api/
+    # and = /api, so /apix is "/"'s (web) and /api itself is api's.
+    dict(name='prefix-stops-at-segment', host='c.example.com', path='/apix',
+         compare=('status', 'app'), expect_status=200, expect_app='web'),
+    dict(name='prefix-matches-its-own-path', host='c.example.com', path='/api',
+         compare=('status', 'app'), expect_status=200, expect_app='api'),
 ]
 
 

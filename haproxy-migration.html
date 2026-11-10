@@ -2953,7 +2953,7 @@ spec:
       http:
         paths:
           - path: /foo
-            pathType: Prefix  # /foo and below /foo/, not /foobar
+            pathType: Prefix  # not /foobar
             backend:
               service:
                 name: foo-svc

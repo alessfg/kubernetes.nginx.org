@@ -22,7 +22,7 @@ The site previously ran F5DS typography over the F5 **marketing** palette. That 
 F5DS's platform primary is Dodger Blue `#4F73FF`. This site leads with **NGINX green `#009639`**, which is not a deviation from what F5 ships: in the F5XC console the NGINX One workspace marks its active navigation item in green and uses a green primary button, while platform-level pages in the same console use Dodger Blue. This is an NGINX community site inside an F5 portfolio, so it follows that same split.
 
 - **NGINX green** is the lead accent: active nav item, primary buttons, section rails, the "new side" of a comparison.
-- **Dodger Blue** is platform and tooling: content links, focus rings, the two Kubernetes tools. It replaced Kubernetes brand blue `#326CE5`: same job, F5's hue rather than the CNCF one.
+- **Dodger Blue** is platform and tooling: content links, focus rings, and the one project that is not green, ingress2gateway (its sidebar rail, card eyebrow, hero tint and primary button). It replaced Kubernetes brand blue `#326CE5`: same job, F5's hue rather than the CNCF one. The three migration tools and Gateway Lens were blue too until 2026-11-17, when the maintainer moved them to green and kept blue for ingress2gateway alone.
 - **F5 Brand Red `#E4002B` is absent entirely.** F5DS restricts it to logo, illustrations and pictograms and forbids it as a CTA, link, accent or error colour. Negative sentiment is Pomegranate.
 
 ## The whole F5DS colour inventory is available, not just the sentiment set
@@ -119,7 +119,7 @@ Do not let a scanner or a tidying pass "fix" these.
 | Deviation | Why |
 |---|---|
 | **NGINX green leads, not Dodger Blue** | What F5 ships on NGINX-branded console surfaces. See above. |
-| **Hexagon lattice in the landing hero** (`--pattern-hex`) | F5DS defines exactly four graphic classes (icons, flags, pictograms, illustrations), and a tiled background texture is none of them. Kept because the lattice is the site's strongest NGINX signal, and the 48px-gutter reasoning applies: F5DS assumes a dense console screen and a community docs front page is not one. Confined to `.page-hero.home`, masked out from behind all copy so no contrast pairing changes, clamped to 10% in dark, hidden below 600px, suppressed in print. |
+| **The event banner is solid green, full width** (`.event-banner`) | F5DS ships Banner Notifications in Attention and Negative only, as a sentiment tint with an icon, aligned to the content area so it never covers Primary Navigation. An event announcement is neither sentiment. An Informative notice inside the content area was mocked up on 2026-11-17 and the maintainer kept the green bar across the whole top, as it was. |
 | **No hover lift** (shadow only, no `translateY`) | A page of cards rising at once is a lot of motion for a docs site. F5DS's `Elevate Up` is a Motion-page catalogue entry, not a mandate. |
 | **Dark theme** | F5DS publishes none (Early Availability only). Authored here, deepening into the same N-ramp (N700 page, N600 surface) with both accents lightened until they clear 4.5:1 on both. |
 | **Two button vocabularies** (`.cta*` and `.btn*`) | Share one base rule in `shared.css` rather than being merged, because consolidating means editing markup in two pages for no visual gain. The geometry is **not** identical: `.cta` is the larger landing-page call to action and overrides the base's height and padding, so check `where.py .cta` before assuming a change to one reaches the other. Compose new work onto `.btn`. |
@@ -151,8 +151,9 @@ appears in neither script.
 
 `shared.css` writes a few structural literals that are deliberately not tokens
 (the 44px mobile touch target, the 32px brand rule, the 3px nav rail, the 1px
-hairlines) and carries a second `:root` block of `--icon-*` and `--pattern-hex`
-values that `tokens.css` does not contain.
+hairlines) and carries a second `:root` block of `--icon-*` values that
+`tokens.css` does not contain. The nav group icons are inline SVG masks too,
+set per page as `--nav-icon` by element id.
 
 **Tried and reverted. Do not re-propose:**
 
@@ -162,6 +163,35 @@ values that `tokens.css` does not contain.
 - A `.topbar::after` bottom rule starting at `--sidebar-w`.
 - A stacked eyebrow-over-title heading.
 - A 64px bar.
+- A hexagon lattice behind the landing hero (`--pattern-hex`), and a green tint
+  behind the green heroes. Both came off on 2026-11-17 at the maintainer's
+  request. F5DS has no background-texture graphic class, and the console puts
+  nothing behind a page title. ingress2gateway keeps its blue tint as the one
+  blue section; `git log -S'pattern-hex'` has the lattice.
+
+### The sidebar is F5DS Primary Navigation
+
+Since 2026-11-17 it follows the Primary Navigation spec images: an N100 rail
+(`--bg`), a nav group title at Body Medium 16/24 with a 16px group icon, a
+full-width rule under each group, item text starting at the title's text
+column (40px), and the selected item on white with `--radius-small`. The
+selected row spans the full rail width so its 3px active rail sits on the
+row's left edge; the first version indented the white box and left the rail
+floating in the grey beside it, and the maintainer flagged it. The group
+holding the current page lights its icon in that page's accent. F5DS
+publishes its icons only as Figma components, so the icons are hand-drawn
+stand-ins on its 16px grid.
+
+An untitled group, one top-level item and no title, carries the icon on the
+item itself: Home on the landing page, and each of a migration tool's three
+views (Getting started, Config analyzer, Reference guide), which the
+maintainer asked to be three groups with their own icons rather than one
+"Sections" group (2026-11-18).
+
+The item boxes run to the rail's right edge, which gives the text 215px (199px
+beside a disclosure chevron). The longest labels measured 210px and 196px on
+2026-11-17, so they fit; "Ingress-NGINX → NGINX Ingress Controller" (246px) is
+the one description that wraps, as it did before.
 
 ### Sidebar labels are the headings they link to
 

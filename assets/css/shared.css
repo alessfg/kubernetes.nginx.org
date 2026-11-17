@@ -446,9 +446,22 @@ body {
 
 
 /* ── Primary navigation ───────────────────────────────────────────────────
-   F5DS fixes this at 264px, full height, with nav groups carrying a group
-   title and an active indicator. The selected-item highlight is the one place
-   F5DS specifies --radius-small. */
+   F5DS Primary Navigation, as its spec images draw it: 264px, full height, on
+   N100 (--bg) rather than white. Each nav group is a block with a full-width
+   rule below it. A titled group's title carries a 16px icon; an untitled
+   group (a single top-level item: Home, or a tool page's own views) puts the
+   icon on the item instead. Either way the text starts at 40px: 16px inset +
+   16px icon + 8px gap. The active indicator is a 3px rail on the selected
+   row's left edge, and the row itself spans the rail and sits on white with
+   the --radius-small highlight, the one place F5DS names that radius. The
+   rail and the white box start together at x=0; an earlier version indented
+   the box and left the rail floating in the grey beside it.
+
+   Item text gets 263 - 40 - 8 = 215px (263 inside the 1px border); a row with
+   a disclosure chevron keeps 199px. The longest labels measured 210px
+   ("HAProxy → NGINX Ingress Controller") and 196px ("Tool overview &
+   migration strategy") on 2026-11-17, so every label fits on one line at
+   100%. Measure again before lengthening one (verify-visually). */
 
 .sidebar {
     position: fixed;
@@ -460,8 +473,7 @@ body {
     flex-direction: column;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--space-2x) 0;
-    background: var(--surface);
+    background: var(--bg);
     border-right: 1px solid var(--border);
     transition: background var(--dur-reveal) linear,
                 border-color var(--dur-reveal) linear,
@@ -469,17 +481,45 @@ body {
                 top var(--dur-colour) linear;
 }
 
-.sidebar-section { padding: 0 var(--space-base); margin-bottom: var(--space-3x); }
-
-/* F5DS nav group title: Body Medium 16px, sitting above its items. */
-.sidebar-label {
-    font-family: var(--font-display);
-    font-size: var(--fs-caption);
-    line-height: var(--lh-caption);
-    font-weight: 700;
-    color: var(--text-secondary);
-    padding: 0 var(--space-base) var(--space-base);
+.sidebar-section {
+    padding: var(--space-2x) 0 var(--space-2hx);
+    border-bottom: 1px solid var(--border);
 }
+
+/* F5DS nav group title: Body Medium 16px with its group icon. Each icon is
+   set on the page, by element id, as --nav-icon. */
+.sidebar-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-base);
+    padding: 0 var(--space-2x) var(--space-base);
+    font-family: var(--font-display);
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-body-lg);
+    font-weight: 500;
+    color: var(--text);
+}
+.sidebar-label::before,
+.sidebar-section:not(:has(.sidebar-label)) > .sidebar-nav > li > .sidebar-link::after {
+    content: '';
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    background: var(--icon);
+    -webkit-mask: var(--nav-icon) center / contain no-repeat;
+            mask: var(--nav-icon) center / contain no-repeat;
+    transition: background var(--dur-colour) linear;
+}
+/* The group holding the current page lights its icon in that page's accent. */
+.sidebar-section:has(.sidebar-link.active) .sidebar-label::before { background: var(--green); }
+
+/* An untitled group's item draws the icon in the title column itself. */
+.sidebar-section:not(:has(.sidebar-label)) { padding-top: var(--space-base); padding-bottom: var(--space-base); }
+.sidebar-section:not(:has(.sidebar-label)) > .sidebar-nav > li > .sidebar-link::after {
+    position: absolute;
+    left: var(--space-2x);
+    top: calc(var(--space-base) + (var(--lh-body) - 16px) / 2);
+}
+.sidebar-section:not(:has(.sidebar-label)) > .sidebar-nav > li > .sidebar-link.active::after { background: var(--green); }
 
 .sidebar-nav { list-style: none; }
 .sidebar-nav li { margin: 0; }
@@ -490,9 +530,9 @@ body {
     align-items: center;
     gap: var(--space-base);
     width: 100%;
-    padding: var(--space-base) var(--space-base) var(--space-base) var(--space-2x);
+    padding: var(--space-base) var(--space-base) var(--space-base) var(--space-5x);
     border: none;
-    border-radius: var(--radius);
+    border-radius: 0 var(--radius-small) var(--radius-small) 0;
     background: none;
     color: var(--text);
     font-family: var(--font);
@@ -504,7 +544,7 @@ body {
     cursor: pointer;
     transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
 }
-.sidebar-link:hover { background: var(--surface-sunken); color: var(--text); }
+.sidebar-link:hover { background: var(--surface); color: var(--text); }
 .sidebar-link:focus-visible { outline-offset: -2px; }
 
 /* Active item. The console marks the current page in green on NGINX-branded
@@ -512,7 +552,7 @@ body {
    The .dot spans stay in the markup purely as per-product colour metadata,
    read via :has() in the page CSS to tint that rail. */
 .sidebar-link.active {
-    background: var(--surface-sunken);
+    background: var(--surface);
     color: var(--green-text);
     font-weight: 500;
 }
@@ -521,8 +561,8 @@ body {
     content: '';
     position: absolute;
     left: 0;
-    top: var(--space-small);
-    bottom: var(--space-small);
+    top: 0;
+    bottom: 0;
     width: 3px;
     border-radius: var(--radius-small);
     background: transparent;
@@ -555,9 +595,7 @@ body {
    every word. */
 .sidebar-link-name, .sidebar-link-desc { overflow-wrap: anywhere; }
 
-.sidebar-divider { height: 1px; background: var(--border); margin: var(--space-3x) var(--space-2x); }
-
-.sidebar-ext-links { padding: 0 var(--space-base); }
+.sidebar-ext-links { padding: var(--space-2x) var(--space-base) 0; }
 .sidebar-ext {
     display: flex;
     align-items: center;
@@ -570,7 +608,7 @@ body {
     transition: background var(--dur-colour) linear, color var(--dur-colour) linear;
 }
 .sidebar-ext:link, .sidebar-ext:visited { color: var(--text); }
-.sidebar-ext:hover { background: var(--surface-sunken); }
+.sidebar-ext:hover { background: var(--surface); }
 .sidebar-ext:focus-visible { outline-offset: -2px; }
 .sidebar-ext svg { flex-shrink: 0; color: var(--icon); }
 
@@ -704,16 +742,6 @@ body {
     --icon-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M8 1l7 7-7 7-7-7 7-7zm0 2.12L3.12 8 8 12.88 12.88 8 8 3.12zM7.25 5h1.5v3.75h-1.5V5zM8 9.6a.9.9 0 110 1.8.9.9 0 010-1.8z'/%3E%3C/svg%3E");
     --icon-warning: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 .9L.6 14.2h14.8L8 .9zm0 3.1l5 9H3l5-9zm-.75 3.2h1.5v3.2h-1.5V7.2zm.75 4.1a.9.9 0 110 1.8.9.9 0 010-1.8z'/%3E%3C/svg%3E");
     --icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M3 8.5l3.5 3.5 7-7.5'/%3E%3C/svg%3E");
-
-    /* The hexagon lattice, carried over from the pre-F5DS design. A 43.3x75
-       tile: one pointy-top hexagon with a stem hanging below it, so tiled it
-       reads as a linked lattice rather than loose cells. Used by the landing
-       hero only (index.css), but it lives here because this block is the one
-       home for the site's inline SVG assets, which is what keeps them
-       auditable. The stroke is white and the tile is hue-agnostic — it sits
-       over whichever tint its section already has. `%23fff` is percent-encoded,
-       so check-tokens.py's hex scan does not see it, same as --icon-check. */
-    --pattern-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='43.3' height='75'%3E%3Cpath d='M0 12.5L21.65 0L43.3 12.5L43.3 37.5L21.65 50L0 37.5Z M21.65 50L21.65 75' fill='none' stroke='%23fff' stroke-width='2.4'/%3E%3C/svg%3E");
 }
 
 .info-box {
@@ -970,6 +998,11 @@ code {
    values but the user's own palette, which is the point of this mode. */
 @media (forced-colors: active) {
     .sidebar-link.active::before { forced-color-adjust: none; background: Highlight; }
+    /* The nav group icons are a mask over a background, which forced colours
+       would discard along with the icon. */
+    .sidebar-label::before,
+    .sidebar-section:has(.sidebar-link.active) .sidebar-label::before,
+    .sidebar-section:not(:has(.sidebar-label)) > .sidebar-nav > li > .sidebar-link::after { forced-color-adjust: none; background: CanvasText; }
     /* The lockup's fills read custom properties (see .brand-logo above), so
        they can follow the palette like text does. Without this its official
        colours stood untouched on the forced background: the dark theme's white

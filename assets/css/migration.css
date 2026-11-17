@@ -24,16 +24,24 @@
 
 
 /* ── Sidebar (tool nav) ───────────────────────────────────────────────────
-   Top-level tool pages use the shared green active rail from shared.css.
+   Each of the three views is a nav group of its own, untitled, so its item
+   carries its icon (shared.css). Drawn on F5DS's 16px grid as stand-ins, like
+   the landing page's group icons: a flag to start, a document under a lens for
+   the analyzer, a book for the reference. */
+.sidebar-link[data-page="getting-started"] { --nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 14.5V2M3.5 2.5h8.5l-2 3 2 3H3.5'/%3E%3C/svg%3E"); }
+.sidebar-link[data-page="analyzer"]        { --nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14H3.5a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1h6l3 3V7M5 5h3M5 7.5h2'/%3E%3Ccircle cx='10.5' cy='10.5' r='2.25'/%3E%3Cpath d='m12.2 12.2 2 2'/%3E%3C/svg%3E"); }
+.sidebar-link[data-page="reference"]       { --nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 3a1 1 0 0 1 1-1h3.5A1.5 1.5 0 0 1 8 3.5V14a1.5 1.5 0 0 0-1.5-1.5H2zM14 3a1 1 0 0 0-1-1H9.5A1.5 1.5 0 0 0 8 3.5V14a1.5 1.5 0 0 1 1.5-1.5H14z'/%3E%3C/svg%3E"); }
+
+/* Top-level tool pages use the shared green active rail from shared.css.
    The disclosure chevron on expandable section parents follows the
    docs.nginx.com idiom, keyed off aria-expanded — the same caret language as
    the mapping-table rows: right-pointing when collapsed, rotating down when
    open. */
-.sidebar-link[aria-expanded] { padding-right: var(--space-3hx); }
-.sidebar-link[aria-expanded]::after {
+.sidebar-link[aria-expanded] { padding-right: var(--space-3x); }
+.sidebar-link[aria-expanded] .sidebar-link-text::after {
     content: '';
     position: absolute;
-    right: var(--space-2x);
+    right: var(--space-base);
     top: 50%;
     width: 6px; height: 6px;
     border-right: 2px solid var(--icon);
@@ -41,7 +49,7 @@
     transform: translateY(-50%) rotate(-45deg);
     transition: transform var(--dur-colour) linear;
 }
-.sidebar-link[aria-expanded="true"]::after {
+.sidebar-link[aria-expanded="true"] .sidebar-link-text::after {
     border-right-color: var(--green);
     border-bottom-color: var(--green);
     transform: translateY(-50%) rotate(45deg);
@@ -56,7 +64,7 @@
     overflow: hidden;
     max-height: 0;
     border-left: 1px solid var(--border);
-    margin: var(--space-xsmall) 0 var(--space-small) var(--space-3x);
+    margin: var(--space-xsmall) 0 var(--space-small) var(--space-5x);
     transition: max-height var(--dur-reveal) var(--ease-enter);
 }
 /* A collapsed list was clipped to zero height but stayed in the Tab order and
@@ -73,6 +81,7 @@
 .sidebar-subnav.open { max-height: 500px; }
 .sidebar-subnav .sidebar-link {
     padding: var(--space-small) var(--space-base);
+    border-radius: var(--radius-small);
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
     color: var(--text-secondary);
@@ -83,7 +92,7 @@
     line-height: var(--lh-caption);
     color: var(--text-secondary);
 }
-.sidebar-subnav .sidebar-link.active { background: var(--surface-sunken); }
+.sidebar-subnav .sidebar-link.active { background: var(--surface); }
 .sidebar-subnav .sidebar-link.active .sidebar-link-name { color: var(--text); font-weight: 500; }
 /* Inactive tool pages carry the hidden attribute (markup +
    migration-core.js), so find-in-page searches only the active one. */

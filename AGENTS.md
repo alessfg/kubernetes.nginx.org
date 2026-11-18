@@ -52,6 +52,7 @@ The single source of truth is `shared.css` and `shared.js`: **edit once there**,
 
 - **The topbar/sidebar/banner markup is duplicated in both pages and must stay structurally in sync**, because the shared CSS/JS keys off `#sidebar`, `#sidebarBackdrop`, `#menuToggle`, `#darkToggle`, `#mobileBreadcrumb`, `.topbar`, `.event-banner`, `#copyright-year`, `#page-announce`.
 - **Dark-mode content link colours** (`a:link`, `a:visited`) are scoped to the content area (`.page-body` in `index.css`, `.main-inner` in `migration.css`) and stay in the per-page CSS, never in `shared.css` or global, or they override the topbar/sidebar links.
+- **The sidebar never scrolls in a browser window 768px tall or more**, on any page, with any one subnav open. Anything that adds height to it (an item, a line of description, padding, a group) is checked with `node .github/scripts/cdp.js sidebar <page> --height 768` on every page, which fails when it would scroll. Make room by tightening spacing, not by cutting content. Below 768px it may scroll, and on a phone it is a drawer. The budget is in `f5ds-design`.
 
 Top-bar geometry and the layouts already tried and reverted are in `f5ds-design`; read it before re-proposing one.
 

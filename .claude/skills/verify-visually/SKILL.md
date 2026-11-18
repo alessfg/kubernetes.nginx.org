@@ -64,6 +64,7 @@ drives it over the DevTools protocol instead (Node 22+, no dependencies):
 ```bash
 node .github/scripts/cdp.js shot     'ingress-nginx-migration.html#configmap-identical' --below 600
 node .github/scripts/cdp.js overflow index.html --width 320     # every element past the viewport, every clipped text box
+node .github/scripts/cdp.js sidebar  index.html --height 768    # fails if the sidebar would scroll (AGENTS.md: never at 768px+)
 node .github/scripts/cdp.js focus    'ingress-nginx-migration.html#reference'   # real Tab presses; focus under the top bar or off-screen
 node .github/scripts/cdp.js measure  index.html --select '.sidebar-link-name'
 node .github/scripts/cdp.js js       index.html --forced-colors --js 'matchMedia("(forced-colors: active)").matches'

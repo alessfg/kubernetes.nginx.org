@@ -482,7 +482,7 @@ body {
 }
 
 .sidebar-section {
-    padding: var(--space-2x) 0 var(--space-2hx);
+    padding: var(--space-small) 0;
     border-bottom: 1px solid var(--border);
 }
 
@@ -492,7 +492,7 @@ body {
     display: flex;
     align-items: center;
     gap: var(--space-base);
-    padding: 0 var(--space-2x) var(--space-base);
+    padding: var(--space-small) var(--space-2x) 0;
     font-family: var(--font-display);
     font-size: var(--fs-body-lg);
     line-height: var(--lh-body-lg);
@@ -513,11 +513,10 @@ body {
 .sidebar-section:has(.sidebar-link.active) .sidebar-label::before { background: var(--green); }
 
 /* An untitled group's item draws the icon in the title column itself. */
-.sidebar-section:not(:has(.sidebar-label)) { padding-top: var(--space-base); padding-bottom: var(--space-base); }
 .sidebar-section:not(:has(.sidebar-label)) > .sidebar-nav > li > .sidebar-link::after {
     position: absolute;
     left: var(--space-2x);
-    top: calc(var(--space-base) + (var(--lh-body) - 16px) / 2);
+    top: calc(var(--space-small) + (var(--lh-body) - 16px) / 2);
 }
 .sidebar-section:not(:has(.sidebar-label)) > .sidebar-nav > li > .sidebar-link.active::after { background: var(--green); }
 
@@ -530,7 +529,7 @@ body {
     align-items: center;
     gap: var(--space-base);
     width: 100%;
-    padding: var(--space-base) var(--space-base) var(--space-base) var(--space-5x);
+    padding: var(--space-small) var(--space-base) var(--space-small) var(--space-5x);
     border: none;
     border-radius: 0 var(--radius-small) var(--radius-small) 0;
     background: none;
@@ -595,12 +594,12 @@ body {
    every word. */
 .sidebar-link-name, .sidebar-link-desc { overflow-wrap: anywhere; }
 
-.sidebar-ext-links { padding: var(--space-2x) var(--space-base) 0; }
+.sidebar-ext-links { padding: var(--space-small) var(--space-base) 0; }
 .sidebar-ext {
     display: flex;
     align-items: center;
     gap: var(--space-base);
-    padding: var(--space-base);
+    padding: var(--space-small) var(--space-base);
     border-radius: var(--radius);
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
@@ -618,14 +617,14 @@ body {
        so "Inc." was orphaning onto a second line. 8px gives 247. The whole
        block moves with it rather than the trademark line alone, which keeps the
        three footer lines aligned to each other. */
-    padding: var(--space-2x) var(--space-base) var(--space-base);
+    padding: var(--space-base) var(--space-base) var(--space-small);
     margin-top: auto;
     font-size: var(--fs-caption);
     line-height: var(--lh-caption);
     color: var(--text-secondary);
 }
-.sidebar-trademark { margin-top: var(--space-base); }
-.sidebar-tagline { margin-top: var(--space-base); font-style: italic; }
+.sidebar-trademark { margin-top: var(--space-small); }
+.sidebar-tagline { margin-top: var(--space-small); font-style: italic; }
 
 
 /* ── Main content ─────────────────────────────────────────────────────────── */

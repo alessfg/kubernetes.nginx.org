@@ -188,6 +188,21 @@ views (Getting started, Config analyzer, Reference guide), which the
 maintainer asked to be three groups with their own icons rather than one
 "Sections" group (2026-11-18).
 
+**The sidebar never scrolls at 768px** (AGENTS.md has the rule; the
+maintainer set it on 2026-11-18 and chose spacing over cutting content). A
+768px window leaves the sidebar 716px under the 52px top bar. The landing page
+is the tightest: its content measured 714px, 2px spare, after the spacing
+came down to 4px around each group, no gap under a group title, 4px inside
+each item and external link, and 8/4px on the copyright. The tool pages need
+633px with their tallest subnav (Getting started) open; migration-core.js
+opens only the active view's subnav, so that is the worst case. Every one of
+those values is already the smallest the 4px grid allows above zero, so the
+next addition to the landing sidebar needs room found elsewhere, or a
+decision from the maintainer. `cdp.js sidebar <page> --height 768` measures
+it: it cuts transitions, measures the copyright at its own height (its
+`margin-top: auto` would otherwise hide an overflow), and opens each subnav
+in turn.
+
 The item boxes run to the rail's right edge, which gives the text 215px (199px
 beside a disclosure chevron). The longest labels measured 210px and 196px on
 2026-11-17, so they fit; "Ingress-NGINX → NGINX Ingress Controller" (246px) is

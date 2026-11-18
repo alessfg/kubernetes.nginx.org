@@ -6,6 +6,7 @@
      node .github/scripts/cdp.js shot     'ingress-nginx-migration.html#configmap-mappings'
      node .github/scripts/cdp.js shot     index.html --width 320 --dark
      node .github/scripts/cdp.js overflow ingress-nginx-migration.html --width 320
+     node .github/scripts/cdp.js sidebar  haproxy-migration.html --height 768
      node .github/scripts/cdp.js focus    'ingress-nginx-migration.html#reference'
      node .github/scripts/cdp.js measure  index.html --select '.sidebar-link-name'
      node .github/scripts/cdp.js js       index.html --js 'document.title'
@@ -60,7 +61,7 @@ function parseArgs(argv) {
         else if (a === '--below') opt.below = parseInt(next(), 10);
         else die(2, 'unknown option: ' + a);
     }
-    if (!['shot', 'overflow', 'focus', 'measure', 'js'].includes(command) || !target) {
+    if (!['shot', 'overflow', 'sidebar', 'focus', 'measure', 'js'].includes(command) || !target) {
         die(2, fs.readFileSync(__filename, 'utf8').split('\n').slice(2, 14).join('\n'));
     }
     return opt;
@@ -211,6 +212,37 @@ const SWEEPS = {
                 out.push({ issue: 'text overflows its box', el: describe(e), need: e.scrollWidth, has: e.clientWidth });
         }
         return { problems: out.slice(0, 40), data: { viewport: vw, document: document.documentElement.scrollWidth } };
+    })()`,
+    // The sidebar's natural height against the room it has, measured with
+    // each disclosure open in turn: migration-core.js opens one subnav at a
+    // time (the active view's) and closes the rest, so the tallest single one
+    // is the worst case a reader can reach. The copyright is pinned to the
+    // bottom with margin-top: auto, which would absorb any slack and hide an
+    // overflow, so it is measured at its own height. Transitions are cut so a
+    // subnav is measured open, not mid-animation.
+    sidebar: `(async () => {
+        const sb = document.getElementById('sidebar');
+        if (!sb) return { problems: [{ issue: 'no #sidebar' }], data: {} };
+        const st = document.createElement('style');
+        st.textContent = '#sidebar, #sidebar * { transition: none !important; }'
+            + ' #sidebar .sidebar-copyright { margin-top: 0 !important; }';
+        document.head.appendChild(st);
+        const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const cs = getComputedStyle(sb);
+        const height = () => Math.ceil([...sb.children].filter((e) => getComputedStyle(e).display !== 'none')
+            .reduce((a, e) => a + e.getBoundingClientRect().height, 0)
+            + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom));
+        const subnavs = [...sb.querySelectorAll('.sidebar-subnav')];
+        let need = 0, worst = 'none open';
+        for (const open of [null, ...subnavs]) {
+            subnavs.forEach((u) => u.classList.toggle('open', u === open));
+            await frame();
+            const h = height();
+            if (h > need) { need = h; worst = open ? open.id : 'none open'; }
+        }
+        const room = sb.clientHeight;
+        const problems = need > room ? [{ issue: 'sidebar scrolls', need, room, short: need - room, worst }] : [];
+        return { problems, data: { viewport: innerHeight, room, need, spare: room - need, worst } };
     })()`,
 };
 
